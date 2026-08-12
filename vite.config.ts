@@ -5,14 +5,13 @@ import { copyFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 /**
- * base disetel ke nama repo agar aset termuat benar di GitHub Pages
- * (https://<user>.github.io/BJM-management-system/).
- * Override dengan env BASE_PATH bila di-host di domain lain.
+ * Build produksi dipasang di GitHub Pages pada sub-path nama repo
+ * (https://<user>.github.io/BJM-management-system/), jadi base perlu diisi.
+ * Dev server tetap di root supaya http://localhost:5180 bisa dibuka langsung.
+ * Override lewat env BASE_PATH bila di-host di domain lain.
  */
-const base = process.env.BASE_PATH ?? '/BJM-management-system/'
-
-export default defineConfig({
-  base,
+export default defineConfig(({ command }) => ({
+  base: process.env.BASE_PATH ?? (command === 'build' ? '/BJM-management-system/' : '/'),
   plugins: [
     react(),
     tailwindcss(),
@@ -27,4 +26,4 @@ export default defineConfig({
     },
   ],
   server: { port: 5180, open: false },
-})
+}))
