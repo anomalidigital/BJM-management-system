@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarRange, ChevronDown, LogOut, Menu, Search } from 'lucide-react'
 import { useAuth } from '../../store/AuthProvider'
+import { useData } from '../../store/DataProvider'
+import { periodeAktif } from '../../lib/periode'
 import { Badge } from '../ui/Badge'
-import { initials, monthLabel, todayISO } from '../../lib/format'
+import { initials, monthLabel } from '../../lib/format'
 import { cn } from '../../lib/utils'
 
 export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => void; onLogout: () => void }) {
   const { user } = useAuth()
+  const { transactionRows } = useData()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [quick, setQuick] = useState('')
@@ -56,7 +59,7 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
       <div className="ml-auto flex items-center gap-3">
         <span className="hidden items-center gap-1.5 rounded-md border border-hairline bg-sunken px-2.5 py-1.5 text-[12px] font-medium text-ink-2 md:inline-flex">
           <CalendarRange size={14} className="text-ink-3" />
-          Periode: {monthLabel(todayISO())}
+          Periode: {monthLabel(periodeAktif(transactionRows.map((t) => t.transaction_date)).start)}
         </span>
 
         <div ref={menuRef} className="relative">

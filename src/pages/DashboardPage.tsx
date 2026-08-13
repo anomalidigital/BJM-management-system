@@ -59,7 +59,13 @@ export function DashboardPage() {
       .map(([id, rows]) => ({
         id,
         label: rows[0].driver_name || 'Tanpa nama',
-        meta: `${formatRupiah(rows.reduce((a, r) => a + komisiTransaksi(r), 0), { compact: true })} komisi`,
+        // Komisi belum punya formula (TBD-01); tampilkan uang jalan yang datanya nyata.
+        meta: (() => {
+          const komisi = rows.reduce((a, r) => a + komisiTransaksi(r), 0)
+          if (komisi > 0) return `${formatRupiah(komisi, { compact: true })} komisi`
+          const uj = rows.reduce((a, r) => a + r.uj_total, 0)
+          return uj > 0 ? `${formatRupiah(uj, { compact: true })} uang jalan` : ''
+        })(),
         value: rows.length,
       }))
       .sort((a, b) => b.value - a.value)
