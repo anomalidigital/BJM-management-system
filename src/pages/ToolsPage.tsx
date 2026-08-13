@@ -55,7 +55,7 @@ export function ToolsPage() {
         <Card className="xl:col-span-2">
           <CardHeader
             title="Business rule yang perlu dikonfirmasi"
-            subtitle="Sesuai dokumen bagian 23, formula yang belum tervalidasi tidak dikarang — hanya diberi placeholder."
+            subtitle="Perhitungan yang menunggu keputusan, agar tidak ditetapkan sebelum waktunya."
             actions={<Badge tone="warning">{TBD_NOTES.length} item</Badge>}
           />
           <ul className="divide-y divide-grid">
@@ -82,25 +82,6 @@ export function ToolsPage() {
 
         <div className="space-y-4">
           <Card>
-            <CardHeader title="Sumber data" subtitle="Dari mana isi aplikasi ini berasal." />
-            <div className="space-y-2.5 p-4">
-              <div className="rounded-lg border border-[#cfeccf] bg-[#effaef] px-3.5 py-3">
-                <p className="text-[12.5px] font-semibold text-[#0a7d0a]">Data operasional sebenarnya</p>
-                <p className="mt-1 text-[12px] leading-relaxed text-ink-2">
-                  Sopir, Mobil, Project, Route, Trip, Uang Jalan, dan Biaya Operasional berasal dari
-                  REKAPAN SHAZA — 241 trip periode 01/06 s/d 21/07/2026.
-                </p>
-              </div>
-              <div className="rounded-lg border border-[#f6e2ac] bg-[#fff8e6] px-3.5 py-3">
-                <p className="text-[12.5px] font-semibold text-[#8a6100]">Masih data contoh</p>
-                <p className="mt-1 text-[12px] leading-relaxed text-ink-2">
-                  SI / Job Order, Data Tagihan, dan Surat Jalan — file operasional tidak memuat ketiganya.
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          <Card>
             <CardHeader title="Isi database" subtitle="Tersimpan di localStorage browser ini." />
             <ul className="divide-y divide-grid">
               {counts.map(([label, n]) => (
@@ -125,10 +106,10 @@ export function ToolsPage() {
                 Simulasikan state error
               </Button>
               <Button className="w-full justify-start" icon={<Shuffle size={15} />} disabled={!canEdit} onClick={() => setConfirmSample(true)}>
-                Ganti ke data contoh (tanpa data asli)
+                Ganti ke data contoh
               </Button>
               <Button className="w-full justify-start" variant="danger" icon={<Database size={15} />} disabled={!canEdit} onClick={() => setConfirmReset(true)}>
-                Muat ulang data REKAPAN SHAZA
+                Muat ulang data awal
               </Button>
             </div>
           </Card>
@@ -139,7 +120,7 @@ export function ToolsPage() {
               <div className="flex justify-between gap-3"><dt className="text-ink-3">Sistem</dt><dd className="font-medium text-ink">SIKOTIS — Sistem Komisi Otomatis</dd></div>
               <div className="flex justify-between gap-3"><dt className="text-ink-3">Perusahaan</dt><dd className="font-medium text-ink">PT Bimajaya Mustika</dd></div>
               <div className="flex justify-between gap-3"><dt className="text-ink-3">Version</dt><dd className="font-medium text-ink">0.1</dd></div>
-              <div className="flex justify-between gap-3"><dt className="text-ink-3">Data</dt><dd className="font-medium text-ink">REKAPAN SHAZA (localStorage)</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-ink-3">Penyimpanan</dt><dd className="font-medium text-ink">Browser (localStorage)</dd></div>
             </dl>
           </Card>
         </div>
@@ -147,8 +128,8 @@ export function ToolsPage() {
 
       <ConfirmDialog
         open={confirmReset}
-        title="Muat ulang data REKAPAN SHAZA?"
-        message="Seluruh perubahan yang Anda buat (tambah / ubah / hapus) akan hilang dan data dikembalikan ke kondisi awal dari file operasional."
+        title="Muat ulang data awal?"
+        message="Seluruh perubahan yang Anda buat (tambah / ubah / hapus) akan hilang dan data dikembalikan ke kondisi awal."
         confirmLabel="Muat Ulang"
         onCancel={() => setConfirmReset(false)}
         onConfirm={doReset}
@@ -157,7 +138,7 @@ export function ToolsPage() {
       <ConfirmDialog
         open={confirmSample}
         title="Ganti ke data contoh?"
-        message="Seluruh data operasional asli (nama sopir, nomor polisi, dan nominal) akan diganti dengan data buatan. Berguna bila prototype perlu ditunjukkan ke pihak luar. Data asli dapat dimuat ulang kapan saja lewat tombol di bawahnya."
+        message="Seluruh data operasional akan diganti dengan data contoh. Berguna bila sistem perlu ditunjukkan ke pihak luar. Data semula dapat dimuat ulang kapan saja lewat tombol di bawahnya."
         confirmLabel="Ganti ke Data Contoh"
         tone="primary"
         onCancel={() => setConfirmSample(false)}

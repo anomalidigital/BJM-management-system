@@ -82,7 +82,7 @@ export function DataRoutePage() {
     if (!deleting) return
     const used = db.transactions.filter((t) => t.route_id === deleting.id).length
     remove('routes', deleting.id)
-    toast.success(used > 0 ? `Data berhasil dihapus. ${used} transaksi lama kehilangan referensi route.` : 'Data berhasil dihapus.')
+    toast.success(used > 0 ? `Data berhasil dihapus. ${used} transaksi terkait kehilangan referensi route.` : 'Data berhasil dihapus.')
     setDeleting(null)
   }
 

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Pencil, Plus, Trash2, Users } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
@@ -170,12 +170,6 @@ export function DataSopirPage() {
         )}
       </Card>
 
-      <p className="mt-3 flex items-start gap-1.5 text-[11.5px] leading-relaxed text-ink-3">
-        <Users size={13} className="mt-0.5 shrink-0" />
-        Alamat dipisah menjadi <span className="font-medium text-ink-2">Alamat</span> (nama jalan &amp; nomor) dan{' '}
-        <span className="font-medium text-ink-2">Alamat 2</span> (kecamatan / area), sehingga data tetap utuh tetapi bisa
-        dicari dan difilter secara terpisah.
-      </p>
 
       <Modal
         open={formOpen}

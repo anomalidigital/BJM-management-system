@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { FolderKanban, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
@@ -133,13 +133,6 @@ export function DataProjectPage() {
         />
       </Card>
 
-      <p className="mt-3 flex items-start gap-1.5 text-[11.5px] leading-relaxed text-ink-3">
-        <FolderKanban size={13} className="mt-0.5 shrink-0" />
-        Pada data operasional, seluruh trip bertanda <span className="font-medium text-ink-2">CASH</span> tercatat tanpa TR
-        maupun No PI — polanya berbeda dari project berdokumen. Karena itu disediakan penanda{' '}
-        <span className="font-medium text-ink-2">Alur Dokumen</span>, sehingga order tunai tidak tercampur ke dimensi
-        customer. Perlu konfirmasi client (TBD-09).
-      </p>
 
       <Modal
         open={formOpen}

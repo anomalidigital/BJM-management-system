@@ -95,11 +95,6 @@ export function LapBiayaPage() {
                   </PRow>
                 )}
               </PrintTable>
-              {i === pages.length - 1 && (
-                <p className="mt-3 text-[9px] text-neutral-600">
-                  Biaya operasional belum diperhitungkan sebagai pengurang pendapatan netto (TBD-03).
-                </p>
-              )}
             </PrintPage>
           ))}
         </PrintDocument>
@@ -178,9 +173,6 @@ export function LapBiayaPage() {
                 </ul>
               )}
             </div>
-            <p className="border-t border-hairline px-4 py-2.5 text-[11.5px] text-ink-3">
-              Jenis biaya disimpan sebagai data, bukan kolom tetap — menambah jenis baru tidak mengubah struktur database.
-            </p>
           </Card>
         </div>
       </div>

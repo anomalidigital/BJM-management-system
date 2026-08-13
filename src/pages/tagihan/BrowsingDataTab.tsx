@@ -20,7 +20,7 @@ import type { BillingRow } from '../../types'
 
 /**
  * Browsing Data. Nilai kolom Sijo dapat diklik dan langsung membuka
- * halaman SI / Job Order -- menghilangkan copy-paste manual sistem lama.
+ * halaman SI / Job Order tanpa perlu menyalin nomornya.
  */
 export function BrowsingDataTab() {
   const { billingRows, loading, error, reload, remove } = useData()

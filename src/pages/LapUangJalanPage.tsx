@@ -107,9 +107,6 @@ export function LapUangJalanPage() {
                   </PRow>
                 )}
               </PrintTable>
-              {i === pages.length - 1 && (
-                <p className="mt-3 text-[9px] text-neutral-600">TF = UJ - Potong Kasbon (aturan terverifikasi dari data operasional).</p>
-              )}
             </PrintPage>
           ))}
         </PrintDocument>

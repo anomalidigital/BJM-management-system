@@ -204,17 +204,12 @@ export function TripDetailPage() {
                 <InfoItem label="No PI" value={trip.pi_number || '—'} mono />
                 <InfoItem label="Status PI" value={trip.pi_status || '—'} />
               </dl>
-              <p className="mt-3 text-[11.5px] leading-relaxed text-ink-3">
-                TR, SI/Job Order, dan No PI disimpan terpisah — belum ada bukti ketiganya merujuk hal yang sama (TBD-08).
-                Status seperti <span className="font-medium text-ink-2">di pool</span> atau{' '}
-                <span className="font-medium text-ink-2">masih moving</span> kini punya kolom sendiri, tidak lagi menumpang di No PI.
-              </p>
             </div>
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <InfoItem label="Kont (No. Container)" value={trip.container_no || '—'} mono />
               <InfoItem
-                label={<span className="inline-flex items-center gap-1">COST <Badge tone="warning">TBD-02</Badge></span>}
+                label="COST"
                 value={trip.cost_value ? formatRupiah(trip.cost_value) : '—'}
                 mono
               />
@@ -285,10 +280,6 @@ export function TripDetailPage() {
                 </table>
               </div>
             )}
-            <p className="border-t border-hairline px-4 py-2.5 text-[11.5px] text-ink-3">
-              Aturan <span className="font-semibold text-ink-2">TF = UJ − Potong Kasbon</span> berasal dari formula asli pada
-              file operasional dan konsisten di seluruh data — bukan asumsi.
-            </p>
           </div>
         )}
 
@@ -342,11 +333,6 @@ export function TripDetailPage() {
                 </table>
               </div>
             )}
-            <p className="border-t border-hairline px-4 py-2.5 text-[11.5px] text-ink-3">
-              Biaya disimpan sebagai baris terpisah (jenis + nominal), bukan tujuh kolom tetap — jenis baru bisa ditambah
-              tanpa mengubah struktur database. Biaya ini <span className="font-medium text-ink-2">belum</span> ikut mengurangi
-              pendapatan netto sampai formulanya dikonfirmasi (TBD-03).
-            </p>
           </div>
         )}
 

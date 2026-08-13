@@ -109,11 +109,6 @@ export function LapNettoPage() {
                   </PRow>
                 )}
               </PrintTable>
-              {i === pages.length - 1 && (
-                <p className="mt-3 text-[9px] text-neutral-600">
-                  Netto memakai formula sementara TBD-03: Harga Route - UjRoute - Komisioner.
-                </p>
-              )}
             </PrintPage>
           ))}
         </PrintDocument>
@@ -166,11 +161,6 @@ export function LapNettoPage() {
                   </PRow>
                 )}
               </PrintTable>
-              {i === pages.length - 1 && (
-                <p className="mt-3 text-[9px] text-neutral-600">
-                  Netto memakai formula sementara TBD-03: Harga Route - UjRoute - Komisioner.
-                </p>
-              )}
             </PrintPage>
           ))}
         </PrintDocument>
@@ -221,10 +211,10 @@ export function LapNettoPage() {
 
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Total Pendapatan" value={formatRupiah(totals.pendapatan, { compact: true })} hint="TBD-02" />
-            <StatCard label="Total UjRoute" value={formatRupiah(totals.ujroute, { compact: true })} hint="Master Route" />
-            <StatCard label="Total Komisioner" value={formatRupiah(totals.komisi, { compact: true })} hint="TBD-01" />
-            <StatCard label="Pendapatan Netto" value={formatRupiah(totals.netto, { compact: true })} hint="TBD-03" />
+            <StatCard label="Total Pendapatan" value={formatRupiah(totals.pendapatan, { compact: true })} hint="periode terpilih" />
+            <StatCard label="Total UjRoute" value={formatRupiah(totals.ujroute, { compact: true })} hint="periode terpilih" />
+            <StatCard label="Total Komisioner" value={formatRupiah(totals.komisi, { compact: true })} hint="periode terpilih" />
+            <StatCard label="Pendapatan Netto" value={formatRupiah(totals.netto, { compact: true })} hint="periode terpilih" />
           </div>
 
           <Card>

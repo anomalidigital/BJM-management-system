@@ -133,11 +133,6 @@ export function LapKomisiPage() {
                   </PRow>
                 )}
               </PrintTable>
-              {i === pages.length - 1 && (
-                <p className="mt-3 text-[9px] text-neutral-600">
-                  Nilai komisi memakai formula sementara TBD-01 (Komisioner master Route).
-                </p>
-              )}
             </PrintPage>
           ))}
         </PrintDocument>
@@ -193,11 +188,6 @@ export function LapKomisiPage() {
                   </PRow>
                 )}
               </PrintTable>
-              {i === pages.length - 1 && (
-                <p className="mt-3 text-[9px] text-neutral-600">
-                  Nilai komisi memakai formula sementara TBD-01 (Komisioner master Route).
-                </p>
-              )}
             </PrintPage>
           ))}
         </PrintDocument>
@@ -270,8 +260,8 @@ export function LapKomisiPage() {
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
             <StatCard label="Transaksi pada periode" value={formatNumber(totals.transaksi)} hint={periodeText} />
-            <StatCard label="Jumlah Ritan" value={formatNumber(totals.ritan)} hint="1 transaksi = 1 ritan (TBD-05)" />
-            <StatCard label="Total Komisi" value={formatRupiah(totals.komisi, { compact: true })} hint="Formula sementara TBD-01" />
+            <StatCard label="Jumlah Ritan" value={formatNumber(totals.ritan)} hint="1 transaksi = 1 ritan" />
+            <StatCard label="Total Komisi" value={formatRupiah(totals.komisi, { compact: true })} hint="periode terpilih" />
           </div>
 
           <Card>

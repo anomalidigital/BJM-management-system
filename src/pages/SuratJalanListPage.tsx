@@ -2,7 +2,6 @@ import { useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, Pencil, Plus, Printer, Trash2, X } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
-import { DataContohNotice } from '../components/ui/DataNotice'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
 import type { Column } from '../components/ui/DataTable'
@@ -163,8 +162,6 @@ export function SuratJalanListPage() {
           </Button>
         }
       />
-
-      <DataContohNotice modul="Surat Jalan" />
 
       <Card>
         <Toolbar

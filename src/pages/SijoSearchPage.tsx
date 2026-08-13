@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Printer, Search, Ship, X } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
-import { DataContohNotice } from '../components/ui/DataNotice'
 import { Card, CardHeader, InfoItem } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input, Checkbox, Label } from '../components/ui/Field'
@@ -151,8 +150,6 @@ export function SijoSearchPage() {
         crumbs={[{ label: 'Pencarian' }, { label: 'SI / Job Order' }]}
         description="Ketik nomor SI / Job Order, atau klik nilai Sijo dari halaman lain untuk langsung membuka detailnya."
       />
-
-      <DataContohNotice modul="SI / Job Order" />
 
       <Card className="mb-4">
         <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">

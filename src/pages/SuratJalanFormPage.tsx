@@ -65,7 +65,7 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
 
   const existing = mode === 'edit' ? db.deliveryNotes.find((n) => n.id === id) : undefined
 
-  /** TBD-07 — penomoran sementara berurutan SJ-000001. */
+  /** Penomoran berurutan mulai SJ-000001. */
   const nextNo = useMemo(() => {
     const max = db.deliveryNotes.reduce((acc, n) => {
       const num = Number(n.sj_no.replace(/\D/g, ''))
@@ -242,7 +242,7 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
             <Field label="Tanggal" required error={errors.sj_date}>
               {(fid) => <DateInput id={fid} value={form.sj_date} invalid={!!errors.sj_date} onChange={(e) => setForm({ ...form, sj_date: e.target.value })} />}
             </Field>
-            <Field label="Nomor Surat Jalan" required error={errors.sj_no} hint={errors.sj_no ? undefined : 'Nomor urut sementara (TBD-07).'}>
+            <Field label="Nomor Surat Jalan" required error={errors.sj_no} hint={errors.sj_no ? undefined : 'Nomor urut otomatis.'}>
               {(fid) => <Input id={fid} value={form.sj_no} invalid={!!errors.sj_no} onChange={(e) => setForm({ ...form, sj_no: e.target.value })} />}
             </Field>
           </div>

@@ -16,7 +16,7 @@ export interface NavGroup {
   items: NavItem[]
 }
 
-/** Struktur navigasi sesuai dokumen bagian 2 (istilah "Lap. Bulan Ini" dipertahankan). */
+/** Struktur navigasi utama aplikasi. */
 export const NAV_GROUPS: NavGroup[] = [
   {
     items: [{ label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard }],

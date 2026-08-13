@@ -147,8 +147,8 @@ export function LoginPage() {
           </form>
 
           <p className="mt-5 rounded-md border border-hairline bg-sunken px-3 py-2.5 text-[12px] leading-relaxed text-ink-3">
-            <span className="font-semibold text-ink-2">Prototype:</span> autentikasi masih simulasi. Username apa pun
-            diterima, password minimal 4 karakter. Pilih peran untuk mencoba pembatasan akses Admin vs Viewer.
+            Autentikasi masih simulasi. Username apa pun diterima, password minimal 4 karakter. Pilih peran untuk
+            mencoba pembatasan akses Admin dan Viewer.
           </p>
         </div>
       </main>

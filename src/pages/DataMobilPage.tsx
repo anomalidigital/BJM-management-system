@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Pencil, Plus, Trash2, Truck } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
@@ -159,12 +159,6 @@ export function DataMobilPage() {
         )}
       </Card>
 
-      <p className="mt-3 flex items-start gap-1.5 text-[11.5px] leading-relaxed text-ink-3">
-        <Truck size={13} className="mt-0.5 shrink-0" />
-        Konfigurasi seperti <span className="font-medium text-ink-2">6X6</span>,{' '}
-        <span className="font-medium text-ink-2">DL</span>, atau <span className="font-medium text-ink-2">LB</span> disimpan
-        sebagai atribut kendaraan, bukan bagian dari nama sopir — sehingga satu sopir tidak terpecah menjadi beberapa nama.
-      </p>
 
       <Modal
         open={formOpen}

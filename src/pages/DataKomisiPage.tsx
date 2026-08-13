@@ -243,7 +243,7 @@ export function DataKomisiPage() {
         description="Klik NoTrans untuk membuka detail trip beserta termin uang jalan, biaya operasional, dan dokumennya."
         actions={
           <>
-            <Button icon={<CircleHelp size={15} />} onClick={() => setShow4B(true)} title="Fungsi tombol 4B belum tervalidasi">4B</Button>
+            <Button icon={<CircleHelp size={15} />} onClick={() => setShow4B(true)} title="Tombol 4B">4B</Button>
             <Button variant="primary" icon={<Plus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah</Button>
           </>
         }
@@ -335,7 +335,7 @@ export function DataKomisiPage() {
               </Select>
             )}
           </Field>
-          <Field label="TR" hint="Nomor referensi dari customer. Disimpan terpisah dari SI/JO (TBD-08).">
+          <Field label="TR" hint="Nomor referensi dari customer.">
             {(fid) => <Input id={fid} value={form.tr_reference} placeholder="2600305331" onChange={(e) => setForm({ ...form, tr_reference: e.target.value })} />}
           </Field>
           <Field label="No PI">
@@ -344,7 +344,7 @@ export function DataKomisiPage() {
           <Field label="Status PI" hint="mis. di pool, masih moving — kini kolom sendiri.">
             {(fid) => <Input id={fid} value={form.pi_status} onChange={(e) => setForm({ ...form, pi_status: e.target.value })} />}
           </Field>
-          <Field label="COST" hint="Makna bisnis belum dikonfirmasi (TBD-02).">
+          <Field label="COST">
             {(fid) => <CurrencyInput id={fid} value={form.cost_value} onValueChange={(v) => setForm({ ...form, cost_value: v })} />}
           </Field>
           <Field label="Daftar S / JO" required error={errors.job_order_id} className="sm:col-span-2">
@@ -412,12 +412,8 @@ export function DataKomisiPage() {
       <Modal open={show4B} onClose={() => setShow4B(false)} title="Tombol 4B" size="sm"
         footer={<Button variant="primary" onClick={() => setShow4B(false)}>Mengerti</Button>}>
         <p className="text-[13px] leading-relaxed text-ink-2">
-          Fungsi bisnis tombol <span className="font-semibold text-ink">4B</span> belum tervalidasi, sehingga
-          tombolnya dipertahankan sebagai secondary action tanpa logic karangan.
-        </p>
-        <p className="mt-3 rounded-md border border-hairline bg-sunken px-3 py-2.5 text-[12.5px] text-ink-3">
-          Ditandai sebagai <span className="font-semibold text-ink-2">TBD-06</span>. Beri tahu fungsi aslinya, dan
-          perilakunya akan diimplementasikan di sini.
+          Fungsi tombol <span className="font-semibold text-ink">4B</span> belum ditentukan. Beri tahu perilakunya, dan
+          akan diimplementasikan di sini.
         </p>
       </Modal>
     </>

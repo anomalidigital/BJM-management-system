@@ -2,9 +2,8 @@
  * ===========================================================================
  *  PERHITUNGAN BISNIS - PLACEHOLDER / TBD
  * ===========================================================================
- *  Formula asli SIKOTIS belum tersedia. Sesuai dokumen bagian 23, seluruh
- *  perhitungan yang belum tervalidasi dikumpulkan DI SATU FILE INI supaya
- *  mudah diganti begitu rumus resmi dari PT Bimajaya Mustika diberikan.
+ *  Seluruh perhitungan yang belum ditetapkan dikumpulkan DI SATU FILE INI
+ *  supaya mudah diganti begitu rumus resminya tersedia.
  *
  *  Jangan menyalin rumus di bawah ke file lain -- panggil fungsinya.
  * ===========================================================================
@@ -53,7 +52,7 @@ export const TBD_NOTES: TbdNote[] = [
     id: 'TBD-03',
     title: 'Pendapatan netto',
     current: 'Sementara: Harga - UjRoute - Komisioner. Biaya operasional belum ikut dikurangkan.',
-    question: 'Laporan lama memakai Bruto - Uang Jalan - Komisi - Kernet. Apakah DEX, tol, SPSI, nginap, dan biaya lain juga menjadi pengurang netto?',
+    question: 'Apakah DEX, tol, SPSI, nginap, dan biaya lain menjadi pengurang pendapatan netto?',
   },
   {
     id: 'TBD-04',
@@ -89,7 +88,7 @@ export const TBD_NOTES: TbdNote[] = [
     id: 'TBD-11',
     title: 'Komponen Kernet pada laporan Netto',
     current: 'Belum ada field kernet di sistem.',
-    question: 'Laporan netto memuat komponen Kernet. Dari mana nilainya diambil, dan apakah masih dipakai?',
+    question: 'Komponen Kernet: dari mana nilainya diambil, dan apakah dipakai?',
   },
   {
     id: 'TBD-12',

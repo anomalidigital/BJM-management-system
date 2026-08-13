@@ -13,7 +13,7 @@ export function NotFoundPage() {
         </div>
         <p className="text-[18px] font-semibold text-ink">Halaman tidak ditemukan</p>
         <p className="mt-1.5 text-[13px] leading-relaxed text-ink-3">
-          Alamat yang Anda buka tidak tersedia pada prototype ini.
+          Alamat yang Anda buka tidak tersedia.
         </p>
         <Button className="mt-5" variant="primary" onClick={() => navigate('/dashboard')}>Kembali ke Dashboard</Button>
       </div>

@@ -67,7 +67,7 @@ export function Sidebar({ collapsed, onToggleCollapse, onLogout, mobileOpen, onC
             </div>
           ))}
 
-          {/* Logout ikut grup "Lainnya" sesuai struktur menu lama */}
+          {/* Logout ditempatkan pada grup terakhir */}
           <ul className="mt-0.5 space-y-0.5 px-2">
             <li>
               <button

@@ -59,7 +59,7 @@ export function DashboardPage() {
       .map(([id, rows]) => ({
         id,
         label: rows[0].driver_name || 'Tanpa nama',
-        // Komisi belum punya formula (TBD-01); tampilkan uang jalan yang datanya nyata.
+        // Nilai komisi belum tersedia; tampilkan uang jalan yang datanya pasti.
         meta: (() => {
           const komisi = rows.reduce((a, r) => a + komisiTransaksi(r), 0)
           if (komisi > 0) return `${formatRupiah(komisi, { compact: true })} komisi`
@@ -185,21 +185,18 @@ export function DashboardPage() {
           value={now.komisi ? formatRupiah(now.komisi, { compact: true }) : '—'}
           icon={<BadgeDollarSign size={15} />}
           delta={now.komisi ? deltaPersen(now.komisi, prev.komisi) : null}
-          hint={now.komisi ? undefined : 'menunggu formula komisi (TBD-01)'}
         />
         <StatCard
           label="Total Pendapatan"
           value={now.pendapatan ? formatRupiah(now.pendapatan, { compact: true }) : formatRupiah(now.cost, { compact: true })}
           icon={<Wallet size={15} />}
           delta={now.pendapatan ? deltaPersen(now.pendapatan, prev.pendapatan) : deltaPersen(now.cost, prev.cost)}
-          hint={now.pendapatan ? undefined : 'dari kolom COST — arti bisnisnya belum dikonfirmasi (TBD-02)'}
         />
         <StatCard
           label="Pendapatan Netto"
           value={now.netto ? formatRupiah(now.netto, { compact: true }) : '—'}
           icon={<TrendingUp size={15} />}
           delta={now.netto ? deltaPersen(now.netto, prev.netto) : null}
-          hint={now.netto ? undefined : 'menunggu formula netto (TBD-03)'}
         />
         <StatCard
           label="Total Sopir Aktif"
@@ -296,10 +293,6 @@ export function DashboardPage() {
               height={214}
             />
           </div>
-          <p className="border-t border-hairline px-4 py-2 text-[11.5px] text-ink-3">
-            Angka memakai formula sementara <span className="font-semibold text-ink-2">TBD-02</span> dan{' '}
-            <span className="font-semibold text-ink-2">TBD-01</span> — lihat halaman Tools.
-          </p>
         </Card>
 
         <Card>
@@ -411,10 +404,6 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      <p className="mt-4 text-[11.5px] text-ink-3">
-        Angka transaksi, uang jalan, dan biaya operasional berasal dari data operasional. Nilai komisi dan netto masih
-        memakai formula sementara — lihat daftar TBD di halaman Tools.
-      </p>
     </>
   )
 }

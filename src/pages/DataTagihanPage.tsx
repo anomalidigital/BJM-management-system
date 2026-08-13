@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { PageHeader } from '../components/layout/PageHeader'
-import { DataContohNotice } from '../components/ui/DataNotice'
 import { Card } from '../components/ui/Card'
 import { Tabs } from '../components/ui/Tabs'
 import { useData } from '../store/DataProvider'
@@ -8,7 +7,7 @@ import { ProsesDataTab } from './tagihan/ProsesDataTab'
 import { BrowsingDataTab } from './tagihan/BrowsingDataTab'
 import { PencarianDataTab } from './tagihan/PencarianDataTab'
 
-/** Transaksi -> Data Tagihan. Tiga tab sesuai dokumen bagian 7. */
+/** Transaksi -> Data Tagihan. */
 export function DataTagihanPage() {
   const { db } = useData()
   const [tab, setTab] = useState('proses')
@@ -19,8 +18,6 @@ export function DataTagihanPage() {
         title="Data Tagihan"
         crumbs={[{ label: 'Transaksi' }, { label: 'Data Tagihan' }]}
       />
-
-      <DataContohNotice modul="tagihan" />
 
       <Card>
         <Tabs

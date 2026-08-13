@@ -162,9 +162,6 @@ export function LapRitanPage() {
                   </PRow>
                 )}
               </PrintTable>
-              {i === printPages.length - 1 && (
-                <p className="mt-3 text-[9px] text-neutral-600">1 transaksi dihitung sebagai 1 ritan (TBD-05).</p>
-              )}
             </PrintPage>
           ))}
         </PrintDocument>
@@ -312,9 +309,6 @@ export function LapRitanPage() {
         )}
       </Card>
 
-      <p className="mt-3 text-[11.5px] text-ink-3">
-        1 transaksi dihitung sebagai 1 ritan (TBD-05).
-      </p>
 
       <ConfirmDialog
         open={confirmDelete}
