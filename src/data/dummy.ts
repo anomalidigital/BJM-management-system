@@ -10,6 +10,7 @@ import type {
   OperationalExpense, Project, Route, TripStatus, UjPayment, Vehicle,
 } from '../types'
 import { EXPENSE_TYPES, VEHICLE_CONFIGS } from '../types'
+import REAL from './real.json'
 import { toISO } from '../lib/format'
 
 /* PRNG deterministik (mulberry32) */
@@ -411,8 +412,37 @@ function makeExpenses(trips: CommissionTransaction[]): OperationalExpense[] {
   return out
 }
 
-/** Bangun seluruh dummy database. */
+/**
+ * Bangun database awal aplikasi.
+ *
+ * Sopir, mobil, project, route, trip, termin uang jalan, dan biaya operasional
+ * berasal dari REKAPAN SHAZA.xlsx (data operasional sebenarnya).
+ *
+ * SI/Job Order, Data Tagihan, dan Surat Jalan TIDAK ada di file tersebut, jadi
+ * ketiganya masih memakai dataset contoh dan diberi penanda di aplikasi.
+ */
 export function generateDatabase(): Database {
+  const real = REAL as unknown as Pick<Database,
+    'drivers' | 'vehicles' | 'projects' | 'routes' | 'transactions' | 'ujPayments' | 'expenses'>
+
+  const jobOrders = makeJobOrders(42)
+  // Dataset contoh untuk modul yang tidak tercakup REKAPAN SHAZA. Trip contoh ini
+  // hanya dipakai untuk membangkitkan tagihan dan surat jalan, tidak ikut disimpan.
+  const trxContoh = makeTransactions(
+    { drivers: real.drivers, routes: real.routes, vehicles: real.vehicles, jobOrders, projects: real.projects },
+    60,
+  )
+  const billings = makeBillings({ jobOrders, transactions: trxContoh }, 46)
+  const deliveryNotes = makeDeliveryNotes({ jobOrders, vehicles: real.vehicles, transactions: trxContoh }, 34)
+
+  return { ...real, jobOrders, billings, deliveryNotes }
+}
+
+/**
+ * Database berisi data contoh sepenuhnya (fiktif), tanpa data operasional asli.
+ * Berguna bila prototype perlu ditunjukkan ke pihak luar.
+ */
+export function generateSampleDatabase(): Database {
   const drivers = makeDrivers(26)
   const routes = makeRoutes(18)
   const vehicles = makeVehicles(16)
@@ -425,3 +455,8 @@ export function generateDatabase(): Database {
   const expenses = makeExpenses(transactions)
   return { drivers, routes, vehicles, jobOrders, projects, transactions, billings, deliveryNotes, ujPayments, expenses }
 }
+
+/** Entitas yang datanya berasal dari REKAPAN SHAZA. */
+export const SUMBER_REAL = ['drivers', 'vehicles', 'projects', 'routes', 'transactions', 'ujPayments', 'expenses'] as const
+/** Entitas yang masih memakai dataset contoh. */
+export const SUMBER_CONTOH = ['jobOrders', 'billings', 'deliveryNotes'] as const

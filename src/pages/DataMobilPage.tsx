@@ -39,7 +39,11 @@ export function DataMobilPage() {
   /** Jumlah trip per kendaraan, untuk konteks sebelum menghapus. */
   const tripCount = useMemo(() => {
     const m = new Map<string, number>()
-    for (const t of transactionRows) m.set(t.vehicle_id, (m.get(t.vehicle_id) ?? 0) + 1)
+    // Sebagian trip tidak mencantumkan nomor polisi; jangan dihitung ke kunci kosong.
+    for (const t of transactionRows) {
+      if (!t.vehicle_id) continue
+      m.set(t.vehicle_id, (m.get(t.vehicle_id) ?? 0) + 1)
+    }
     return m
   }, [transactionRows])
 
@@ -218,9 +222,9 @@ export function DataMobilPage() {
             Data yang sudah dihapus mungkin tidak dapat dikembalikan.
             <br />
             <span className="mt-2 block font-medium text-ink">{deleting?.plate_number}</span>
-            {(tripCount.get(deleting?.id ?? '') ?? 0) > 0 && (
+            {deleting && (tripCount.get(deleting.id) ?? 0) > 0 && (
               <span className="mt-2 block text-[12.5px] text-[color:var(--color-critical)]">
-                Kendaraan ini dipakai pada {formatNumber(tripCount.get(deleting!.id) ?? 0)} trip. Trip tersebut akan
+                Kendaraan ini dipakai pada {formatNumber(tripCount.get(deleting.id) ?? 0)} trip. Trip tersebut akan
                 kehilangan referensi kendaraan.
               </span>
             )}

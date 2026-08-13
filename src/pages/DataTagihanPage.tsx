@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { PageHeader } from '../components/layout/PageHeader'
+import { DataContohNotice } from '../components/ui/DataNotice'
 import { Card } from '../components/ui/Card'
 import { Tabs } from '../components/ui/Tabs'
 import { useData } from '../store/DataProvider'
@@ -19,6 +20,8 @@ export function DataTagihanPage() {
         legacyTitle="Pemrosesan file data SI / JO"
         crumbs={[{ label: 'Transaksi' }, { label: 'Data Tagihan' }]}
       />
+
+      <DataContohNotice modul="tagihan" />
 
       <Card>
         <Tabs

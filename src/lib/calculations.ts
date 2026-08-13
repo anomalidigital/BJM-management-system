@@ -141,6 +141,8 @@ export function ringkas(rows: TransactionRow[]) {
     ujroute: rows.reduce((a, r) => a + r.ujroute, 0),
     netto: rows.reduce((a, r) => a + nettoTransaksi(r), 0),
     bonPribadi: rows.reduce((a, r) => a + r.personal_bon, 0),
+    /** Nilai COST apa adanya dari data operasional; makna bisnisnya TBD-02. */
+    cost: rows.reduce((a, r) => a + r.cost_value, 0),
   }
 }
 

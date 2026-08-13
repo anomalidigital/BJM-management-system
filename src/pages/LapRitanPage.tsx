@@ -20,7 +20,8 @@ import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
 import { useTable } from '../lib/useTable'
 import { matchesQuery, sum } from '../lib/utils'
-import { endOfMonthISO, formatDate, formatNumber, formatRupiah, monthLabel, startOfMonthISO, todayISO } from '../lib/format'
+import { periodeAktif } from '../lib/periode'
+import { formatDate, formatNumber, formatRupiah, monthLabel } from '../lib/format'
 import type { TransactionRow } from '../types'
 
 interface Draft {
@@ -42,8 +43,9 @@ export function LapRitanPage() {
   const [cityFilter, setCityFilter] = useState('')
   const [preview, setPreview] = useState(false)
 
-  const monthStart = startOfMonthISO()
-  const monthEnd = endOfMonthISO()
+  const periode = useMemo(() => periodeAktif(transactionRows.map((t) => t.transaction_date)), [transactionRows])
+  const monthStart = periode.start
+  const monthEnd = periode.end
 
   const driverCity = useMemo(() => new Map(db.drivers.map((d) => [d.id, d.city])), [db.drivers])
   const cities = useMemo(() => Array.from(new Set(db.drivers.map((d) => d.city))).sort(), [db.drivers])
@@ -125,7 +127,7 @@ export function LapRitanPage() {
               meta={[
                 { label: 'Jumlah ritan', value: formatNumber(table.total) },
                 { label: 'Total Bon Pribadi', value: formatRupiah(totalBon) },
-                { label: 'Bulan', value: monthLabel(todayISO()) },
+                { label: 'Bulan', value: monthLabel(monthStart) },
               ]}
             >
               <PrintTable
@@ -223,7 +225,7 @@ export function LapRitanPage() {
         title="Cek Ritan Bulan Ini"
         legacyTitle="Transportation Management System - Driver Reports"
         crumbs={[{ label: 'Lap. Bulan Ini' }, { label: 'Cek Ritan Bulan Ini' }]}
-        description={`Ritan Sopir — bulan berjalan (${monthLabel(todayISO())}). Gunakan Sunting untuk mengubah Tgl Bon dan Bon Pribadi langsung di tabel.`}
+        description={`Ritan Sopir — bulan berjalan (${monthLabel(monthStart)}). Gunakan Sunting untuk mengubah Tgl Bon dan Bon Pribadi langsung di tabel.`}
         actions={
           <>
             <Button icon={<Printer size={15} />} onClick={() => setPreview(true)}>Cetak</Button>

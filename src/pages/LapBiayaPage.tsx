@@ -11,15 +11,17 @@ import { PrintTable, PRow, PCell } from '../components/report/PrintTable'
 import { ReportPreview } from '../components/report/ReportPreview'
 import { useData } from '../store/DataProvider'
 import { useToast } from '../store/ToastProvider'
-import { endOfMonthISO, formatDate, formatNumber, formatRupiah, startOfMonthISO } from '../lib/format'
+import { formatDate, formatNumber, formatRupiah } from '../lib/format'
 import { groupBy } from '../lib/utils'
+import { periodeAktif } from '../lib/periode'
 import { EXPENSE_TYPES } from '../types'
 
 export function LapBiayaPage() {
   const { db, transactionRows } = useData()
   const toast = useToast()
-  const [from, setFrom] = useState(startOfMonthISO())
-  const [to, setTo] = useState(endOfMonthISO())
+  const periodeDefault = useMemo(() => periodeAktif(db.expenses.map((e) => e.expense_date)), [db.expenses])
+  const [from, setFrom] = useState(periodeDefault.start)
+  const [to, setTo] = useState(periodeDefault.end)
   const [jenis, setJenis] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
@@ -133,7 +135,7 @@ export function LapBiayaPage() {
             <div className="flex flex-wrap items-center gap-2 border-t border-hairline pt-4">
               <Button variant="primary" icon={<Eye size={15} />} onClick={openPreview}>Preview</Button>
               <Button icon={<Printer size={15} />} onClick={openPreview}>Cetak</Button>
-              <Button variant="ghost" icon={<X size={14} />} onClick={() => { setFrom(startOfMonthISO()); setTo(endOfMonthISO()); setJenis(''); setError(null) }}>Batal</Button>
+              <Button variant="ghost" icon={<X size={14} />} onClick={() => { setFrom(periodeDefault.start); setTo(periodeDefault.end); setJenis(''); setError(null) }}>Batal</Button>
             </div>
           </div>
         </Card>

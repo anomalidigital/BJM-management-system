@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Billing, BillingRow, CommissionTransaction, Database, DeliveryNote, DeliveryNoteRow, EntityKey, TransactionRow } from '../types'
-import { loadDatabase, resetDatabase, saveDatabase } from './persistence'
+import { loadDatabase, resetDatabase, resetToSampleDatabase, saveDatabase } from './persistence'
 import { nowISO, uid } from '../lib/utils'
 
 type Row<K extends EntityKey> = Database[K][number]
@@ -16,6 +16,8 @@ interface DataContextValue {
   /** Paksa state error untuk mendemokan halaman gagal memuat. */
   simulateError: () => void
   resetToDummy: () => void
+  /** Ganti seluruh isi dengan dataset contoh (tanpa data operasional asli). */
+  resetToSample: () => void
   create: <K extends EntityKey>(key: K, row: NewRow<K>) => Row<K>
   update: <K extends EntityKey>(key: K, id: string, patch: Partial<Row<K>>) => void
   remove: <K extends EntityKey>(key: K, ids: string | string[]) => number
@@ -88,6 +90,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     window.setTimeout(() => {
       setDb(resetDatabase())
+      setError(null)
+      setLoading(false)
+    }, 400)
+  }, [])
+
+  const resetToSample = useCallback(() => {
+    setLoading(true)
+    window.setTimeout(() => {
+      setDb(resetToSampleDatabase())
       setError(null)
       setLoading(false)
     }, 400)
@@ -169,8 +180,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [db])
 
   const value = useMemo<DataContextValue>(
-    () => ({ db, loading, error, reload: runLoad, simulateError, resetToDummy, create, update, remove, transactionRows, billingRows, deliveryNoteRows }),
-    [db, loading, error, runLoad, simulateError, resetToDummy, create, update, remove, transactionRows, billingRows, deliveryNoteRows],
+    () => ({ db, loading, error, reload: runLoad, simulateError, resetToDummy, resetToSample, create, update, remove, transactionRows, billingRows, deliveryNoteRows }),
+    [db, loading, error, runLoad, simulateError, resetToDummy, resetToSample, create, update, remove, transactionRows, billingRows, deliveryNoteRows],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

@@ -15,20 +15,24 @@ import { RankingBars } from '../components/charts/RankingBars'
 import { VIZ } from '../components/charts/chartUtils'
 import { useData } from '../store/DataProvider'
 import { deltaPersen, komisiTransaksi, pendapatanTransaksi, ringkas } from '../lib/calculations'
-import { endOfMonthISO, formatDate, formatDateShort, formatNumber, formatRupiah, monthLabel, startOfMonthISO, todayISO } from '../lib/format'
+import { formatDate, formatDateShort, formatNumber, formatRupiah, monthLabel, todayISO } from '../lib/format'
 import { groupBy } from '../lib/utils'
+import { periodeAktif, periodeSebelumnya } from '../lib/periode'
 
 export function DashboardPage() {
   const { db, transactionRows, billingRows, deliveryNoteRows, loading } = useData()
 
   const model = useMemo(() => {
-    const today = todayISO()
-    const monthStart = startOfMonthISO()
-    const monthEnd = endOfMonthISO()
-    const prevRef = new Date()
-    prevRef.setMonth(prevRef.getMonth() - 1)
-    const prevStart = startOfMonthISO(prevRef)
-    const prevEnd = endOfMonthISO(prevRef)
+    const periode = periodeAktif(transactionRows.map((t) => t.transaction_date))
+    const sebelum = periodeSebelumnya(periode)
+    const monthStart = periode.start
+    const monthEnd = periode.end
+    const prevStart = sebelum.start
+    const prevEnd = sebelum.end
+    // Hari terakhir yang ditampilkan pada grafik harian.
+    const today = periode.dariData
+      ? transactionRows.map((t) => t.transaction_date).filter((d) => d <= monthEnd).sort().at(-1)!
+      : todayISO()
 
     const thisMonth = transactionRows.filter((t) => t.transaction_date >= monthStart && t.transaction_date <= monthEnd)
     const lastMonth = transactionRows.filter((t) => t.transaction_date >= prevStart && t.transaction_date <= prevEnd)
@@ -114,7 +118,7 @@ export function DashboardPage() {
       tf: lastMonth.reduce((a, t) => a + t.tf_total, 0),
       biaya: lastMonth.reduce((a, t) => a + t.expense_total, 0),
     }
-    return { now, prev, daily, days, revenue, commission, topDrivers, attention, thisMonth, ujNow, ujPrev }
+    return { now, prev, daily, days, revenue, commission, topDrivers, attention, thisMonth, ujNow, ujPrev, periode }
   }, [transactionRows, billingRows, deliveryNoteRows, db.jobOrders])
 
   const recentTrx = useMemo(
@@ -142,13 +146,13 @@ export function DashboardPage() {
     )
   }
 
-  const { now, prev, daily, days, revenue, commission, topDrivers, attention, ujNow, ujPrev } = model
+  const { now, prev, daily, days, revenue, commission, topDrivers, attention, ujNow, ujPrev, periode } = model
 
   return (
     <>
       <PageHeader
         title="Dashboard"
-        description={`Ringkasan aktivitas operasional PT Bimajaya Mustika — periode ${monthLabel(todayISO())}.`}
+        description={`Ringkasan aktivitas operasional PT Bimajaya Mustika — periode ${monthLabel(periode.start)}${periode.dariData ? " (bulan terakhir yang memiliki data)" : ""}.`}
         actions={
           <Link to="/laporan/komisi">
             <span className="inline-flex h-9 items-center gap-2 rounded-md border border-hairline bg-surface px-3.5 text-[13px] font-medium text-ink transition hover:bg-sunken">
@@ -167,23 +171,29 @@ export function DashboardPage() {
           icon={<Truck size={15} />}
           delta={deltaPersen(now.transaksi, prev.transaksi)}
         />
+        {/* Nilainya bergantung pada tarif master Route, yang belum ada di data
+            operasional. Ditampilkan sebagai belum tersedia, bukan Rp 0, supaya
+            tidak terbaca seolah tidak ada pendapatan. */}
         <StatCard
           label="Total Komisi Bulan Ini"
-          value={formatRupiah(now.komisi, { compact: true })}
+          value={now.komisi ? formatRupiah(now.komisi, { compact: true }) : '—'}
           icon={<BadgeDollarSign size={15} />}
-          delta={deltaPersen(now.komisi, prev.komisi)}
+          delta={now.komisi ? deltaPersen(now.komisi, prev.komisi) : null}
+          hint={now.komisi ? undefined : 'menunggu formula komisi (TBD-01)'}
         />
         <StatCard
           label="Total Pendapatan"
-          value={formatRupiah(now.pendapatan, { compact: true })}
+          value={now.pendapatan ? formatRupiah(now.pendapatan, { compact: true }) : formatRupiah(now.cost, { compact: true })}
           icon={<Wallet size={15} />}
-          delta={deltaPersen(now.pendapatan, prev.pendapatan)}
+          delta={now.pendapatan ? deltaPersen(now.pendapatan, prev.pendapatan) : deltaPersen(now.cost, prev.cost)}
+          hint={now.pendapatan ? undefined : 'dari kolom COST — arti bisnisnya belum dikonfirmasi (TBD-02)'}
         />
         <StatCard
           label="Pendapatan Netto"
-          value={formatRupiah(now.netto, { compact: true })}
+          value={now.netto ? formatRupiah(now.netto, { compact: true }) : '—'}
           icon={<TrendingUp size={15} />}
-          delta={deltaPersen(now.netto, prev.netto)}
+          delta={now.netto ? deltaPersen(now.netto, prev.netto) : null}
+          hint={now.netto ? undefined : 'menunggu formula netto (TBD-03)'}
         />
         <StatCard
           label="Total Sopir Aktif"
@@ -219,7 +229,8 @@ export function DashboardPage() {
           label="Biaya Operasional"
           value={formatRupiah(ujNow.biaya, { compact: true })}
           icon={<Fuel size={15} />}
-          delta={deltaPersen(ujNow.biaya, ujPrev.biaya)}
+          delta={ujNow.biaya ? deltaPersen(ujNow.biaya, ujPrev.biaya) : null}
+          hint={ujNow.biaya ? undefined : 'belum ada biaya tercatat pada periode ini'}
           invertDelta
         />
       </div>
@@ -229,7 +240,7 @@ export function DashboardPage() {
         <Card className="xl:col-span-2">
           <CardHeader
             title="Jumlah transaksi per hari"
-            subtitle={`${monthLabel(todayISO())} — tanggal 1 s/d hari ini`}
+            subtitle={`${monthLabel(periode.start)} — tanggal 1 s/d ${formatDate(model.days.at(-1) ?? periode.start).slice(0, 5)}`}
             actions={<Badge tone="brand">{formatNumber(now.transaksi)} transaksi</Badge>}
           />
           <div className="px-3 pt-3 pb-2">

@@ -190,22 +190,40 @@ Identitas seri tidak pernah bergantung pada warna saja — selalu ada legend dan
 
 ---
 
-## Isi data dummy
+## Sumber data aplikasi
 
-| Entitas | Jumlah |
-|---|---|
-| Sopir | 26 |
-| Route | 18 |
-| Mobil | 16 |
-| Project | 4 |
-| SI / Job Order | 42 |
-| Trip / Transaksi Komisi | 88 |
-| Termin Uang Jalan | ~108 |
-| Biaya Operasional | ~54 |
-| Data Tagihan | 38 |
-| Surat Jalan | 34 |
+Aplikasi memakai **data operasional sebenarnya** dari `REKAPAN SHAZA.xlsx`
+(periode 01/06/2026 – 21/07/2026) untuk entitas yang tercakup di file tersebut.
 
-Reset atau export data dummy lewat halaman **Tools**.
+| Entitas | Jumlah | Sumber |
+|---|---:|---|
+| Sopir | 39 | REKAPAN SHAZA (nama dinormalkan dari atribut kendaraan) |
+| Mobil | 29 | REKAPAN SHAZA (+ konfigurasi hasil pemisahan) |
+| Project | 4 | REKAPAN SHAZA — SLB, CASH, ATLAS, PDT |
+| Route | 136 | REKAPAN SHAZA (kode dibangkitkan dari nama rute) |
+| Trip / Transaksi | 241 | REKAPAN SHAZA |
+| Termin Uang Jalan | 343 | REKAPAN SHAZA |
+| Biaya Operasional | 84 | REKAPAN SHAZA |
+| SI / Job Order | 42 | **data contoh** — tidak ada di file |
+| Data Tagihan | 28 | **data contoh** — tidak ada di file |
+| Surat Jalan | 34 | **data contoh** — tidak ada di file |
+
+Halaman yang memakai data contoh diberi penanda di aplikasi. Halaman **Tools** menyediakan
+tombol untuk beralih ke dataset contoh sepenuhnya (tanpa data operasional asli) dan untuk
+memuat ulang data REKAPAN SHAZA.
+
+### Angka yang tercermin di aplikasi
+
+| | |
+|---|---:|
+| Total UJ | Rp 993.133.000 |
+| Potong kasbon | Rp 20.035.500 |
+| TF ke sopir | Rp 973.097.500 |
+| COST | Rp 2.337.950.000 |
+| Biaya operasional | Rp 103.076.250 |
+
+Periode laporan otomatis mengikuti **bulan terakhir yang memiliki data**, bukan bulan
+kalender berjalan — jadi halaman laporan tidak tampak kosong.
 
 ---
 

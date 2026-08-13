@@ -35,6 +35,7 @@ export function DataProjectPage() {
   const stat = useMemo(() => {
     const m = new Map<string, { trip: number; uj: number }>()
     for (const t of transactionRows) {
+      if (!t.project_id) continue
       const a = m.get(t.project_id) ?? { trip: 0, uj: 0 }
       a.trip += 1; a.uj += t.uj_total
       m.set(t.project_id, a)

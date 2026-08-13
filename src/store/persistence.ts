@@ -1,7 +1,7 @@
 import type { Database } from '../types'
-import { generateDatabase } from '../data/dummy'
+import { generateDatabase, generateSampleDatabase } from '../data/dummy'
 
-const DB_KEY = 'sikotis.db.v1'
+const DB_KEY = 'sikotis.db.v2'
 const AUTH_KEY = 'sikotis.auth.v1'
 
 /** Koleksi inti yang sudah ada sejak versi pertama. */
@@ -91,6 +91,13 @@ export function resetDatabase(): Database {
     /* abaikan */
   }
   const fresh = generateDatabase()
+  saveDatabase(fresh)
+  return fresh
+}
+
+/** Ganti isi database dengan dataset contoh sepenuhnya (tanpa data operasional asli). */
+export function resetToSampleDatabase(): Database {
+  const fresh = generateSampleDatabase()
   saveDatabase(fresh)
   return fresh
 }

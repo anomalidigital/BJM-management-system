@@ -12,8 +12,9 @@ import { ReportPreview } from '../components/report/ReportPreview'
 import { useData } from '../store/DataProvider'
 import { useToast } from '../store/ToastProvider'
 import { komisiTransaksi, ringkas } from '../lib/calculations'
-import { endOfMonthISO, formatDate, formatNumber, formatRupiah, startOfMonthISO } from '../lib/format'
+import { formatDate, formatNumber, formatRupiah } from '../lib/format'
 import { groupBy } from '../lib/utils'
+import { periodeAktif } from '../lib/periode'
 import type { TransactionRow } from '../types'
 
 type Mode = 'perSopir' | 'semuaSopir' | 'global'
@@ -28,8 +29,9 @@ export function LapKomisiPage() {
   const { db, transactionRows } = useData()
   const toast = useToast()
 
-  const [from, setFrom] = useState(startOfMonthISO())
-  const [to, setTo] = useState(endOfMonthISO())
+  const periodeDefault = useMemo(() => periodeAktif(transactionRows.map((t) => t.transaction_date)), [transactionRows])
+  const [from, setFrom] = useState(periodeDefault.start)
+  const [to, setTo] = useState(periodeDefault.end)
   const [mode, setMode] = useState<Mode>('semuaSopir')
   const [driverId, setDriverId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -85,7 +87,7 @@ export function LapKomisiPage() {
   }
 
   function resetFilter() {
-    setFrom(startOfMonthISO()); setTo(endOfMonthISO()); setMode('semuaSopir'); setDriverId(null); setError(null)
+    setFrom(periodeDefault.start); setTo(periodeDefault.end); setMode('semuaSopir'); setDriverId(null); setError(null)
   }
 
   const periodeText = `${formatDate(from)} s/d ${formatDate(to)}`

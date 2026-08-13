@@ -11,8 +11,9 @@ import { ReportPreview } from '../components/report/ReportPreview'
 import { useData } from '../store/DataProvider'
 import { useToast } from '../store/ToastProvider'
 import { nettoTransaksi, pendapatanTransaksi, ringkas } from '../lib/calculations'
-import { endOfMonthISO, formatDate, formatNumber, formatRupiah, startOfMonthISO } from '../lib/format'
+import { formatDate, formatNumber, formatRupiah } from '../lib/format'
 import { groupBy } from '../lib/utils'
+import { periodeAktif } from '../lib/periode'
 
 type Mode = 'perMobil' | 'global'
 
@@ -20,8 +21,9 @@ export function LapNettoPage() {
   const { transactionRows } = useData()
   const toast = useToast()
 
-  const [from, setFrom] = useState(startOfMonthISO())
-  const [to, setTo] = useState(endOfMonthISO())
+  const periodeDefault = useMemo(() => periodeAktif(transactionRows.map((t) => t.transaction_date)), [transactionRows])
+  const [from, setFrom] = useState(periodeDefault.start)
+  const [to, setTo] = useState(periodeDefault.end)
   const [mode, setMode] = useState<Mode>('perMobil')
   const [error, setError] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
@@ -213,7 +215,7 @@ export function LapNettoPage() {
             <div className="flex flex-wrap items-center gap-2 border-t border-hairline pt-4">
               <Button variant="primary" icon={<Eye size={15} />} onClick={openPreview}>Preview</Button>
               <Button icon={<Printer size={15} />} onClick={openPreview}>Cetak</Button>
-              <Button variant="ghost" icon={<X size={14} />} onClick={() => { setFrom(startOfMonthISO()); setTo(endOfMonthISO()); setMode('perMobil'); setError(null) }}>Batal</Button>
+              <Button variant="ghost" icon={<X size={14} />} onClick={() => { setFrom(periodeDefault.start); setTo(periodeDefault.end); setMode('perMobil'); setError(null) }}>Batal</Button>
             </div>
           </div>
         </Card>
