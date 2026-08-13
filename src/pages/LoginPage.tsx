@@ -1,23 +1,16 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { KeyRound, LogIn, ShieldCheck, TriangleAlert, User } from 'lucide-react'
+import { Eye, EyeOff, KeyRound, LogIn, ShieldCheck, TriangleAlert, User } from 'lucide-react'
 import { useAuth } from '../store/AuthProvider'
 import { Button } from '../components/ui/Button'
-import { Field, Input, Label } from '../components/ui/Field'
-import type { Role } from '../types'
-import { cn } from '../lib/utils'
-
-const ROLES: Array<{ id: Role; title: string; desc: string }> = [
-  { id: 'admin', title: 'Admin', desc: 'Kelola master, transaksi, dan laporan' },
-  { id: 'viewer', title: 'Viewer / Management', desc: 'Hanya melihat data dan export laporan' },
-]
+import { Field, Input } from '../components/ui/Field'
 
 export function LoginPage() {
   const { user, login } = useAuth()
   const navigate = useNavigate()
   const [username, setUsername] = useState('admin')
   const [password, setPassword] = useState('sikotis')
-  const [role, setRole] = useState<Role>('admin')
+  const [lihatPassword, setLihatPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -28,7 +21,7 @@ export function LoginPage() {
     setError(null)
     setLoading(true)
     try {
-      await login(username, password, role)
+      await login(username, password)
       navigate('/dashboard', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login gagal.')
@@ -98,38 +91,25 @@ export function LoginPage() {
                   <KeyRound size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-3" />
                   <Input
                     id={id}
-                    type="password"
+                    type={lihatPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-8"
+                    className="pr-9 pl-8"
                     autoComplete="current-password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setLihatPassword((v) => !v)}
+                    aria-label={lihatPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                    title={lihatPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                    className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded p-1.5 text-ink-3 transition hover:bg-sunken hover:text-ink"
+                  >
+                    {lihatPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
                 </div>
               )}
             </Field>
 
-            <div>
-              <Label>Masuk sebagai</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {ROLES.map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => {
-                      setRole(r.id)
-                      setUsername(r.id === 'admin' ? 'admin' : 'viewer')
-                    }}
-                    className={cn(
-                      'rounded-lg border p-2.5 text-left transition-colors',
-                      role === r.id ? 'border-brand-400 bg-brand-50' : 'border-hairline bg-surface hover:border-brand-200 hover:bg-brand-50/40',
-                    )}
-                  >
-                    <span className="block text-[13px] font-semibold text-ink">{r.title}</span>
-                    <span className="mt-0.5 block text-[11.5px] leading-snug text-ink-3">{r.desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
 
             {error && (
               <div
@@ -146,10 +126,6 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <p className="mt-5 rounded-md border border-hairline bg-sunken px-3 py-2.5 text-[12px] leading-relaxed text-ink-3">
-            Autentikasi masih simulasi. Username apa pun diterima, password minimal 4 karakter. Pilih peran untuk
-            mencoba pembatasan akses Admin dan Viewer.
-          </p>
         </div>
       </main>
     </div>
