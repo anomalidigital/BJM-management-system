@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Database, Download, RefreshCw, Shuffle, TriangleAlert } from 'lucide-react'
+import { Database, Download, RefreshCw } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -13,11 +13,10 @@ import { downloadFile } from '../lib/utils'
 import { formatNumber, todayISO } from '../lib/format'
 
 export function ToolsPage() {
-  const { db, muatUlangData, resetToSample, simulateError, reload } = useData()
+  const { db, muatUlangData, reload } = useData()
   const { canEdit } = useAuth()
   const toast = useToast()
   const [confirmReset, setConfirmReset] = useState(false)
-  const [confirmSample, setConfirmSample] = useState(false)
 
   const counts: Array<[string, number]> = [
     ['Sopir', db.drivers.length],
@@ -102,14 +101,8 @@ export function ToolsPage() {
               <Button className="w-full justify-start" icon={<RefreshCw size={15} />} onClick={reload}>
                 Muat ulang data
               </Button>
-              <Button className="w-full justify-start" icon={<TriangleAlert size={15} />} onClick={() => { simulateError(); toast.error('State error disimulasikan.') }}>
-                Simulasikan state error
-              </Button>
-              <Button className="w-full justify-start" icon={<Shuffle size={15} />} disabled={!canEdit} onClick={() => setConfirmSample(true)}>
-                Ganti ke data contoh
-              </Button>
               <Button className="w-full justify-start" variant="danger" icon={<Database size={15} />} disabled={!canEdit} onClick={() => setConfirmReset(true)}>
-                Muat ulang data awal
+                Reset data ke kondisi awal
               </Button>
             </div>
           </Card>
@@ -128,22 +121,13 @@ export function ToolsPage() {
 
       <ConfirmDialog
         open={confirmReset}
-        title="Muat ulang data awal?"
+        title="Reset data ke kondisi awal?"
         message="Seluruh perubahan yang Anda buat (tambah / ubah / hapus) akan hilang dan data dikembalikan ke kondisi awal."
-        confirmLabel="Muat Ulang"
+        confirmLabel="Reset Data"
         onCancel={() => setConfirmReset(false)}
         onConfirm={doReset}
       />
 
-      <ConfirmDialog
-        open={confirmSample}
-        title="Ganti ke data contoh?"
-        message="Seluruh data operasional akan diganti dengan data contoh. Berguna bila sistem perlu ditunjukkan ke pihak luar. Data semula dapat dimuat ulang kapan saja lewat tombol di bawahnya."
-        confirmLabel="Ganti ke Data Contoh"
-        tone="primary"
-        onCancel={() => setConfirmSample(false)}
-        onConfirm={() => { resetToSample(); setConfirmSample(false); toast.success('Beralih ke data contoh.') }}
-      />
     </>
   )
 }
