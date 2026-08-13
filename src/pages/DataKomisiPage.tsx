@@ -239,7 +239,6 @@ export function DataKomisiPage() {
     <>
       <PageHeader
         title="Trip & Komisi"
-        legacyTitle="Pengisian Data Surat Jalan"
         crumbs={[{ label: 'Transaksi' }, { label: 'Data Komisi' }]}
         description="Klik NoTrans untuk membuka detail trip beserta termin uang jalan, biaya operasional, dan dokumennya."
         actions={
@@ -273,7 +272,7 @@ export function DataKomisiPage() {
           right={<Button size="sm" onClick={() => setDateFrom(startOfMonthISO())}>Bulan ini</Button>}
         />
 
-        {/* "Tandai" pada aplikasi lama = memilih baris; aksinya muncul di sini */}
+        {/* Menandai baris memunculkan aksi massal di sini */}
         {selected.size > 0 && (
           <div className="animate-in-fade flex flex-wrap items-center justify-between gap-3 border-b border-brand-100 bg-brand-50 px-4 py-2.5">
             <p className="text-[13px] font-semibold text-brand-800">{selected.size} transaksi ditandai</p>
@@ -413,8 +412,8 @@ export function DataKomisiPage() {
       <Modal open={show4B} onClose={() => setShow4B(false)} title="Tombol 4B" size="sm"
         footer={<Button variant="primary" onClick={() => setShow4B(false)}>Mengerti</Button>}>
         <p className="text-[13px] leading-relaxed text-ink-2">
-          Fungsi bisnis tombol <span className="font-semibold text-ink">4B</span> pada window lama belum tervalidasi,
-          sehingga tombolnya dipertahankan sebagai secondary action tanpa logic karangan.
+          Fungsi bisnis tombol <span className="font-semibold text-ink">4B</span> belum tervalidasi, sehingga
+          tombolnya dipertahankan sebagai secondary action tanpa logic karangan.
         </p>
         <p className="mt-3 rounded-md border border-hairline bg-sunken px-3 py-2.5 text-[12.5px] text-ink-3">
           Ditandai sebagai <span className="font-semibold text-ink-2">TBD-06</span>. Beri tahu fungsi aslinya, dan

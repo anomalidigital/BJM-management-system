@@ -41,7 +41,7 @@ export const TBD_NOTES: TbdNote[] = [
     id: 'TBD-01',
     title: 'Komisi sopir per transaksi',
     current: 'Sementara memakai nilai Komisioner dari master Route. Fitur komisi dipertahankan.',
-    question: 'Spreadsheet operasional tidak punya kolom komisi sama sekali, tetapi aplikasi lama punya menu dan laporan komisi. Apakah komisi masih dipakai? Bila ya, apa formula, sumber data, dan waktu pembayarannya?',
+    question: 'Data operasional tidak memuat kolom komisi sama sekali. Apakah komisi masih dipakai? Bila ya, apa formula, sumber data, dan waktu pembayarannya?',
   },
   {
     id: 'TBD-02',
@@ -58,7 +58,7 @@ export const TBD_NOTES: TbdNote[] = [
   {
     id: 'TBD-04',
     title: 'Data Cost pada Data Tagihan',
-    current: 'Dummy mengisi Data Cost mengikuti Kode Cust dari SI/JO.',
+    current: 'Data Cost mengikuti Kode Cust dari SI/JO.',
     question: 'Apakah Data Cost memang sama dengan Kode Cust, atau master kode biaya tersendiri?',
   },
   {
@@ -71,7 +71,7 @@ export const TBD_NOTES: TbdNote[] = [
     id: 'TBD-08',
     title: 'Apakah TR sama dengan SIJO?',
     current: 'Disimpan sebagai dua field terpisah pada trip.',
-    question: 'TR pada spreadsheet seragam 10 digit, sedangkan SIJO pada aplikasi lama 7 digit, dan tidak ada kolom berformat SIJO di spreadsheet. Apakah TR = SI/Job Order, nomor trucking request, atau dokumen lain?',
+    question: 'TR pada data operasional seragam 10 digit, sedangkan SIJO berformat 7 digit, dan tidak ada kolom berformat SIJO sama sekali. Apakah TR = SI/Job Order, nomor trucking request, atau dokumen lain?',
   },
   {
     id: 'TBD-09',
@@ -89,7 +89,7 @@ export const TBD_NOTES: TbdNote[] = [
     id: 'TBD-11',
     title: 'Komponen Kernet pada laporan Netto',
     current: 'Belum ada field kernet di sistem.',
-    question: 'Laporan netto aplikasi lama memuat komponen Kernet. Dari mana nilainya diambil, dan apakah masih dipakai?',
+    question: 'Laporan netto memuat komponen Kernet. Dari mana nilainya diambil, dan apakah masih dipakai?',
   },
   {
     id: 'TBD-12',

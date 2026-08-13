@@ -223,7 +223,6 @@ export function LapRitanPage() {
     <>
       <PageHeader
         title="Cek Ritan Bulan Ini"
-        legacyTitle="Transportation Management System - Driver Reports"
         crumbs={[{ label: 'Lap. Bulan Ini' }, { label: 'Cek Ritan Bulan Ini' }]}
         description={`Ritan Sopir — bulan berjalan (${monthLabel(monthStart)}). Gunakan Sunting untuk mengubah Tgl Bon dan Bon Pribadi langsung di tabel.`}
         actions={
@@ -314,9 +313,7 @@ export function LapRitanPage() {
       </Card>
 
       <p className="mt-3 text-[11.5px] text-ink-3">
-        Kolom mengikuti koreksi dokumen: <span className="font-medium text-ink-2">Tujuan → Tgl Bon</span>,{' '}
-        <span className="font-medium text-ink-2">Jam.Brkt → Bon Pribadi</span>,{' '}
-        <span className="font-medium text-ink-2">St.Job → SI - JOB ORDER</span>. 1 transaksi = 1 ritan (TBD-05).
+        1 transaksi dihitung sebagai 1 ritan (TBD-05).
       </p>
 
       <ConfirmDialog

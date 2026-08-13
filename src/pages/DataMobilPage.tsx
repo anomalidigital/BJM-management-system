@@ -161,10 +161,9 @@ export function DataMobilPage() {
 
       <p className="mt-3 flex items-start gap-1.5 text-[11.5px] leading-relaxed text-ink-3">
         <Truck size={13} className="mt-0.5 shrink-0" />
-        Pada spreadsheet lama, konfigurasi seperti <span className="font-medium text-ink-2">6X6</span>,{' '}
-        <span className="font-medium text-ink-2">DL</span>, atau <span className="font-medium text-ink-2">LB</span> ditulis menempel
-        pada nama sopir (mis. <span className="font-medium text-ink-2">IWAN 6X6 DL</span>). Di sistem ini konfigurasi menjadi
-        atribut kendaraan, sehingga satu sopir tidak lagi terpecah menjadi beberapa nama.
+        Konfigurasi seperti <span className="font-medium text-ink-2">6X6</span>,{' '}
+        <span className="font-medium text-ink-2">DL</span>, atau <span className="font-medium text-ink-2">LB</span> disimpan
+        sebagai atribut kendaraan, bukan bagian dari nama sopir — sehingga satu sopir tidak terpecah menjadi beberapa nama.
       </p>
 
       <Modal

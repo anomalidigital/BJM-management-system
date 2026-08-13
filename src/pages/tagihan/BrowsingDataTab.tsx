@@ -173,7 +173,7 @@ export function BrowsingDataTab() {
 
       <p className="border-t border-hairline px-4 py-2.5 text-[11.5px] text-ink-3">
         Klik nilai pada kolom <span className="font-semibold text-ink-2">Sijo</span> untuk langsung membuka detail
-        SI / Job Order — tidak perlu menyalin nomor secara manual seperti pada aplikasi lama.
+        SI / Job Order — tidak perlu menyalin nomornya secara manual.
       </p>
 
       <ConfirmDialog

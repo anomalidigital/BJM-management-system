@@ -17,7 +17,6 @@ export function DataTagihanPage() {
     <>
       <PageHeader
         title="Data Tagihan"
-        legacyTitle="Pemrosesan file data SI / JO"
         crumbs={[{ label: 'Transaksi' }, { label: 'Data Tagihan' }]}
       />
 

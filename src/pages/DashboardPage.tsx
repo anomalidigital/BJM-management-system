@@ -412,8 +412,8 @@ export function DashboardPage() {
       </div>
 
       <p className="mt-4 text-[11.5px] text-ink-3">
-        Seluruh angka pada dashboard berasal dari data dummy dan formula sementara. Ganti implementasi di{' '}
-        <code className="rounded bg-sunken px-1 py-0.5 text-[11px]">src/lib/calculations.ts</code> setelah formula resmi tersedia.
+        Angka transaksi, uang jalan, dan biaya operasional berasal dari data operasional. Nilai komisi dan netto masih
+        memakai formula sementara — lihat daftar TBD di halaman Tools.
       </p>
     </>
   )

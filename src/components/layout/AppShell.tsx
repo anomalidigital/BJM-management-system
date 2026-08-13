@@ -42,7 +42,7 @@ export function AppShell() {
       <ConfirmDialog
         open={confirmLogout}
         title="Keluar dari SIKOTIS?"
-        message="Anda akan kembali ke halaman login. Data dummy yang tersimpan tidak akan terhapus."
+        message="Anda akan kembali ke halaman login. Data yang tersimpan tidak akan terhapus."
         confirmLabel="Logout"
         tone="primary"
         onCancel={() => setConfirmLogout(false)}

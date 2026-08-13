@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils'
 
 /**
  * Layout dokumen Surat Jalan ukuran A4 (bukan screenshot UI).
- * Dua varian sesuai fungsi legacy: Dengan Logo dan Tanpa Logo.
+ * Dua varian: Dengan Logo dan Tanpa Logo.
  */
 export function SuratJalanDocument({
   note,

@@ -15,7 +15,7 @@ interface DataContextValue {
   reload: () => void
   /** Paksa state error untuk mendemokan halaman gagal memuat. */
   simulateError: () => void
-  resetToDummy: () => void
+  muatUlangData: () => void
   /** Ganti seluruh isi dengan dataset contoh (tanpa data operasional asli). */
   resetToSample: () => void
   create: <K extends EntityKey>(key: K, row: NewRow<K>) => Row<K>
@@ -86,7 +86,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return list.length
   }, [])
 
-  const resetToDummy = useCallback(() => {
+  const muatUlangData = useCallback(() => {
     setLoading(true)
     window.setTimeout(() => {
       setDb(resetDatabase())
@@ -180,8 +180,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [db])
 
   const value = useMemo<DataContextValue>(
-    () => ({ db, loading, error, reload: runLoad, simulateError, resetToDummy, resetToSample, create, update, remove, transactionRows, billingRows, deliveryNoteRows }),
-    [db, loading, error, runLoad, simulateError, resetToDummy, resetToSample, create, update, remove, transactionRows, billingRows, deliveryNoteRows],
+    () => ({ db, loading, error, reload: runLoad, simulateError, muatUlangData, resetToSample, create, update, remove, transactionRows, billingRows, deliveryNoteRows }),
+    [db, loading, error, runLoad, simulateError, muatUlangData, resetToSample, create, update, remove, transactionRows, billingRows, deliveryNoteRows],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

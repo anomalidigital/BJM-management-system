@@ -209,7 +209,6 @@ export function LapKomisiPage() {
     <>
       <PageHeader
         title="Cetak Komisi Bulan Berjalan"
-        legacyTitle="Cetak Komisi Bulan Berjalan"
         crumbs={[{ label: 'Lap. Bulan Ini' }, { label: 'Komisi Bulan Berjalan' }]}
         description="Pilih periode dan jenis laporan, lalu buka preview sebelum mencetak atau menyimpan sebagai PDF."
       />

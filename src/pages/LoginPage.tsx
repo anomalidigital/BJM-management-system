@@ -67,7 +67,7 @@ export function LoginPage() {
           </ul>
         </div>
 
-        <p className="text-[11.5px] text-nav-ink/60">PT Bimajaya Mustika &middot; Prototype v0.1 &middot; Data dummy</p>
+        <p className="text-[11.5px] text-nav-ink/60">PT Bimajaya Mustika &middot; Version 0.1</p>
       </aside>
 
       {/* Form */}

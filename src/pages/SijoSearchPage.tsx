@@ -148,7 +148,6 @@ export function SijoSearchPage() {
     <>
       <PageHeader
         title="Pencarian nomor SI - Job Order"
-        legacyTitle="Pencarian nomor SI - Job Order"
         crumbs={[{ label: 'Pencarian' }, { label: 'SI / Job Order' }]}
         description="Ketik nomor SI / Job Order, atau klik nilai Sijo dari halaman lain untuk langsung membuka detailnya."
       />

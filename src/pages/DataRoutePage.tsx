@@ -167,7 +167,6 @@ export function DataRoutePage() {
     <>
       <PageHeader
         title="Data Route"
-        legacyTitle="Pengisian Data Route"
         crumbs={[{ label: 'Master' }, { label: 'Data Route' }]}
         actions={
           <>

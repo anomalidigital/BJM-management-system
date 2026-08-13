@@ -136,7 +136,6 @@ export function DataSopirPage() {
     <>
       <PageHeader
         title="Data Sopir"
-        legacyTitle="PENGISIAN DATA SOPIR"
         crumbs={[{ label: 'Master' }, { label: 'Data Sopir' }]}
         actions={
           <Button variant="primary" icon={<Plus size={15} />} disabled={!canEdit} onClick={openCreate}
@@ -173,8 +172,7 @@ export function DataSopirPage() {
 
       <p className="mt-3 flex items-start gap-1.5 text-[11.5px] leading-relaxed text-ink-3">
         <Users size={13} className="mt-0.5 shrink-0" />
-        Aplikasi lama menampilkan dua kolom berjudul <span className="font-medium text-ink-2">Alamat</span>. Pada sistem baru
-        keduanya dipisah menjadi <span className="font-medium text-ink-2">Alamat</span> (nama jalan &amp; nomor) dan{' '}
+        Alamat dipisah menjadi <span className="font-medium text-ink-2">Alamat</span> (nama jalan &amp; nomor) dan{' '}
         <span className="font-medium text-ink-2">Alamat 2</span> (kecamatan / area), sehingga data tetap utuh tetapi bisa
         dicari dan difilter secara terpisah.
       </p>
@@ -210,7 +208,7 @@ export function DataSopirPage() {
                 onChange={(e) => setForm({ ...form, address_1: e.target.value })} />
             )}
           </Field>
-          <Field label="Alamat 2" hint="Kecamatan / area — kolom Alamat kedua pada aplikasi lama.">
+          <Field label="Alamat 2" hint="Kecamatan / area.">
             {(id) => (
               <Input id={id} value={form.address_2} placeholder="Jakarta Timur"
                 onChange={(e) => setForm({ ...form, address_2: e.target.value })} />

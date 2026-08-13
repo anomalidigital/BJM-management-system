@@ -13,7 +13,7 @@ import { downloadFile } from '../lib/utils'
 import { formatNumber, todayISO } from '../lib/format'
 
 export function ToolsPage() {
-  const { db, resetToDummy, resetToSample, simulateError, reload } = useData()
+  const { db, muatUlangData, resetToSample, simulateError, reload } = useData()
   const { canEdit } = useAuth()
   const toast = useToast()
   const [confirmReset, setConfirmReset] = useState(false)
@@ -33,14 +33,14 @@ export function ToolsPage() {
   ]
 
   function exportJson() {
-    downloadFile(`sikotis-dummy-${todayISO()}.json`, JSON.stringify(db, null, 2))
+    downloadFile(`sikotis-data-${todayISO()}.json`, JSON.stringify(db, null, 2))
     toast.success('Data berhasil diexport.')
   }
 
   function doReset() {
-    resetToDummy()
+    muatUlangData()
     setConfirmReset(false)
-    toast.success('Data dummy berhasil dibuat ulang.')
+    toast.success('Data berhasil dimuat ulang.')
   }
 
   return (
@@ -48,7 +48,7 @@ export function ToolsPage() {
       <PageHeader
         title="Tools"
         crumbs={[{ label: 'Lainnya' }, { label: 'Tools' }]}
-        description="Utilitas prototype: kelola data dummy, uji state halaman, dan lihat daftar business rule yang masih perlu dikonfirmasi."
+        description="Kelola data aplikasi, uji state halaman, dan lihat daftar business rule yang masih perlu dikonfirmasi."
       />
 
       <div className="grid gap-4 xl:grid-cols-3">
@@ -116,7 +116,7 @@ export function ToolsPage() {
             <CardHeader title="Aksi" />
             <div className="space-y-2 p-4">
               <Button className="w-full justify-start" icon={<Download size={15} />} onClick={exportJson}>
-                Export data dummy (JSON)
+                Export data (JSON)
               </Button>
               <Button className="w-full justify-start" icon={<RefreshCw size={15} />} onClick={reload}>
                 Muat ulang data
@@ -138,8 +138,8 @@ export function ToolsPage() {
             <dl className="space-y-2 p-4 text-[12.5px]">
               <div className="flex justify-between gap-3"><dt className="text-ink-3">Sistem</dt><dd className="font-medium text-ink">SIKOTIS — Sistem Komisi Otomatis</dd></div>
               <div className="flex justify-between gap-3"><dt className="text-ink-3">Perusahaan</dt><dd className="font-medium text-ink">PT Bimajaya Mustika</dd></div>
-              <div className="flex justify-between gap-3"><dt className="text-ink-3">Versi</dt><dd className="font-medium text-ink">Prototype 0.1</dd></div>
-              <div className="flex justify-between gap-3"><dt className="text-ink-3">Data</dt><dd className="font-medium text-ink">Dummy (localStorage)</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-ink-3">Version</dt><dd className="font-medium text-ink">0.1</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-ink-3">Data</dt><dd className="font-medium text-ink">REKAPAN SHAZA (localStorage)</dd></div>
             </dl>
           </Card>
         </div>

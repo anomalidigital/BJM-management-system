@@ -49,7 +49,7 @@ export function Sidebar({ collapsed, onToggleCollapse, onLogout, mobileOpen, onC
                     <NavLink
                       to={item.to}
                       onClick={onCloseMobile}
-                      title={collapsed ? item.label : item.legacy}
+                      title={item.label}
                       className={({ isActive }) =>
                         cn(
                           'group flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors',
@@ -98,7 +98,7 @@ export function Sidebar({ collapsed, onToggleCollapse, onLogout, mobileOpen, onC
             {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
             {!collapsed && <span>Sembunyikan menu</span>}
           </button>
-          {!collapsed && <p className="px-2.5 pt-1 pb-0.5 text-[10.5px] text-nav-ink/45">Prototype v0.1 &middot; data dummy</p>}
+          {!collapsed && <p className="px-2.5 pt-1 pb-0.5 text-[10.5px] text-nav-ink/45">Version 0.1</p>}
         </div>
       </aside>
     </>

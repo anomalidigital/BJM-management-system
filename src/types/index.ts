@@ -1,6 +1,6 @@
 /**
  * SIKOTIS - domain types.
- * Nama field mengikuti kosakata bisnis legacy (dokumen bagian 23):
+ * Nama field mengikuti kosakata bisnis yang dipakai PT Bimajaya Mustika:
  * SIJO, Data Cost, Kode Cust, UjRoute, Komisioner, S/JO, Ritan, Bon Pribadi.
  */
 
@@ -84,7 +84,7 @@ export interface JobOrder {
 export type TripStatus = 'draft' | 'aktif' | 'selesai' | 'batal'
 
 /**
- * Transaksi -> Data Trip / Komisi (legacy: Pengisian Data Surat Jalan).
+ * Transaksi -> Data Trip / Komisi.
  * Entity operasional inti. Identifier TR / SIJO / No PI sengaja DIPISAH -
  * belum ada bukti ketiganya merujuk hal yang sama.
  */
@@ -143,7 +143,7 @@ export interface OperationalExpense {
   updated_at: string
 }
 
-/** Transaksi -> Data Tagihan (legacy: Pemrosesan file data SI / JO) */
+/** Transaksi -> Data Tagihan */
 export interface Billing {
   id: string
   invoice_no: string             // No Faktur / Nofaktur

@@ -24,8 +24,7 @@ const blank = (): FormState => ({
 })
 
 /**
- * Navigasi record legacy (Atas / Bawah / Sebelum / Berikut) diganti dengan
- * daftar record yang bisa diklik langsung + tombol Previous / Next Record.
+ * Daftar record dapat diklik langsung, dilengkapi tombol Previous / Next Record.
  */
 export function ProsesDataTab() {
   const { db, billingRows, loading, create, update, remove } = useData()
@@ -266,7 +265,7 @@ export function ProsesDataTab() {
 
             <details className="mt-4 rounded-lg border border-hairline">
               <summary className="cursor-pointer px-3.5 py-2.5 text-[12.5px] font-medium text-ink-2 select-none">
-                Field legacy lainnya (BL No, Invoice No, Catatan)
+                Field lainnya (BL No, Invoice No, Catatan)
               </summary>
               <div className="grid gap-4 border-t border-hairline p-3.5 sm:grid-cols-3">
                 <Field label="BL No">{(fid) => <Input id={fid} value={form.bl_no} readOnly={readOnly} onChange={(e) => setForm({ ...form, bl_no: e.target.value })} />}</Field>
