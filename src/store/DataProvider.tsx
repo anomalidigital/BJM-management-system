@@ -29,7 +29,10 @@ interface DataContextValue {
 
 const DataContext = createContext<DataContextValue | null>(null)
 
-const EMPTY_DB: Database = { drivers: [], routes: [], vehicles: [], jobOrders: [], transactions: [], billings: [], deliveryNotes: [] }
+const EMPTY_DB: Database = {
+  drivers: [], routes: [], vehicles: [], jobOrders: [], transactions: [],
+  billings: [], deliveryNotes: [], projects: [], ujPayments: [], expenses: [],
+}
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [db, setDb] = useState<Database>(EMPTY_DB)
@@ -100,11 +103,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const vehicles = new Map(db.vehicles.map((v) => [v.id, v]))
     const routes = new Map(db.routes.map((r) => [r.id, r]))
     const jobOrders = new Map(db.jobOrders.map((j) => [j.id, j]))
+    const projects = new Map(db.projects.map((p) => [p.id, p]))
+    // Agregasi termin UJ dan biaya per trip - dihitung sekali di sini.
+    const uj = new Map<string, { uj: number; kasbon: number; n: number }>()
+    for (const p of db.ujPayments) {
+      const a = uj.get(p.trip_id) ?? { uj: 0, kasbon: 0, n: 0 }
+      a.uj += p.uj_amount; a.kasbon += p.kasbon_deduction; a.n += 1
+      uj.set(p.trip_id, a)
+    }
+    const exp = new Map<string, number>()
+    for (const e of db.expenses) exp.set(e.trip_id, (exp.get(e.trip_id) ?? 0) + e.amount)
+
     return db.transactions.map((t: CommissionTransaction) => {
       const d = drivers.get(t.driver_id)
       const v = vehicles.get(t.vehicle_id)
       const r = routes.get(t.route_id)
       const j = jobOrders.get(t.job_order_id)
+      const pr = projects.get(t.project_id)
+      const u = uj.get(t.id) ?? { uj: 0, kasbon: 0, n: 0 }
       return {
         ...t,
         driver_code: d?.driver_code ?? '',
@@ -116,6 +132,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         route_price: r?.price ?? 0,
         ujroute: r?.ujroute ?? 0,
         commissioner: r?.commissioner ?? 0,
+        project_code: pr?.project_code ?? '',
+        project_name: pr?.project_name ?? '',
+        uj_total: u.uj,
+        kasbon_total: u.kasbon,
+        tf_total: u.uj - u.kasbon,
+        termin_count: u.n,
+        expense_total: exp.get(t.id) ?? 0,
       }
     })
   }, [db])

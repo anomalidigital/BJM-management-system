@@ -39,11 +39,28 @@ export interface Route {
   updated_at: string
 }
 
+/** Konfigurasi kendaraan - sebelumnya menempel pada nama sopir di spreadsheet. */
+export const VEHICLE_CONFIGS = ['6X6', '4X4', 'DL', 'LB', 'HB', 'EXT', 'TRONTON', 'DOLLY'] as const
+
 export interface Vehicle {
   id: string
-  plate_number: string           // No Mobil
+  plate_number: string           // No Mobil / No. Polisi
   vehicle_type: string
+  configuration: string          // 6X6, DL, LB, HB, EXT, TRONTON, DOLLY - boleh kosong
   status: 'aktif' | 'servis' | 'nonaktif'
+  created_at: string
+  updated_at: string
+}
+
+/** Master -> Data Project (SLB, ATLAS, PDT, ...). */
+export interface Project {
+  id: string
+  project_code: string
+  project_name: string
+  description: string
+  /** CASH tidak punya alur dokumen (tanpa TR / No PI) - lihat TBD-09. */
+  requires_document: boolean
+  status: 'aktif' | 'nonaktif'
   created_at: string
   updated_at: string
 }
@@ -63,7 +80,14 @@ export interface JobOrder {
   updated_at: string
 }
 
-/** Transaksi -> Data Komisi (legacy: Pengisian Data Surat Jalan) */
+/** Status trip. Spreadsheet mencampur status ke kolom dokumen, jadi dipisah. */
+export type TripStatus = 'draft' | 'aktif' | 'selesai' | 'batal'
+
+/**
+ * Transaksi -> Data Trip / Komisi (legacy: Pengisian Data Surat Jalan).
+ * Entity operasional inti. Identifier TR / SIJO / No PI sengaja DIPISAH -
+ * belum ada bukti ketiganya merujuk hal yang sama.
+ */
 export interface CommissionTransaction {
   id: string
   transaction_no: string         // NoTrans
@@ -74,10 +98,47 @@ export interface CommissionTransaction {
   route_id: string               // Kode Route
   destination_detail: string     // Detail Tujuan
   container_no: string           // Kont
+  project_id: string             // Project (SLB / CASH / ATLAS / PDT)
+  tr_reference: string           // TR  - JANGAN disamakan dengan SIJO (TBD-08)
+  pi_number: string              // No PI (nomor saja)
+  pi_status: string              // status yang di spreadsheet tercampur ke No PI
+  cost_value: number             // COST - makna bisnis belum dikonfirmasi (TBD-02)
+  status: TripStatus
+  notes: string
   is_marked: boolean             // Tandai
-  is_done: boolean               // Selesai
   bon_date: string | null        // Tgl Bon     (dipakai di Cek Ritan)
   personal_bon: number           // Bon Pribadi (dipakai di Cek Ritan)
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Pembayaran Uang Jalan per termin. Satu trip bisa punya banyak termin
+ * (data real: sampai 4). Aturan TERVERIFIKASI: tf_amount = uj_amount - kasbon_deduction
+ */
+export interface UjPayment {
+  id: string
+  trip_id: string
+  sequence: number               // Termin ke-
+  payment_date: string
+  uj_amount: number              // UJ
+  kasbon_deduction: number       // Potong Kasbon
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+/** Jenis biaya operasional - master, bukan kolom database permanen. */
+export const EXPENSE_TYPES = ['DEX', 'Tol', 'SPSI', 'Nginap', 'Reimbus', 'Uang Dorong', 'Double Driver', 'Escort', 'Lainnya'] as const
+export type ExpenseType = (typeof EXPENSE_TYPES)[number]
+
+export interface OperationalExpense {
+  id: string
+  trip_id: string
+  expense_type: string
+  amount: number
+  expense_date: string
+  notes: string
   created_at: string
   updated_at: string
 }
@@ -138,6 +199,9 @@ export interface Database {
   transactions: CommissionTransaction[]
   billings: Billing[]
   deliveryNotes: DeliveryNote[]
+  projects: Project[]
+  ujPayments: UjPayment[]
+  expenses: OperationalExpense[]
 }
 
 export type EntityKey = keyof Database
@@ -153,6 +217,14 @@ export interface TransactionRow extends CommissionTransaction {
   route_price: number
   ujroute: number
   commissioner: number
+  project_code: string
+  project_name: string
+  /** Agregat dari uj_payments milik trip ini. */
+  uj_total: number
+  kasbon_total: number
+  tf_total: number
+  termin_count: number
+  expense_total: number
 }
 
 export interface BillingRow extends Billing {

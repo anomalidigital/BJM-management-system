@@ -170,3 +170,87 @@ CREATE TABLE driver_bons (
   bentuknya menjadi tabel `delivery_note_containers` seperti di atas.
 - Constraint `UNIQUE (delivery_note_id, container_no)` menegakkan aturan validasi
   "Nomor container sudah digunakan" di level database.
+
+---
+
+# Tambahan — Corrective Update
+
+Ditambahkan setelah cross-check dengan spreadsheet operasional real. Ketiga tabel di
+bawah menggantikan asumsi lama bahwa satu trip hanya punya satu nilai uang jalan dan
+bahwa biaya operasional cukup disimpan sebagai kolom tetap.
+
+```sql
+CREATE TABLE projects (
+  id           BIGSERIAL PRIMARY KEY,
+  project_code VARCHAR(20)  NOT NULL UNIQUE,   -- SLB, ATLAS, PDT, ...
+  project_name VARCHAR(120) NOT NULL,
+  description  VARCHAR(240),
+  -- Data real: seluruh trip CASH tercatat tanpa TR dan tanpa No PI.
+  -- Penanda ini memisahkan order tunai dari dimensi customer (TBD-09).
+  requires_document BOOLEAN NOT NULL DEFAULT TRUE,
+  status       VARCHAR(10)  NOT NULL DEFAULT 'aktif',
+  created_at   TIMESTAMP    NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+-- Uang jalan dibayar bertahap: data real menunjukkan 1 sampai 4 termin per trip.
+CREATE TABLE uj_payments (
+  id                BIGSERIAL PRIMARY KEY,
+  trip_id           BIGINT   NOT NULL REFERENCES commission_transactions(id) ON DELETE CASCADE,
+  sequence          INT      NOT NULL,          -- Termin ke-
+  payment_date      DATE     NOT NULL,
+  uj_amount         BIGINT   NOT NULL DEFAULT 0, -- UJ
+  kasbon_deduction  BIGINT   NOT NULL DEFAULT 0, -- Potong Kasbon
+  notes             TEXT,
+  created_at        TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (trip_id, sequence),
+  -- Aturan TERVERIFIKASI dari formula asli spreadsheet.
+  CONSTRAINT chk_kasbon CHECK (kasbon_deduction <= uj_amount)
+);
+-- tf_amount TIDAK disimpan; selalu dihitung: uj_amount - kasbon_deduction
+
+-- Jenis biaya sebagai data, bukan tujuh kolom permanen.
+CREATE TABLE operational_expenses (
+  id           BIGSERIAL PRIMARY KEY,
+  trip_id      BIGINT      NOT NULL REFERENCES commission_transactions(id) ON DELETE CASCADE,
+  expense_type VARCHAR(40) NOT NULL,   -- DEX, Tol, SPSI, Nginap, Reimbus, Uang Dorong, ...
+  amount       BIGINT      NOT NULL DEFAULT 0,
+  expense_date DATE        NOT NULL,
+  notes        TEXT,
+  created_at   TIMESTAMP   NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMP   NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_expense_trip ON operational_expenses(trip_id);
+CREATE INDEX idx_expense_type ON operational_expenses(expense_type);
+```
+
+## Perubahan pada tabel yang sudah ada
+
+```sql
+ALTER TABLE vehicles ADD COLUMN configuration VARCHAR(20);   -- 6X6, DL, LB, HB, EXT, ...
+
+ALTER TABLE commission_transactions
+  ADD COLUMN project_id   BIGINT REFERENCES projects(id),
+  ADD COLUMN tr_reference VARCHAR(30),   -- TR, DIPISAH dari sijo (TBD-08)
+  ADD COLUMN pi_number    VARCHAR(30),   -- No PI, nomor saja
+  ADD COLUMN pi_status    VARCHAR(40),   -- "di pool", "masih moving" - dulu menumpang di No PI
+  ADD COLUMN cost_value   BIGINT DEFAULT 0,  -- COST, makna belum dikonfirmasi (TBD-02)
+  ADD COLUMN status       VARCHAR(10) NOT NULL DEFAULT 'draft', -- draft/aktif/selesai/batal
+  ADD COLUMN notes        TEXT;
+
+-- Kolom is_done lama digantikan status; migrasi memetakan
+-- is_done = true  -> status 'selesai'
+-- is_done = false -> status 'aktif'
+ALTER TABLE commission_transactions DROP COLUMN is_done;
+```
+
+## Catatan penting
+
+- `tf_amount` sengaja **tidak** disimpan sebagai kolom. Nilainya turunan
+  (`uj_amount - kasbon_deduction`), jadi menyimpannya hanya menciptakan peluang data
+  tidak sinkron.
+- `route_rates` (tarif per rute yang bisa berubah menurut project / kendaraan / tanggal
+  berlaku) **belum** dibuat. Data real menunjukkan COST pada rute yang sama bisa berbeda
+  (`CIB - DURI`: 35jt / 42jt / 43jt), tetapi penentunya belum diketahui — menunggu
+  jawaban TBD-02 sebelum strukturnya dikunci.

@@ -8,6 +8,11 @@ import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { DataSopirPage } from './pages/DataSopirPage'
 import { DataRoutePage } from './pages/DataRoutePage'
+import { DataMobilPage } from './pages/DataMobilPage'
+import { DataProjectPage } from './pages/DataProjectPage'
+import { TripDetailPage } from './pages/TripDetailPage'
+import { LapUangJalanPage } from './pages/LapUangJalanPage'
+import { LapBiayaPage } from './pages/LapBiayaPage'
 import { SuratJalanListPage } from './pages/SuratJalanListPage'
 import { SuratJalanFormPage } from './pages/SuratJalanFormPage'
 import { SuratJalanDetailPage } from './pages/SuratJalanDetailPage'
@@ -33,18 +38,23 @@ export function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
 
                 <Route path="/master/sopir" element={<DataSopirPage />} />
+                <Route path="/master/mobil" element={<DataMobilPage />} />
                 <Route path="/master/route" element={<DataRoutePage />} />
+                <Route path="/master/project" element={<DataProjectPage />} />
 
                 <Route path="/transaksi/surat-jalan" element={<SuratJalanListPage />} />
                 <Route path="/transaksi/surat-jalan/tambah" element={<SuratJalanFormPage mode="create" />} />
                 <Route path="/transaksi/surat-jalan/:id" element={<SuratJalanDetailPage />} />
                 <Route path="/transaksi/surat-jalan/:id/edit" element={<SuratJalanFormPage mode="edit" />} />
                 <Route path="/transaksi/komisi" element={<DataKomisiPage />} />
+                <Route path="/transaksi/trip/:id" element={<TripDetailPage />} />
                 <Route path="/transaksi/tagihan" element={<DataTagihanPage />} />
 
                 <Route path="/laporan/komisi" element={<LapKomisiPage />} />
                 <Route path="/laporan/netto" element={<LapNettoPage />} />
                 <Route path="/laporan/ritan" element={<LapRitanPage />} />
+                <Route path="/laporan/uang-jalan" element={<LapUangJalanPage />} />
+                <Route path="/laporan/biaya" element={<LapBiayaPage />} />
 
                 <Route path="/pencarian/sijo" element={<SijoSearchPage />} />
                 <Route path="/tools" element={<ToolsPage />} />

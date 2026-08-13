@@ -57,14 +57,17 @@ npm run build
 
 MASTER
 /master/sopir                       Data Sopir          (legacy: PENGISIAN DATA SOPIR)
+/master/mobil                       Data Mobil          + konfigurasi 6X6 / DL / LB / HB
 /master/route                       Data Route          (legacy: Pengisian Data Route)
+/master/project                     Data Project        SLB / ATLAS / PDT / order tunai
 
 TRANSAKSI
 /transaksi/surat-jalan              Surat Jalan - daftar + bulk print
 /transaksi/surat-jalan/tambah       Surat Jalan - form tambah
 /transaksi/surat-jalan/:id          Surat Jalan - detail
 /transaksi/surat-jalan/:id/edit     Surat Jalan - form ubah
-/transaksi/komisi                   Data Komisi         (legacy: Pengisian Data Surat Jalan)
+/transaksi/komisi                   Trip & Komisi       (legacy: Pengisian Data Surat Jalan)
+/transaksi/trip/:id                 Trip Detail         tab Overview / Uang Jalan / Biaya / Dokumen
 /transaksi/tagihan                  Data Tagihan        (legacy: Pemrosesan file data SI / JO)
                                     tab: Proses Data / Browsing Data / Pencarian Data
 
@@ -72,6 +75,8 @@ LAP. BULAN INI
 /laporan/komisi                     Komisi Bulan Berjalan
 /laporan/netto                      Netto Bulan Berjalan
 /laporan/ritan                      Cek Ritan Bulan Ini
+/laporan/uang-jalan                 Rekap Uang Jalan
+/laporan/biaya                      Rekap Biaya Operasional
 
 PENCARIAN
 /pencarian/sijo                     Pencarian nomor SI - Job Order
@@ -91,6 +96,10 @@ LAINNYA
 | Popup "masukkan jumlah container" sebelum mengisi | **Dynamic container list** - tambah/hapus bebas, jumlah dihitung otomatis, bisa paste banyak nomor sekaligus |
 | Dropdown terpisah untuk SI/JO, sopir, mobil, route | **Satu form terintegrasi** dengan searchable dropdown; Detail Tujuan terisi otomatis dari master Route |
 | Cetak langsung ke printer | **Print Settings, Preview A4, lalu Cetak / PDF** |
+| Satu trip = satu nilai uang jalan | **Uang jalan multi-termin.** Data real menunjukkan satu trip dibayar sampai 4 termin |
+| Konfigurasi kendaraan menempel di nama sopir (`IWAN 6X6 DL`) | **Konfigurasi jadi atribut kendaraan**, satu sopir tidak lagi terpecah jadi banyak nama |
+| Status operasional menumpang di kolom No PI (`di pool`, `masih moving`) | **Status dan catatan punya kolom sendiri** |
+| Tujuh kolom biaya tetap | **Biaya operasional sebagai baris data** (jenis + nominal), jenis baru tanpa ubah struktur |
 | Tag record dengan tombol SPACE | Checkbox + **contextual toolbar** yang muncul saat ada baris terpilih |
 
 ---
@@ -120,6 +129,20 @@ src/
 
 ---
 
+## Aturan bisnis yang SUDAH terverifikasi
+
+Satu-satunya formula yang bukan asumsi — diambil dari formula asli pada spreadsheet
+operasional dan konsisten di seluruh 343 baris pembayaran:
+
+```text
+TF = UJ − POTONG KASBON
+```
+
+Diimplementasikan di `src/lib/calculations.ts` sebagai `tfPembayaran()`. Pada UI, nilai
+TF bersifat read-only dan dihitung otomatis.
+
+---
+
 ## Business rule yang masih TBD
 
 Sesuai instruksi dokumen, **formula yang belum tervalidasi tidak dikarang**. Semuanya
@@ -135,6 +158,11 @@ lengkapnya juga tampil di halaman **Tools**.
 | TBD-05 | Definisi 1 Ritan | 1 transaksi = 1 ritan | Per transaksi, per container, atau per surat jalan? |
 | TBD-06 | Tombol `4B` di Data Komisi | Secondary action tanpa logic | Apa fungsi bisnisnya? |
 | TBD-07 | Auto-number Surat Jalan | `SJ-000001` berurutan | Ada pola khusus (per bulan / customer / armada)? |
+| TBD-08 | Apakah `TR` = `SIJO`? | Disimpan sebagai dua field terpisah | TR seragam 10 digit, SIJO legacy 7 digit, dan tidak ada kolom berformat SIJO di spreadsheet |
+| TBD-09 | Status `CASH` pada kolom Project | Project punya penanda "alur dokumen" | 34 trip CASH semuanya tanpa TR dan tanpa No PI — apakah CASH nama project atau jenis order? |
+| TBD-10 | Satuan cetak Surat Jalan | Satu SJ = satu halaman berisi daftar container | Atau satu halaman per container? Apakah tiap container punya nomor SJ sendiri? |
+| TBD-11 | Komponen `Kernet` pada laporan Netto | Belum ada field kernet | Laporan lama memuat Kernet — dari mana nilainya dan apakah masih dipakai? |
+| TBD-12 | `Potong Kasbon` vs `Bon Pribadi` | Dicatat terpisah | Apakah keduanya hal yang sama? Ada saldo kasbon sopir tersendiri? |
 
 Setelah rumus resminya diberikan, cukup ubah isi fungsi di `calculations.ts` — halaman
 lain tidak perlu disentuh.
@@ -169,8 +197,11 @@ Identitas seri tidak pernah bergantung pada warna saja — selalu ada legend dan
 | Sopir | 26 |
 | Route | 18 |
 | Mobil | 16 |
+| Project | 4 |
 | SI / Job Order | 42 |
-| Transaksi Komisi | 88 |
+| Trip / Transaksi Komisi | 88 |
+| Termin Uang Jalan | ~108 |
+| Biaya Operasional | ~54 |
 | Data Tagihan | 38 |
 | Surat Jalan | 34 |
 
@@ -180,10 +211,12 @@ Reset atau export data dummy lewat halaman **Tools**.
 
 ## Status pengerjaan
 
-- [x] **Phase 1 — Prototype UI** (semua halaman, komponen, state, print/PDF)
-- [ ] Phase 2 — Database dan API
-- [ ] Phase 3 — Business logic (menunggu jawaban TBD-01 s/d TBD-07)
-- [ ] Phase 4 — Reporting lanjutan
-- [ ] Phase 5 — QA
+- [x] **Prototype UI** — semua halaman, komponen, state, print/PDF
+- [x] **Corrective update Phase 1** — Data Mobil, Data Project, Trip Detail
+- [x] **Corrective update Phase 2** — Uang Jalan multi-termin, Potong Kasbon, TF otomatis
+- [x] **Corrective update Phase 3** — Biaya operasional generic + rekapnya
+- [ ] Phase 4 — Route rate versioned (menunggu TBD-02 dan TBD-05)
+- [ ] Phase 5 — Database dan API
+- [ ] Phase 6 — Business logic final (menunggu jawaban TBD-01 s/d TBD-12)
 
 Dokumen teknis lain: [`docs/DATABASE.md`](docs/DATABASE.md) dan [`docs/DESIGN-SYSTEM.md`](docs/DESIGN-SYSTEM.md)

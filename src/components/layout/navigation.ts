@@ -1,6 +1,6 @@
 import {
-  BadgeDollarSign, FileSpreadsheet, FileText, LayoutDashboard, Receipt, Route as RouteIcon,
-  Search, Settings2, TrendingUp, Truck, Users,
+  BadgeDollarSign, FileSpreadsheet, FileText, FolderKanban, LayoutDashboard, Receipt,
+  Route as RouteIcon, Search, Settings2, TrendingUp, Truck, Users, Wallet,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -27,7 +27,9 @@ export const NAV_GROUPS: NavGroup[] = [
     title: 'Master',
     items: [
       { label: 'Data Sopir', to: '/master/sopir', icon: Users, legacy: 'PENGISIAN DATA SOPIR' },
+      { label: 'Data Mobil', to: '/master/mobil', icon: Truck },
       { label: 'Data Route', to: '/master/route', icon: RouteIcon, legacy: 'Pengisian Data Route' },
+      { label: 'Data Project', to: '/master/project', icon: FolderKanban },
     ],
   },
   {
@@ -44,6 +46,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Komisi Bulan Berjalan', to: '/laporan/komisi', icon: BadgeDollarSign, legacy: 'Cetak Komisi Bulan Berjalan' },
       { label: 'Netto Bulan Berjalan', to: '/laporan/netto', icon: TrendingUp, legacy: 'Pendapatan Netto Bulan Berjalan' },
       { label: 'Cek Ritan Bulan Ini', to: '/laporan/ritan', icon: FileSpreadsheet, legacy: 'Driver Reports - Ritan Sopir' },
+      { label: 'Rekap Uang Jalan', to: '/laporan/uang-jalan', icon: Wallet },
+      { label: 'Rekap Biaya Operasional', to: '/laporan/biaya', icon: Receipt },
     ],
   },
   {

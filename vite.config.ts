@@ -25,5 +25,11 @@ export default defineConfig(({ command }) => ({
       },
     },
   ],
-  server: { port: 5180, open: false },
+  server: {
+    port: 5180,
+    open: false,
+    // Project berada di drive jaringan; watcher berbasis event sering putus,
+    // polling membuat dev server tidak mati sendiri.
+    watch: { usePolling: true, interval: 400 },
+  },
 }))

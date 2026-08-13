@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { CheckCheck, CircleHelp, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { CheckCheck, CircleHelp, PanelRight, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
@@ -10,6 +10,7 @@ import { FilterField, SearchInput, Toolbar } from '../components/ui/Toolbar'
 import { Button, IconButton } from '../components/ui/Button'
 import { Modal, ConfirmDialog } from '../components/ui/Modal'
 import { Field, Input, DateInput, Select } from '../components/ui/Field'
+import { CurrencyInput } from '../components/ui/CurrencyInput'
 import { SearchableSelect } from '../components/ui/SearchableSelect'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState, NotFoundState } from '../components/ui/States'
@@ -18,15 +19,22 @@ import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
 import { useTable } from '../lib/useTable'
 import { matchesQuery } from '../lib/utils'
-import { formatDate, startOfMonthISO, todayISO } from '../lib/format'
-import type { CommissionTransaction, TransactionRow } from '../types'
+import { formatDate, formatRupiah, startOfMonthISO, todayISO } from '../lib/format'
+import type { CommissionTransaction, TransactionRow, TripStatus } from '../types'
+
+export const STATUS_LABEL: Record<TripStatus, string> = { draft: 'Draft', aktif: 'Aktif', selesai: 'Selesai', batal: 'Batal' }
+export const STATUS_TONE: Record<TripStatus, 'neutral' | 'brand' | 'good' | 'critical'> = {
+  draft: 'neutral', aktif: 'brand', selesai: 'good', batal: 'critical',
+}
 
 type FormState = Omit<CommissionTransaction, 'id' | 'created_at' | 'updated_at' | 'is_marked'>
+
 
 export function DataKomisiPage() {
   const { db, transactionRows, loading, error, reload, create, update, remove } = useData()
   const { canEdit } = useAuth()
   const toast = useToast()
+  const navigate = useNavigate()
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [formOpen, setFormOpen] = useState(false)
@@ -49,7 +57,8 @@ export function DataKomisiPage() {
   const blank = (): FormState => ({
     transaction_no: nextTrxNo, transaction_date: todayISO(), driver_id: '', vehicle_id: '',
     job_order_id: '', route_id: '', destination_detail: '', container_no: '',
-    is_done: false, bon_date: null, personal_bon: 0,
+    project_id: '', tr_reference: '', pi_number: '', pi_status: '', cost_value: 0,
+    status: 'draft', notes: '', bon_date: null, personal_bon: 0,
   })
   const [form, setForm] = useState<FormState>(blank)
 
@@ -62,7 +71,7 @@ export function DataKomisiPage() {
     (t: TransactionRow) =>
       (!dateFrom || t.transaction_date >= dateFrom) &&
       (!dateTo || t.transaction_date <= dateTo) &&
-      (!statusFilter || (statusFilter === 'selesai' ? t.is_done : !t.is_done)),
+      (!statusFilter || t.status === statusFilter),
     [dateFrom, dateTo, statusFilter],
   )
   const filterActive = Boolean(dateFrom || dateTo || statusFilter)
@@ -98,7 +107,9 @@ export function DataKomisiPage() {
       transaction_no: t.transaction_no, transaction_date: t.transaction_date, driver_id: t.driver_id,
       vehicle_id: t.vehicle_id, job_order_id: t.job_order_id, route_id: t.route_id,
       destination_detail: t.destination_detail, container_no: t.container_no,
-      is_done: t.is_done, bon_date: t.bon_date, personal_bon: t.personal_bon,
+      project_id: t.project_id, tr_reference: t.tr_reference, pi_number: t.pi_number,
+      pi_status: t.pi_status, cost_value: t.cost_value, status: t.status, notes: t.notes,
+      bon_date: t.bon_date, personal_bon: t.personal_bon,
     })
     setErrors({}); setFormOpen(true)
   }
@@ -155,7 +166,7 @@ export function DataKomisiPage() {
   }
 
   function doSelesai() {
-    selected.forEach((id) => update('transactions', id, { is_done: true }))
+    selected.forEach((id) => update('transactions', id, { status: 'selesai' }))
     toast.success(`${selected.size} transaksi ditandai Selesai.`)
     setSelected(new Set()); setConfirm(null)
   }
@@ -165,7 +176,19 @@ export function DataKomisiPage() {
   }
 
   const columns: Column<TransactionRow>[] = [
-    { key: 'transaction_no', header: 'NoTrans', sortable: true, width: '116px', render: (t) => <span className="tnum font-semibold text-ink">{t.transaction_no}</span> },
+    {
+      key: 'transaction_no', header: 'NoTrans', sortable: true, width: '124px',
+      render: (t) => (
+        <Link to={`/transaksi/trip/${t.id}`} onClick={(e) => e.stopPropagation()}
+          className="tnum font-semibold text-brand-700 underline decoration-brand-200 underline-offset-2 hover:decoration-brand-500">
+          {t.transaction_no}
+        </Link>
+      ),
+    },
+    {
+      key: 'project_code', header: 'Project', sortable: true, width: '96px',
+      render: (t) => (t.project_code ? <Badge tone="neutral">{t.project_code}</Badge> : <span className="text-ink-3">—</span>),
+    },
     { key: 'transaction_date', header: 'Tanggal', sortable: true, width: '104px', render: (t) => <span className="tnum text-ink-2">{formatDate(t.transaction_date)}</span> },
     { key: 'driver_code', header: 'Kode Sopir', sortable: true, width: '104px', render: (t) => <span className="tnum text-ink-2">{t.driver_code || '—'}</span> },
     { key: 'driver_name', header: 'Nama Sopir', sortable: true, render: (t) => <span className="font-medium">{t.driver_name || '—'}</span> },
@@ -178,16 +201,33 @@ export function DataKomisiPage() {
         </Link>
       ),
     },
+    { key: 'tr_reference', header: 'TR', sortable: true, width: '116px', render: (t) => <span className="tnum text-ink-2">{t.tr_reference || '—'}</span> },
     { key: 'route_code', header: 'Kode Route', sortable: true, width: '112px', render: (t) => <span className="tnum text-ink-2">{t.route_code || '—'}</span> },
     { key: 'destination_detail', header: 'Detail Tujuan', sortable: true, render: (t) => <span className="text-ink-2">{t.destination_detail || '—'}</span> },
     {
-      key: 'is_done', header: 'Status', sortable: true, width: '104px',
-      render: (t) => (t.is_done ? <Badge tone="good">Selesai</Badge> : <Badge tone="warning">Proses</Badge>),
+      key: 'uj_total', header: 'Uang Jalan', sortable: true, align: 'right', width: '138px',
+      render: (t) => (
+        t.termin_count > 0
+          ? <span className="tnum">
+              <span className="font-medium text-ink">{formatRupiah(t.uj_total)}</span>
+              <span className="ml-1.5 text-[11.5px] text-ink-3">{t.termin_count}×</span>
+            </span>
+          : <span className="text-ink-3">—</span>
+      ),
     },
     {
-      key: 'action', header: 'Action', align: 'right', width: '84px',
+      key: 'cost_value', header: 'COST', sortable: true, align: 'right', width: '132px',
+      render: (t) => (t.cost_value ? <span className="tnum text-ink-2">{formatRupiah(t.cost_value)}</span> : <span className="text-ink-3">—</span>),
+    },
+    {
+      key: 'status', header: 'Status', sortable: true, width: '104px',
+      render: (t) => <Badge tone={STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</Badge>,
+    },
+    {
+      key: 'action', header: 'Action', align: 'right', width: '116px',
       render: (t) => (
         <div className="flex justify-end gap-1">
+          <IconButton label="Buka detail trip" icon={<PanelRight size={14} />} onClick={() => navigate(`/transaksi/trip/${t.id}`)} />
           <IconButton label="Ubah" icon={<Pencil size={14} />} disabled={!canEdit} onClick={() => openEdit(t)} />
           <IconButton label="Hapus" tone="danger" icon={<Trash2 size={14} />} disabled={!canEdit} onClick={() => { setSelected(new Set([t.id])); setConfirm('hapus') }} />
         </div>
@@ -198,10 +238,10 @@ export function DataKomisiPage() {
   return (
     <>
       <PageHeader
-        title="Data Komisi"
+        title="Trip & Komisi"
         legacyTitle="Pengisian Data Surat Jalan"
         crumbs={[{ label: 'Transaksi' }, { label: 'Data Komisi' }]}
-        description="Satu form terintegrasi: pilih SI/JO, sopir, mobil, dan route — Detail Tujuan terisi otomatis dari master Route."
+        description="Klik NoTrans untuk membuka detail trip beserta termin uang jalan, biaya operasional, dan dokumennya."
         actions={
           <>
             <Button icon={<CircleHelp size={15} />} onClick={() => setShow4B(true)} title="Fungsi tombol 4B belum tervalidasi">4B</Button>
@@ -222,8 +262,10 @@ export function DataKomisiPage() {
               <DateInput value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-[150px]" aria-label="Tanggal sampai" />
               <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-36" aria-label="Filter status">
                 <option value="">Semua Status</option>
-                <option value="proses">Proses</option>
+                <option value="draft">Draft</option>
+                <option value="aktif">Aktif</option>
                 <option value="selesai">Selesai</option>
+                <option value="batal">Batal</option>
               </Select>
               {(table.isFiltered || filterActive) && <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={resetFilters}>Reset</Button>}
             </>
@@ -269,7 +311,7 @@ export function DataKomisiPage() {
         open={formOpen}
         onClose={() => setFormOpen(false)}
         title={editing ? `Ubah Transaksi ${editing.transaction_no}` : 'Tambah Transaksi Komisi'}
-        subtitle="Urutan pengisian: SI/JO → Sopir → Mobil → Route. Tanda * wajib diisi."
+        subtitle="Data finansial tidak wajib diisi di sini — termin uang jalan dan biaya dikelola di halaman detail trip."
         size="lg"
         footer={
           <>
@@ -286,6 +328,26 @@ export function DataKomisiPage() {
             {(fid) => <DateInput id={fid} value={form.transaction_date} invalid={!!errors.transaction_date} onChange={(e) => setForm({ ...form, transaction_date: e.target.value })} />}
           </Field>
 
+          <Field label="Project" hint="Menentukan apakah trip memakai alur dokumen TR / No PI.">
+            {(fid) => (
+              <Select id={fid} value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })}>
+                <option value="">— belum ditentukan —</option>
+                {db.projects.map((p) => <option key={p.id} value={p.id}>{p.project_code} — {p.project_name}</option>)}
+              </Select>
+            )}
+          </Field>
+          <Field label="TR" hint="Nomor referensi dari customer. Disimpan terpisah dari SI/JO (TBD-08).">
+            {(fid) => <Input id={fid} value={form.tr_reference} placeholder="2600305331" onChange={(e) => setForm({ ...form, tr_reference: e.target.value })} />}
+          </Field>
+          <Field label="No PI">
+            {(fid) => <Input id={fid} value={form.pi_number} placeholder="0473" onChange={(e) => setForm({ ...form, pi_number: e.target.value })} />}
+          </Field>
+          <Field label="Status PI" hint="mis. di pool, masih moving — kini kolom sendiri.">
+            {(fid) => <Input id={fid} value={form.pi_status} onChange={(e) => setForm({ ...form, pi_status: e.target.value })} />}
+          </Field>
+          <Field label="COST" hint="Makna bisnis belum dikonfirmasi (TBD-02).">
+            {(fid) => <CurrencyInput id={fid} value={form.cost_value} onValueChange={(v) => setForm({ ...form, cost_value: v })} />}
+          </Field>
           <Field label="Daftar S / JO" required error={errors.job_order_id} className="sm:col-span-2">
             {(fid) => (
               <SearchableSelect id={fid} options={joOptions} value={form.job_order_id || null} invalid={!!errors.job_order_id}
@@ -316,11 +378,16 @@ export function DataKomisiPage() {
           <Field label="Kont (No. Container)">
             {(fid) => <Input id={fid} value={form.container_no} placeholder="TGHU 4429318" onChange={(e) => setForm({ ...form, container_no: e.target.value })} />}
           </Field>
+          <Field label="Catatan" className="sm:col-span-2">
+            {(fid) => <Input id={fid} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />}
+          </Field>
           <Field label="Status">
             {(fid) => (
-              <Select id={fid} value={form.is_done ? 'selesai' : 'proses'} onChange={(e) => setForm({ ...form, is_done: e.target.value === 'selesai' })}>
-                <option value="proses">Proses</option>
+              <Select id={fid} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as TripStatus })}>
+                <option value="draft">Draft</option>
+                <option value="aktif">Aktif</option>
                 <option value="selesai">Selesai</option>
+                <option value="batal">Batal</option>
               </Select>
             )}
           </Field>

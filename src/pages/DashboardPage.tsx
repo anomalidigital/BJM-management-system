@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ArrowRight, BadgeDollarSign, CircleAlert, FileText, Receipt, TrendingUp, Truck, Users, Wallet,
+  ArrowRight, BadgeDollarSign, CircleAlert, FileText, Fuel, Receipt, Scissors, Send,
+  TrendingUp, Truck, Users, Wallet,
 } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader } from '../components/ui/Card'
@@ -70,8 +71,8 @@ export function DashboardPage() {
       },
       {
         id: 'belum-selesai',
-        label: 'Transaksi belum ditandai Selesai',
-        count: thisMonth.filter((t) => !t.is_done).length,
+        label: 'Trip belum ditandai Selesai',
+        count: thisMonth.filter((t) => t.status !== 'selesai' && t.status !== 'batal').length,
         to: '/transaksi/komisi',
       },
       {
@@ -100,7 +101,20 @@ export function DashboardPage() {
       },
     ].filter((a) => a.count > 0)
 
-    return { now, prev, daily, days, revenue, commission, topDrivers, attention, thisMonth }
+    // Uang jalan & biaya operasional bulan berjalan (aturan terverifikasi).
+    const ujNow = {
+      uj: thisMonth.reduce((a, t) => a + t.uj_total, 0),
+      kasbon: thisMonth.reduce((a, t) => a + t.kasbon_total, 0),
+      tf: thisMonth.reduce((a, t) => a + t.tf_total, 0),
+      biaya: thisMonth.reduce((a, t) => a + t.expense_total, 0),
+      termin: thisMonth.reduce((a, t) => a + t.termin_count, 0),
+    }
+    const ujPrev = {
+      uj: lastMonth.reduce((a, t) => a + t.uj_total, 0),
+      tf: lastMonth.reduce((a, t) => a + t.tf_total, 0),
+      biaya: lastMonth.reduce((a, t) => a + t.expense_total, 0),
+    }
+    return { now, prev, daily, days, revenue, commission, topDrivers, attention, thisMonth, ujNow, ujPrev }
   }, [transactionRows, billingRows, deliveryNoteRows, db.jobOrders])
 
   const recentTrx = useMemo(
@@ -128,7 +142,7 @@ export function DashboardPage() {
     )
   }
 
-  const { now, prev, daily, days, revenue, commission, topDrivers, attention } = model
+  const { now, prev, daily, days, revenue, commission, topDrivers, attention, ujNow, ujPrev } = model
 
   return (
     <>
@@ -182,6 +196,31 @@ export function DashboardPage() {
           value={formatNumber(db.jobOrders.length)}
           icon={<FileText size={15} />}
           hint={`${db.jobOrders.filter((j) => j.is_complete).length} sudah Komplit`}
+        />
+      </div>
+
+      {/* Uang jalan & biaya - angka dari aturan yang sudah terverifikasi */}
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Total Uang Jalan"
+          value={formatRupiah(ujNow.uj, { compact: true })}
+          icon={<Wallet size={15} />}
+          delta={deltaPersen(ujNow.uj, ujPrev.uj)}
+          invertDelta
+        />
+        <StatCard label="Potong Kasbon" value={formatRupiah(ujNow.kasbon, { compact: true })} icon={<Scissors size={15} />} hint="pengurang uang jalan" />
+        <StatCard
+          label="TF ke Sopir"
+          value={formatRupiah(ujNow.tf, { compact: true })}
+          icon={<Send size={15} />}
+          hint={`${formatNumber(ujNow.termin)} termin pembayaran`}
+        />
+        <StatCard
+          label="Biaya Operasional"
+          value={formatRupiah(ujNow.biaya, { compact: true })}
+          icon={<Fuel size={15} />}
+          delta={deltaPersen(ujNow.biaya, ujPrev.biaya)}
+          invertDelta
         />
       </div>
 

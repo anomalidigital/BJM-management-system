@@ -4,13 +4,55 @@ import { generateDatabase } from '../data/dummy'
 const DB_KEY = 'sikotis.db.v1'
 const AUTH_KEY = 'sikotis.auth.v1'
 
-/** Bentuk minimal yang wajib ada supaya data lama tidak merusak aplikasi. */
-const REQUIRED_KEYS: Array<keyof Database> = ['drivers', 'routes', 'vehicles', 'jobOrders', 'transactions', 'billings', 'deliveryNotes']
+/** Koleksi inti yang sudah ada sejak versi pertama. */
+const CORE_KEYS: Array<keyof Database> = ['drivers', 'routes', 'vehicles', 'jobOrders', 'transactions', 'billings']
+/** Koleksi yang ditambahkan belakangan - boleh belum ada di data tersimpan. */
+const ADDED_KEYS: Array<keyof Database> = ['deliveryNotes', 'projects', 'ujPayments', 'expenses']
 
-function isValidDatabase(value: unknown): value is Database {
+function hasCore(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false
   const v = value as Record<string, unknown>
-  return REQUIRED_KEYS.every((k) => Array.isArray(v[k]))
+  return CORE_KEYS.every((k) => Array.isArray(v[k]))
+}
+
+/**
+ * Migrasi non-destruktif: data lama dipertahankan, koleksi baru diisi dari
+ * dummy segar. Jadi menambah modul tidak menghapus perubahan yang sudah
+ * dibuat user pada master maupun transaksi.
+ */
+function migrate(stored: Record<string, unknown>): Database {
+  const merged = { ...stored }
+
+  // 1) Koleksi yang belum ada diisi dari dummy segar.
+  const missing = ADDED_KEYS.filter((k) => !Array.isArray(merged[k]))
+  if (missing.length > 0) {
+    const fresh = generateDatabase() as unknown as Record<string, unknown>
+    for (const k of missing) merged[k] = fresh[k]
+  }
+
+  // 2) Field baru pada record lama diberi nilai awal, supaya data yang sudah
+  //    tersimpan tetap terbaca dan tidak ada kolom kosong di tabel.
+  const trx = merged.transactions as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(trx)) {
+    merged.transactions = trx.map((t) => ({
+      project_id: '',
+      tr_reference: '',
+      pi_number: '',
+      pi_status: '',
+      cost_value: 0,
+      notes: '',
+      ...t,
+      // Field lama is_done dipetakan ke status baru, bukan dibuang.
+      status: t.status ?? (t.is_done ? 'selesai' : 'aktif'),
+    }))
+  }
+
+  const veh = merged.vehicles as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(veh)) {
+    merged.vehicles = veh.map((v) => ({ configuration: '', ...v }))
+  }
+
+  return merged as unknown as Database
 }
 
 /** Muat dari localStorage; jika kosong / rusak, bangun ulang dari dummy. */
@@ -19,7 +61,11 @@ export function loadDatabase(): Database {
     const raw = localStorage.getItem(DB_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (isValidDatabase(parsed)) return parsed
+      if (hasCore(parsed)) {
+        const migrated = migrate(parsed as Record<string, unknown>)
+        saveDatabase(migrated)
+        return migrated
+      }
     }
   } catch {
     // localStorage tidak tersedia / JSON rusak -> jatuh ke dummy

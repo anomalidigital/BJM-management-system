@@ -9,7 +9,24 @@
  *  Jangan menyalin rumus di bawah ke file lain -- panggil fungsinya.
  * ===========================================================================
  */
-import type { TransactionRow } from '../types'
+import type { TransactionRow, UjPayment } from '../types'
+
+/* ===========================================================================
+ *  ATURAN TERVERIFIKASI (bukan TBD)
+ *  Berasal dari formula asli pada spreadsheet operasional:
+ *      TF = UJ - POTONG KASBON
+ *  Konsisten pada seluruh 343 baris pembayaran.
+ * ======================================================================== */
+export function tfPembayaran(p: Pick<UjPayment, 'uj_amount' | 'kasbon_deduction'>): number {
+  return p.uj_amount - p.kasbon_deduction
+}
+
+/** Total UJ / potong kasbon / TF untuk sekumpulan termin. */
+export function totalUj(payments: Array<Pick<UjPayment, 'uj_amount' | 'kasbon_deduction'>>) {
+  const uj = payments.reduce((a, p) => a + p.uj_amount, 0)
+  const kasbon = payments.reduce((a, p) => a + p.kasbon_deduction, 0)
+  return { uj, kasbon, tf: uj - kasbon, termin: payments.length }
+}
 
 export interface TbdNote {
   id: string
@@ -23,20 +40,20 @@ export const TBD_NOTES: TbdNote[] = [
   {
     id: 'TBD-01',
     title: 'Komisi sopir per transaksi',
-    current: 'Sementara memakai nilai Komisioner dari master Route.',
-    question: 'Apakah komisi sopir = Komisioner route, atau ada persentase / potongan lain?',
+    current: 'Sementara memakai nilai Komisioner dari master Route. Fitur komisi dipertahankan.',
+    question: 'Spreadsheet operasional tidak punya kolom komisi sama sekali, tetapi aplikasi lama punya menu dan laporan komisi. Apakah komisi masih dipakai? Bila ya, apa formula, sumber data, dan waktu pembayarannya?',
   },
   {
     id: 'TBD-02',
     title: 'Pendapatan bruto per transaksi',
-    current: 'Sementara memakai Harga dari master Route.',
-    question: 'Apakah pendapatan diakui dari Harga route atau dari Jumlah Rp pada Data Tagihan?',
+    current: 'Trip menyimpan cost_value apa adanya; maknanya belum diubah.',
+    question: 'COST pada spreadsheet hanya terisi di 107 dari 241 trip dan nilainya berbeda-beda pada rute yang sama. Apakah COST = harga ke customer, pendapatan bruto, biaya, atau nilai kontrak?',
   },
   {
     id: 'TBD-03',
     title: 'Pendapatan netto',
-    current: 'Sementara: Harga - UjRoute - Komisioner.',
-    question: 'Komponen biaya apa saja yang mengurangi pendapatan netto (BBM, tol, bon sopir, jaminan)?',
+    current: 'Sementara: Harga - UjRoute - Komisioner. Biaya operasional belum ikut dikurangkan.',
+    question: 'Laporan lama memakai Bruto - Uang Jalan - Komisi - Kernet. Apakah DEX, tol, SPSI, nginap, dan biaya lain juga menjadi pengurang netto?',
   },
   {
     id: 'TBD-04',
@@ -49,6 +66,36 @@ export const TBD_NOTES: TbdNote[] = [
     title: 'Definisi 1 Ritan',
     current: 'Sementara 1 transaksi komisi dihitung sebagai 1 ritan.',
     question: 'Apakah ritan dihitung per transaksi, per container, atau per surat jalan?',
+  },
+  {
+    id: 'TBD-08',
+    title: 'Apakah TR sama dengan SIJO?',
+    current: 'Disimpan sebagai dua field terpisah pada trip.',
+    question: 'TR pada spreadsheet seragam 10 digit, sedangkan SIJO pada aplikasi lama 7 digit, dan tidak ada kolom berformat SIJO di spreadsheet. Apakah TR = SI/Job Order, nomor trucking request, atau dokumen lain?',
+  },
+  {
+    id: 'TBD-09',
+    title: 'Status CASH pada kolom Project',
+    current: 'Project punya penanda "alur dokumen"; CASH ditandai tanpa dokumen.',
+    question: 'Seluruh 34 trip CASH tercatat tanpa TR dan tanpa No PI. Apakah CASH memang nama project, atau sebenarnya jenis order / cara bayar yang seharusnya jadi field tersendiri?',
+  },
+  {
+    id: 'TBD-10',
+    title: 'Satuan cetak Surat Jalan',
+    current: 'Satu Surat Jalan dicetak satu halaman berisi daftar container bernomor.',
+    question: 'Apakah satu Surat Jalan dicetak sekali untuk semua container, atau satu halaman per container? Dan apakah tiap container punya nomor Surat Jalan sendiri?',
+  },
+  {
+    id: 'TBD-11',
+    title: 'Komponen Kernet pada laporan Netto',
+    current: 'Belum ada field kernet di sistem.',
+    question: 'Laporan netto aplikasi lama memuat komponen Kernet. Dari mana nilainya diambil, dan apakah masih dipakai?',
+  },
+  {
+    id: 'TBD-12',
+    title: 'Potong Kasbon vs Bon Pribadi',
+    current: 'Potong Kasbon dicatat per termin UJ; Bon Pribadi tetap di Cek Ritan.',
+    question: 'Apakah keduanya hal yang sama? Bila ya, apakah ada saldo kasbon sopir yang dikelola terpisah?',
   },
   {
     id: 'TBD-06',

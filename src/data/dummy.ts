@@ -5,7 +5,11 @@
  * TANGGALNYA relatif terhadap hari ini -- jadi menu "Lap. Bulan Ini" selalu
  * berisi data, kapan pun prototype ini dibuka.
  */
-import type { Billing, CommissionTransaction, Database, DeliveryNote, Driver, JobOrder, Route, Vehicle } from '../types'
+import type {
+  Billing, CommissionTransaction, Database, DeliveryNote, Driver, JobOrder,
+  OperationalExpense, Project, Route, TripStatus, UjPayment, Vehicle,
+} from '../types'
+import { EXPENSE_TYPES, VEHICLE_CONFIGS } from '../types'
 import { toISO } from '../lib/format'
 
 /* PRNG deterministik (mulberry32) */
@@ -65,6 +69,34 @@ const SHIPS = ['MV. ORIENTAL DIAMOND', 'MV. SINAR BANDUNG', 'KM. TANTO EXPRESS',
 const GOODS = ['PAPER ROLL', 'PLASTIC RESIN', 'TEXTILE GOODS', 'GENERAL CARGO', 'STEEL COIL', 'CERAMIC TILES', 'FOOD GRADE PACK', 'AUTO PARTS', 'CHEMICAL DRUM', 'PACKAGING BOX']
 const VEHICLE_TYPES = ['Tronton 6x2', 'Trailer 20 FT', 'Trailer 40 FT', 'Head Truck', 'Wingbox']
 const CONT_PREFIX = ['TGHU', 'MSKU', 'TCLU', 'CAIU', 'GESU', 'SEGU', 'FCIU', 'TRHU']
+
+/**
+ * Project dummy. Struktur meniru data real (beberapa project berdokumen +
+ * satu jenis order tunai tanpa TR/No PI), tetapi kodenya fiktif - data
+ * operasional asli tidak boleh masuk repository publik.
+ */
+const PROJECT_SEED: ReadonlyArray<readonly [string, string, string, boolean]> = [
+  ['ARM', 'Armada Migas Riau', 'Distribusi peralatan pengeboran wilayah Riau', true],
+  ['NSP', 'Nusantara Selat Pulp', 'Pengangkutan pulp dan kertas lintas Sumatera-Jawa', true],
+  ['TBS', 'Tirta Bumi Sejahtera', 'Proyek kawasan industri Cikarang-Karawang', true],
+  ['CASH', 'Order Tunai', 'Order lepas tanpa alur dokumen TR / No PI', false],
+]
+/** Status yang pada spreadsheet tercampur ke kolom No PI. */
+const PI_STATUS = ['', '', '', '', 'di pool', 'masih moving', 'sudah di pool', 'paket']
+
+/* Master: Project */
+function makeProjects(): Project[] {
+  return PROJECT_SEED.map(([code, name, desc, doc], i) => ({
+    id: `prj-${i + 1}`,
+    project_code: code,
+    project_name: name,
+    description: desc,
+    requires_document: doc,
+    status: 'aktif' as const,
+    created_at: stamp,
+    updated_at: stamp,
+  }))
+}
 
 /* Master: Sopir */
 function makeDrivers(count: number): Driver[] {
@@ -141,6 +173,8 @@ function makeVehicles(count: number): Vehicle[] {
       id: `veh-${i + 1}`,
       plate_number: plate,
       vehicle_type: pick(VEHICLE_TYPES),
+      // Konfigurasi disimpan di kendaraan, bukan ditempel ke nama sopir.
+      configuration: rand() > 0.45 ? pick(VEHICLE_CONFIGS) : '',
       status: i % 11 === 10 ? 'servis' : 'aktif',
       created_at: stamp,
       updated_at: stamp,
@@ -175,7 +209,7 @@ function makeJobOrders(count: number): JobOrder[] {
 
 /* Transaksi Komisi */
 function makeTransactions(
-  db: Pick<Database, 'drivers' | 'routes' | 'vehicles' | 'jobOrders'>,
+  db: Pick<Database, 'drivers' | 'routes' | 'vehicles' | 'jobOrders' | 'projects'>,
   count: number,
 ): CommissionTransaction[] {
   const activeDrivers = db.drivers.filter((d) => d.status === 'aktif')
@@ -201,6 +235,10 @@ function makeTransactions(
     const driver = pick(activeDrivers)
     const vehicle = pick(activeVehicles)
     const hasBon = rand() > 0.45
+    const project = pick(db.projects)
+    const withDoc = project.requires_document
+    const roll = rand()
+    const status: TripStatus = roll > 0.97 ? 'batal' : roll > 0.28 ? 'selesai' : roll > 0.06 ? 'aktif' : 'draft'
     return {
       id: `trx-${i + 1}`,
       transaction_no: `${ym}${String(seqPerMonth[ym]).padStart(4, '0')}`,
@@ -212,8 +250,15 @@ function makeTransactions(
       destination_detail: route.route_name,
       // sengaja ada beberapa yang kosong -> muncul di panel "Perlu perhatian"
       container_no: rand() > 0.08 ? `${pick(CONT_PREFIX)} ${int(1000000, 9999999)}` : '',
+      // Project tanpa alur dokumen tidak punya TR maupun No PI - pola ini nyata.
+      project_id: project.id,
+      tr_reference: withDoc && rand() > 0.05 ? String(2600280000 + int(1, 39999)) : '',
+      pi_number: withDoc && rand() > 0.32 ? String(int(400, 999)).padStart(4, '0') : '',
+      pi_status: withDoc ? pick(PI_STATUS) : '',
+      cost_value: rand() > 0.45 ? money(2_000_000, 48_000_000, 50_000) : 0,
+      status,
+      notes: '',
       is_marked: false,
-      is_done: rand() > 0.22,
       bon_date: hasBon ? date : null,
       personal_bon: hasBon ? money(150_000, 900_000, 25_000) : 0,
       created_at: stamp,
@@ -302,14 +347,81 @@ function makeDeliveryNotes(
   return out
 }
 
+/* Uang Jalan - multi termin (data real: 1 sampai 4 termin per trip) */
+function makeUjPayments(trips: CommissionTransaction[]): UjPayment[] {
+  const out: UjPayment[] = []
+  let n = 0
+  for (const t of trips) {
+    if (t.status === 'batal' && rand() > 0.5) continue
+    // Proporsi meniru sebaran nyata: sebagian trip belum ada UJ sama sekali.
+    const r = rand()
+    const termin = r > 0.88 ? 0 : r > 0.24 ? 1 : r > 0.09 ? 2 : r > 0.02 ? 3 : 4
+    for (let i = 1; i <= termin; i++) {
+      const uj = money(1_000_000, 6_500_000, 50_000)
+      out.push({
+        id: `ujp-${++n}`,
+        trip_id: t.id,
+        sequence: i,
+        payment_date: i === 1 ? t.transaction_date : addDays(t.transaction_date, i * int(1, 4)),
+        uj_amount: uj,
+        kasbon_deduction: rand() > 0.68 ? money(100_000, 400_000, 50_000) : 0,
+        notes: '',
+        created_at: stamp,
+        updated_at: stamp,
+      })
+    }
+  }
+  return out
+}
+
+function addDays(iso: string, d: number): string {
+  const x = new Date(iso + 'T00:00:00')
+  x.setDate(x.getDate() + d)
+  return toISO(x)
+}
+
+/* Biaya operasional - baris terpisah, bukan tujuh kolom permanen */
+function makeExpenses(trips: CommissionTransaction[]): OperationalExpense[] {
+  const out: OperationalExpense[] = []
+  let n = 0
+  for (const t of trips) {
+    const jumlah = rand() > 0.62 ? int(1, 3) : 0
+    const dipakai = new Set<string>()
+    for (let i = 0; i < jumlah; i++) {
+      const jenis = pick(EXPENSE_TYPES)
+      if (dipakai.has(jenis)) continue
+      dipakai.add(jenis)
+      const nominal =
+        jenis === 'DEX' ? money(2_500_000, 6_500_000, 12_500)
+        : jenis === 'Tol' ? money(150_000, 900_000, 5_000)
+        : jenis === 'Nginap' ? money(150_000, 600_000, 25_000)
+        : money(100_000, 500_000, 5_000)
+      out.push({
+        id: `exp-${++n}`,
+        trip_id: t.id,
+        expense_type: jenis,
+        amount: nominal,
+        expense_date: t.transaction_date,
+        notes: '',
+        created_at: stamp,
+        updated_at: stamp,
+      })
+    }
+  }
+  return out
+}
+
 /** Bangun seluruh dummy database. */
 export function generateDatabase(): Database {
   const drivers = makeDrivers(26)
   const routes = makeRoutes(18)
   const vehicles = makeVehicles(16)
   const jobOrders = makeJobOrders(42)
-  const transactions = makeTransactions({ drivers, routes, vehicles, jobOrders }, 88)
+  const projects = makeProjects()
+  const transactions = makeTransactions({ drivers, routes, vehicles, jobOrders, projects }, 88)
   const billings = makeBillings({ jobOrders, transactions }, 46)
   const deliveryNotes = makeDeliveryNotes({ jobOrders, vehicles, transactions }, 34)
-  return { drivers, routes, vehicles, jobOrders, transactions, billings, deliveryNotes }
+  const ujPayments = makeUjPayments(transactions)
+  const expenses = makeExpenses(transactions)
+  return { drivers, routes, vehicles, jobOrders, projects, transactions, billings, deliveryNotes, ujPayments, expenses }
 }
