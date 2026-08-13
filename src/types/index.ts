@@ -1,7 +1,7 @@
 /**
  * SIKOTIS - domain types.
  * Nama field mengikuti kosakata bisnis yang dipakai PT Bimajaya Mustika:
- * SIJO, Data Cost, Kode Cust, UjRoute, Komisioner, S/JO, Ritan, Bon Pribadi.
+ * SIJO, Data Cost, Kode Cust, UJROUTE, Komisioner, S/JO, Ritan, Bon Pribadi.
  */
 
 export type Role = 'admin' | 'viewer'
@@ -31,8 +31,8 @@ export interface Route {
   id: string
   route_code: string             // No. Route
   route_name: string             // Nama Route
-  fart: string                   // Fart (mis. 1X40, 1X20K, 2X20)
-  ujroute: number                // UjRoute - JANGAN tulis "U-Route"
+  feet: string                   // Feet - ukuran container, mis. 1X40 (1 x 40 kaki)
+  ujroute: number                // UJROUTE - uang jalan baku untuk route ini
   commissioner: number           // Komisioner
   price: number                  // Harga
   created_at: string

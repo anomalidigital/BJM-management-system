@@ -51,7 +51,7 @@ export const TBD_NOTES: TbdNote[] = [
   {
     id: 'TBD-03',
     title: 'Pendapatan netto',
-    current: 'Sementara: Harga - UjRoute - Komisioner. Biaya operasional belum ikut dikurangkan.',
+    current: 'Sementara: Harga - UJROUTE - Komisioner. Biaya operasional belum ikut dikurangkan.',
     question: 'Apakah DEX, tol, SPSI, nginap, dan biaya lain menjadi pengurang pendapatan netto?',
   },
   {
@@ -95,6 +95,24 @@ export const TBD_NOTES: TbdNote[] = [
     title: 'Potong Kasbon vs Bon Pribadi',
     current: 'Potong Kasbon dicatat per termin UJ; Bon Pribadi tetap di Cek Ritan.',
     question: 'Apakah keduanya hal yang sama? Bila ya, apakah ada saldo kasbon sopir yang dikelola terpisah?',
+  },
+  {
+    id: 'TBD-13',
+    title: 'Data Cost atau Kode Cust?',
+    current: 'Label tetap "Data Cost" seperti dokumen; nilainya mengikuti kode customer.',
+    question: 'Contoh nilainya berupa nama customer (mis. INDAH), dan layar pencarian memakai istilah Kode Cust untuk hal yang sama. Apakah kolom ini sebenarnya kode customer, atau memang kode jenis biaya yang berbeda?',
+  },
+  {
+    id: 'TBD-14',
+    title: 'Tiga kolom pada Cek Ritan',
+    current: 'Memakai Tgl Bon, Bon Pribadi, dan SI - JOB ORDER.',
+    question: 'Bacaan awal dari layar lama adalah Tujuan, Jam.Brkt, dan St.Job — ketiganya lazim di trucking. Mana yang benar: Tujuan atau Tgl Bon? Jam Berangkat atau Bon Pribadi? Status Job atau SI - Job Order?',
+  },
+  {
+    id: 'TBD-15',
+    title: 'Penulisan S / JO',
+    current: 'Kolom ditulis S / JO mengikuti dokumen.',
+    question: 'Apakah yang dimaksud SI / JO (Shipping Instruction / Job Order), atau memang S / JO dengan arti lain?',
   },
   {
     id: 'TBD-06',

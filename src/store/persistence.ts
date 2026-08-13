@@ -52,6 +52,12 @@ function migrate(stored: Record<string, unknown>): Database {
     merged.vehicles = veh.map((v) => ({ configuration: '', ...v }))
   }
 
+  // Kolom ukuran container semula bernama "fart" (salah baca dari "feet").
+  const rte = merged.routes as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(rte)) {
+    merged.routes = rte.map(({ fart, ...r }) => ({ feet: fart ?? '', ...r }))
+  }
+
   return merged as unknown as Database
 }
 

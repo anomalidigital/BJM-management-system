@@ -89,7 +89,7 @@ export function DataKomisiPage() {
     [db.vehicles],
   )
   const routeOptions = useMemo(
-    () => db.routes.map((r) => ({ value: r.id, label: r.route_code, meta: r.route_name, keywords: r.fart })),
+    () => db.routes.map((r) => ({ value: r.id, label: r.route_code, meta: r.route_name, keywords: r.feet })),
     [db.routes],
   )
   const joOptions = useMemo(

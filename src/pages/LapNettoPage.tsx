@@ -82,7 +82,7 @@ export function LapNettoPage() {
                   { label: 'No. Mobil', width: '16%' },
                   { label: 'Ritan', align: 'right', width: '10%' },
                   { label: 'Pendapatan', align: 'right' },
-                  { label: 'UjRoute', align: 'right' },
+                  { label: 'UJROUTE', align: 'right' },
                   { label: 'Komisioner', align: 'right' },
                   { label: 'Netto (Rp)', align: 'right' },
                 ]}
@@ -218,7 +218,7 @@ export function LapNettoPage() {
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Total Pendapatan" value={formatRupiah(totals.pendapatan, { compact: true })} hint="periode terpilih" />
-            <StatCard label="Total UjRoute" value={formatRupiah(totals.ujroute, { compact: true })} hint="periode terpilih" />
+            <StatCard label="Total UJROUTE" value={formatRupiah(totals.ujroute, { compact: true })} hint="periode terpilih" />
             <StatCard label="Total Komisioner" value={formatRupiah(totals.komisi, { compact: true })} hint="periode terpilih" />
             <StatCard label="Pendapatan Netto" value={formatRupiah(totals.netto, { compact: true })} hint="periode terpilih" />
           </div>

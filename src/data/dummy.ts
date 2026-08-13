@@ -50,7 +50,8 @@ const PLACES: ReadonlyArray<readonly [string, string]> = [
   ['TGR', 'TANGERANG'], ['CLG', 'CILEGON'], ['MRK', 'MERAK'], ['BKS', 'BEKASI'], ['CBT', 'CIBITUNG'],
   ['BGR', 'BOGOR'], ['SBP', 'SUNTER'],
 ]
-const FARTS = ['1X20', '1X40', '2X20', '1X20K', '1X40K'] as const
+/** Ukuran container: jumlah x kaki. 1X40 = satu container 40 kaki. */
+const FEET_OPTIONS = ['1X20', '1X40', '2X20', '1X20K', '1X40K'] as const
 
 const CUSTOMERS: ReadonlyArray<readonly [string, string, string]> = [
   ['INDAH', 'PT INDAH KIAT PULP & PAPER', 'Jl. Raya Serpong KM 8, Tangerang'],
@@ -134,19 +135,19 @@ function makeRoutes(count: number): Route[] {
     let to = pick(PLACES)
     let guard = 0
     while (to[0] === from[0] && guard++ < 20) to = pick(PLACES)
-    const fart = pick(FARTS)
-    const sizeCode = fart.startsWith('2') ? '2' + fart.slice(2, 4) : fart.slice(2, 4)
-    const suffix = fart.endsWith('K') ? 'K' : ''
+    const feet = pick(FEET_OPTIONS)
+    const sizeCode = feet.startsWith('2') ? '2' + feet.slice(2, 4) : feet.slice(2, 4)
+    const suffix = feet.endsWith('K') ? 'K' : ''
     let code = `${from[0]}${to[0]}${sizeCode}${suffix}`.toUpperCase().slice(0, 8)
     let n = 1
     while (used.has(code)) code = `${from[0]}${to[0]}${sizeCode}${n++}`.slice(0, 8)
     used.add(code)
-    const nameSize = fart.startsWith('2') ? '2X20' : fart.includes('40') ? "40'" : "20'"
+    const nameSize = feet.startsWith('2') ? '2X20' : feet.includes('40') ? "40'" : "20'"
     out.push({
       id: `rte-${i + 1}`,
       route_code: code,
       route_name: `${from[1]}-${to[1]} ${nameSize}${suffix ? '(K)' : ''}`,
-      fart,
+      feet,
       ujroute: money(620_000, 1_150_000),
       commissioner: money(100_000, 250_000),
       price: money(1_650_000, 3_600_000, 50_000),
