@@ -41,9 +41,7 @@ export function PrintPage({ title, subtitle, periode, page, totalPages, withLogo
       className={cn(
         'print-sheet mx-auto flex w-[210mm] max-w-full flex-col bg-white p-[14mm] text-[11px] text-black',
         'shadow-card border border-hairline print:border-0 print:shadow-none',
-        page < totalPages && 'print-page-break-after',
       )}
-      style={{ minHeight: '297mm' }}
     >
       <header className="mb-4 flex items-start justify-between gap-6 border-b-2 border-black pb-2.5">
         <div className="flex items-start gap-3">

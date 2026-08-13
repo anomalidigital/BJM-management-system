@@ -10,7 +10,7 @@ import { DataTable } from '../components/ui/DataTable'
 import type { Column } from '../components/ui/DataTable'
 import { Badge } from '../components/ui/Badge'
 import { PrintDocument, PrintPage, chunkRows } from '../components/report/PrintDocument'
-import { ReportPreview } from '../components/report/ReportPreview'
+import { ReportPreview, barisPerLembar } from '../components/report/ReportPreview'
 import { useData } from '../store/DataProvider'
 import { formatDate, formatNumber } from '../lib/format'
 import type { TransactionRow } from '../types'
@@ -86,11 +86,13 @@ export function SijoSearchPage() {
     { key: 'container_no', header: 'Kont', sortable: true, width: '160px', render: (t) => <span className="tnum text-ink-2">{t.container_no || '—'}</span> },
   ]
 
-  const printPages = useMemo(() => chunkRows(rows, 26), [rows])
 
   if (preview && jobOrder) {
     return (
       <ReportPreview onClose={() => setPreview(false)} onPrint={() => window.print()}>
+        {(orientasi) => {
+          const printPages = chunkRows(rows, barisPerLembar(orientasi, 26))
+          return (
         <PrintDocument>
           {printPages.map((pageRows, i) => (
             <PrintPage
@@ -139,6 +141,8 @@ export function SijoSearchPage() {
             </PrintPage>
           ))}
         </PrintDocument>
+          )
+        }}
       </ReportPreview>
     )
   }

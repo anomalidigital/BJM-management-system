@@ -14,7 +14,7 @@ import { CurrencyInput } from '../components/ui/CurrencyInput'
 import { EmptyState, NotFoundState } from '../components/ui/States'
 import { PrintDocument, PrintPage, chunkRows } from '../components/report/PrintDocument'
 import { PrintTable, PRow, PCell } from '../components/report/PrintTable'
-import { ReportPreview } from '../components/report/ReportPreview'
+import { ReportPreview, barisPerLembar } from '../components/report/ReportPreview'
 import { useData } from '../store/DataProvider'
 import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
@@ -112,11 +112,13 @@ export function LapRitanPage() {
 
   const totalBon = sum(table.filtered, (t) => draftOf(t).personal_bon)
 
-  const printPages = useMemo(() => chunkRows(table.filtered, 24), [table.filtered])
 
   if (preview) {
     return (
       <ReportPreview onClose={() => setPreview(false)} onPrint={() => window.print()}>
+        {(orientasi) => {
+          const printPages = chunkRows(table.filtered, barisPerLembar(orientasi, 24))
+          return (
         <PrintDocument>
           {printPages.map((rows, i) => (
             <PrintPage
@@ -165,6 +167,8 @@ export function LapRitanPage() {
             </PrintPage>
           ))}
         </PrintDocument>
+          )
+        }}
       </ReportPreview>
     )
   }

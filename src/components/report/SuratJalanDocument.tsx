@@ -6,15 +6,7 @@ import { cn } from '../../lib/utils'
  * Layout dokumen Surat Jalan ukuran A4 (bukan screenshot UI).
  * Dua varian: Dengan Logo dan Tanpa Logo.
  */
-export function SuratJalanDocument({
-  note,
-  withLogo = true,
-  breakAfter = false,
-}: {
-  note: DeliveryNoteRow
-  withLogo?: boolean
-  breakAfter?: boolean
-}) {
+export function SuratJalanDocument({ note, withLogo = true }: { note: DeliveryNoteRow; withLogo?: boolean }) {
   const rows: Array<[string, string]> = [
     ['No. Polisi', note.plate_number || '-'],
     ['Party', note.party || '-'],
@@ -31,9 +23,7 @@ export function SuratJalanDocument({
       className={cn(
         'print-sheet mx-auto flex w-[210mm] max-w-full flex-col bg-white p-[16mm] text-[11.5px] text-black',
         'shadow-card border border-hairline print:border-0 print:shadow-none',
-        breakAfter && 'print-page-break-after',
       )}
-      style={{ minHeight: '297mm' }}
     >
       {/* Kop surat */}
       <header className={cn('flex items-start justify-between gap-8 pb-3', withLogo ? 'border-b-[3px] border-black' : 'border-b border-black')}>

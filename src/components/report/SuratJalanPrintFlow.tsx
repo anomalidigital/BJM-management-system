@@ -48,6 +48,7 @@ export function SuratJalanPrintFlow({
         onClose={onClose}
         onPrint={doPrint}
         closeLabel="Kembali"
+        orientasiTetap="potret"
         settings={
           <div className="space-y-4">
             <div>
@@ -82,8 +83,8 @@ export function SuratJalanPrintFlow({
         }
       >
         <PrintDocument>
-          {notes.map((n, i) => (
-            <SuratJalanDocument key={n.id} note={n} withLogo={template === 'logo'} breakAfter={i < notes.length - 1} />
+          {notes.map((n) => (
+            <SuratJalanDocument key={n.id} note={n} withLogo={template === 'logo'} />
           ))}
         </PrintDocument>
       </ReportPreview>

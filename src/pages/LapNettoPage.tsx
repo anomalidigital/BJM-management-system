@@ -7,13 +7,13 @@ import { Field, DateInput, Radio, FieldError } from '../components/ui/Field'
 import { StatCard } from '../components/ui/StatCard'
 import { PrintDocument, PrintPage, chunkRows } from '../components/report/PrintDocument'
 import { PrintTable, PRow, PCell } from '../components/report/PrintTable'
-import { ReportPreview } from '../components/report/ReportPreview'
+import { ReportPreview, barisPerLembar } from '../components/report/ReportPreview'
 import { useData } from '../store/DataProvider'
 import { useToast } from '../store/ToastProvider'
 import { nettoTransaksi, pendapatanTransaksi, ringkas } from '../lib/calculations'
 import { formatDate, formatNumber, formatRupiah } from '../lib/format'
 import { groupBy } from '../lib/utils'
-import { periodeAktif } from '../lib/periode'
+import { usePeriodeDefault } from '../lib/periode'
 
 type Mode = 'perMobil' | 'global'
 
@@ -21,9 +21,7 @@ export function LapNettoPage() {
   const { transactionRows } = useData()
   const toast = useToast()
 
-  const periodeDefault = useMemo(() => periodeAktif(transactionRows.map((t) => t.transaction_date)), [transactionRows])
-  const [from, setFrom] = useState(periodeDefault.start)
-  const [to, setTo] = useState(periodeDefault.end)
+  const { from, setFrom, to, setTo, reset: resetPeriode } = usePeriodeDefault(transactionRows.map((t) => t.transaction_date))
   const [mode, setMode] = useState<Mode>('perMobil')
   const [error, setError] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
@@ -67,9 +65,11 @@ export function LapNettoPage() {
   ]
 
   if (preview && mode === 'perMobil') {
-    const pages = chunkRows(perMobil, 26)
     return (
       <ReportPreview onClose={() => setPreview(false)} onPrint={() => window.print()}>
+        {(orientasi) => {
+          const pages = chunkRows(perMobil, barisPerLembar(orientasi, 26))
+          return (
         <PrintDocument>
           {pages.map((pageRows, i) => (
             <PrintPage
@@ -112,6 +112,8 @@ export function LapNettoPage() {
             </PrintPage>
           ))}
         </PrintDocument>
+          )
+        }}
       </ReportPreview>
     )
   }
@@ -125,9 +127,11 @@ export function LapNettoPage() {
         netto: group.reduce((a, r) => a + nettoTransaksi(r), 0),
       }))
       .sort((a, b) => a.date.localeCompare(b.date))
-    const pages = chunkRows(perDay, 28)
     return (
       <ReportPreview onClose={() => setPreview(false)} onPrint={() => window.print()}>
+        {(orientasi) => {
+          const pages = chunkRows(perDay, barisPerLembar(orientasi, 28))
+          return (
         <PrintDocument>
           {pages.map((pageRows, i) => (
             <PrintPage
@@ -164,6 +168,8 @@ export function LapNettoPage() {
             </PrintPage>
           ))}
         </PrintDocument>
+          )
+        }}
       </ReportPreview>
     )
   }
@@ -204,7 +210,7 @@ export function LapNettoPage() {
             <div className="flex flex-wrap items-center gap-2 border-t border-hairline pt-4">
               <Button variant="primary" icon={<Eye size={15} />} onClick={openPreview}>Preview</Button>
               <Button icon={<Printer size={15} />} onClick={openPreview}>Cetak</Button>
-              <Button variant="ghost" icon={<X size={14} />} onClick={() => { setFrom(periodeDefault.start); setTo(periodeDefault.end); setMode('perMobil'); setError(null) }}>Batal</Button>
+              <Button variant="ghost" icon={<X size={14} />} onClick={() => { resetPeriode(); setMode('perMobil'); setError(null) }}>Batal</Button>
             </div>
           </div>
         </Card>

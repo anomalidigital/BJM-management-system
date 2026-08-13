@@ -7,21 +7,19 @@ import { Field, DateInput, Radio, FieldError } from '../components/ui/Field'
 import { StatCard } from '../components/ui/StatCard'
 import { PrintDocument, PrintPage, chunkRows } from '../components/report/PrintDocument'
 import { PrintTable, PRow, PCell } from '../components/report/PrintTable'
-import { ReportPreview } from '../components/report/ReportPreview'
+import { ReportPreview, barisPerLembar } from '../components/report/ReportPreview'
 import { useData } from '../store/DataProvider'
 import { useToast } from '../store/ToastProvider'
 import { formatDate, formatNumber, formatRupiah } from '../lib/format'
 import { groupBy } from '../lib/utils'
-import { periodeAktif } from '../lib/periode'
+import { usePeriodeDefault } from '../lib/periode'
 
 type Mode = 'perSopir' | 'perTermin'
 
 export function LapUangJalanPage() {
   const { db, transactionRows } = useData()
   const toast = useToast()
-  const periodeDefault = useMemo(() => periodeAktif(db.ujPayments.map((p) => p.payment_date)), [db.ujPayments])
-  const [from, setFrom] = useState(periodeDefault.start)
-  const [to, setTo] = useState(periodeDefault.end)
+  const { from, setFrom, to, setTo, reset: resetPeriode } = usePeriodeDefault(db.ujPayments.map((p) => p.payment_date))
   const [mode, setMode] = useState<Mode>('perSopir')
   const [error, setError] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
@@ -74,9 +72,11 @@ export function LapUangJalanPage() {
   ]
 
   if (preview && mode === 'perSopir') {
-    const pages = chunkRows(perSopir, 26)
     return (
       <ReportPreview onClose={() => setPreview(false)} onPrint={() => window.print()}>
+        {(orientasi) => {
+          const pages = chunkRows(perSopir, barisPerLembar(orientasi, 26))
+          return (
         <PrintDocument>
           {pages.map((rows, i) => (
             <PrintPage key={i} page={i + 1} totalPages={pages.length}
@@ -110,14 +110,18 @@ export function LapUangJalanPage() {
             </PrintPage>
           ))}
         </PrintDocument>
+          )
+        }}
       </ReportPreview>
     )
   }
 
   if (preview) {
-    const pages = chunkRows(termin, 24)
     return (
       <ReportPreview onClose={() => setPreview(false)} onPrint={() => window.print()}>
+        {(orientasi) => {
+          const pages = chunkRows(termin, barisPerLembar(orientasi, 24))
+          return (
         <PrintDocument>
           {pages.map((rows, i) => (
             <PrintPage key={i} page={i + 1} totalPages={pages.length}
@@ -153,6 +157,8 @@ export function LapUangJalanPage() {
             </PrintPage>
           ))}
         </PrintDocument>
+          )
+        }}
       </ReportPreview>
     )
   }
@@ -186,7 +192,7 @@ export function LapUangJalanPage() {
             <div className="flex flex-wrap items-center gap-2 border-t border-hairline pt-4">
               <Button variant="primary" icon={<Eye size={15} />} onClick={openPreview}>Preview</Button>
               <Button icon={<Printer size={15} />} onClick={openPreview}>Cetak</Button>
-              <Button variant="ghost" icon={<X size={14} />} onClick={() => { setFrom(periodeDefault.start); setTo(periodeDefault.end); setError(null) }}>Batal</Button>
+              <Button variant="ghost" icon={<X size={14} />} onClick={() => { resetPeriode(); setError(null) }}>Batal</Button>
             </div>
           </div>
         </Card>

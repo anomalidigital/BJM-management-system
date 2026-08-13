@@ -8,13 +8,13 @@ import { SearchableSelect } from '../components/ui/SearchableSelect'
 import { StatCard } from '../components/ui/StatCard'
 import { PrintDocument, PrintPage, chunkRows } from '../components/report/PrintDocument'
 import { PrintTable, PRow, PCell } from '../components/report/PrintTable'
-import { ReportPreview } from '../components/report/ReportPreview'
+import { ReportPreview, barisPerLembar } from '../components/report/ReportPreview'
 import { useData } from '../store/DataProvider'
 import { useToast } from '../store/ToastProvider'
 import { komisiTransaksi, ringkas } from '../lib/calculations'
 import { formatDate, formatNumber, formatRupiah } from '../lib/format'
 import { groupBy } from '../lib/utils'
-import { periodeAktif } from '../lib/periode'
+import { usePeriodeDefault } from '../lib/periode'
 import type { TransactionRow } from '../types'
 
 type Mode = 'perSopir' | 'semuaSopir' | 'global'
@@ -29,9 +29,7 @@ export function LapKomisiPage() {
   const { db, transactionRows } = useData()
   const toast = useToast()
 
-  const periodeDefault = useMemo(() => periodeAktif(transactionRows.map((t) => t.transaction_date)), [transactionRows])
-  const [from, setFrom] = useState(periodeDefault.start)
-  const [to, setTo] = useState(periodeDefault.end)
+  const { from, setFrom, to, setTo, reset: resetPeriode } = usePeriodeDefault(transactionRows.map((t) => t.transaction_date))
   const [mode, setMode] = useState<Mode>('semuaSopir')
   const [driverId, setDriverId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -87,7 +85,7 @@ export function LapKomisiPage() {
   }
 
   function resetFilter() {
-    setFrom(periodeDefault.start); setTo(periodeDefault.end); setMode('semuaSopir'); setDriverId(null); setError(null)
+    resetPeriode(); setMode('semuaSopir'); setDriverId(null); setError(null)
   }
 
   const periodeText = `${formatDate(from)} s/d ${formatDate(to)}`
@@ -95,9 +93,11 @@ export function LapKomisiPage() {
 
   /* ── Preview: mode Global (ringkasan per sopir) ────────────── */
   if (preview && mode === 'global') {
-    const pages = chunkRows(globalRows, 28)
     return (
       <ReportPreview onClose={() => setPreview(false)} onPrint={() => window.print()}>
+        {(orientasi) => {
+          const pages = chunkRows(globalRows, barisPerLembar(orientasi, 28))
+          return (
         <PrintDocument>
           {pages.map((pageRows, i) => (
             <PrintPage
@@ -136,16 +136,20 @@ export function LapKomisiPage() {
             </PrintPage>
           ))}
         </PrintDocument>
+          )
+        }}
       </ReportPreview>
     )
   }
 
   /* ── Preview: mode perSopir / semuaSopir (rincian transaksi) ─ */
   if (preview) {
-    const pages = chunkRows(rows, 24)
     const title = mode === 'perSopir' ? 'Laporan Komisi per Sopir' : 'Laporan Komisi Seluruh Sopir'
     return (
       <ReportPreview onClose={() => setPreview(false)} onPrint={() => window.print()}>
+        {(orientasi) => {
+          const pages = chunkRows(rows, barisPerLembar(orientasi, 24))
+          return (
         <PrintDocument>
           {pages.map((pageRows, i) => (
             <PrintPage
@@ -191,6 +195,8 @@ export function LapKomisiPage() {
             </PrintPage>
           ))}
         </PrintDocument>
+          )
+        }}
       </ReportPreview>
     )
   }

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Pencil, Plus, Printer, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
@@ -13,7 +13,7 @@ import { CurrencyInput } from '../components/ui/CurrencyInput'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState, NotFoundState } from '../components/ui/States'
 import { PrintDocument, PrintPage, chunkRows } from '../components/report/PrintDocument'
-import { ReportPreview } from '../components/report/ReportPreview'
+import { ReportPreview, barisPerLembar } from '../components/report/ReportPreview'
 import { useData } from '../store/DataProvider'
 import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
@@ -87,7 +87,6 @@ export function DataRoutePage() {
   }
 
   const printRows = table.filtered
-  const printPages = useMemo(() => chunkRows(printRows, 24), [printRows])
 
   const columns: Column<Route>[] = [
     { key: 'route_code', header: 'No. Route', sortable: true, width: '116px', render: (r) => <span className="tnum font-semibold text-ink">{r.route_code}</span> },
@@ -110,6 +109,9 @@ export function DataRoutePage() {
   if (preview) {
     return (
       <ReportPreview onClose={() => setPreview(false)} onPrint={() => window.print()}>
+        {(orientasi) => {
+          const printPages = chunkRows(printRows, barisPerLembar(orientasi, 24))
+          return (
         <PrintDocument>
           {printPages.map((rows, i) => (
             <PrintPage
@@ -159,6 +161,8 @@ export function DataRoutePage() {
             </PrintPage>
           ))}
         </PrintDocument>
+          )
+        }}
       </ReportPreview>
     )
   }

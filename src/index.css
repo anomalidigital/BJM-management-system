@@ -92,36 +92,79 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   PRINT / PDF EXPORT
-   Only .print-root is printed. Everything else is hidden, so
-   "Cetak" and "Export PDF" both use the browser print pipeline
-   (Save as PDF) with the same paged layout.
+   CETAK / EKSPOR PDF
+
+   Dokumen harus berada di ALIRAN NORMAL agar browser dapat
+   memecahnya menjadi beberapa halaman. Karena itu pembungkus
+   preview yang position:fixed dan overflow:auto dinetralkan saat
+   mencetak, bukan disembunyikan dengan visibility.
    ═══════════════════════════════════════════════════════════ */
-@page { size: A4; margin: 14mm 12mm 16mm 12mm; }
+
+/* Ukuran halaman disuntikkan dari ReportPreview mengikuti pilihan
+   orientasi; nilai di bawah hanya cadangan. */
+@page { size: A4 portrait; margin: 12mm 10mm 14mm 10mm; }
 
 @media print {
-  html, body { background: #fff !important; font-size: 10.5pt; }
-  body * { visibility: hidden !important; }
-  .print-root, .print-root * { visibility: visible !important; }
-  .print-root {
-    position: absolute !important;
-    inset: 0 auto auto 0;
-    width: 100%;
-    padding: 0 !important;
-    margin: 0 !important;
+  html, body {
     background: #fff !important;
-    box-shadow: none !important;
-    border: 0 !important;
-    max-height: none !important;
+    height: auto !important;
     overflow: visible !important;
   }
-  .no-print, .no-print * { display: none !important; }
-  .print-sheet { box-shadow: none !important; border: 0 !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
-  .print-page-break { break-before: page; }
-  .print-page-break-after { break-after: page; }
-  .print-sheet { min-height: auto !important; }
+
+  /* Kembalikan seluruh kerangka aplikasi ke aliran normal */
+  #root,
+  #root > div,
+  main {
+    display: block !important;
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  .no-print,
+  .no-print * { display: none !important; }
+
+  /* Pembungkus preview: lepas dari fixed dan area scroll */
+  .print-shell {
+    position: static !important;
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  .print-scroll {
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto !important;
+  }
+  .print-root { display: block !important; }
+
+  /* Tiap lembar mengisi area cetak; margin diatur oleh @page */
+  .print-sheet {
+    width: auto !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+  /* Lembar kedua dan seterusnya selalu mulai di halaman baru */
+  .print-sheet + .print-sheet { break-before: page; page-break-before: always; }
+
   thead { display: table-header-group; }
   tr, td, th { break-inside: avoid; }
-  .print-table th, .print-table td { border-color: #999 !important; }
+  .print-table th,
+  .print-table td { border-color: #999 !important; }
   a[href]::after { content: "" !important; }
 }
+
+/* Ukuran lembar di layar mengikuti orientasi yang dipilih */
+.print-sheet { min-height: 297mm; }
+[data-orientasi='lanskap'] .print-sheet { width: 297mm; min-height: 210mm; }
