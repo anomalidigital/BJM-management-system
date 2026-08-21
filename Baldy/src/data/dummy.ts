@@ -322,8 +322,8 @@ function makeDeliveryNotes(
   source.forEach((t, i) => {
     const jo = db.jobOrders.find((j) => j.id === t.job_order_id)!
     const veh = db.vehicles.find((v) => v.id === t.vehicle_id)!
-    const qty = int(1, 4)
-    const containers = Array.from({ length: qty }, () => `${pick(CONT_PREFIX)}${int(1000000, 9999999)}`)
+    // Satu Surat Jalan memuat satu nomor container.
+    const containers = [`${pick(CONT_PREFIX)}${int(1000000, 9999999)}`]
     const printed = rand() > 0.4
     out.push({
       id: `sj-${i + 1}`,
@@ -333,6 +333,8 @@ function makeDeliveryNotes(
       recipient_address_1: jo.customer_address.split(',')[0].trim(),
       recipient_address_2: jo.customer_address.split(',').slice(1).join(',').trim() || 'Jakarta',
       vehicle_id: veh.id,
+      driver_id: t.driver_id,
+      route_id: t.route_id,
       party: jo.party,
       job_order_id: jo.id,
       goods_type: pick(GOODS_TYPE),

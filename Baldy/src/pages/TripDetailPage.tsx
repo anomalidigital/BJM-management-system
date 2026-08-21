@@ -351,7 +351,7 @@ export function TripDetailPage() {
                       <Link to={`/transaksi/surat-jalan/${n.id}`} className="flex items-center justify-between gap-3 px-3.5 py-2.5 transition-colors hover:bg-sunken">
                         <span>
                           <span className="tnum block text-[13px] font-semibold text-brand-700">{n.sj_no}</span>
-                          <span className="block text-[12px] text-ink-3">{formatDate(n.sj_date)} · {n.container_count} container</span>
+                          <span className="block text-[12px] text-ink-3">{formatDate(n.sj_date)} · {n.containers[0] || '—'}</span>
                         </span>
                         {n.printed_at ? <Badge tone="good">Tercetak</Badge> : <Badge tone="warning">Draft</Badge>}
                       </Link>

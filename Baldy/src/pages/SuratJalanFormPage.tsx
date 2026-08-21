@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, Printer, Save, Trash2, TriangleAlert } from 'lucide-react'
+import { Printer, Save, TriangleAlert } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader } from '../components/ui/Card'
-import { Button, IconButton } from '../components/ui/Button'
-import { Field, Input, DateInput, FieldError } from '../components/ui/Field'
+import { Button } from '../components/ui/Button'
+import { Field, Input, DateInput } from '../components/ui/Field'
 import { SearchableSelect } from '../components/ui/SearchableSelect'
-import { Badge } from '../components/ui/Badge'
 import { useData } from '../store/DataProvider'
 import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
@@ -18,7 +17,7 @@ type FormState = Omit<DeliveryNote, 'id' | 'created_at' | 'updated_at' | 'printe
 
 const BLANK: FormState = {
   sj_no: '', sj_date: todayISO(), recipient_name: '', recipient_address_1: '', recipient_address_2: '',
-  vehicle_id: '', party: '', job_order_id: '', goods_type: '', kosongan: '', location: '',
+  vehicle_id: '', driver_id: '', route_id: '', party: '', job_order_id: '', goods_type: '', kosongan: '', location: '',
   ship: '', destination: '', containers: [''],
 }
 
@@ -80,7 +79,7 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
       : { ...BLANK, sj_no: nextNo },
   )
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [containerErrors, setContainerErrors] = useState<Record<number, string>>({})
+  const [containerError, setContainerError] = useState('')
 
   const joOptions = useMemo(
     () => db.jobOrders.map((j) => ({ value: j.id, label: j.sijo, meta: `${j.customer_name} · ${j.party}`, keywords: `${j.customer_code} ${j.goods} ${j.ship}` })),
@@ -89,6 +88,14 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
   const vehicleOptions = useMemo(
     () => db.vehicles.map((v) => ({ value: v.id, label: v.plate_number, meta: v.vehicle_type })),
     [db.vehicles],
+  )
+  const driverOptions = useMemo(
+    () => db.drivers.map((d) => ({ value: d.id, label: d.driver_code, meta: d.driver_name, keywords: `${d.driver_name} ${d.city}` })),
+    [db.drivers],
+  )
+  const routeOptions = useMemo(
+    () => db.routes.map((r) => ({ value: r.id, label: r.route_code, meta: r.route_name, keywords: `${r.route_name} ${r.feet}` })),
+    [db.routes],
   )
 
   if (mode === 'edit' && !existing) {
@@ -129,38 +136,8 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
   }
 
   /* ── Container: list dinamis ──────────────────────────────── */
-  function setContainer(index: number, value: string) {
-    setForm((f) => {
-      const next = [...f.containers]
-      next[index] = value.toUpperCase().replace(/\s+/g, '')
-      return { ...f, containers: next }
-    })
-  }
-
-  function addContainer() {
-    setForm((f) => ({ ...f, containers: [...f.containers, ''] }))
-  }
-
-  function removeContainer(index: number) {
-    setForm((f) => {
-      const next = f.containers.filter((_, i) => i !== index)
-      return { ...f, containers: next.length ? next : [''] }
-    })
-    setContainerErrors({})
-  }
-
-  /** Paste banyak nomor sekaligus (dipisah baris/koma/spasi). */
-  function onPasteContainer(index: number, e: React.ClipboardEvent<HTMLInputElement>) {
-    const text = e.clipboardData.getData('text')
-    const parts = text.split(/[\s,;\n\r\t]+/).map((s) => s.trim().toUpperCase()).filter(Boolean)
-    if (parts.length <= 1) return
-    e.preventDefault()
-    setForm((f) => {
-      const next = [...f.containers]
-      next.splice(index, 1, ...parts)
-      return { ...f, containers: next.filter((c, i) => c !== '' || i === next.length - 1) }
-    })
-    toast.info(`${parts.length} nomor container ditambahkan.`)
+  function setContainer(value: string) {
+    setForm((f) => ({ ...f, containers: [value.toUpperCase().replace(/\s+/g, '')] }))
   }
 
   function validate(): boolean {
@@ -173,22 +150,15 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
     if (!form.vehicle_id) e.vehicle_id = 'No. Polisi wajib dipilih.'
     if (!form.destination.trim()) e.destination = 'Tujuan wajib diisi.'
 
-    // Validasi container: tidak kosong, tidak duplikat dalam satu Surat Jalan.
-    const ce: Record<number, string> = {}
-    const seen = new Map<string, number>()
-    const filled = form.containers.map((c) => c.trim().toUpperCase())
-    if (filled.every((c) => !c)) e.containers = 'Minimal satu nomor container harus diisi.'
-    filled.forEach((c, i) => {
-      if (!c) {
-        if (filled.filter(Boolean).length > 0 && form.containers.length > 1) ce[i] = 'Nomor container tidak boleh kosong.'
-        return
-      }
-      if (seen.has(c)) ce[i] = 'Nomor container sudah digunakan.'
-      else seen.set(c, i)
-    })
+    // Satu Surat Jalan memuat satu nomor container.
+    const nomor = (form.containers[0] ?? '').trim().toUpperCase()
+    let ce = ''
+    if (!nomor) ce = 'Nomor container wajib diisi.'
+    else if (db.deliveryNotes.some((n) => n.id !== existing?.id && (n.containers[0] ?? '').trim().toUpperCase() === nomor))
+      ce = 'Nomor container sudah dipakai di Surat Jalan lain.'
     setErrors(e)
-    setContainerErrors(ce)
-    return Object.keys(e).length === 0 && Object.keys(ce).length === 0
+    setContainerError(ce)
+    return Object.keys(e).length === 0 && !ce
   }
 
   function save(thenPrint: boolean) {
@@ -214,8 +184,10 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
     }
   }
 
-  const containerCount = form.containers.filter((c) => c.trim()).length
+  const nomorContainer = (form.containers[0] ?? '').trim()
   const selectedJo = db.jobOrders.find((j) => j.id === form.job_order_id)
+  const selectedDriver = db.drivers.find((d) => d.id === form.driver_id)
+  const selectedRoute = db.routes.find((r) => r.id === form.route_id)
 
   return (
     <div className="pb-20">
@@ -241,38 +213,21 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
         <Card>
           <CardHeader
             title="Container"
-            subtitle="Tambahkan nomor container satu per satu, atau paste beberapa nomor sekaligus."
-            actions={<Badge tone={containerCount > 0 ? 'brand' : 'neutral'}>{containerCount} container</Badge>}
+            subtitle="Satu Surat Jalan memuat satu nomor container."
           />
           <div className="p-4">
-            <div className="space-y-2">
-              {form.containers.map((c, i) => (
-                <div key={i}>
-                  <div className="flex items-center gap-2">
-                    <span className="tnum w-6 shrink-0 text-[12.5px] font-semibold text-ink-3">{i + 1}.</span>
-                    <Input
-                      value={c}
-                      invalid={!!containerErrors[i]}
-                      placeholder="TGHU1234567"
-                      className="max-w-md font-medium tracking-wide"
-                      onChange={(e) => setContainer(i, e.target.value)}
-                      onPaste={(e) => onPasteContainer(i, e)}
-                      aria-label={`Nomor container ${i + 1}`}
-                    />
-                    <IconButton
-                      label="Hapus container"
-                      tone="danger"
-                      icon={<Trash2 size={14} />}
-                      disabled={form.containers.length === 1 && !c}
-                      onClick={() => removeContainer(i)}
-                    />
-                  </div>
-                  {containerErrors[i] && <p className="mt-1 pl-8 text-[12px] font-medium text-[color:var(--color-critical)]">{containerErrors[i]}</p>}
-                </div>
-              ))}
-            </div>
-            {errors.containers && <div className="mt-2"><FieldError>{errors.containers}</FieldError></div>}
-            <Button className="mt-3" size="sm" icon={<Plus size={14} />} onClick={addContainer}>Tambah Container</Button>
+            <Field label="No. Container" required error={containerError}>
+              {(fid) => (
+                <Input
+                  id={fid}
+                  value={form.containers[0] ?? ''}
+                  invalid={!!containerError}
+                  placeholder="TGHU1234567"
+                  className="max-w-md font-medium tracking-wide"
+                  onChange={(e) => setContainer(e.target.value)}
+                />
+              )}
+            </Field>
           </div>
         </Card>
       </div>
@@ -321,6 +276,18 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
                   placeholder="Pilih nomor polisi..." onChange={(v) => setForm({ ...form, vehicle_id: v ?? '' })} />
               )}
             </Field>
+            <Field label="Sopir" hint={selectedDriver ? `Nama: ${selectedDriver.driver_name}` : 'Pilih kode sopir yang membawa muatan.'}>
+              {(fid) => (
+                <SearchableSelect id={fid} options={driverOptions} value={form.driver_id || null}
+                  placeholder="Cari kode / nama sopir..." onChange={(v) => setForm({ ...form, driver_id: v ?? '' })} />
+              )}
+            </Field>
+            <Field label="Kode Route" hint={selectedRoute ? selectedRoute.route_name : 'Route yang dipakai untuk pengiriman ini.'}>
+              {(fid) => (
+                <SearchableSelect id={fid} options={routeOptions} value={form.route_id || null}
+                  placeholder="Cari kode route..." onChange={(v) => setForm({ ...form, route_id: v ?? '' })} />
+              )}
+            </Field>
             <Field label="Party">
               {(fid) => <Input id={fid} value={form.party} placeholder="40 X 40" onChange={(e) => setForm({ ...form, party: e.target.value })} />}
             </Field>
@@ -357,7 +324,7 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
       <div className={cn('no-print fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-surface/95 backdrop-blur', 'px-4 py-3 lg:px-6')}>
         <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3">
           <p className="hidden text-[12.5px] text-ink-3 sm:block">
-            {containerCount} container &middot; {form.sj_no || 'nomor belum diisi'}
+            {nomorContainer || 'container belum diisi'} &middot; {form.sj_no || 'nomor belum diisi'}
           </p>
           <div className="ml-auto flex items-center gap-2">
             <Button onClick={() => navigate('/transaksi/surat-jalan')}>Batal</Button>

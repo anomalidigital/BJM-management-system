@@ -178,6 +178,8 @@ export interface DeliveryNote {
   recipient_address_1: string    // di (baris 1)
   recipient_address_2: string    // di (baris 2)
   vehicle_id: string             // No.Polisi
+  driver_id: string              // Kode Sopir / Nama Sopir (mengikuti trip terkait)
+  route_id: string               // Kode Route (mengikuti trip terkait)
   party: string                  // Party
   job_order_id: string           // SI/BL  -> relasi ke SI / Job Order
   goods_type: string             // Jenis Brg
@@ -236,6 +238,11 @@ export interface BillingRow extends Billing {
 
 export interface DeliveryNoteRow extends DeliveryNote {
   plate_number: string
+  driver_code: string
+  driver_name: string
+  route_code: string
+  route_name: string
   sijo: string
+  container_no: string
   container_count: number
 }

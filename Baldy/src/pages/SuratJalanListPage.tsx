@@ -43,7 +43,7 @@ export function SuratJalanListPage() {
 
   const search = useCallback(
     (n: DeliveryNoteRow, q: string) =>
-      matchesQuery(q, n.sj_no, n.sijo, n.recipient_name, n.plate_number, n.destination, n.containers.join(' ')),
+      matchesQuery(q, n.sj_no, n.sijo, n.recipient_name, n.driver_code, n.driver_name, n.plate_number, n.route_code, n.route_name, n.destination, n.containers.join(' ')),
     [],
   )
   const extraFilter = useCallback(
@@ -101,19 +101,33 @@ export function SuratJalanListPage() {
   }
 
   const columns: Column<DeliveryNoteRow>[] = [
-    { key: 'sj_date', header: 'Tanggal', sortable: true, width: '104px', render: (n) => <span className="tnum text-ink-2">{formatDate(n.sj_date)}</span> },
+    { key: 'sj_date', header: 'Tanggal', sortable: true, width: '88px', render: (n) => <span className="tnum text-ink-2">{formatDate(n.sj_date)}</span> },
     {
-      key: 'sj_no', header: 'No. Surat Jalan', sortable: true, width: '132px',
+      key: 'sj_no', header: 'No. Surat Jalan', sortable: true, width: '150px',
       render: (n) => (
-        <Link to={`/transaksi/surat-jalan/${n.id}`} className="tnum font-semibold text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>
-          {n.sj_no}
-        </Link>
+        <div className="leading-tight">
+          <Link to={`/transaksi/surat-jalan/${n.id}`} className="tnum font-semibold text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>
+            {n.sj_no}
+          </Link>
+          <div className="tnum text-xs text-ink-3" title="No. Container">{n.containers[0] || '—'}</div>
+        </div>
       ),
     },
     { key: 'recipient_name', header: 'Kepada Yth', sortable: true, render: (n) => <span className="font-medium">{n.recipient_name}</span> },
-    { key: 'plate_number', header: 'No. Polisi', sortable: true, width: '124px', render: (n) => <span className="tnum text-ink-2">{n.plate_number || '—'}</span> },
+    { key: 'driver_code', header: 'Kode Sopir', sortable: true, width: '92px', render: (n) => <span className="tnum text-ink-2">{n.driver_code || '—'}</span> },
+    { key: 'driver_name', header: 'Nama Sopir', sortable: true, render: (n) => <span>{n.driver_name || '—'}</span> },
+    { key: 'plate_number', header: 'No. Polisi', sortable: true, width: '112px', render: (n) => <span className="tnum text-ink-2">{n.plate_number || '—'}</span> },
     {
-      key: 'sijo', header: 'SI / BL', sortable: true, width: '108px',
+      key: 'route_code', header: 'Kode Route', sortable: true, width: '152px',
+      render: (n) => (
+        <div className="leading-tight" title={n.route_name}>
+          <div className="tnum">{n.route_code || '—'}</div>
+          {n.destination && <div className="text-xs text-ink-3">{n.destination}</div>}
+        </div>
+      ),
+    },
+    {
+      key: 'sijo', header: 'S / JO', sortable: true, width: '100px',
       render: (n) => (
         <Link to={`/pencarian/sijo?sijo=${n.sijo}`} className="tnum text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>
           {n.sijo || '—'}
@@ -121,27 +135,18 @@ export function SuratJalanListPage() {
       ),
     },
     {
-      key: 'container_count', header: 'Container', sortable: true, width: '110px',
-      render: (n) => (
-        <span title={n.containers.join(', ')}>
-          <Badge tone={n.container_count > 0 ? 'brand' : 'neutral'}>{n.container_count} cont.</Badge>
-        </span>
-      ),
-    },
-    { key: 'destination', header: 'Tujuan', sortable: true, render: (n) => <span className="text-ink-2">{n.destination || '—'}</span> },
-    {
       key: 'status', header: 'Status', sortable: true, width: '104px',
       render: (n) => (n.printed_at ? <Badge tone="good">Tercetak</Badge> : <Badge tone="warning">Draft</Badge>),
     },
     {
-      key: 'action', header: 'Action', align: 'right', width: '128px',
+      key: 'action', header: 'Action', align: 'right', width: '120px',
       render: (n) => (
         <div className="flex justify-end gap-1">
           <IconButton label="Lihat" icon={<Eye size={14} />} onClick={() => navigate(`/transaksi/surat-jalan/${n.id}`)} />
           <IconButton label="Edit" icon={<Pencil size={14} />} disabled={!canEdit} onClick={() => navigate(`/transaksi/surat-jalan/${n.id}/edit`)} />
-          <IconButton label="Cetak" icon={<Printer size={14} />} onClick={() => setPrinting([n])} />
           <OverflowMenu
             actions={[
+              { label: 'Cetak Surat Jalan', icon: <Printer size={14} />, onSelect: () => setPrinting([n]) },
               { label: 'Hapus Surat Jalan', icon: <Trash2 size={14} />, tone: 'danger', disabled: !canEdit, onSelect: () => setDeleting(n) },
             ]}
           />
@@ -171,7 +176,7 @@ export function SuratJalanListPage() {
                 value={table.query}
                 onChange={table.setQuery}
                 width="w-80"
-                placeholder="Cari No. Surat Jalan, SI/BL, Container..."
+                placeholder="Cari No. Surat Jalan, S/JO, Sopir, Route, Container..."
               />
               <FilterField label="Tanggal">
                 <DateInput value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-[150px]" aria-label="Tanggal dari" />

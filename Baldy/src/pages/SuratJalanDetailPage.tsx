@@ -105,7 +105,7 @@ export function SuratJalanDetailPage() {
             <dl className="grid gap-4 p-4 sm:grid-cols-3">
               <InfoItem label="Tanggal" value={formatDate(note.sj_date)} mono />
               <InfoItem label="Nomor Surat Jalan" value={note.sj_no} mono />
-              <InfoItem label="Jumlah Container" value={`${note.container_count} container`} />
+              <InfoItem label="No. Container" value={note.containers[0] || '—'} />
             </dl>
           </Card>
 
@@ -154,7 +154,7 @@ export function SuratJalanDetailPage() {
         </div>
 
         <Card className="h-fit">
-          <CardHeader title="Container" subtitle={`${note.container_count} nomor container`} />
+          <CardHeader title="Container" subtitle="Satu nomor container per Surat Jalan." />
           <div className="p-4">
             {note.containers.length === 0 ? (
               <p className="py-8 text-center text-[13px] text-ink-3">Belum ada nomor container.</p>

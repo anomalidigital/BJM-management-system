@@ -108,9 +108,14 @@ export function DataSopirPage() {
       render: (d) => <span className="tnum font-semibold text-ink">{d.driver_code}</span>,
     },
     { key: 'driver_name', header: 'Nama Sopir', sortable: true, render: (d) => <span className="font-medium">{d.driver_name}</span> },
-    { key: 'address_1', header: 'Alamat', sortable: true, render: (d) => <span className="text-ink-2">{d.address_1 || '—'}</span> },
-    { key: 'address_2', header: 'Alamat 2', sortable: true, render: (d) => <span className="text-ink-2">{d.address_2 || '—'}</span> },
-    { key: 'city', header: 'Kota', sortable: true, width: '130px', render: (d) => <span className="text-ink-2">{d.city}</span> },
+    {
+      key: 'address_1', header: 'Alamat', sortable: true,
+      render: (d) => {
+        const alamat = [d.address_1, d.address_2].filter(Boolean).join(', ')
+        return <span className="text-ink-2">{alamat || '—'}</span>
+      },
+    },
+    { key: 'city', header: 'Kota', sortable: true, width: '130px', render: (d) => <span className="text-ink-2">{d.city || '—'}</span> },
     {
       key: 'status',
       header: 'Status',
@@ -196,16 +201,10 @@ export function DataSopirPage() {
                 onChange={(e) => setForm({ ...form, driver_name: e.target.value })} />
             )}
           </Field>
-          <Field label="Alamat" className="sm:col-span-2" hint="Nama jalan dan nomor rumah.">
+          <Field label="Alamat" className="sm:col-span-2" hint="Alamat lengkap sopir.">
             {(id) => (
-              <Input id={id} value={form.address_1} placeholder="Jl. Melati No. 12"
+              <Input id={id} value={form.address_1} placeholder="Jl. Melati No. 12, Jakarta Timur"
                 onChange={(e) => setForm({ ...form, address_1: e.target.value })} />
-            )}
-          </Field>
-          <Field label="Alamat 2" hint="Kecamatan / area.">
-            {(id) => (
-              <Input id={id} value={form.address_2} placeholder="Jakarta Timur"
-                onChange={(e) => setForm({ ...form, address_2: e.target.value })} />
             )}
           </Field>
           <Field label="Kota" required error={errors.city}>

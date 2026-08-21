@@ -58,6 +58,28 @@ function migrate(stored: Record<string, unknown>): Database {
     merged.routes = rte.map(({ fart, ...r }) => ({ feet: fart ?? '', ...r }))
   }
 
+  // Surat Jalan semula tidak menyimpan sopir dan route. Keduanya diambil dari
+  // trip yang bersangkutan supaya data lama ikut terisi, bukan dikosongkan.
+  const notes = merged.deliveryNotes as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(notes)) {
+    const src = Array.isArray(trx) ? (merged.transactions as Array<Record<string, unknown>>) : []
+    const byJoVeh = new Map<string, Record<string, unknown>>()
+    const byJo = new Map<string, Record<string, unknown>>()
+    for (const t of src) {
+      const jo = String(t.job_order_id ?? '')
+      if (!jo) continue
+      const key = `${jo}|${String(t.vehicle_id ?? '')}`
+      if (!byJoVeh.has(key)) byJoVeh.set(key, t)
+      if (!byJo.has(jo)) byJo.set(jo, t)
+    }
+    merged.deliveryNotes = notes.map((n) => {
+      if (n.driver_id !== undefined && n.route_id !== undefined) return n
+      const jo = String(n.job_order_id ?? '')
+      const t = byJoVeh.get(`${jo}|${String(n.vehicle_id ?? '')}`) ?? byJo.get(jo)
+      return { driver_id: t?.driver_id ?? '', route_id: t?.route_id ?? '', ...n }
+    })
+  }
+
   return merged as unknown as Database
 }
 

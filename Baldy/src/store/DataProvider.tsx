@@ -171,12 +171,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const deliveryNoteRows = useMemo<DeliveryNoteRow[]>(() => {
     const vehicles = new Map(db.vehicles.map((v) => [v.id, v]))
     const jobOrders = new Map(db.jobOrders.map((j) => [j.id, j]))
-    return db.deliveryNotes.map((n: DeliveryNote) => ({
-      ...n,
-      plate_number: vehicles.get(n.vehicle_id)?.plate_number ?? '',
-      sijo: jobOrders.get(n.job_order_id)?.sijo ?? '',
-      container_count: n.containers.length,
-    }))
+    const drivers = new Map(db.drivers.map((d) => [d.id, d]))
+    const routes = new Map(db.routes.map((r) => [r.id, r]))
+    return db.deliveryNotes.map((n: DeliveryNote) => {
+      const d = drivers.get(n.driver_id)
+      const r = routes.get(n.route_id)
+      return {
+        ...n,
+        plate_number: vehicles.get(n.vehicle_id)?.plate_number ?? '',
+        driver_code: d?.driver_code ?? '',
+        driver_name: d?.driver_name ?? '',
+        route_code: r?.route_code ?? '',
+        route_name: r?.route_name ?? '',
+        sijo: jobOrders.get(n.job_order_id)?.sijo ?? '',
+        container_no: n.containers[0] ?? '',
+        container_count: n.containers.length,
+      }
+    })
   }, [db])
 
   const value = useMemo<DataContextValue>(
