@@ -58,25 +58,45 @@ function migrate(stored: Record<string, unknown>): Database {
     merged.routes = rte.map(({ fart, ...r }) => ({ feet: fart ?? '', ...r }))
   }
 
-  // Surat Jalan semula tidak menyimpan sopir dan route. Keduanya diambil dari
-  // trip yang bersangkutan supaya data lama ikut terisi, bukan dikosongkan.
+  // Surat Jalan semula tidak menyimpan sopir dan route.
+  //
+  // Surat Jalan dibangkitkan dari trip contoh yang tidak ikut disimpan, jadi trip
+  // asalnya tidak bisa ditelusuri kembali. Yang bisa dipakai adalah Tujuan: nilainya
+  // selalu sama dengan Nama Route, sehingga route dapat dipetakan tepat. Sopir lalu
+  // diambil dari trip yang memang pernah menempuh route tersebut, agar pasangan
+  // sopir-route tetap masuk akal.
   const notes = merged.deliveryNotes as Array<Record<string, unknown>> | undefined
-  if (Array.isArray(notes)) {
+  const rte2 = merged.routes as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(notes) && Array.isArray(rte2)) {
     const src = Array.isArray(trx) ? (merged.transactions as Array<Record<string, unknown>>) : []
-    const byJoVeh = new Map<string, Record<string, unknown>>()
-    const byJo = new Map<string, Record<string, unknown>>()
-    for (const t of src) {
-      const jo = String(t.job_order_id ?? '')
-      if (!jo) continue
-      const key = `${jo}|${String(t.vehicle_id ?? '')}`
-      if (!byJoVeh.has(key)) byJoVeh.set(key, t)
-      if (!byJo.has(jo)) byJo.set(jo, t)
+    const kunci = (v: unknown) => String(v ?? '').trim().toUpperCase()
+
+    const routePerNama = new Map<string, string>()
+    for (const r of rte2) {
+      const nama = kunci(r.route_name)
+      if (nama && !routePerNama.has(nama)) routePerNama.set(nama, String(r.id ?? ''))
     }
+
+    const sopirPerRoute = new Map<string, string>()
+    const sopirPerMobil = new Map<string, string>()
+    for (const t of src) {
+      const rid = String(t.route_id ?? '')
+      const did = String(t.driver_id ?? '')
+      const vid = String(t.vehicle_id ?? '')
+      if (rid && did && !sopirPerRoute.has(rid)) sopirPerRoute.set(rid, did)
+      if (vid && did && !sopirPerMobil.has(vid)) sopirPerMobil.set(vid, did)
+    }
+
     merged.deliveryNotes = notes.map((n) => {
-      if (n.driver_id !== undefined && n.route_id !== undefined) return n
-      const jo = String(n.job_order_id ?? '')
-      const t = byJoVeh.get(`${jo}|${String(n.vehicle_id ?? '')}`) ?? byJo.get(jo)
-      return { driver_id: t?.driver_id ?? '', route_id: t?.route_id ?? '', ...n }
+      // Nilai kosong ikut diisi ulang, bukan hanya field yang belum ada.
+      if (n.driver_id && n.route_id) return n
+      const routeId = String(n.route_id ?? '') || (routePerNama.get(kunci(n.destination)) ?? '')
+      const driverId =
+        String(n.driver_id ?? '') ||
+        (routeId ? sopirPerRoute.get(routeId) : undefined) ||
+        sopirPerMobil.get(String(n.vehicle_id ?? '')) ||
+        ''
+      return { ...n, driver_id: driverId, route_id: routeId }
     })
   }
 
