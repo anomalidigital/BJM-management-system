@@ -24,3 +24,6 @@ pnpm-debug.log*
 
 # Aset presentasi (berisi tangkapan layar sistem client)
 presentasi/
+
+# Berkas kunci sementara Office
+~$*

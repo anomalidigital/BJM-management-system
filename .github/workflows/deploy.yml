@@ -1,8 +1,15 @@
 name: Deploy ke GitHub Pages
 
+# Aplikasi berada di subfolder Baldy/, sedangkan GitHub hanya membaca
+# workflow dari .github/workflows di akar repo. Karena itu berkas ini
+# tinggal di akar, dan seluruh langkah build dijalankan di dalam Baldy/.
+
 on:
   push:
     branches: [main]
+    paths:
+      - 'Baldy/**'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 permissions:
@@ -14,6 +21,10 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+defaults:
+  run:
+    working-directory: Baldy
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -23,15 +34,15 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: Baldy/package-lock.json
       - run: npm ci
       - run: npm run build
       - uses: actions/configure-pages@v5
         with:
-          # coba aktifkan Pages otomatis bila belum diset ke GitHub Actions
           enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: Baldy/dist
 
   deploy:
     needs: build
