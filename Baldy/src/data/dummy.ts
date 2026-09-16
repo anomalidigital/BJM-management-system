@@ -531,7 +531,8 @@ export function generateDatabase(): Database {
   const routes = real.routes.map((r) => ({ ...r, toll: r.toll ?? 0 }))
   const transactions = real.transactions.map((t) => ({
     ...t,
-    workspace: t.workspace ?? workspaceForSeed(t.vehicle_id),
+    // Trip tanpa kendaraan memakai id-nya sendiri sebagai seed.
+    workspace: t.workspace ?? workspaceForSeed(t.vehicle_id || t.id),
   }))
   const internalCosts = makeInternalCosts(transactions)
   const commissionSchemes = makeCommissionSchemes()

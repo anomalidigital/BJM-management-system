@@ -73,9 +73,13 @@ function migrate(stored: Record<string, unknown>): Database {
   ) => {
     const list = merged[key] as Array<Record<string, unknown>> | undefined
     if (!Array.isArray(list)) return
-    merged[key] = list.map((row) =>
-      row.workspace ? row : { ...row, workspace: workspaceForSeed(String(row[seedField] ?? row.id ?? '')) },
-    )
+    merged[key] = list.map((row) => {
+      if (row.workspace) return row
+      // Baris tanpa kendaraan jatuh ke id-nya sendiri, supaya tidak menumpuk
+      // di satu cabang hanya karena seed-nya sama-sama kosong.
+      const seed = String(row[seedField] ?? '') || String(row.id ?? '')
+      return { ...row, workspace: workspaceForSeed(seed) }
+    })
   }
   beriWorkspace('transactions', 'vehicle_id')
   beriWorkspace('deliveryNotes', 'vehicle_id')
