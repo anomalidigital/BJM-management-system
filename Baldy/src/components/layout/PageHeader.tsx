@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { findNavHref } from './navigation'
 
 export interface Crumb {
   label: string
+  /** Kosongkan saja: tujuan dicari otomatis dari struktur menu. */
   to?: string
 }
 
@@ -23,18 +25,27 @@ export function PageHeader({
     <header className="no-print mb-4">
       {crumbs.length > 0 && (
         <nav aria-label="Breadcrumb" className="mb-1.5 flex items-center gap-1 text-[12px] text-ink-3">
-          {crumbs.map((c, i) => (
-            <span key={`${c.label}-${i}`} className="flex items-center gap-1">
-              {i > 0 && <ChevronRight size={12} className="text-ink-3/60" />}
-              {c.to ? (
-                <Link to={c.to} className="transition-colors hover:text-brand-600">
-                  {c.label}
-                </Link>
-              ) : (
-                <span className="text-ink-2">{c.label}</span>
-              )}
-            </span>
-          ))}
+          {crumbs.map((c, i) => {
+            // Crumb terakhir adalah halaman yang sedang dibuka, jadi tidak ditautkan.
+            const terakhir = i === crumbs.length - 1
+            const href = terakhir ? undefined : (c.to ?? findNavHref(c.label))
+            return (
+              <span key={`${c.label}-${i}`} className="flex items-center gap-1">
+                {i > 0 && <ChevronRight size={12} className="text-ink-3/60" />}
+                {href ? (
+                  <Link
+                    to={href}
+                    title={`Buka ${c.label}`}
+                    className="rounded-sm underline decoration-transparent underline-offset-2 transition-colors hover:text-brand-600 hover:decoration-brand-300"
+                  >
+                    {c.label}
+                  </Link>
+                ) : (
+                  <span className="text-ink-2">{c.label}</span>
+                )}
+              </span>
+            )
+          })}
         </nav>
       )}
       <div className="flex flex-wrap items-start justify-between gap-3">

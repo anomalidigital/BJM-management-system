@@ -8,12 +8,14 @@ import { ConfirmDialog } from '../components/ui/Modal'
 import { useData } from '../store/DataProvider'
 import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
+import { useWorkspace } from '../store/WorkspaceProvider'
 import { TBD_NOTES } from '../lib/calculations'
 import { downloadFile } from '../lib/utils'
 import { formatNumber, todayISO } from '../lib/format'
 
 export function ToolsPage() {
-  const { db, muatUlangData, reload } = useData()
+  const { db, dbAll, muatUlangData, reload } = useData()
+  const { meta } = useWorkspace()
   const { canEdit } = useAuth()
   const toast = useToast()
   const [confirmReset, setConfirmReset] = useState(false)
@@ -29,11 +31,14 @@ export function ToolsPage() {
     ['Surat Jalan', db.deliveryNotes.length],
     ['Termin Uang Jalan', db.ujPayments.length],
     ['Biaya Operasional', db.expenses.length],
+    ['Biaya Internal', db.internalCosts.length],
+    ['Pengaturan Komisi', db.commissionSchemes.length],
   ]
 
+  // Export selalu berisi seluruh workspace, bukan hanya yang sedang aktif.
   function exportJson() {
-    downloadFile(`sikotis-data-${todayISO()}.json`, JSON.stringify(db, null, 2))
-    toast.success('Data berhasil diexport.')
+    downloadFile(`sikotis-data-${todayISO()}.json`, JSON.stringify(dbAll, null, 2))
+    toast.success('Data seluruh workspace berhasil diexport.')
   }
 
   function doReset() {
@@ -81,7 +86,7 @@ export function ToolsPage() {
 
         <div className="space-y-4">
           <Card>
-            <CardHeader title="Isi database" subtitle="Tersimpan di localStorage browser ini." />
+            <CardHeader title="Isi database" subtitle={`Workspace ${meta.label} · tersimpan di localStorage browser ini.`} />
             <ul className="divide-y divide-grid">
               {counts.map(([label, n]) => (
                 <li key={label} className="flex items-center justify-between px-4 py-2">

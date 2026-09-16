@@ -12,6 +12,21 @@ export interface User {
   role: Role
 }
 
+/**
+ * Workspace = area kerja / cabang. Satu aplikasi web, dua sistem management
+ * yang datanya terpisah. Jakarta adalah workspace bawaan saat login.
+ */
+export const WORKSPACES = ['jakarta', 'tangerang'] as const
+export type Workspace = (typeof WORKSPACES)[number]
+
+/**
+ * Ditempel pada entitas transaksional. Opsional supaya data lama tetap terbaca;
+ * nilai kosong diperlakukan sebagai Jakarta (lihat migrasi di persistence.ts).
+ */
+export interface WorkspaceScoped {
+  workspace?: Workspace
+}
+
 /** Master -> Data Sopir */
 export interface Driver {
   id: string
@@ -33,7 +48,8 @@ export interface Route {
   route_name: string             // Nama Route
   feet: string                   // Feet - ukuran container, mis. 1X40 (1 x 40 kaki)
   ujroute: number                // UJROUTE - uang jalan baku untuk route ini
-  commissioner: number           // Komisioner
+  toll: number                   // Uang Tol - biaya tol baku untuk route ini
+  commissioner: number           // Komisi Sopir (dulu berlabel "Komisioner")
   price: number                  // Harga
   created_at: string
   updated_at: string
@@ -88,7 +104,7 @@ export type TripStatus = 'draft' | 'aktif' | 'selesai' | 'batal'
  * Entity operasional inti. Identifier TR / SIJO / No PI sengaja DIPISAH -
  * belum ada bukti ketiganya merujuk hal yang sama.
  */
-export interface CommissionTransaction {
+export interface CommissionTransaction extends WorkspaceScoped {
   id: string
   transaction_no: string         // NoTrans
   transaction_date: string       // Tanggal (ISO yyyy-mm-dd)
@@ -143,8 +159,28 @@ export interface OperationalExpense {
   updated_at: string
 }
 
+/**
+ * Jenis biaya internal - pengeluaran perusahaan sendiri atas satu trip
+ * (uang jalan, uang makan, kernet, dst). Dipisah dari biaya operasional
+ * yang ditagihkan / dikeluarkan di jalan.
+ */
+export const INTERNAL_COST_TYPES = ['Uang Jalan', 'Uang Makan', 'Kernet', 'Servis & Sparepart', 'Gaji Sopir', 'Administrasi', 'Lainnya'] as const
+export type InternalCostType = (typeof INTERNAL_COST_TYPES)[number]
+
+/** Transaksi -> Data Komisi -> detail trip -> Biaya Internal. */
+export interface InternalCost {
+  id: string
+  trip_id: string
+  cost_type: string
+  amount: number
+  cost_date: string
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
 /** Transaksi -> Data Tagihan */
-export interface Billing {
+export interface Billing extends WorkspaceScoped {
   id: string
   invoice_no: string             // No Faktur / Nofaktur
   job_order_id: string           // No. SI/JO
@@ -170,7 +206,7 @@ export interface Billing {
  * Label field mengikuti dokumen: Kepada Yth, di, No.Polisi, Party, SI/BL,
  * Jenis Brg, Kosongan, Lokasi, Kapal, Tujuan.
  */
-export interface DeliveryNote {
+export interface DeliveryNote extends WorkspaceScoped {
   id: string
   sj_no: string                  // Nomor Surat Jalan
   sj_date: string                // Tanggal (ISO yyyy-mm-dd)
@@ -193,6 +229,32 @@ export interface DeliveryNote {
   updated_at: string
 }
 
+/**
+ * Satuan nilai komisi: nominal Rupiah tetap, atau persen dari realisasi.
+ * Persen dipakai bila komisi mengikuti besar omzet, bukan angka pasti per trip.
+ */
+export type CommissionUnit = 'rp' | 'persen'
+
+/**
+ * Master -> Komisi (Pengaturan Komisi).
+ * Satu baris = satu skema komisi: bila realisasi mencapai target, komisi yang
+ * dibayarkan naik dari komisi dasar ke komisi target.
+ */
+export interface CommissionScheme extends WorkspaceScoped {
+  id: string
+  name: string                   // Nama skema / penerima komisi
+  target: number                 // Target
+  base_commission: number        // Komisi Dasar (nominal atau persen)
+  base_commission_unit?: CommissionUnit
+  target_commission: number      // Komisi Apabila Target Tercapai
+  target_commission_unit?: CommissionUnit
+  realization: number            // Realisasi berjalan - sumbernya masih TBD-16
+  period: string                 // Periode yyyy-mm
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Database {
   drivers: Driver[]
   routes: Route[]
@@ -204,6 +266,8 @@ export interface Database {
   projects: Project[]
   ujPayments: UjPayment[]
   expenses: OperationalExpense[]
+  internalCosts: InternalCost[]
+  commissionSchemes: CommissionScheme[]
 }
 
 export type EntityKey = keyof Database
@@ -218,6 +282,7 @@ export interface TransactionRow extends CommissionTransaction {
   route_name: string
   route_price: number
   ujroute: number
+  toll: number
   commissioner: number
   project_code: string
   project_name: string
@@ -227,6 +292,8 @@ export interface TransactionRow extends CommissionTransaction {
   tf_total: number
   termin_count: number
   expense_total: number
+  /** Agregat biaya internal milik trip ini. */
+  internal_total: number
 }
 
 export interface BillingRow extends Billing {

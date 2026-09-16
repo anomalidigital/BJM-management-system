@@ -8,7 +8,7 @@
  *  Jangan menyalin rumus di bawah ke file lain -- panggil fungsinya.
  * ===========================================================================
  */
-import type { TransactionRow, UjPayment } from '../types'
+import type { CommissionScheme, CommissionUnit, TransactionRow, UjPayment } from '../types'
 
 /* ===========================================================================
  *  ATURAN TERVERIFIKASI (bukan TBD)
@@ -25,6 +25,40 @@ export function totalUj(payments: Array<Pick<UjPayment, 'uj_amount' | 'kasbon_de
   const uj = payments.reduce((a, p) => a + p.uj_amount, 0)
   const kasbon = payments.reduce((a, p) => a + p.kasbon_deduction, 0)
   return { uj, kasbon, tf: uj - kasbon, termin: payments.length }
+}
+
+/**
+ * Ubah nilai komisi menjadi Rupiah.
+ * Satuan "persen" dihitung terhadap REALISASI berjalan - dasar perhitungannya
+ * masih menunggu konfirmasi (TBD-20).
+ */
+export function nilaiKomisi(nominal: number, unit: CommissionUnit | undefined, basis: number): number {
+  return unit === 'persen' ? Math.round((nominal / 100) * basis) : nominal
+}
+
+type SkemaKomisi = Pick<
+  CommissionScheme,
+  'target' | 'realization' | 'base_commission' | 'target_commission'
+> & Partial<Pick<CommissionScheme, 'base_commission_unit' | 'target_commission_unit'>>
+
+/**
+ * Capaian satu pengaturan komisi (halaman Master -> Komisi).
+ * Aturannya sederhana dan sudah ditetapkan di layar: selama realisasi belum
+ * menyentuh target, komisi dasar yang berlaku; setelah tercapai memakai komisi
+ * target. Yang belum pasti adalah SUMBER realisasinya - lihat TBD-16.
+ */
+export function capaianKomisi(s: SkemaKomisi) {
+  const tercapai = s.target > 0 && s.realization >= s.target
+  const komisiDasar = nilaiKomisi(s.base_commission, s.base_commission_unit, s.realization)
+  const komisiTarget = nilaiKomisi(s.target_commission, s.target_commission_unit, s.realization)
+  return {
+    persen: s.target > 0 ? (s.realization / s.target) * 100 : 0,
+    tercapai,
+    komisiDasar,
+    komisiTarget,
+    komisiBerlaku: tercapai ? komisiTarget : komisiDasar,
+    sisa: Math.max(0, s.target - s.realization),
+  }
 }
 
 export interface TbdNote {
@@ -119,6 +153,36 @@ export const TBD_NOTES: TbdNote[] = [
     title: 'Fungsi tombol 4B pada Data Komisi',
     current: 'Dipertahankan sebagai secondary action, belum diberi logic.',
     question: 'Apa fungsi bisnis tombol 4B pada window Pengisian Data Surat Jalan?',
+  },
+  {
+    id: 'TBD-16',
+    title: 'Sumber realisasi pada Pengaturan Komisi',
+    current: 'Realisasi diisi manual pada form Pengaturan Komisi.',
+    question: 'Realisasi target diambil dari mana: total pendapatan, jumlah ritan, nilai tagihan lunas, atau angka yang memang diinput manual tiap bulan? Dan target itu milik sopir, route, customer, atau marketing?',
+  },
+  {
+    id: 'TBD-17',
+    title: 'Cakupan pemisahan data antar workspace',
+    current: 'Transaksi, Surat Jalan, Tagihan, dan Pengaturan Komisi terpisah per workspace. Master (sopir, mobil, route, project, SI/JO) dipakai bersama.',
+    question: 'Apakah master juga dipisah per cabang? Lalu perhitungan apa saja yang berbeda antara Jakarta dan Tangerang - UJROUTE, komisi, tol, atau seluruhnya memakai rumus yang sama?',
+  },
+  {
+    id: 'TBD-18',
+    title: 'Uang Tol pada master Route',
+    current: 'Disimpan sebagai nominal baku per route, belum masuk perhitungan mana pun.',
+    question: 'Uang Tol ini pengurang netto, komponen uang jalan, atau hanya acuan? Dan hubungannya dengan biaya operasional jenis "Tol" yang dicatat per trip - saling menggantikan atau dua hal berbeda?',
+  },
+  {
+    id: 'TBD-19',
+    title: 'Biaya Internal pada detail trip',
+    current: 'Dicatat terpisah dari biaya operasional, belum mengurangi netto.',
+    question: 'Apa saja yang masuk biaya internal selain uang jalan, dan apakah uang jalan di sini sama dengan termin Uang Jalan (UJ) yang sudah ada? Apakah biaya internal ikut mengurangi pendapatan netto?',
+  },
+  {
+    id: 'TBD-20',
+    title: 'Dasar perhitungan komisi berbasis persen',
+    current: 'Persen dihitung terhadap realisasi berjalan pada pengaturan komisi itu sendiri.',
+    question: 'Bila komisi diisi dalam persen, persen itu dihitung dari apa: realisasi/omzet yang tercapai, nilai target, harga route per trip, atau pendapatan netto? Dan apakah persen hanya berlaku untuk komisi target, atau juga untuk komisi dasar?',
   },
   {
     id: 'TBD-07',

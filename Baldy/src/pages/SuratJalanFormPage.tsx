@@ -93,8 +93,10 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
     () => db.drivers.map((d) => ({ value: d.id, label: d.driver_code, meta: d.driver_name, keywords: `${d.driver_name} ${d.city}` })),
     [db.drivers],
   )
+  // Rute ditampilkan dengan nama tujuan lebih dulu (mis. "PRIOK-SERANG"),
+  // kodenya tetap ikut dicari.
   const routeOptions = useMemo(
-    () => db.routes.map((r) => ({ value: r.id, label: r.route_code, meta: r.route_name, keywords: `${r.route_name} ${r.feet}` })),
+    () => db.routes.map((r) => ({ value: r.id, label: r.route_name || r.route_code, meta: `${r.route_code}${r.feet ? ` · ${r.feet}` : ''}`, keywords: `${r.route_code} ${r.feet}` })),
     [db.routes],
   )
 
@@ -138,6 +140,20 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
   /* ── Container: list dinamis ──────────────────────────────── */
   function setContainer(value: string) {
     setForm((f) => ({ ...f, containers: [value.toUpperCase().replace(/\s+/g, '')] }))
+  }
+
+  /** Pilih rute -> Tujuan ikut terisi, kecuali sudah diketik manual. */
+  function applyRoute(routeId: string | null) {
+    const route = db.routes.find((r) => r.id === routeId)
+    setForm((f) => {
+      const sebelumnya = db.routes.find((r) => r.id === f.route_id)?.route_name ?? ''
+      const bolehTimpa = !f.destination.trim() || f.destination.trim() === sebelumnya.trim()
+      return {
+        ...f,
+        route_id: routeId ?? '',
+        destination: route && bolehTimpa ? route.route_name : f.destination,
+      }
+    })
   }
 
   function validate(): boolean {
@@ -212,10 +228,10 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
       <div className="mb-4">
         <Card>
           <CardHeader
-            title="Container"
-            subtitle="Satu Surat Jalan memuat satu nomor container."
+            title="Konfigurasi"
+            subtitle="Satu Surat Jalan memuat satu nomor container dan satu rute."
           />
-          <div className="p-4">
+          <div className="grid gap-4 p-4 sm:grid-cols-2">
             <Field label="No. Container" required error={containerError}>
               {(fid) => (
                 <Input
@@ -223,8 +239,23 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
                   value={form.containers[0] ?? ''}
                   invalid={!!containerError}
                   placeholder="TGHU1234567"
-                  className="max-w-md font-medium tracking-wide"
+                  className="font-medium tracking-wide"
                   onChange={(e) => setContainer(e.target.value)}
+                />
+              )}
+            </Field>
+            <Field
+              label="Rute"
+              hint={selectedRoute ? `Kode route: ${selectedRoute.route_code}` : 'Pilih rute pengiriman, mis. PRIOK — TANGERANG.'}
+            >
+              {(fid) => (
+                <SearchableSelect
+                  id={fid}
+                  options={routeOptions}
+                  value={form.route_id || null}
+                  placeholder="Pilih rute..."
+                  searchPlaceholder="Ketik nama atau kode rute..."
+                  onChange={applyRoute}
                 />
               )}
             </Field>
@@ -282,12 +313,6 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
                   placeholder="Cari kode / nama sopir..." onChange={(v) => setForm({ ...form, driver_id: v ?? '' })} />
               )}
             </Field>
-            <Field label="Kode Route" hint={selectedRoute ? selectedRoute.route_name : 'Route yang dipakai untuk pengiriman ini.'}>
-              {(fid) => (
-                <SearchableSelect id={fid} options={routeOptions} value={form.route_id || null}
-                  placeholder="Cari kode route..." onChange={(v) => setForm({ ...form, route_id: v ?? '' })} />
-              )}
-            </Field>
             <Field label="Party">
               {(fid) => <Input id={fid} value={form.party} placeholder="40 X 40" onChange={(e) => setForm({ ...form, party: e.target.value })} />}
             </Field>
@@ -309,7 +334,7 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
             <Field label="Kapal">
               {(fid) => <Input id={fid} value={form.ship} placeholder="MV. ORIENTAL DIAMOND" onChange={(e) => setForm({ ...form, ship: e.target.value })} />}
             </Field>
-            <Field label="Tujuan" required error={errors.destination}>
+            <Field label="Tujuan" required error={errors.destination} hint={errors.destination ? undefined : 'Terisi otomatis dari rute, masih bisa diubah.'}>
               {(fid) => (
                 <Input id={fid} value={form.destination} invalid={!!errors.destination} placeholder="PRIOK-SERANG 40'(K)"
                   onChange={(e) => setForm({ ...form, destination: e.target.value })} />

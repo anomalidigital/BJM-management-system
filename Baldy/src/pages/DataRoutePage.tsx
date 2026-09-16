@@ -24,7 +24,7 @@ import type { Route } from '../types'
 
 type FormState = Omit<Route, 'id' | 'created_at' | 'updated_at'>
 
-const BLANK: FormState = { route_code: '', route_name: '', feet: '1X40', ujroute: 0, commissioner: 0, price: 0 }
+const BLANK: FormState = { route_code: '', route_name: '', feet: '1X40', ujroute: 0, toll: 0, commissioner: 0, price: 0 }
 const FEET_OPTIONS = ['1X20', '1X40', '2X20', '1X20K', '1X40K']
 
 export function DataRoutePage() {
@@ -52,7 +52,7 @@ export function DataRoutePage() {
 
   function openEdit(r: Route) {
     setEditing(r)
-    setForm({ route_code: r.route_code, route_name: r.route_name, feet: r.feet, ujroute: r.ujroute, commissioner: r.commissioner, price: r.price })
+    setForm({ route_code: r.route_code, route_name: r.route_name, feet: r.feet, ujroute: r.ujroute, toll: r.toll ?? 0, commissioner: r.commissioner, price: r.price })
     setErrors({}); setFormOpen(true)
   }
 
@@ -65,7 +65,8 @@ export function DataRoutePage() {
     if (!form.route_name.trim()) e.route_name = 'Nama Route wajib diisi.'
     if (form.price <= 0) e.price = 'Harga harus lebih dari 0.'
     if (form.ujroute < 0) e.ujroute = 'UJROUTE tidak boleh negatif.'
-    if (form.commissioner < 0) e.commissioner = 'Komisioner tidak boleh negatif.'
+    if (form.toll < 0) e.toll = 'Uang Tol tidak boleh negatif.'
+    if (form.commissioner < 0) e.commissioner = 'Komisi Sopir tidak boleh negatif.'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -93,7 +94,8 @@ export function DataRoutePage() {
     { key: 'route_name', header: 'Nama Route', sortable: true, render: (r) => <span className="font-medium">{r.route_name}</span> },
     { key: 'feet', header: 'Feet', sortable: true, width: '86px', render: (r) => <Badge tone="neutral">{r.feet}</Badge> },
     { key: 'ujroute', header: 'UJROUTE', sortable: true, align: 'right', width: '128px', render: (r) => <span className="tnum">{formatRupiah(r.ujroute)}</span> },
-    { key: 'commissioner', header: 'Komisioner', sortable: true, align: 'right', width: '128px', render: (r) => <span className="tnum">{formatRupiah(r.commissioner)}</span> },
+    { key: 'toll', header: 'Uang Tol', sortable: true, align: 'right', width: '128px', render: (r) => <span className="tnum">{formatRupiah(r.toll ?? 0)}</span> },
+    { key: 'commissioner', header: 'Komisi Sopir', sortable: true, align: 'right', width: '128px', render: (r) => <span className="tnum">{formatRupiah(r.commissioner)}</span> },
     { key: 'price', header: 'Harga', sortable: true, align: 'right', width: '134px', render: (r) => <span className="tnum font-semibold text-ink">{formatRupiah(r.price)}</span> },
     {
       key: 'action', header: 'Action', align: 'right', width: '92px',
@@ -123,13 +125,14 @@ export function DataRoutePage() {
               meta={[
                 { label: 'Jumlah route', value: `${formatNumber(printRows.length)} route` },
                 { label: 'Total Harga', value: formatRupiah(sum(printRows, (r) => r.price)) },
-                { label: 'Total Komisioner', value: formatRupiah(sum(printRows, (r) => r.commissioner)) },
+                { label: 'Total Uang Tol', value: formatRupiah(sum(printRows, (r) => r.toll ?? 0)) },
+                { label: 'Total Komisi Sopir', value: formatRupiah(sum(printRows, (r) => r.commissioner)) },
               ]}
             >
               <table className="w-full border-collapse text-[10px]">
                 <thead>
                   <tr className="bg-neutral-100">
-                    {['No.', 'No. Route', 'Nama Route', 'Feet', 'UJROUTE', 'Komisioner', 'Harga'].map((h, hi) => (
+                    {['No.', 'No. Route', 'Nama Route', 'Feet', 'UJROUTE', 'Uang Tol', 'Komisi Sopir', 'Harga'].map((h, hi) => (
                       <th key={h} className={`border border-neutral-400 px-1.5 py-1 font-semibold ${hi > 3 ? 'text-right' : 'text-left'}`}>
                         {h}
                       </th>
@@ -144,6 +147,7 @@ export function DataRoutePage() {
                       <td className="border border-neutral-400 px-1.5 py-1">{r.route_name}</td>
                       <td className="border border-neutral-400 px-1.5 py-1">{r.feet}</td>
                       <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(r.ujroute)}</td>
+                      <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(r.toll ?? 0)}</td>
                       <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(r.commissioner)}</td>
                       <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(r.price)}</td>
                     </tr>
@@ -152,6 +156,7 @@ export function DataRoutePage() {
                     <tr className="bg-neutral-100 font-bold">
                       <td className="border border-neutral-400 px-1.5 py-1 text-right" colSpan={4}>TOTAL</td>
                       <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(sum(printRows, (r) => r.ujroute))}</td>
+                      <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(sum(printRows, (r) => r.toll ?? 0))}</td>
                       <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(sum(printRows, (r) => r.commissioner))}</td>
                       <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(sum(printRows, (r) => r.price))}</td>
                     </tr>
@@ -213,6 +218,7 @@ export function DataRoutePage() {
               <tr>
                 <td className="px-3 py-2 text-[12px] text-ink-2" colSpan={3}>Total {formatNumber(table.total)} route</td>
                 <td className="tnum px-3 py-2 text-right text-[12.5px]">{formatRupiah(sum(table.filtered, (r) => r.ujroute))}</td>
+                <td className="tnum px-3 py-2 text-right text-[12.5px]">{formatRupiah(sum(table.filtered, (r) => r.toll ?? 0))}</td>
                 <td className="tnum px-3 py-2 text-right text-[12.5px]">{formatRupiah(sum(table.filtered, (r) => r.commissioner))}</td>
                 <td className="tnum px-3 py-2 text-right text-[12.5px] text-ink">{formatRupiah(sum(table.filtered, (r) => r.price))}</td>
                 <td />
@@ -255,10 +261,13 @@ export function DataRoutePage() {
           <Field label="UJROUTE" required error={errors.ujroute}>
             {(id) => <CurrencyInput id={id} value={form.ujroute} invalid={!!errors.ujroute} onValueChange={(v) => setForm({ ...form, ujroute: v })} />}
           </Field>
-          <Field label="Komisioner" required error={errors.commissioner}>
+          <Field label="Uang Tol" error={errors.toll} hint={errors.toll ? undefined : 'Biaya tol baku untuk route ini.'}>
+            {(id) => <CurrencyInput id={id} value={form.toll} invalid={!!errors.toll} onValueChange={(v) => setForm({ ...form, toll: v })} />}
+          </Field>
+          <Field label="Komisi Sopir" required error={errors.commissioner}>
             {(id) => <CurrencyInput id={id} value={form.commissioner} invalid={!!errors.commissioner} onValueChange={(v) => setForm({ ...form, commissioner: v })} />}
           </Field>
-          <Field label="Harga" required error={errors.price} className="sm:col-span-2">
+          <Field label="Harga" required error={errors.price}>
             {(id) => <CurrencyInput id={id} value={form.price} invalid={!!errors.price} onValueChange={(v) => setForm({ ...form, price: v })} />}
           </Field>
         </div>

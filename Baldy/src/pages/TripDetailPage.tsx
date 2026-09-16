@@ -14,12 +14,13 @@ import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
 import { tfPembayaran, totalUj } from '../lib/calculations'
 import { formatDate, formatDateLong, formatRupiah, todayISO } from '../lib/format'
-import { EXPENSE_TYPES } from '../types'
-import type { OperationalExpense, UjPayment } from '../types'
+import { EXPENSE_TYPES, INTERNAL_COST_TYPES } from '../types'
+import type { InternalCost, OperationalExpense, UjPayment } from '../types'
 import { STATUS_LABEL, STATUS_TONE } from './DataKomisiPage'
 
 type UjForm = { payment_date: string; uj_amount: number; kasbon_deduction: number; notes: string }
 type ExpForm = { expense_type: string; amount: number; expense_date: string; notes: string }
+type IntForm = { cost_type: string; amount: number; cost_date: string; notes: string }
 
 export function TripDetailPage() {
   const { id } = useParams()
@@ -41,6 +42,12 @@ export function TripDetailPage() {
   const [expErr, setExpErr] = useState<string | null>(null)
   const [expDel, setExpDel] = useState<OperationalExpense | null>(null)
 
+  const [intOpen, setIntOpen] = useState(false)
+  const [intEditing, setIntEditing] = useState<InternalCost | null>(null)
+  const [intForm, setIntForm] = useState<IntForm>({ cost_type: 'Uang Jalan', amount: 0, cost_date: todayISO(), notes: '' })
+  const [intErr, setIntErr] = useState<string | null>(null)
+  const [intDel, setIntDel] = useState<InternalCost | null>(null)
+
   const trip = transactionRows.find((t) => t.id === id)
   const payments = useMemo(
     () => db.ujPayments.filter((p) => p.trip_id === id).sort((a, b) => a.sequence - b.sequence),
@@ -50,8 +57,13 @@ export function TripDetailPage() {
     () => db.expenses.filter((e) => e.trip_id === id).sort((a, b) => a.expense_date.localeCompare(b.expense_date)),
     [db.expenses, id],
   )
+  const internals = useMemo(
+    () => db.internalCosts.filter((c) => c.trip_id === id).sort((a, b) => a.cost_date.localeCompare(b.cost_date)),
+    [db.internalCosts, id],
+  )
   const uj = totalUj(payments)
   const expTotal = expenses.reduce((a, e) => a + e.amount, 0)
+  const intTotal = internals.reduce((a, c) => a + c.amount, 0)
 
   const docs = useMemo(() => ({
     suratJalan: deliveryNoteRows.filter((n) => trip && n.job_order_id === trip.job_order_id && n.vehicle_id === trip.vehicle_id),
@@ -137,10 +149,37 @@ export function TripDetailPage() {
     setExpDel(null)
   }
 
+  /* ── Biaya internal ───────────────────────────────────────
+   * Pengeluaran perusahaan sendiri atas trip ini (uang jalan, kernet,
+   * servis, dst) - dipisah dari biaya operasional di jalan. */
+  function openInt(c?: InternalCost) {
+    setIntEditing(c ?? null)
+    setIntForm(c
+      ? { cost_type: c.cost_type, amount: c.amount, cost_date: c.cost_date, notes: c.notes }
+      : { cost_type: 'Uang Jalan', amount: 0, cost_date: trip!.transaction_date, notes: '' })
+    setIntErr(null); setIntOpen(true)
+  }
+
+  function saveInt() {
+    if (intForm.amount <= 0) { setIntErr('Nominal harus lebih dari 0.'); return }
+    if (!intForm.cost_date) { setIntErr('Tanggal wajib diisi.'); return }
+    if (intEditing) { update('internalCosts', intEditing.id, intForm); toast.success('Biaya internal berhasil diperbarui.') }
+    else { create('internalCosts', { ...intForm, trip_id: trip!.id }); toast.success('Biaya internal berhasil ditambahkan.') }
+    setIntOpen(false)
+  }
+
+  function deleteInt() {
+    if (!intDel) return
+    remove('internalCosts', intDel.id)
+    toast.success('Biaya internal berhasil dihapus.')
+    setIntDel(null)
+  }
+
   const tabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'uj', label: 'Uang Jalan', badge: payments.length },
     { id: 'biaya', label: 'Biaya Operasional', badge: expenses.length },
+    { id: 'internal', label: 'Biaya Internal', badge: internals.length },
     { id: 'dokumen', label: 'Dokumen', badge: docs.suratJalan.length + docs.tagihan.length },
   ]
 
@@ -159,12 +198,13 @@ export function TripDetailPage() {
       />
 
       {/* Ringkasan finansial trip */}
-      <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {[
           ['Total UJ', formatRupiah(uj.uj), `${uj.termin} termin`],
           ['Potong Kasbon', formatRupiah(uj.kasbon), 'pengurang UJ'],
           ['TF ke Sopir', formatRupiah(uj.tf), 'UJ − Potong Kasbon'],
           ['Biaya Operasional', formatRupiah(expTotal), `${expenses.length} item`],
+          ['Biaya Internal', formatRupiah(intTotal), `${internals.length} item`],
         ].map(([label, value, hint]) => (
           <div key={label} className="shadow-card rounded-xl border border-hairline bg-surface p-4">
             <p className="text-[12.5px] font-medium text-ink-3">{label}</p>
@@ -336,6 +376,61 @@ export function TripDetailPage() {
           </div>
         )}
 
+        {tab === 'internal' && (
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-4 py-3">
+              <p className="text-[12.5px] text-ink-3">
+                Pengeluaran internal perusahaan atas trip ini — uang jalan, kernet, servis, dan sejenisnya.
+              </p>
+              <Button size="sm" variant="primary" icon={<Plus size={14} />} disabled={!canEdit} onClick={() => openInt()}>
+                Tambah Biaya Internal
+              </Button>
+            </div>
+            {internals.length === 0 ? (
+              <div className="px-6 py-14 text-center">
+                <p className="text-[14px] font-semibold text-ink">Belum ada biaya internal.</p>
+                <p className="mt-1 text-[13px] text-ink-3">Trip ini belum mencatat uang jalan, kernet, atau biaya internal lain.</p>
+                {canEdit && <Button className="mt-4" variant="primary" icon={<Plus size={15} />} onClick={() => openInt()}>Tambah Biaya Internal</Button>}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-max text-[13px]">
+                  <thead className="bg-sunken">
+                    <tr className="border-b border-hairline">
+                      {['Jenis Biaya', 'Tanggal', 'Nominal', 'Catatan', 'Action'].map((h, i) => (
+                        <th key={h} className={`px-3 py-2 text-[11.5px] font-semibold tracking-wide text-ink-2 uppercase ${i === 2 || i === 4 ? 'text-right' : 'text-left'}`}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {internals.map((c) => (
+                      <tr key={c.id} className="border-b border-grid last:border-0 hover:bg-sunken">
+                        <td className="px-3 py-2.5"><Badge tone="neutral">{c.cost_type}</Badge></td>
+                        <td className="tnum px-3 py-2.5 text-ink-2">{formatDate(c.cost_date)}</td>
+                        <td className="tnum px-3 py-2.5 text-right font-semibold text-ink">{formatRupiah(c.amount)}</td>
+                        <td className="px-3 py-2.5 text-ink-3">{c.notes || '—'}</td>
+                        <td className="px-3 py-2.5 text-right">
+                          <div className="flex justify-end gap-1">
+                            <IconButton label="Ubah" icon={<Pencil size={14} />} disabled={!canEdit} onClick={() => openInt(c)} />
+                            <IconButton label="Hapus" tone="danger" icon={<Trash2 size={14} />} disabled={!canEdit} onClick={() => setIntDel(c)} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="border-t-2 border-hairline bg-sunken font-semibold">
+                    <tr>
+                      <td className="px-3 py-2.5 text-[12px] text-ink-2" colSpan={2}>Total {internals.length} biaya internal</td>
+                      <td className="tnum px-3 py-2.5 text-right text-ink">{formatRupiah(intTotal)}</td>
+                      <td colSpan={2} />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {tab === 'dokumen' && (
           <div className="grid gap-4 p-4 lg:grid-cols-2">
             <div className="rounded-lg border border-hairline">
@@ -459,6 +554,41 @@ export function TripDetailPage() {
         </div>
       </Modal>
 
+      {/* Modal biaya internal */}
+      <Modal
+        open={intOpen}
+        onClose={() => setIntOpen(false)}
+        title={intEditing ? 'Ubah Biaya Internal' : 'Tambah Biaya Internal'}
+        subtitle={`Trip ${trip.transaction_no}`}
+        size="sm"
+        footer={
+          <>
+            <Button onClick={() => setIntOpen(false)}>Batal</Button>
+            <Button variant="primary" onClick={saveInt}>Simpan</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Field label="Jenis Biaya" required>
+            {(fid) => (
+              <Select id={fid} value={intForm.cost_type} onChange={(e) => setIntForm({ ...intForm, cost_type: e.target.value })}>
+                {INTERNAL_COST_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </Select>
+            )}
+          </Field>
+          <Field label="Nominal" required>
+            {(fid) => <CurrencyInput id={fid} value={intForm.amount} onValueChange={(v) => setIntForm({ ...intForm, amount: v })} />}
+          </Field>
+          <Field label="Tanggal" required>
+            {(fid) => <DateInput id={fid} value={intForm.cost_date} onChange={(e) => setIntForm({ ...intForm, cost_date: e.target.value })} />}
+          </Field>
+          <Field label="Catatan">
+            {(fid) => <Input id={fid} value={intForm.notes} onChange={(e) => setIntForm({ ...intForm, notes: e.target.value })} />}
+          </Field>
+          {intErr && <p className="text-[12px] font-medium text-[color:var(--color-critical)]">{intErr}</p>}
+        </div>
+      </Modal>
+
       <ConfirmDialog
         open={!!ujDel}
         title="Hapus termin?"
@@ -472,6 +602,13 @@ export function TripDetailPage() {
         message={`${expDel?.expense_type} senilai ${formatRupiah(expDel?.amount ?? 0)} akan dihapus.`}
         onCancel={() => setExpDel(null)}
         onConfirm={deleteExp}
+      />
+      <ConfirmDialog
+        open={!!intDel}
+        title="Hapus biaya internal?"
+        message={`${intDel?.cost_type} senilai ${formatRupiah(intDel?.amount ?? 0)} akan dihapus.`}
+        onCancel={() => setIntDel(null)}
+        onConfirm={deleteInt}
       />
     </>
   )

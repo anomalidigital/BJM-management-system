@@ -223,6 +223,39 @@ CREATE TABLE operational_expenses (
 );
 CREATE INDEX idx_expense_trip ON operational_expenses(trip_id);
 CREATE INDEX idx_expense_type ON operational_expenses(expense_type);
+
+-- Biaya internal: pengeluaran perusahaan sendiri atas satu trip.
+-- Dipisah dari operational_expenses agar laporan internal dan biaya jalan
+-- tidak tercampur (lihat TBD-19).
+CREATE TABLE internal_costs (
+  id         BIGSERIAL PRIMARY KEY,
+  trip_id    BIGINT      NOT NULL REFERENCES commission_transactions(id) ON DELETE CASCADE,
+  cost_type  VARCHAR(40) NOT NULL,   -- Uang Jalan, Uang Makan, Kernet, Servis & Sparepart, ...
+  amount     BIGINT      NOT NULL DEFAULT 0,
+  cost_date  DATE        NOT NULL,
+  notes      TEXT,
+  created_at TIMESTAMP   NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP   NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_internal_trip ON internal_costs(trip_id);
+
+-- Pengaturan Komisi (menu Master -> Komisi).
+-- Komisi dasar berlaku selama realization < target; setelah tercapai
+-- memakai target_commission. Sumber realization masih TBD-16.
+CREATE TABLE commission_schemes (
+  id                BIGSERIAL PRIMARY KEY,
+  workspace         VARCHAR(20)  NOT NULL DEFAULT 'jakarta',
+  name              VARCHAR(140) NOT NULL,
+  target            BIGINT       NOT NULL DEFAULT 0,
+  base_commission   BIGINT       NOT NULL DEFAULT 0,
+  target_commission BIGINT       NOT NULL DEFAULT 0,
+  realization       BIGINT       NOT NULL DEFAULT 0,
+  period            CHAR(7)      NOT NULL,      -- yyyy-mm
+  notes             TEXT,
+  created_at        TIMESTAMP    NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_scheme_workspace ON commission_schemes(workspace, period);
 ```
 
 ## Perubahan pada tabel yang sudah ada
@@ -243,6 +276,15 @@ ALTER TABLE commission_transactions
 -- is_done = true  -> status 'selesai'
 -- is_done = false -> status 'aktif'
 ALTER TABLE commission_transactions DROP COLUMN is_done;
+
+ALTER TABLE routes ADD COLUMN toll BIGINT NOT NULL DEFAULT 0;  -- Uang Tol (TBD-18)
+
+-- Workspace (Jakarta / Tangerang): satu aplikasi, dua sistem management.
+-- Hanya tabel transaksional yang dipisah; master masih dipakai bersama (TBD-17).
+ALTER TABLE commission_transactions ADD COLUMN workspace VARCHAR(20) NOT NULL DEFAULT 'jakarta';
+ALTER TABLE delivery_notes          ADD COLUMN workspace VARCHAR(20) NOT NULL DEFAULT 'jakarta';
+ALTER TABLE billings                ADD COLUMN workspace VARCHAR(20) NOT NULL DEFAULT 'jakarta';
+CREATE INDEX idx_trx_workspace ON commission_transactions(workspace, transaction_date);
 ```
 
 ## Catatan penting

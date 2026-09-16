@@ -1,14 +1,28 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Billing, BillingRow, CommissionTransaction, Database, DeliveryNote, DeliveryNoteRow, EntityKey, TransactionRow } from '../types'
+import type { Billing, BillingRow, CommissionTransaction, Database, DeliveryNote, DeliveryNoteRow, EntityKey, TransactionRow, Workspace } from '../types'
 import { loadDatabase, resetDatabase, resetToSampleDatabase, saveDatabase } from './persistence'
 import { nowISO, uid } from '../lib/utils'
+import { useWorkspace } from './WorkspaceProvider'
 
 type Row<K extends EntityKey> = Database[K][number]
 type NewRow<K extends EntityKey> = Omit<Row<K>, 'id' | 'created_at' | 'updated_at'>
 
+/**
+ * Koleksi yang isinya terpisah antar workspace. Master (sopir, mobil, route,
+ * project, SI/JO) sengaja dipakai bersama supaya relasi antar data tidak putus
+ * saat workspace berganti - lihat TBD-17.
+ */
+const SCOPED_KEYS = ['transactions', 'deliveryNotes', 'billings', 'commissionSchemes'] as const
+
+/** Data lama tanpa penanda cabang diperlakukan sebagai Jakarta. */
+const wsOf = (row: { workspace?: Workspace }): Workspace => row.workspace ?? 'jakarta'
+
 interface DataContextValue {
+  /** Database yang sudah disaring mengikuti workspace aktif. */
   db: Database
+  /** Seluruh data lintas workspace - dipakai halaman Tools / ekspor. */
+  dbAll: Database
   loading: boolean
   error: string | null
   /** Muat ulang data (mensimulasikan fetch ulang + state loading). */
@@ -34,9 +48,11 @@ const DataContext = createContext<DataContextValue | null>(null)
 const EMPTY_DB: Database = {
   drivers: [], routes: [], vehicles: [], jobOrders: [], transactions: [],
   billings: [], deliveryNotes: [], projects: [], ujPayments: [], expenses: [],
+  internalCosts: [], commissionSchemes: [],
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
+  const { workspace } = useWorkspace()
   const [db, setDb] = useState<Database>(EMPTY_DB)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -67,10 +83,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [db, loading])
 
   const create = useCallback(<K extends EntityKey>(key: K, row: NewRow<K>): Row<K> => {
-    const created = { ...row, id: uid(key.slice(0, 3)), created_at: nowISO(), updated_at: nowISO() } as Row<K>
+    // Data baru otomatis milik workspace yang sedang aktif.
+    const scoped = (SCOPED_KEYS as readonly string[]).includes(key) ? { workspace } : null
+    const created = { ...scoped, ...row, id: uid(key.slice(0, 3)), created_at: nowISO(), updated_at: nowISO() } as Row<K>
     setDb((prev) => ({ ...prev, [key]: [created, ...(prev[key] as Row<K>[])] }))
     return created
-  }, [])
+  }, [workspace])
 
   const update = useCallback(<K extends EntityKey>(key: K, id: string, patch: Partial<Row<K>>) => {
     setDb((prev) => ({
@@ -109,23 +127,45 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoading(false)
   }, [])
 
+  /**
+   * Penyaringan per workspace dikerjakan di satu tempat ini, sehingga seluruh
+   * halaman ikut berganti isi tanpa perlu tahu soal workspace.
+   */
+  const scopedDb = useMemo<Database>(() => {
+    const transactions = db.transactions.filter((t) => wsOf(t) === workspace)
+    const tripIds = new Set(transactions.map((t) => t.id))
+    return {
+      ...db,
+      transactions,
+      // Anak dari trip ikut induknya, tidak perlu penanda workspace sendiri.
+      ujPayments: db.ujPayments.filter((p) => tripIds.has(p.trip_id)),
+      expenses: db.expenses.filter((e) => tripIds.has(e.trip_id)),
+      internalCosts: db.internalCosts.filter((c) => tripIds.has(c.trip_id)),
+      deliveryNotes: db.deliveryNotes.filter((n) => wsOf(n) === workspace),
+      billings: db.billings.filter((b) => wsOf(b) === workspace),
+      commissionSchemes: db.commissionSchemes.filter((s) => wsOf(s) === workspace),
+    }
+  }, [db, workspace])
+
   const transactionRows = useMemo<TransactionRow[]>(() => {
-    const drivers = new Map(db.drivers.map((d) => [d.id, d]))
-    const vehicles = new Map(db.vehicles.map((v) => [v.id, v]))
-    const routes = new Map(db.routes.map((r) => [r.id, r]))
-    const jobOrders = new Map(db.jobOrders.map((j) => [j.id, j]))
-    const projects = new Map(db.projects.map((p) => [p.id, p]))
+    const drivers = new Map(scopedDb.drivers.map((d) => [d.id, d]))
+    const vehicles = new Map(scopedDb.vehicles.map((v) => [v.id, v]))
+    const routes = new Map(scopedDb.routes.map((r) => [r.id, r]))
+    const jobOrders = new Map(scopedDb.jobOrders.map((j) => [j.id, j]))
+    const projects = new Map(scopedDb.projects.map((p) => [p.id, p]))
     // Agregasi termin UJ dan biaya per trip - dihitung sekali di sini.
     const uj = new Map<string, { uj: number; kasbon: number; n: number }>()
-    for (const p of db.ujPayments) {
+    for (const p of scopedDb.ujPayments) {
       const a = uj.get(p.trip_id) ?? { uj: 0, kasbon: 0, n: 0 }
       a.uj += p.uj_amount; a.kasbon += p.kasbon_deduction; a.n += 1
       uj.set(p.trip_id, a)
     }
     const exp = new Map<string, number>()
-    for (const e of db.expenses) exp.set(e.trip_id, (exp.get(e.trip_id) ?? 0) + e.amount)
+    for (const e of scopedDb.expenses) exp.set(e.trip_id, (exp.get(e.trip_id) ?? 0) + e.amount)
+    const internal = new Map<string, number>()
+    for (const c of scopedDb.internalCosts) internal.set(c.trip_id, (internal.get(c.trip_id) ?? 0) + c.amount)
 
-    return db.transactions.map((t: CommissionTransaction) => {
+    return scopedDb.transactions.map((t: CommissionTransaction) => {
       const d = drivers.get(t.driver_id)
       const v = vehicles.get(t.vehicle_id)
       const r = routes.get(t.route_id)
@@ -142,6 +182,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         route_name: r?.route_name ?? '',
         route_price: r?.price ?? 0,
         ujroute: r?.ujroute ?? 0,
+        toll: r?.toll ?? 0,
         commissioner: r?.commissioner ?? 0,
         project_code: pr?.project_code ?? '',
         project_name: pr?.project_name ?? '',
@@ -150,13 +191,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
         tf_total: u.uj - u.kasbon,
         termin_count: u.n,
         expense_total: exp.get(t.id) ?? 0,
+        internal_total: internal.get(t.id) ?? 0,
       }
     })
-  }, [db])
+  }, [scopedDb])
 
   const billingRows = useMemo<BillingRow[]>(() => {
-    const jobOrders = new Map(db.jobOrders.map((j) => [j.id, j]))
-    return db.billings.map((b: Billing) => {
+    const jobOrders = new Map(scopedDb.jobOrders.map((j) => [j.id, j]))
+    return scopedDb.billings.map((b: Billing) => {
       const j = jobOrders.get(b.job_order_id)
       return {
         ...b,
@@ -166,14 +208,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
         party: j?.party ?? '',
       }
     })
-  }, [db])
+  }, [scopedDb])
 
   const deliveryNoteRows = useMemo<DeliveryNoteRow[]>(() => {
-    const vehicles = new Map(db.vehicles.map((v) => [v.id, v]))
-    const jobOrders = new Map(db.jobOrders.map((j) => [j.id, j]))
-    const drivers = new Map(db.drivers.map((d) => [d.id, d]))
-    const routes = new Map(db.routes.map((r) => [r.id, r]))
-    return db.deliveryNotes.map((n: DeliveryNote) => {
+    const vehicles = new Map(scopedDb.vehicles.map((v) => [v.id, v]))
+    const jobOrders = new Map(scopedDb.jobOrders.map((j) => [j.id, j]))
+    const drivers = new Map(scopedDb.drivers.map((d) => [d.id, d]))
+    const routes = new Map(scopedDb.routes.map((r) => [r.id, r]))
+    return scopedDb.deliveryNotes.map((n: DeliveryNote) => {
       const d = drivers.get(n.driver_id)
       const r = routes.get(n.route_id)
       return {
@@ -188,11 +230,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         container_count: n.containers.length,
       }
     })
-  }, [db])
+  }, [scopedDb])
 
   const value = useMemo<DataContextValue>(
-    () => ({ db, loading, error, reload: runLoad, simulateError, muatUlangData, resetToSample, create, update, remove, transactionRows, billingRows, deliveryNoteRows }),
-    [db, loading, error, runLoad, simulateError, muatUlangData, resetToSample, create, update, remove, transactionRows, billingRows, deliveryNoteRows],
+    () => ({ db: scopedDb, dbAll: db, loading, error, reload: runLoad, simulateError, muatUlangData, resetToSample, create, update, remove, transactionRows, billingRows, deliveryNoteRows }),
+    [scopedDb, db, loading, error, runLoad, simulateError, muatUlangData, resetToSample, create, update, remove, transactionRows, billingRows, deliveryNoteRows],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

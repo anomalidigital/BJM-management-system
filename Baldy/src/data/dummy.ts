@@ -6,8 +6,8 @@
  * berisi data, kapan pun prototype ini dibuka.
  */
 import type {
-  Billing, CommissionTransaction, Database, DeliveryNote, Driver, JobOrder,
-  OperationalExpense, Project, Route, TripStatus, UjPayment, Vehicle,
+  Billing, CommissionScheme, CommissionTransaction, CommissionUnit, Database, DeliveryNote, Driver,
+  InternalCost, InternalCostType, JobOrder, OperationalExpense, Project, Route, TripStatus, UjPayment, Vehicle, Workspace,
 } from '../types'
 import { EXPENSE_TYPES, VEHICLE_CONFIGS } from '../types'
 import REAL from './real.json'
@@ -32,6 +32,18 @@ const money = (min: number, max: number, step = 5000): number => Math.round(int(
 
 const now = new Date()
 const stamp = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+
+/**
+ * Pembagian workspace SEMENTARA untuk data yang belum punya penanda cabang.
+ * Memakai hash sederhana supaya hasilnya sama setiap kali aplikasi dibuka -
+ * bukan aturan bisnis. Ganti isi fungsi ini begitu daftar armada / transaksi
+ * per cabang tersedia dari klien.
+ */
+export function workspaceForSeed(seed: string): Workspace {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0
+  return h % 100 < 34 ? 'tangerang' : 'jakarta'
+}
 
 /* Referensi teks Indonesia */
 const FIRST = ['Budi', 'Andi', 'Slamet', 'Joko', 'Agus', 'Bambang', 'Dedi', 'Eko', 'Fajar', 'Gunawan', 'Hendra', 'Imam', 'Rudi', 'Sugeng', 'Teguh', 'Wahyu', 'Yanto', 'Rizki', 'Sapto', 'Marno', 'Darmawan', 'Hadi', 'Nurdin', 'Suryadi', 'Iwan', 'Parjo', 'Trisno', 'Basuki']
@@ -149,6 +161,7 @@ function makeRoutes(count: number): Route[] {
       route_name: `${from[1]}-${to[1]} ${nameSize}${suffix ? '(K)' : ''}`,
       feet,
       ujroute: money(620_000, 1_150_000),
+      toll: money(120_000, 640_000, 5_000),
       commissioner: money(100_000, 250_000),
       price: money(1_650_000, 3_600_000, 50_000),
       created_at: stamp,
@@ -243,6 +256,8 @@ function makeTransactions(
     const status: TripStatus = roll > 0.97 ? 'batal' : roll > 0.28 ? 'selesai' : roll > 0.06 ? 'aktif' : 'draft'
     return {
       id: `trx-${i + 1}`,
+      // Cabang mengikuti armada: satu kendaraan berpangkalan di satu workspace.
+      workspace: workspaceForSeed(vehicle.id),
       transaction_no: `${ym}${String(seqPerMonth[ym]).padStart(4, '0')}`,
       transaction_date: date,
       driver_id: driver.id,
@@ -286,6 +301,8 @@ function makeBillings(db: Pick<Database, 'jobOrders' | 'transactions'>, count: n
     const paid = !rejected && rand() > 0.45
     out.push({
       id: `bil-${i + 1}`,
+      // Tagihan mengikuti workspace trip pertama pada SI/JO yang sama.
+      workspace: trxForJo[0]?.workspace ?? workspaceForSeed(joId),
       invoice_no: `INV-${String(invoiceSeq++).padStart(3, '0')}`,
       job_order_id: joId,
       cost_code: jo.customer_code, // Data Cost default mengikuti Kode Cust SI/JO (lihat TBD-04)
@@ -327,6 +344,7 @@ function makeDeliveryNotes(
     const printed = rand() > 0.4
     out.push({
       id: `sj-${i + 1}`,
+      workspace: t.workspace ?? workspaceForSeed(veh.id),
       sj_no: `SJ-${String(count - i).padStart(6, '0')}`,
       sj_date: t.transaction_date,
       recipient_name: jo.customer_name,
@@ -415,6 +433,76 @@ function makeExpenses(trips: CommissionTransaction[]): OperationalExpense[] {
   return out
 }
 
+/* Biaya internal - pengeluaran perusahaan sendiri atas satu trip */
+const INTERNAL_SEED: ReadonlyArray<readonly [InternalCostType, number, number]> = [
+  ['Uang Jalan', 800_000, 2_600_000],
+  ['Uang Makan', 100_000, 350_000],
+  ['Kernet', 150_000, 450_000],
+  ['Servis & Sparepart', 250_000, 1_900_000],
+  ['Gaji Sopir', 500_000, 1_600_000],
+  ['Administrasi', 50_000, 250_000],
+]
+
+function makeInternalCosts(trips: CommissionTransaction[]): InternalCost[] {
+  const out: InternalCost[] = []
+  let n = 0
+  for (const t of trips) {
+    if (t.status === 'batal') continue
+    const jumlah = rand() > 0.42 ? int(1, 3) : 0
+    const dipakai = new Set<string>()
+    for (let i = 0; i < jumlah; i++) {
+      const [jenis, min, max] = pick(INTERNAL_SEED)
+      if (dipakai.has(jenis)) continue
+      dipakai.add(jenis)
+      out.push({
+        id: `int-${++n}`,
+        trip_id: t.id,
+        cost_type: jenis,
+        amount: money(min, max, 25_000),
+        cost_date: t.transaction_date,
+        notes: '',
+        created_at: stamp,
+        updated_at: stamp,
+      })
+    }
+  }
+  return out
+}
+
+/**
+ * Pengaturan Komisi (halaman Komisi).
+ * Nilai contoh: sebagian sudah melewati target, sebagian masih berjalan -
+ * supaya kedua tampilan (Tercapai / Masih Progres) sama-sama terisi.
+ */
+function makeCommissionSchemes(): CommissionScheme[] {
+  const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  // nama, workspace, target, komisi dasar, komisi target, realisasi, satuan komisi
+  const seed: ReadonlyArray<readonly [string, Workspace, number, number, number, number, CommissionUnit]> = [
+    ['Komisi Sopir Reguler', 'jakarta', 150_000_000, 250_000, 450_000, 168_400_000, 'rp'],
+    ['Komisi Route Priok - Cikarang', 'jakarta', 90_000_000, 150_000, 300_000, 61_250_000, 'rp'],
+    ['Komisi Marketing Kontainer', 'jakarta', 220_000_000, 0.25, 0.5, 224_750_000, 'persen'],
+    ['Komisi Sopir Ritan Harian', 'jakarta', 75_000_000, 100_000, 225_000, 38_900_000, 'rp'],
+    ['Komisi Sopir Cabang Tangerang', 'tangerang', 110_000_000, 200_000, 400_000, 118_600_000, 'rp'],
+    ['Komisi Route Tangerang - Merak', 'tangerang', 85_000_000, 0.2, 0.45, 47_300_000, 'persen'],
+    ['Komisi Kernet Cabang', 'tangerang', 40_000_000, 75_000, 150_000, 21_450_000, 'rp'],
+  ]
+  return seed.map(([name, workspace, target, base, bonus, realisasi, unit], i) => ({
+    id: `cms-${i + 1}`,
+    workspace,
+    name,
+    target,
+    base_commission: base,
+    base_commission_unit: unit,
+    target_commission: bonus,
+    target_commission_unit: unit,
+    realization: realisasi,
+    period,
+    notes: '',
+    created_at: stamp,
+    updated_at: stamp,
+  }))
+}
+
 /**
  * Bangun database awal aplikasi.
  *
@@ -438,7 +526,17 @@ export function generateDatabase(): Database {
   const billings = makeBillings({ jobOrders, transactions: trxContoh }, 46)
   const deliveryNotes = makeDeliveryNotes({ jobOrders, vehicles: real.vehicles, transactions: trxContoh }, 34)
 
-  return { ...real, jobOrders, billings, deliveryNotes }
+  // Kolom / modul yang ditambahkan setelah impor: diberi nilai awal di sini
+  // supaya tampilan pertama tidak kosong.
+  const routes = real.routes.map((r) => ({ ...r, toll: r.toll ?? 0 }))
+  const transactions = real.transactions.map((t) => ({
+    ...t,
+    workspace: t.workspace ?? workspaceForSeed(t.vehicle_id),
+  }))
+  const internalCosts = makeInternalCosts(transactions)
+  const commissionSchemes = makeCommissionSchemes()
+
+  return { ...real, routes, transactions, jobOrders, billings, deliveryNotes, internalCosts, commissionSchemes }
 }
 
 /**
@@ -456,10 +554,15 @@ export function generateSampleDatabase(): Database {
   const deliveryNotes = makeDeliveryNotes({ jobOrders, vehicles, transactions }, 34)
   const ujPayments = makeUjPayments(transactions)
   const expenses = makeExpenses(transactions)
-  return { drivers, routes, vehicles, jobOrders, projects, transactions, billings, deliveryNotes, ujPayments, expenses }
+  const internalCosts = makeInternalCosts(transactions)
+  const commissionSchemes = makeCommissionSchemes()
+  return {
+    drivers, routes, vehicles, jobOrders, projects, transactions, billings, deliveryNotes,
+    ujPayments, expenses, internalCosts, commissionSchemes,
+  }
 }
 
 /** Entitas yang datanya berasal dari berkas data operasional. */
 export const SUMBER_REAL = ['drivers', 'vehicles', 'projects', 'routes', 'transactions', 'ujPayments', 'expenses'] as const
 /** Entitas yang masih memakai dataset contoh. */
-export const SUMBER_CONTOH = ['jobOrders', 'billings', 'deliveryNotes'] as const
+export const SUMBER_CONTOH = ['jobOrders', 'billings', 'deliveryNotes', 'internalCosts', 'commissionSchemes'] as const

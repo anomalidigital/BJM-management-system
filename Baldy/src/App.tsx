@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './store/AuthProvider'
+import { WorkspaceProvider } from './store/WorkspaceProvider'
 import { DataProvider } from './store/DataProvider'
 import { ToastProvider } from './store/ToastProvider'
 import { AppShell } from './components/layout/AppShell'
@@ -10,6 +11,7 @@ import { DataSopirPage } from './pages/DataSopirPage'
 import { DataRoutePage } from './pages/DataRoutePage'
 import { DataMobilPage } from './pages/DataMobilPage'
 import { DataProjectPage } from './pages/DataProjectPage'
+import { PengaturanKomisiPage } from './pages/PengaturanKomisiPage'
 import { TripDetailPage } from './pages/TripDetailPage'
 import { LapUangJalanPage } from './pages/LapUangJalanPage'
 import { LapBiayaPage } from './pages/LapBiayaPage'
@@ -29,40 +31,43 @@ export function App() {
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>
       <AuthProvider>
-        <DataProvider>
-          <ToastProvider>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route element={<AppShell />}>
-                <Route index element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
+        <WorkspaceProvider>
+          <DataProvider>
+            <ToastProvider>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route element={<AppShell />}>
+                  <Route index element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
 
-                <Route path="/master/sopir" element={<DataSopirPage />} />
-                <Route path="/master/mobil" element={<DataMobilPage />} />
-                <Route path="/master/route" element={<DataRoutePage />} />
-                <Route path="/master/project" element={<DataProjectPage />} />
+                  <Route path="/master/sopir" element={<DataSopirPage />} />
+                  <Route path="/master/mobil" element={<DataMobilPage />} />
+                  <Route path="/master/route" element={<DataRoutePage />} />
+                  <Route path="/master/project" element={<DataProjectPage />} />
+                  <Route path="/master/komisi" element={<PengaturanKomisiPage />} />
 
-                <Route path="/transaksi/surat-jalan" element={<SuratJalanListPage />} />
-                <Route path="/transaksi/surat-jalan/tambah" element={<SuratJalanFormPage mode="create" />} />
-                <Route path="/transaksi/surat-jalan/:id" element={<SuratJalanDetailPage />} />
-                <Route path="/transaksi/surat-jalan/:id/edit" element={<SuratJalanFormPage mode="edit" />} />
-                <Route path="/transaksi/komisi" element={<DataKomisiPage />} />
-                <Route path="/transaksi/trip/:id" element={<TripDetailPage />} />
-                <Route path="/transaksi/tagihan" element={<DataTagihanPage />} />
+                  <Route path="/transaksi/surat-jalan" element={<SuratJalanListPage />} />
+                  <Route path="/transaksi/surat-jalan/tambah" element={<SuratJalanFormPage mode="create" />} />
+                  <Route path="/transaksi/surat-jalan/:id" element={<SuratJalanDetailPage />} />
+                  <Route path="/transaksi/surat-jalan/:id/edit" element={<SuratJalanFormPage mode="edit" />} />
+                  <Route path="/transaksi/komisi" element={<DataKomisiPage />} />
+                  <Route path="/transaksi/trip/:id" element={<TripDetailPage />} />
+                  <Route path="/transaksi/tagihan" element={<DataTagihanPage />} />
 
-                <Route path="/laporan/komisi" element={<LapKomisiPage />} />
-                <Route path="/laporan/netto" element={<LapNettoPage />} />
-                <Route path="/laporan/ritan" element={<LapRitanPage />} />
-                <Route path="/laporan/uang-jalan" element={<LapUangJalanPage />} />
-                <Route path="/laporan/biaya" element={<LapBiayaPage />} />
+                  <Route path="/laporan/komisi" element={<LapKomisiPage />} />
+                  <Route path="/laporan/netto" element={<LapNettoPage />} />
+                  <Route path="/laporan/ritan" element={<LapRitanPage />} />
+                  <Route path="/laporan/uang-jalan" element={<LapUangJalanPage />} />
+                  <Route path="/laporan/biaya" element={<LapBiayaPage />} />
 
-                <Route path="/pencarian/sijo" element={<SijoSearchPage />} />
-                <Route path="/tools" element={<ToolsPage />} />
-                <Route path="*" element={<NotFoundPage />} />
-              </Route>
-            </Routes>
-          </ToastProvider>
-        </DataProvider>
+                  <Route path="/pencarian/sijo" element={<SijoSearchPage />} />
+                  <Route path="/tools" element={<ToolsPage />} />
+                  <Route path="*" element={<NotFoundPage />} />
+                </Route>
+              </Routes>
+            </ToastProvider>
+          </DataProvider>
+        </WorkspaceProvider>
       </AuthProvider>
     </BrowserRouter>
   )

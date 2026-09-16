@@ -1,13 +1,14 @@
 import type { Database } from '../types'
-import { generateDatabase, generateSampleDatabase } from '../data/dummy'
+import { generateDatabase, generateSampleDatabase, workspaceForSeed } from '../data/dummy'
 
 const DB_KEY = 'sikotis.db.v2'
 const AUTH_KEY = 'sikotis.auth.v1'
+const WORKSPACE_KEY = 'sikotis.workspace.v1'
 
 /** Koleksi inti yang sudah ada sejak versi pertama. */
 const CORE_KEYS: Array<keyof Database> = ['drivers', 'routes', 'vehicles', 'jobOrders', 'transactions', 'billings']
 /** Koleksi yang ditambahkan belakangan - boleh belum ada di data tersimpan. */
-const ADDED_KEYS: Array<keyof Database> = ['deliveryNotes', 'projects', 'ujPayments', 'expenses']
+const ADDED_KEYS: Array<keyof Database> = ['deliveryNotes', 'projects', 'ujPayments', 'expenses', 'internalCosts', 'commissionSchemes']
 
 function hasCore(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false
@@ -53,9 +54,46 @@ function migrate(stored: Record<string, unknown>): Database {
   }
 
   // Kolom ukuran container semula bernama "fart" (salah baca dari "feet").
+  // Uang Tol baru ditambahkan, jadi route lama diberi nilai awal 0.
   const rte = merged.routes as Array<Record<string, unknown>> | undefined
   if (Array.isArray(rte)) {
-    merged.routes = rte.map(({ fart, ...r }) => ({ feet: fart ?? '', ...r }))
+    merged.routes = rte.map(({ fart, ...r }) => ({ feet: fart ?? '', toll: 0, ...r }))
+  }
+
+  /* Workspace (Jakarta / Tangerang).
+   *
+   * Data lama belum mengenal workspace. Pembagiannya mengikuti armada:
+   * satu kendaraan dianggap berpangkalan di satu cabang, sehingga trip dan
+   * Surat Jalan yang memakai kendaraan itu jatuh ke cabang yang sama.
+   * Tagihan mengikuti SI/JO-nya. Pembagian ini SEMENTARA - begitu klien
+   * memberi daftar armada per cabang, cukup ganti workspaceForSeed(). */
+  const beriWorkspace = (
+    key: 'transactions' | 'deliveryNotes' | 'billings',
+    seedField: string,
+  ) => {
+    const list = merged[key] as Array<Record<string, unknown>> | undefined
+    if (!Array.isArray(list)) return
+    merged[key] = list.map((row) =>
+      row.workspace ? row : { ...row, workspace: workspaceForSeed(String(row[seedField] ?? row.id ?? '')) },
+    )
+  }
+  beriWorkspace('transactions', 'vehicle_id')
+  beriWorkspace('deliveryNotes', 'vehicle_id')
+  beriWorkspace('billings', 'job_order_id')
+
+  // Tagihan sebisa mungkin mengikuti workspace trip pada SI/JO yang sama.
+  const trxWs = merged.transactions as Array<Record<string, unknown>> | undefined
+  const bil = merged.billings as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(trxWs) && Array.isArray(bil)) {
+    const wsPerJo = new Map<string, unknown>()
+    for (const t of trxWs) {
+      const jo = String(t.job_order_id ?? '')
+      if (jo && !wsPerJo.has(jo)) wsPerJo.set(jo, t.workspace)
+    }
+    merged.billings = bil.map((b) => {
+      const ws = wsPerJo.get(String(b.job_order_id ?? ''))
+      return ws ? { ...b, workspace: ws } : b
+    })
   }
 
   // Surat Jalan semula tidak menyimpan sopir dan route.
@@ -148,6 +186,24 @@ export function resetToSampleDatabase(): Database {
   const fresh = generateSampleDatabase()
   saveDatabase(fresh)
   return fresh
+}
+
+/** Workspace aktif (Jakarta / Tangerang) - disimpan terpisah dari data. */
+export const workspaceStorage = {
+  read(): string | null {
+    try {
+      return localStorage.getItem(WORKSPACE_KEY)
+    } catch {
+      return null
+    }
+  },
+  write(value: string): void {
+    try {
+      localStorage.setItem(WORKSPACE_KEY, value)
+    } catch {
+      /* abaikan */
+    }
+  },
 }
 
 export const authStorage = {
