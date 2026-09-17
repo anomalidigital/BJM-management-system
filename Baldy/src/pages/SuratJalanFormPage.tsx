@@ -166,12 +166,12 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
     if (!form.vehicle_id) e.vehicle_id = 'No. Polisi wajib dipilih.'
     if (!form.destination.trim()) e.destination = 'Tujuan wajib diisi.'
 
-    // Satu Surat Jalan memuat satu nomor container.
+    // Satu Surat Jalan memuat satu ID Perjalanan.
     const nomor = (form.containers[0] ?? '').trim().toUpperCase()
     let ce = ''
-    if (!nomor) ce = 'Nomor container wajib diisi.'
+    if (!nomor) ce = 'ID Perjalanan wajib diisi.'
     else if (db.deliveryNotes.some((n) => n.id !== existing?.id && (n.containers[0] ?? '').trim().toUpperCase() === nomor))
-      ce = 'Nomor container sudah dipakai di Surat Jalan lain.'
+      ce = 'ID Perjalanan sudah dipakai di Surat Jalan lain.'
     setErrors(e)
     setContainerError(ce)
     return Object.keys(e).length === 0 && !ce
@@ -229,16 +229,16 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
         <Card>
           <CardHeader
             title="Konfigurasi"
-            subtitle="Satu Surat Jalan memuat satu nomor container dan satu rute."
+            subtitle="Satu Surat Jalan memuat satu ID Perjalanan dan satu rute."
           />
           <div className="grid gap-4 p-4 sm:grid-cols-2">
-            <Field label="No. Container" required error={containerError}>
+            <Field label="ID Perjalanan" required error={containerError}>
               {(fid) => (
                 <Input
                   id={fid}
                   value={form.containers[0] ?? ''}
                   invalid={!!containerError}
-                  placeholder="TGHU1234567"
+                  placeholder="2026070098"
                   className="font-medium tracking-wide"
                   onChange={(e) => setContainer(e.target.value)}
                 />
@@ -349,7 +349,7 @@ function SuratJalanForm({ mode }: { mode: 'create' | 'edit' }) {
       <div className={cn('no-print fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-surface/95 backdrop-blur', 'px-4 py-3 lg:px-6')}>
         <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3">
           <p className="hidden text-[12.5px] text-ink-3 sm:block">
-            {nomorContainer || 'container belum diisi'} &middot; {form.sj_no || 'nomor belum diisi'}
+            {nomorContainer || 'ID Perjalanan belum diisi'} &middot; {form.sj_no || 'nomor belum diisi'}
           </p>
           <div className="ml-auto flex items-center gap-2">
             <Button onClick={() => navigate('/transaksi/surat-jalan')}>Batal</Button>

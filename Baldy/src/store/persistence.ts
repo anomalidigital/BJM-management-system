@@ -85,6 +85,27 @@ function migrate(stored: Record<string, unknown>): Database {
   beriWorkspace('deliveryNotes', 'vehicle_id')
   beriWorkspace('billings', 'job_order_id')
 
+  // Pengaturan Komisi: Nama, Target, Komisi Dasar, Komisi Target, Catatan.
+  // Realisasi dan periode dibuang - halaman ini hanya mengatur nilai, bukan
+  // memantau pencapaian. Bentuk ringkas sebelumnya (satu kolom `commission`)
+  // dipakai untuk kedua nilai sekaligus.
+  const skema = merged.commissionSchemes as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(skema)) {
+    merged.commissionSchemes = skema.map((c) => {
+      const { commission, commission_unit, realization, period, ...tetap } = c
+      void realization
+      void period
+      return {
+        ...tetap,
+        notes: tetap.notes ?? '',
+        base_commission: tetap.base_commission ?? commission ?? 0,
+        base_commission_unit: tetap.base_commission_unit ?? commission_unit ?? 'rp',
+        target_commission: tetap.target_commission ?? commission ?? 0,
+        target_commission_unit: tetap.target_commission_unit ?? commission_unit ?? 'rp',
+      }
+    })
+  }
+
   // Tagihan sebisa mungkin mengikuti workspace trip pada SI/JO yang sama.
   const trxWs = merged.transactions as Array<Record<string, unknown>> | undefined
   const bil = merged.billings as Array<Record<string, unknown>> | undefined

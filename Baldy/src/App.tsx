@@ -11,7 +11,7 @@ import { DataSopirPage } from './pages/DataSopirPage'
 import { DataRoutePage } from './pages/DataRoutePage'
 import { DataMobilPage } from './pages/DataMobilPage'
 import { DataProjectPage } from './pages/DataProjectPage'
-import { PengaturanKomisiPage } from './pages/PengaturanKomisiPage'
+import { KomisiPage } from './pages/KomisiPage'
 import { TripDetailPage } from './pages/TripDetailPage'
 import { LapUangJalanPage } from './pages/LapUangJalanPage'
 import { LapBiayaPage } from './pages/LapBiayaPage'
@@ -44,7 +44,7 @@ export function App() {
                   <Route path="/master/mobil" element={<DataMobilPage />} />
                   <Route path="/master/route" element={<DataRoutePage />} />
                   <Route path="/master/project" element={<DataProjectPage />} />
-                  <Route path="/master/komisi" element={<PengaturanKomisiPage />} />
+                  <Route path="/master/komisi" element={<KomisiPage />} />
 
                   <Route path="/transaksi/surat-jalan" element={<SuratJalanListPage />} />
                   <Route path="/transaksi/surat-jalan/tambah" element={<SuratJalanFormPage mode="create" />} />

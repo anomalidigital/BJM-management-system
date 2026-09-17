@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Building2, CalendarRange, ChevronDown, LogOut, Menu, Search } from 'lucide-react'
+import { CalendarRange, ChevronDown, LogOut, Menu, Search } from 'lucide-react'
 import { useAuth } from '../../store/AuthProvider'
 import { useData } from '../../store/DataProvider'
-import { useWorkspace } from '../../store/WorkspaceProvider'
 import { periodeAktif } from '../../lib/periode'
 import { Badge } from '../ui/Badge'
 import { initials, monthLabel } from '../../lib/format'
@@ -12,7 +11,6 @@ import { cn } from '../../lib/utils'
 export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => void; onLogout: () => void }) {
   const { user } = useAuth()
   const { transactionRows } = useData()
-  const { meta } = useWorkspace()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [quick, setQuick] = useState('')
@@ -59,16 +57,6 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
       </form>
 
       <div className="ml-auto flex items-center gap-3">
-        {/* Penanda workspace aktif — warnanya ikut token brand */}
-        <span
-          className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] font-semibold"
-          style={{ borderColor: `${meta.color}33`, background: `${meta.color}14`, color: meta.color }}
-          title={`Workspace ${meta.label}`}
-        >
-          <Building2 size={14} />
-          {meta.label}
-        </span>
-
         <span className="hidden items-center gap-1.5 rounded-md border border-hairline bg-sunken px-2.5 py-1.5 text-[12px] font-medium text-ink-2 md:inline-flex">
           <CalendarRange size={14} className="text-ink-3" />
           Periode: {monthLabel(periodeAktif(transactionRows.map((t) => t.transaction_date)).start)}

@@ -4,13 +4,11 @@ import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { ConfirmDialog } from '../ui/Modal'
 import { useAuth } from '../../store/AuthProvider'
-import { cn } from '../../lib/utils'
 
 /** Kerangka aplikasi: sidebar + topbar + area konten. */
 export function AppShell() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [confirmLogout, setConfirmLogout] = useState(false)
 
@@ -25,14 +23,13 @@ export function AppShell() {
   return (
     <div className="min-h-screen bg-page">
       <Sidebar
-        collapsed={collapsed}
-        onToggleCollapse={() => setCollapsed((c) => !c)}
         onLogout={() => setConfirmLogout(true)}
         mobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
       />
 
-      <div className={cn('flex min-h-screen flex-col transition-[padding] duration-200', collapsed ? 'lg:pl-[68px]' : 'lg:pl-[248px]')}>
+      {/* Sidebar melebar di atas konten, jadi jarak kiri tetap selebar rel ikon. */}
+      <div className="flex min-h-screen flex-col lg:pl-[68px]">
         <Topbar onOpenMobileNav={() => setMobileOpen(true)} onLogout={() => setConfirmLogout(true)} />
         <main className="flex-1 px-4 py-5 lg:px-6 lg:py-6">
           <Outlet />

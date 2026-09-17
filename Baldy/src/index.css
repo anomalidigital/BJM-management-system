@@ -44,31 +44,12 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   WORKSPACE (Jakarta / Tangerang)
+   WORKSPACE
 
-   Jakarta memakai token bawaan di atas (biru). Tangerang menimpa
-   token yang sama dengan biru-ungu, sehingga SELURUH komponen ikut
-   berganti warna tanpa perlu class tambahan di tiap halaman.
+   Token warna per workspace TIDAK ditulis di sini: temanya dipasang
+   dari WorkspaceProvider sebagai custom property di <html>, supaya
+   menambah workspace baru tidak perlu menyentuh CSS.
    ═══════════════════════════════════════════════════════════ */
-:root[data-workspace='tangerang'] {
-  --color-brand-50:  #f3f0ff;
-  --color-brand-100: #ded6fb;
-  --color-brand-200: #c2b3f5;
-  --color-brand-300: #a48eed;
-  --color-brand-400: #8465e6;
-  --color-brand-500: #7050d6;
-  --color-brand-600: #6344bf;
-  --color-brand-700: #563aab;
-  --color-brand-800: #4a3196;
-  --color-brand-900: #33206b;
-
-  --color-nav-900: #16102a;
-  --color-nav-800: #1d1636;
-  --color-nav-700: #2a1f4c;
-  --color-nav-ink: #a296c4;
-
-  --color-series-1: #7050d6;
-}
 
 /* Transisi warna hanya dinyalakan saat workspace berganti, supaya
    animasi hover sehari-hari tidak ikut melambat. */

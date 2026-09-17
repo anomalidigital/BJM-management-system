@@ -470,33 +470,27 @@ function makeInternalCosts(trips: CommissionTransaction[]): InternalCost[] {
 }
 
 /**
- * Pengaturan Komisi (halaman Komisi).
- * Nilai contoh: sebagian sudah melewati target, sebagian masih berjalan -
- * supaya kedua tampilan (Tercapai / Masih Progres) sama-sama terisi.
+ * Daftar tarif komisi (halaman Master -> Komisi).
+ * Contoh mengikuti pola yang diberikan klien: satu aturan bernominal Rupiah
+ * dan satu aturan berpersen, supaya kedua bentuk isian terlihat.
  */
 function makeCommissionSchemes(): CommissionScheme[] {
-  const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  // nama, workspace, target, komisi dasar, komisi target, realisasi, satuan komisi
-  const seed: ReadonlyArray<readonly [string, Workspace, number, number, number, number, CommissionUnit]> = [
-    ['Komisi Sopir Reguler', 'jakarta', 150_000_000, 250_000, 450_000, 168_400_000, 'rp'],
-    ['Komisi Route Priok - Cikarang', 'jakarta', 90_000_000, 150_000, 300_000, 61_250_000, 'rp'],
-    ['Komisi Marketing Kontainer', 'jakarta', 220_000_000, 0.25, 0.5, 224_750_000, 'persen'],
-    ['Komisi Sopir Ritan Harian', 'jakarta', 75_000_000, 100_000, 225_000, 38_900_000, 'rp'],
-    ['Komisi Sopir Cabang Tangerang', 'tangerang', 110_000_000, 200_000, 400_000, 118_600_000, 'rp'],
-    ['Komisi Route Tangerang - Merak', 'tangerang', 85_000_000, 0.2, 0.45, 47_300_000, 'persen'],
-    ['Komisi Kernet Cabang', 'tangerang', 40_000_000, 75_000, 150_000, 21_450_000, 'rp'],
+  // nama, workspace, target, komisi dasar, komisi target, satuan
+  const seed: ReadonlyArray<readonly [string, Workspace, number, number, number, CommissionUnit]> = [
+    ['Komisi Standar', 'jakarta', 1_000_000, 25_000, 40_000, 'rp'],
+    ['Komisi Senior', 'jakarta', 5_000_000, 10, 15, 'persen'],
+    ['Komisi Standar', 'tangerang', 1_000_000, 25_000, 40_000, 'rp'],
+    ['Komisi Senior', 'tangerang', 5_000_000, 10, 15, 'persen'],
   ]
-  return seed.map(([name, workspace, target, base, bonus, realisasi, unit], i) => ({
+  return seed.map(([name, workspace, target, dasar, tercapai, unit], i) => ({
     id: `cms-${i + 1}`,
     workspace,
     name,
     target,
-    base_commission: base,
+    base_commission: dasar,
     base_commission_unit: unit,
-    target_commission: bonus,
+    target_commission: tercapai,
     target_commission_unit: unit,
-    realization: realisasi,
-    period,
     notes: '',
     created_at: stamp,
     updated_at: stamp,

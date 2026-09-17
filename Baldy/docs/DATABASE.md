@@ -239,23 +239,23 @@ CREATE TABLE internal_costs (
 );
 CREATE INDEX idx_internal_trip ON internal_costs(trip_id);
 
--- Pengaturan Komisi (menu Master -> Komisi).
--- Komisi dasar berlaku selama realization < target; setelah tercapai
--- memakai target_commission. Sumber realization masih TBD-16.
+-- Komisi (menu Master -> Komisi). Daftar tarif, bukan pemantauan:
+-- komisi dasar dipakai selama target belum tercapai, setelah tercapai memakai
+-- komisi target. Tiap nilai boleh Rupiah atau persen (TBD-16).
 CREATE TABLE commission_schemes (
-  id                BIGSERIAL PRIMARY KEY,
-  workspace         VARCHAR(20)  NOT NULL DEFAULT 'jakarta',
-  name              VARCHAR(140) NOT NULL,
-  target            BIGINT       NOT NULL DEFAULT 0,
-  base_commission   BIGINT       NOT NULL DEFAULT 0,
-  target_commission BIGINT       NOT NULL DEFAULT 0,
-  realization       BIGINT       NOT NULL DEFAULT 0,
-  period            CHAR(7)      NOT NULL,      -- yyyy-mm
-  notes             TEXT,
-  created_at        TIMESTAMP    NOT NULL DEFAULT NOW(),
-  updated_at        TIMESTAMP    NOT NULL DEFAULT NOW()
+  id                     BIGSERIAL PRIMARY KEY,
+  workspace              VARCHAR(20)   NOT NULL DEFAULT 'jakarta',
+  name                   VARCHAR(140)  NOT NULL,       -- Nama
+  target                 BIGINT        NOT NULL DEFAULT 0,
+  base_commission        NUMERIC(14,2) NOT NULL DEFAULT 0,
+  base_commission_unit   VARCHAR(10)   NOT NULL DEFAULT 'rp',   -- rp | persen
+  target_commission      NUMERIC(14,2) NOT NULL DEFAULT 0,
+  target_commission_unit VARCHAR(10)   NOT NULL DEFAULT 'rp',
+  notes                  TEXT,
+  created_at             TIMESTAMP     NOT NULL DEFAULT NOW(),
+  updated_at             TIMESTAMP     NOT NULL DEFAULT NOW()
 );
-CREATE INDEX idx_scheme_workspace ON commission_schemes(workspace, period);
+CREATE INDEX idx_scheme_workspace ON commission_schemes(workspace);
 ```
 
 ## Perubahan pada tabel yang sudah ada

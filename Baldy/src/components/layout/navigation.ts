@@ -73,13 +73,3 @@ export function findNavHref(label: string): string | undefined {
   }
   return undefined
 }
-
-/** Cari label halaman dari path, dipakai untuk judul di topbar. */
-export function findNavLabel(pathname: string): string {
-  for (const g of NAV_GROUPS) {
-    for (const it of g.items) {
-      if (pathname === it.to || pathname.startsWith(it.to + '/')) return it.label
-    }
-  }
-  return 'SIKOTIS'
-}

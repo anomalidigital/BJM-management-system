@@ -229,28 +229,24 @@ export interface DeliveryNote extends WorkspaceScoped {
   updated_at: string
 }
 
-/**
- * Satuan nilai komisi: nominal Rupiah tetap, atau persen dari realisasi.
- * Persen dipakai bila komisi mengikuti besar omzet, bukan angka pasti per trip.
- */
+/** Satuan nilai komisi: nominal Rupiah, atau persen. */
 export type CommissionUnit = 'rp' | 'persen'
 
 /**
- * Master -> Komisi (Pengaturan Komisi).
- * Satu baris = satu skema komisi: bila realisasi mencapai target, komisi yang
- * dibayarkan naik dari komisi dasar ke komisi target.
+ * Master -> Komisi. Daftar tarif komisi, bukan pemantauan.
+ * Satu baris = satu aturan: komisi dasar dipakai selama target belum tercapai,
+ * setelah tercapai memakai komisi target. Tiap nilai boleh nominal Rupiah atau
+ * persen. Apa yang diukur target masih TBD-16.
  */
 export interface CommissionScheme extends WorkspaceScoped {
   id: string
-  name: string                   // Nama skema / penerima komisi
+  name: string                   // Nama
   target: number                 // Target
-  base_commission: number        // Komisi Dasar (nominal atau persen)
-  base_commission_unit?: CommissionUnit
+  base_commission: number        // Komisi Dasar
+  base_commission_unit: CommissionUnit
   target_commission: number      // Komisi Apabila Target Tercapai
-  target_commission_unit?: CommissionUnit
-  realization: number            // Realisasi berjalan - sumbernya masih TBD-16
-  period: string                 // Periode yyyy-mm
-  notes: string
+  target_commission_unit: CommissionUnit
+  notes: string                  // Catatan
   created_at: string
   updated_at: string
 }
