@@ -6,7 +6,7 @@ import { DataTable } from '../components/ui/DataTable'
 import type { Column } from '../components/ui/DataTable'
 import { Button, IconButton } from '../components/ui/Button'
 import { Modal, ConfirmDialog } from '../components/ui/Modal'
-import { Field, Input } from '../components/ui/Field'
+import { Field, Input, Textarea } from '../components/ui/Field'
 import { CurrencyInput } from '../components/ui/CurrencyInput'
 import { EmptyState } from '../components/ui/States'
 import { useData } from '../store/DataProvider'
@@ -37,11 +37,13 @@ const tulisKomisi = (nilai: number, unit: CommissionUnit) =>
  * Rp untuk nominal tetap, % untuk bagian dari target.
  */
 function NilaiKomisi({
-  id, value, unit, onValue, onUnit, invalid,
+  id, value, unit, target, onValue, onUnit, invalid,
 }: {
   id: string
   value: number
   unit: CommissionUnit
+  /** Dipakai sebagai dasar konversi Rp <-> persen. */
+  target: number
   onValue: (v: number) => void
   onUnit: (u: CommissionUnit) => void
   invalid?: boolean
@@ -54,31 +56,58 @@ function NilaiKomisi({
     onValue(Number.isFinite(angka) ? Math.min(angka, 100) : 0)
   }
 
+  /** Nilai Rupiah yang diwakili isian persen. */
+  const setara = persen ? Math.round((value / 100) * target) : 0
+
+  /**
+   * Ganti satuan ikut mengonversi angkanya lewat Target, jadi nilai yang sudah
+   * diisi tidak hilang: Rp 1.000.000 dari target Rp 5.000.000 menjadi 20%.
+   * Dasar konversi ini memakai Target - lihat TBD-16 bila ternyata persen
+   * dihitung dari nilai lain.
+   */
+  function gantiSatuan(next: CommissionUnit) {
+    if (next === unit) return
+    onUnit(next)
+    if (!target || !value) { onValue(0); return }
+    onValue(next === 'persen'
+      ? Math.min(Math.round((value / target) * 10000) / 100, 100)
+      : Math.round((value / 100) * target))
+  }
+
   return (
-    <div
-      className={cn(
-        'flex h-9 w-full items-center overflow-hidden rounded-md border bg-surface transition-colors',
-        'focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/15',
-        invalid ? 'border-[color:var(--color-critical)]' : 'border-hairline',
-      )}
-    >
-      <select
-        value={unit}
-        aria-label="Satuan komisi"
-        onChange={(e) => onUnit(e.target.value as CommissionUnit)}
-        className="h-full cursor-pointer border-r border-hairline bg-sunken pr-6 pl-2.5 text-[12px] font-semibold text-ink-2 outline-none"
+    <>
+      <div
+        className={cn(
+          'flex h-9 w-full items-center overflow-hidden rounded-md border bg-surface transition-colors',
+          'focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/15',
+          invalid ? 'border-[color:var(--color-critical)]' : 'border-hairline',
+        )}
       >
-        <option value="rp">Rp</option>
-        <option value="persen">%</option>
-      </select>
-      <input
-        id={id}
-        inputMode="decimal"
-        value={persen ? tulisAngka(value) : currencyInputValue(value)}
-        onChange={(e) => ubah(e.target.value)}
-        className="tnum h-full min-w-0 flex-1 bg-transparent px-2.5 text-right text-[13px] text-ink outline-none"
-      />
-    </div>
+        <select
+          value={unit}
+          aria-label="Satuan komisi"
+          onChange={(e) => gantiSatuan(e.target.value as CommissionUnit)}
+          className="h-full cursor-pointer border-r border-hairline bg-sunken pr-6 pl-2.5 text-[12px] font-semibold text-ink-2 outline-none"
+        >
+          <option value="rp">Rp</option>
+          <option value="persen">%</option>
+        </select>
+        <input
+          id={id}
+          inputMode="decimal"
+          value={persen ? tulisAngka(value) : currencyInputValue(value)}
+          onChange={(e) => ubah(e.target.value)}
+          className="tnum h-full min-w-0 flex-1 bg-transparent px-2.5 text-right text-[13px] text-ink outline-none"
+        />
+      </div>
+      {persen && (
+        <p className="mt-1 text-[12px] text-ink-3">
+          {target > 0
+            ? <>Setara <span className="tnum font-semibold text-ink-2">{formatRupiah(setara)}</span> dari target {formatRupiah(target)}</>
+            : 'Isi Target dulu supaya nilai persennya bisa dihitung.'}
+        </p>
+      )}
+    </>
   )
 }
 
@@ -221,6 +250,7 @@ export function KomisiPage() {
                 id={id}
                 value={form.base_commission}
                 unit={form.base_commission_unit}
+                target={form.target}
                 invalid={!!errors.base_commission}
                 onValue={(v) => setForm((f) => ({ ...f, base_commission: v }))}
                 onUnit={(u) => setForm((f) => ({ ...f, base_commission_unit: u }))}
@@ -233,6 +263,7 @@ export function KomisiPage() {
                 id={id}
                 value={form.target_commission}
                 unit={form.target_commission_unit}
+                target={form.target}
                 invalid={!!errors.target_commission}
                 onValue={(v) => setForm((f) => ({ ...f, target_commission: v }))}
                 onUnit={(u) => setForm((f) => ({ ...f, target_commission_unit: u }))}
@@ -246,7 +277,16 @@ export function KomisiPage() {
             )}
           </Field>
           <Field label="Catatan">
-            {(id) => <Input id={id} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />}
+            {(id) => (
+              <Textarea
+                id={id}
+                rows={3}
+                value={form.notes}
+                placeholder="Keterangan tambahan, mis. syarat komisi atau masa berlaku."
+                className="resize-y"
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              />
+            )}
           </Field>
         </div>
       </Modal>

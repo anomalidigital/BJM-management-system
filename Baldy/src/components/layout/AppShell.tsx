@@ -22,11 +22,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-page">
-      <Sidebar
-        onLogout={() => setConfirmLogout(true)}
-        mobileOpen={mobileOpen}
-        onCloseMobile={() => setMobileOpen(false)}
-      />
+      <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
 
       {/* Sidebar melebar di atas konten, jadi jarak kiri tetap selebar rel ikon. */}
       <div className="flex min-h-screen flex-col lg:pl-[68px]">

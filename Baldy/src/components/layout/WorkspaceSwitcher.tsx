@@ -74,7 +74,7 @@ export function WorkspaceSwitcher({
         <div
           role="menu"
           aria-label="Pilih workspace"
-          className="animate-in-pop absolute bottom-full left-0 z-50 mb-2 w-[212px] overflow-hidden rounded-xl border border-white/12 bg-nav-800 shadow-pop"
+          className="animate-in-pop absolute bottom-0 left-full z-50 ml-3 w-[212px] overflow-hidden rounded-xl border border-white/12 bg-nav-800 shadow-pop"
         >
           <p className="px-3 pt-2.5 pb-1 text-[11px] font-semibold tracking-[.08em] text-nav-ink/60 uppercase">
             Workspace

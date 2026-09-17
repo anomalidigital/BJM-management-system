@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LogOut } from 'lucide-react'
 import { NAV_GROUPS } from './navigation'
 import { WorkspaceSwitcher } from './WorkspaceSwitcher'
 import { cn } from '../../lib/utils'
 
 interface Props {
-  onLogout: () => void
   /** Di layar sempit sidebar tampil sebagai overlay. */
   mobileOpen: boolean
   onCloseMobile: () => void
@@ -22,7 +20,7 @@ interface Props {
  * disembunyikan dengan opacity - bukan dibongkar pasang - supaya tinggi tiap
  * baris tidak ikut berubah.
  */
-export function Sidebar({ onLogout, mobileOpen, onCloseMobile }: Props) {
+export function Sidebar({ mobileOpen, onCloseMobile }: Props) {
   const [hover, setHover] = useState(false)
   const [daftarWorkspace, setDaftarWorkspace] = useState(false)
   /** Menyempit: rel ikon. Tetap melebar selama daftar workspace terbuka. */
@@ -101,27 +99,6 @@ export function Sidebar({ onLogout, mobileOpen, onCloseMobile }: Props) {
             </div>
           ))}
 
-          {/* Logout ditempatkan pada grup terakhir */}
-          <ul className="mt-0.5 space-y-0.5 px-2">
-            <li>
-              <button
-                type="button"
-                onClick={onLogout}
-                title="Logout"
-                className="flex w-full items-center gap-2.5 overflow-hidden rounded-md py-2 pl-[18px] text-[13px] font-medium text-nav-ink transition-colors hover:bg-white/7 hover:text-white"
-              >
-                <LogOut size={17} className="shrink-0" />
-                <span
-                  className={cn(
-                    'whitespace-nowrap transition-opacity duration-200',
-                    rapat ? 'opacity-0' : 'opacity-100 delay-100',
-                  )}
-                >
-                  Logout
-                </span>
-              </button>
-            </li>
-          </ul>
         </nav>
 
         {/* Pemilih workspace: Jakarta / Tangerang */}
