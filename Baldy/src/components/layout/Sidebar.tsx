@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { NAV_GROUPS } from './navigation'
-import { WorkspaceSwitcher } from './WorkspaceSwitcher'
 import { cn } from '../../lib/utils'
 
 interface Props {
@@ -22,9 +21,8 @@ interface Props {
  */
 export function Sidebar({ mobileOpen, onCloseMobile }: Props) {
   const [hover, setHover] = useState(false)
-  const [daftarWorkspace, setDaftarWorkspace] = useState(false)
-  /** Menyempit: rel ikon. Tetap melebar selama daftar workspace terbuka. */
-  const rapat = !hover && !mobileOpen && !daftarWorkspace
+  /** Menyempit: rel ikon. Di layar sempit sidebar selalu tampil penuh. */
+  const rapat = !hover && !mobileOpen
 
   return (
     <>
@@ -101,18 +99,17 @@ export function Sidebar({ mobileOpen, onCloseMobile }: Props) {
 
         </nav>
 
-        {/* Pemilih workspace: Jakarta / Tangerang */}
-        <div className={cn('shrink-0 border-t border-white/8 pt-2.5 pb-2', rapat ? 'px-2' : 'px-2.5')}>
-          <WorkspaceSwitcher collapsed={rapat} onOpenChange={setDaftarWorkspace} />
+        <div className={cn('shrink-0 border-t border-white/8 py-2', rapat ? 'px-2' : 'px-3')}>
           <p
             className={cn(
-              'px-0.5 pt-1.5 text-[10.5px] whitespace-nowrap text-nav-ink/45 transition-opacity duration-200',
+              'text-[10.5px] whitespace-nowrap text-nav-ink/45 transition-opacity duration-200',
               rapat ? 'opacity-0' : 'opacity-100 delay-100',
             )}
           >
             Version 0.1
           </p>
         </div>
+
       </aside>
     </>
   )

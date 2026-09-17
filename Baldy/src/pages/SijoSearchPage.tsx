@@ -18,7 +18,7 @@ import type { TransactionRow } from '../types'
 /**
  * Pencarian nomor SI - Job Order.
  * Bisa diakses langsung dengan mengetik nomor, atau otomatis terisi ketika
- * user mengklik nilai Sijo dari Browsing Data / Data Komisi / Surat Jalan.
+ * user mengklik nilai Sijo dari Browsing Data / Data Pengeluaran / Surat Jalan.
  */
 export function SijoSearchPage() {
   const [params, setParams] = useSearchParams()
@@ -250,7 +250,7 @@ export function SijoSearchPage() {
                 empty={
                   <div className="px-6 py-12 text-center">
                     <p className="text-[13.5px] font-semibold text-ink">Belum ada transaksi untuk SI/JO ini.</p>
-                    <p className="mt-1 text-[13px] text-ink-3">Buat transaksi pada halaman Data Komisi.</p>
+                    <p className="mt-1 text-[13px] text-ink-3">Buat transaksi pada halaman Data Pengeluaran.</p>
                   </div>
                 }
               />

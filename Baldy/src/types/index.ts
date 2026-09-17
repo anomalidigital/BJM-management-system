@@ -167,7 +167,7 @@ export interface OperationalExpense {
 export const INTERNAL_COST_TYPES = ['Uang Jalan', 'Uang Makan', 'Kernet', 'Servis & Sparepart', 'Gaji Sopir', 'Administrasi', 'Lainnya'] as const
 export type InternalCostType = (typeof INTERNAL_COST_TYPES)[number]
 
-/** Transaksi -> Data Komisi -> detail trip -> Biaya Internal. */
+/** Transaksi -> Data Pengeluaran -> detail trip -> Biaya Internal. */
 export interface InternalCost {
   id: string
   trip_id: string

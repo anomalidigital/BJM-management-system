@@ -54,8 +54,8 @@ export function LineChart({ labels, series, height = 210 }: { labels: string[]; 
           const pts = s.values.map((v, i) => ({ x: x(i), y: y(v) }))
           return (
             <g key={s.name}>
-              <path d={areaPath(pts, padT + innerH)} fill={s.color} opacity={0.1} />
-              <path d={linePath(pts)} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+              <path d={areaPath(pts, padT + innerH)} style={{ fill: s.color }} opacity={0.1} />
+              <path d={linePath(pts)} fill="none" style={{ stroke: s.color }} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
             </g>
           )
         })}
@@ -68,7 +68,7 @@ export function LineChart({ labels, series, height = 210 }: { labels: string[]; 
         {series.map((s) => {
           const i = hover ?? s.values.length - 1
           return (
-            <circle key={`m-${s.name}`} cx={x(i)} cy={y(s.values[i])} r={4.5} fill={s.color} stroke={VIZ.surface} strokeWidth={2} />
+            <circle key={`m-${s.name}`} cx={x(i)} cy={y(s.values[i])} r={4.5} style={{ fill: s.color }} stroke={VIZ.surface} strokeWidth={2} />
           )
         })}
 

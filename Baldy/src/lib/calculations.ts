@@ -116,7 +116,7 @@ export const TBD_NOTES: TbdNote[] = [
   },
   {
     id: 'TBD-06',
-    title: 'Fungsi tombol 4B pada Data Komisi',
+    title: 'Fungsi tombol 4B pada Data Pengeluaran',
     current: 'Dipertahankan sebagai secondary action, belum diberi logic.',
     question: 'Apa fungsi bisnis tombol 4B pada window Pengisian Data Surat Jalan?',
   },

@@ -238,8 +238,8 @@ export function DataKomisiPage() {
   return (
     <>
       <PageHeader
-        title="Trip & Komisi"
-        crumbs={[{ label: 'Transaksi' }, { label: 'Data Komisi' }]}
+        title="Pengeluaran"
+        crumbs={[{ label: 'Transaksi' }, { label: 'Data Pengeluaran' }]}
         description="Klik NoTrans untuk membuka detail trip beserta termin uang jalan, biaya operasional, dan dokumennya."
         actions={
           <>

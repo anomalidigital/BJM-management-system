@@ -1,16 +1,39 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CalendarRange, ChevronDown, LogOut, Menu, Search } from 'lucide-react'
+import { CalendarRange, Check, ChevronDown, LogOut, Menu, Search } from 'lucide-react'
 import { useAuth } from '../../store/AuthProvider'
 import { useData } from '../../store/DataProvider'
+import { WORKSPACE_LIST, useWorkspace } from '../../store/WorkspaceProvider'
+import type { WorkspaceMeta } from '../../store/WorkspaceProvider'
+import { useToast } from '../../store/ToastProvider'
 import { periodeAktif } from '../../lib/periode'
 import { Badge } from '../ui/Badge'
 import { initials, monthLabel } from '../../lib/format'
 import { cn } from '../../lib/utils'
+import type { Workspace } from '../../types'
 
+/** Avatar bulat berisi inisial workspace. */
+function AvatarWorkspace({ meta }: { meta: WorkspaceMeta }) {
+  return (
+    <span
+      aria-hidden
+      className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[9.5px] font-bold text-white"
+      style={{ background: `linear-gradient(135deg, ${meta.color}, ${meta.colorSoft})` }}
+    >
+      {meta.initial}
+    </span>
+  )
+}
+
+/**
+ * Baris atas: pencarian cepat, periode aktif, dan satu menu akun yang memuat
+ * identitas pengguna, pemilih workspace, dan logout.
+ */
 export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => void; onLogout: () => void }) {
   const { user } = useAuth()
   const { transactionRows } = useData()
+  const { workspace, meta, setWorkspace } = useWorkspace()
+  const toast = useToast()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [quick, setQuick] = useState('')
@@ -21,8 +44,15 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
     const onDown = (e: MouseEvent) => {
       if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false)
     }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
     document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
   }, [menuOpen])
 
   function submitQuick(e: React.FormEvent) {
@@ -31,6 +61,14 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
     if (!q) return
     navigate(`/pencarian/sijo?sijo=${encodeURIComponent(q)}`)
     setQuick('')
+  }
+
+  function pilihWorkspace(next: Workspace) {
+    setMenuOpen(false)
+    if (next === workspace) return
+    setWorkspace(next)
+    const nama = WORKSPACE_LIST.find((w) => w.id === next)?.label ?? next
+    toast.info(`Workspace ${nama} aktif. Transaksi yang tampil mengikuti workspace ini.`)
   }
 
   return (
@@ -65,6 +103,8 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
         <div ref={menuRef} className="relative">
           <button
             type="button"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
             onClick={() => setMenuOpen((o) => !o)}
             className={cn(
               'flex items-center gap-2 rounded-md border border-transparent py-1 pr-1.5 pl-1 transition-colors hover:bg-sunken',
@@ -76,21 +116,56 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
             </span>
             <span className="hidden text-left sm:block">
               <span className="block text-[12.5px] leading-tight font-semibold text-ink">{user?.name}</span>
-              <span className="block text-[11px] leading-tight text-ink-3">{user?.username}</span>
+              {/* Workspace aktif ikut tampil, karena seluruh isi halaman mengikutinya */}
+              <span className="flex items-center gap-1.5 text-[11px] leading-tight text-ink-3">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: meta.color }} />
+                {meta.label}
+              </span>
             </span>
             <ChevronDown size={14} className="text-ink-3" />
           </button>
 
           {menuOpen && (
-            <div className="animate-in-pop absolute right-0 z-50 mt-1.5 w-60 overflow-hidden rounded-lg border border-hairline bg-surface shadow-pop">
+            <div
+              role="menu"
+              className="animate-in-pop absolute right-0 z-50 mt-1.5 w-64 overflow-hidden rounded-lg border border-hairline bg-surface shadow-pop"
+            >
               <div className="border-b border-hairline px-3.5 py-3">
                 <p className="text-[13px] font-semibold text-ink">{user?.name}</p>
+                <p className="text-[11.5px] text-ink-3">{user?.username}</p>
                 <div className="mt-1.5">
                   <Badge tone={user?.role === 'admin' ? 'brand' : 'neutral'}>
                     {user?.role === 'admin' ? 'Admin — akses penuh' : 'Viewer — hanya lihat & export'}
                   </Badge>
                 </div>
               </div>
+
+              <div className="border-b border-hairline py-1.5">
+                <p className="px-3.5 pt-1 pb-1.5 text-[10.5px] font-semibold tracking-[.08em] text-ink-3 uppercase">
+                  Workspace
+                </p>
+                {WORKSPACE_LIST.map((w) => {
+                  const active = w.id === workspace
+                  return (
+                    <button
+                      key={w.id}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={active}
+                      onClick={() => pilihWorkspace(w.id)}
+                      className={cn(
+                        'flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] transition-colors hover:bg-sunken',
+                        active ? 'font-semibold text-ink' : 'text-ink-2',
+                      )}
+                    >
+                      <AvatarWorkspace meta={w} />
+                      <span className="min-w-0 flex-1 truncate">{w.label}</span>
+                      {active && <Check size={15} className="shrink-0 text-brand-600" />}
+                    </button>
+                  )
+                })}
+              </div>
+
               <button
                 type="button"
                 onClick={onLogout}

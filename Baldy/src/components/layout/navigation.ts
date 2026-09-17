@@ -35,7 +35,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: 'Transaksi',
     items: [
       { label: 'Surat Jalan', to: '/transaksi/surat-jalan', icon: FileText },
-      { label: 'Data Komisi', to: '/transaksi/komisi', icon: Truck },
+      { label: 'Data Pengeluaran', to: '/transaksi/komisi', icon: Truck },
       { label: 'Data Tagihan', to: '/transaksi/tagihan', icon: Receipt },
     ],
   },

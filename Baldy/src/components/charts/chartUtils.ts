@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 
-/** Warna chart — satu tempat, mengacu ke token di index.css. */
+/**
+ * Warna chart — satu tempat, mengacu ke token di index.css.
+ * series1 memakai custom property supaya ikut berganti mengikuti workspace;
+ * karena itu pemakaiannya lewat style, bukan atribut SVG.
+ */
 export const VIZ = {
-  series1: '#2a78d6',
+  series1: 'var(--color-series-1)',
   series2: '#eb6834',
   series3: '#1baf7a',
   surface: '#ffffff',

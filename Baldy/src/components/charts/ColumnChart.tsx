@@ -67,7 +67,7 @@ export function ColumnChart({ data, height = 200, valueSuffix = '' }: { data: Co
                 onMouseEnter={() => setHover(i)}
                 onMouseLeave={() => setHover(null)}
               />
-              <path d={path} fill={VIZ.series1} opacity={hover === null || hover === i ? 1 : 0.45} pointerEvents="none" />
+              <path d={path} style={{ fill: VIZ.series1 }} opacity={hover === null || hover === i ? 1 : 0.45} pointerEvents="none" />
             </g>
           )
         })}

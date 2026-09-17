@@ -73,7 +73,7 @@ export function TripDetailPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Memuat trip..." crumbs={[{ label: 'Transaksi' }, { label: 'Data Komisi', to: '/transaksi/komisi' }]} />
+        <PageHeader title="Memuat trip..." crumbs={[{ label: 'Transaksi' }, { label: 'Data Pengeluaran', to: '/transaksi/komisi' }]} />
         <div className="skeleton h-64 rounded-xl" />
       </>
     )
@@ -82,7 +82,7 @@ export function TripDetailPage() {
   if (!trip) {
     return (
       <>
-        <PageHeader title="Trip tidak ditemukan" crumbs={[{ label: 'Transaksi' }, { label: 'Data Komisi', to: '/transaksi/komisi' }]} />
+        <PageHeader title="Trip tidak ditemukan" crumbs={[{ label: 'Transaksi' }, { label: 'Data Pengeluaran', to: '/transaksi/komisi' }]} />
         <Card>
           <div className="px-6 py-14 text-center">
             <p className="text-[14px] font-semibold text-ink">Data tidak ditemukan.</p>
@@ -188,7 +188,7 @@ export function TripDetailPage() {
       <PageHeader
         title={`Trip ${trip.transaction_no}`}
         description={`${formatDateLong(trip.transaction_date)} · ${trip.driver_name || 'tanpa sopir'} · ${trip.plate_number || 'tanpa mobil'}`}
-        crumbs={[{ label: 'Transaksi' }, { label: 'Data Komisi', to: '/transaksi/komisi' }, { label: trip.transaction_no }]}
+        crumbs={[{ label: 'Transaksi' }, { label: 'Data Pengeluaran', to: '/transaksi/komisi' }, { label: trip.transaction_no }]}
         actions={
           <>
             <Button icon={<ArrowLeft size={15} />} onClick={() => navigate('/transaksi/komisi')}>Kembali</Button>
