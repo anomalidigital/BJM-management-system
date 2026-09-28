@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'
+import { FaArrowTrendDown, FaArrowTrendUp, FaMinus } from './icons'
 import { cn } from '../../lib/utils'
 
 interface Props {
@@ -19,7 +19,7 @@ export function StatCard({ label, value, icon, delta, deltaLabel = 'vs bulan lal
   const up = hasDelta && delta! > 0
   const flat = hasDelta && Math.abs(delta!) < 0.05
   const good = invertDelta ? !up : up
-  const Icon = flat ? Minus : up ? ArrowUpRight : ArrowDownRight
+  const Icon = flat ? FaMinus : up ? FaArrowTrendUp : FaArrowTrendDown
 
   return (
     <div className="shadow-card rounded-xl border border-hairline bg-surface p-4">

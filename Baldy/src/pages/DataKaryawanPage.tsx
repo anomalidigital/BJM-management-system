@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { HandCoins, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { FaHandHoldingDollar, FaPen, FaPlus, FaTrashCan, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
@@ -169,9 +169,9 @@ export function DataKaryawanPage() {
       key: 'action', header: 'Action', align: 'right', width: '124px',
       render: (d) => (
         <div className="flex justify-end gap-1">
-          <IconButton label={`Kasbon & transaksi ${d.driver_name}`} icon={<HandCoins size={15} />} onClick={() => navigate(`/master/karyawan/${d.id}`)} />
-          <IconButton label="Ubah" icon={<Pencil size={14} />} disabled={!canEdit} onClick={() => openEdit(d)} />
-          <IconButton label="Hapus" tone="danger" icon={<Trash2 size={14} />} disabled={!canEdit} onClick={() => setDeleting(d)} />
+          <IconButton label={`Kasbon & transaksi ${d.driver_name}`} icon={<FaHandHoldingDollar size={15} />} onClick={() => navigate(`/master/karyawan/${d.id}`)} />
+          <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!canEdit} onClick={() => openEdit(d)} />
+          <IconButton label="Hapus" tone="danger" icon={<FaTrashCan size={14} />} disabled={!canEdit} onClick={() => setDeleting(d)} />
         </div>
       ),
     },
@@ -183,7 +183,7 @@ export function DataKaryawanPage() {
         title="Data Karyawan"
         crumbs={[{ label: 'Master' }, { label: 'Data Karyawan' }]}
         actions={
-          <Button variant="primary" icon={<Plus size={15} />} disabled={!canEdit} onClick={openCreate}
+          <Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}
             title={canEdit ? undefined : 'Peran Viewer tidak dapat mengubah master data'}>
             Tambah Karyawan
           </Button>
@@ -215,7 +215,7 @@ export function DataKaryawanPage() {
                   <option value="lunas">Lunas</option>
                 </Select>
               </FilterField>
-              {(table.isFiltered || filterAktif) && <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={resetFilter}>Reset</Button>}
+              {(table.isFiltered || filterAktif) && <Button size="sm" variant="ghost" icon={<FaXmark size={14} />} onClick={resetFilter}>Reset</Button>}
             </>
           }
           right={<span className="text-[12.5px] text-ink-3">{db.drivers.length} karyawan terdaftar</span>}
@@ -231,7 +231,7 @@ export function DataKaryawanPage() {
           isFiltered={table.isFiltered || filterAktif}
           sort={table.sort}
           onSortChange={table.toggleSort}
-          empty={<EmptyState entity="karyawan" action={canEdit && <Button variant="primary" icon={<Plus size={15} />} onClick={openCreate}>Tambah Karyawan</Button>} />}
+          empty={<EmptyState entity="karyawan" action={canEdit && <Button variant="primary" icon={<FaPlus size={15} />} onClick={openCreate}>Tambah Karyawan</Button>} />}
           notFound={<NotFoundState onReset={resetFilter} />}
         />
 

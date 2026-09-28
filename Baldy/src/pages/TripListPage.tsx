@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Ban, CheckCheck, CircleHelp, Eye, Pencil, Plus, Printer, Trash2, X } from 'lucide-react'
+import {
+  FaBan, FaCheckDouble, FaCircleQuestion, FaEye, FaPen, FaPlus, FaPrint, FaTrashCan, FaXmark,
+} from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
@@ -183,13 +185,13 @@ export function TripListPage() {
       key: 'action', header: 'Action', align: 'right', width: '120px',
       render: (t) => (
         <div className="flex justify-end gap-1">
-          <IconButton label="Lihat" icon={<Eye size={14} />} onClick={() => navigate(`/transaksi/trip/${t.id}`)} />
-          <IconButton label="Edit" icon={<Pencil size={14} />} disabled={!canEdit || t.status === 'batal'} onClick={() => navigate(`/transaksi/trip/${t.id}/edit`)} />
+          <IconButton label="Lihat" icon={<FaEye size={14} />} onClick={() => navigate(`/transaksi/trip/${t.id}`)} />
+          <IconButton label="Edit" icon={<FaPen size={14} />} disabled={!canEdit || t.status === 'batal'} onClick={() => navigate(`/transaksi/trip/${t.id}/edit`)} />
           <OverflowMenu
             actions={[
-              { label: 'Cetak Surat Jalan', icon: <Printer size={14} />, onSelect: () => setPrinting([t]) },
-              { label: 'Batalkan Trip', icon: <Ban size={14} />, tone: 'danger', disabled: !canEdit || t.status === 'batal', onSelect: () => setMembatalkan(t) },
-              { label: 'Hapus Trip', icon: <Trash2 size={14} />, tone: 'danger', disabled: !canEdit, onSelect: () => setMenghapus(t) },
+              { label: 'Cetak Surat Jalan', icon: <FaPrint size={14} />, onSelect: () => setPrinting([t]) },
+              { label: 'Batalkan Trip', icon: <FaBan size={14} />, tone: 'danger', disabled: !canEdit || t.status === 'batal', onSelect: () => setMembatalkan(t) },
+              { label: 'Hapus Trip', icon: <FaTrashCan size={14} />, tone: 'danger', disabled: !canEdit, onSelect: () => setMenghapus(t) },
             ]}
           />
         </div>
@@ -205,8 +207,8 @@ export function TripListPage() {
         crumbs={[{ label: 'Transaksi' }, { label: 'Trip' }]}
         actions={
           <>
-            <Button icon={<CircleHelp size={15} />} onClick={() => setShow4B(true)} title="Tombol 4B">4B</Button>
-            <Button variant="primary" icon={<Plus size={15} />} disabled={!canEdit} onClick={() => navigate('/transaksi/trip/tambah')}>
+            <Button icon={<FaCircleQuestion size={15} />} onClick={() => setShow4B(true)} title="Tombol 4B">4B</Button>
+            <Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={() => navigate('/transaksi/trip/tambah')}>
               Tambah Trip
             </Button>
           </>
@@ -259,7 +261,7 @@ export function TripListPage() {
                 </Select>
               </FilterField>
               {(table.isFiltered || filterActive) && (
-                <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={resetFilters}>Reset</Button>
+                <Button size="sm" variant="ghost" icon={<FaXmark size={14} />} onClick={resetFilters}>Reset</Button>
               )}
             </>
           }
@@ -269,8 +271,8 @@ export function TripListPage() {
           <div className="animate-in-fade flex flex-wrap items-center justify-between gap-3 border-b border-brand-100 bg-brand-50 px-4 py-2.5">
             <p className="text-[13px] font-semibold text-brand-800">{selected.size} trip dipilih</p>
             <div className="flex items-center gap-2">
-              <Button size="sm" icon={<Printer size={14} />} onClick={() => setPrinting(selectedRows)}>Cetak Surat Jalan</Button>
-              <Button size="sm" icon={<CheckCheck size={14} />} disabled={!canEdit || bisaSelesai.length === 0} onClick={() => setTandaiSelesai(true)}>Tandai Selesai</Button>
+              <Button size="sm" icon={<FaPrint size={14} />} onClick={() => setPrinting(selectedRows)}>Cetak Surat Jalan</Button>
+              <Button size="sm" icon={<FaCheckDouble size={14} />} disabled={!canEdit || bisaSelesai.length === 0} onClick={() => setTandaiSelesai(true)}>Tandai Selesai</Button>
               <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Batalkan pilihan</Button>
             </div>
           </div>
@@ -292,7 +294,7 @@ export function TripListPage() {
           empty={
             <EmptyState
               entity="trip"
-              action={canEdit && <Button variant="primary" icon={<Plus size={15} />} onClick={() => navigate('/transaksi/trip/tambah')}>Tambah Trip</Button>}
+              action={canEdit && <Button variant="primary" icon={<FaPlus size={15} />} onClick={() => navigate('/transaksi/trip/tambah')}>Tambah Trip</Button>}
             />
           }
           notFound={<NotFoundState onReset={resetFilters} />}

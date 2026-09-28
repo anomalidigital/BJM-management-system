@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Database, Download, RefreshCw } from 'lucide-react'
+import { FaArrowsRotate, FaDatabase, FaDownload } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -102,13 +102,13 @@ export function ToolsPage() {
           <Card>
             <CardHeader title="Aksi" />
             <div className="space-y-2 p-4">
-              <Button className="w-full justify-start" icon={<Download size={15} />} onClick={exportJson}>
+              <Button className="w-full justify-start" icon={<FaDownload size={15} />} onClick={exportJson}>
                 Export data (JSON)
               </Button>
-              <Button className="w-full justify-start" icon={<RefreshCw size={15} />} onClick={reload}>
+              <Button className="w-full justify-start" icon={<FaArrowsRotate size={15} />} onClick={reload}>
                 Muat ulang data
               </Button>
-              <Button className="w-full justify-start" variant="danger" icon={<Database size={15} />} disabled={!canEdit} onClick={() => setConfirmReset(true)}>
+              <Button className="w-full justify-start" variant="danger" icon={<FaDatabase size={15} />} disabled={!canEdit} onClick={() => setConfirmReset(true)}>
                 Reset data ke kondisi awal
               </Button>
             </div>

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { FaXmark } from './icons'
 import { Button } from './Button'
 import { cn } from '../../lib/utils'
 
@@ -51,7 +51,7 @@ export function Modal({ open, onClose, title, subtitle, footer, size = 'md', chi
             aria-label="Tutup"
             className="-mt-1 -mr-1 rounded-md p-1.5 text-ink-3 transition hover:bg-sunken hover:text-ink"
           >
-            <X size={17} />
+            <FaXmark size={17} />
           </button>
         </header>
         <div className="max-h-[calc(100vh-16rem)] overflow-y-auto px-5 py-4">{children}</div>

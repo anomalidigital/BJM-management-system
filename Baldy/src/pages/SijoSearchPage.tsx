@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Printer, Search, Ship, X } from 'lucide-react'
+import { FaMagnifyingGlass, FaPrint, FaShip, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader, InfoItem } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -176,8 +176,8 @@ export function SijoSearchPage() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') doSearch() }}
                 />
-                <Button variant="primary" icon={<Search size={15} />} onClick={() => doSearch()}>Cari</Button>
-                {submitted && <Button variant="ghost" icon={<X size={14} />} onClick={clearSearch}>Bersihkan</Button>}
+                <Button variant="primary" icon={<FaMagnifyingGlass size={15} />} onClick={() => doSearch()}>Cari</Button>
+                {submitted && <Button variant="ghost" icon={<FaXmark size={14} />} onClick={clearSearch}>Bersihkan</Button>}
               </div>
             </div>
             <div>
@@ -205,7 +205,7 @@ export function SijoSearchPage() {
         <Card>
           <div className="px-6 py-16 text-center">
             <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-full border border-hairline bg-sunken text-ink-3">
-              <Ship size={20} />
+              <FaShip size={20} />
             </div>
             <p className="text-[14px] font-semibold text-ink">Masukkan nomor SI / Job Order.</p>
             <p className="mt-1 text-[13px] text-ink-3">Sistem akan menampilkan customer beserta daftar mobil dan sopirnya.</p>
@@ -243,7 +243,7 @@ export function SijoSearchPage() {
                 subtitle="Seluruh transaksi yang terhubung dengan SI / Job Order ini."
                 actions={
                   <>
-                    <Button icon={<Printer size={15} />} disabled={rows.length === 0} onClick={() => setPreview(true)}>Cetak</Button>
+                    <Button icon={<FaPrint size={15} />} disabled={rows.length === 0} onClick={() => setPreview(true)}>Cetak</Button>
                     <Button variant="primary" onClick={() => navigate('/transaksi/tagihan')}>Selesai</Button>
                   </>
                 }

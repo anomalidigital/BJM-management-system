@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Inbox, RotateCcw, SearchX, TriangleAlert } from 'lucide-react'
+import { FaInbox, FaMagnifyingGlassMinus, FaRotateLeft, FaTriangleExclamation } from './icons'
 import { Button } from './Button'
 import { cn } from '../../lib/utils'
 
@@ -20,7 +20,7 @@ function Shell({ icon, title, description, action }: { icon: ReactNode; title: s
 export function EmptyState({ entity, action }: { entity: string; action?: ReactNode }) {
   return (
     <Shell
-      icon={<Inbox size={20} />}
+      icon={<FaInbox size={20} />}
       title="Belum ada data."
       description={`Tambahkan ${entity} pertama untuk memulai.`}
       action={action}
@@ -32,12 +32,12 @@ export function EmptyState({ entity, action }: { entity: string; action?: ReactN
 export function NotFoundState({ onReset }: { onReset?: () => void }) {
   return (
     <Shell
-      icon={<SearchX size={20} />}
+      icon={<FaMagnifyingGlassMinus size={20} />}
       title="Data tidak ditemukan."
       description="Coba periksa kembali kata kunci atau filter."
       action={
         onReset && (
-          <Button size="sm" icon={<RotateCcw size={14} />} onClick={onReset}>
+          <Button size="sm" icon={<FaRotateLeft size={14} />} onClick={onReset}>
             Reset filter
           </Button>
         )
@@ -49,12 +49,12 @@ export function NotFoundState({ onReset }: { onReset?: () => void }) {
 export function ErrorState({ message, onRetry }: { message?: string; onRetry?: () => void }) {
   return (
     <Shell
-      icon={<TriangleAlert size={20} className="text-[color:var(--color-critical)]" />}
+      icon={<FaTriangleExclamation size={20} className="text-[color:var(--color-critical)]" />}
       title="Gagal memuat data."
       description={message ?? 'Terjadi kendala saat mengambil data dari server.'}
       action={
         onRetry && (
-          <Button size="sm" variant="primary" icon={<RotateCcw size={14} />} onClick={onRetry}>
+          <Button size="sm" variant="primary" icon={<FaRotateLeft size={14} />} onClick={onRetry}>
             Coba lagi
           </Button>
         )

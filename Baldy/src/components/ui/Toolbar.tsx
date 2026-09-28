@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Search, X } from 'lucide-react'
+import { FaMagnifyingGlass, FaXmark } from './icons'
 import { cn } from '../../lib/utils'
 
 /** Kotak pencarian instan — memfilter tanpa reload halaman. */
@@ -18,7 +18,7 @@ export function SearchInput({
 }) {
   return (
     <div className={cn('relative', width, className)}>
-      <Search size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-3" />
+      <FaMagnifyingGlass size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-3" />
       <input
         type="search"
         value={value}
@@ -34,7 +34,7 @@ export function SearchInput({
           aria-label="Hapus pencarian"
           className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-0.5 text-ink-3 transition hover:bg-black/5 hover:text-ink"
         >
-          <X size={14} />
+          <FaXmark size={14} />
         </button>
       )}
     </div>
@@ -67,7 +67,7 @@ export function FilterChip({ children, onClear }: { children: ReactNode; onClear
     <span className="inline-flex items-center gap-1 rounded-full border border-brand-100 bg-brand-50 py-0.5 pr-1 pl-2.5 text-[12px] font-medium text-brand-700">
       {children}
       <button type="button" onClick={onClear} aria-label="Hapus filter" className="rounded-full p-0.5 hover:bg-brand-100">
-        <X size={12} />
+        <FaXmark size={12} />
       </button>
     </span>
   )

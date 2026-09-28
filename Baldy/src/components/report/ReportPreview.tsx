@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { FileDown, Printer, X } from 'lucide-react'
+import { FaFileArrowDown, FaPrint, FaXmark } from '../ui/icons'
 import { Button } from '../ui/Button'
 import { cn } from '../../lib/utils'
 
@@ -72,7 +72,7 @@ export function ReportPreview({
             aria-label="Tutup preview"
             className="rounded-md p-1.5 text-ink-3 transition hover:bg-sunken hover:text-ink"
           >
-            <X size={18} />
+            <FaXmark size={18} />
           </button>
           <div>
             <p className="text-[14px] leading-tight font-semibold text-ink">Preview Laporan</p>
@@ -100,10 +100,10 @@ export function ReportPreview({
           </div>
           )}
           <Button onClick={onClose}>{closeLabel}</Button>
-          <Button icon={<FileDown size={15} />} onClick={onPrint}>
+          <Button icon={<FaFileArrowDown size={15} />} onClick={onPrint}>
             Export PDF
           </Button>
-          <Button variant="primary" icon={<Printer size={15} />} onClick={onPrint}>
+          <Button variant="primary" icon={<FaPrint size={15} />} onClick={onPrint}>
             Print
           </Button>
         </div>

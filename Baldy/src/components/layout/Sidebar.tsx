@@ -106,7 +106,7 @@ export function Sidebar({ mobileOpen, onCloseMobile }: Props) {
                     >
                       {({ isActive }) => (
                         <>
-                          <item.icon size={18} strokeWidth={isActive ? 2.2 : 1.8} className={cn('shrink-0', isActive && 'text-signal')} />
+                          <item.icon size={18} className={cn('shrink-0', isActive && 'text-signal')} />
                           <span className={cn('truncate whitespace-nowrap', pudar(!rapat))}>{item.label}</span>
                         </>
                       )}

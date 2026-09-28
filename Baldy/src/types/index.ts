@@ -91,7 +91,7 @@ export interface Vehicle {
   updated_at: string
 }
 
-/** Master -> Data Project (SLB, ATLAS, PDT, ...). */
+/** Master -> Klien (SLB, ATLAS, PDT, ...): pemilik trip dan kontrak Dedicated. */
 export interface Project {
   id: string
   project_code: string
@@ -134,11 +134,11 @@ export const SERVICE_TYPES = ['callout', 'dedicated'] as const
 export type ServiceType = (typeof SERVICE_TYPES)[number]
 export const SERVICE_LABEL: Record<ServiceType, string> = { callout: 'Callout', dedicated: 'Dedicated' }
 
-/** Master -> Data Kontrak: kontrak layanan Dedicated dengan satu client. */
+/** Kontrak layanan Dedicated milik satu klien; dikelola di Master -> Klien. */
 export interface Contract extends WorkspaceScoped {
   id: string
   contract_no: string            // Nomor Kontrak
-  client_name: string            // Nama client
+  project_id: string             // Klien pemilik kontrak
   value: number                  // Nilai kontrak
   start_date: string
   end_date: string
@@ -452,6 +452,7 @@ export interface TransactionRow extends CommissionTransaction {
   toll_paid: number
   vehicle_config: string
   contract_no: string
+  /** Nama klien pemilik kontrak (Dedicated). */
   client_name: string
   /* Komisi otomatis dari master Komisi (0 untuk trip batal). */
   komisi_sopir: number

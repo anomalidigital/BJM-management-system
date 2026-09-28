@@ -440,11 +440,12 @@ DROP TABLE delivery_notes;
 -- Status piutang = saldo kasbon > 0 (dihitung, tidak disimpan).
 
 -- Layanan trip dipilih di awal form: callout (per order) atau dedicated (kontrak).
+-- Kontrak milik satu klien dan dikelola di halaman klien (Master -> Klien -> detail).
 CREATE TABLE contracts (
   id           BIGSERIAL PRIMARY KEY,
   workspace    VARCHAR(20)  NOT NULL DEFAULT 'jakarta',
   contract_no  VARCHAR(30)  NOT NULL UNIQUE,      -- KTR-2026-001
-  client_name  VARCHAR(160) NOT NULL,
+  project_id   BIGINT       NOT NULL REFERENCES projects(id),  -- klien pemilik kontrak
   value        BIGINT       NOT NULL,             -- nilai kontrak
   start_date   DATE,
   end_date     DATE,

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Trash2, X } from 'lucide-react'
+import { FaTrashCan, FaXmark } from '../../components/ui/icons'
 import { DataTable } from '../../components/ui/DataTable'
 import type { Column } from '../../components/ui/DataTable'
 import { Pagination } from '../../components/ui/Pagination'
@@ -124,7 +124,7 @@ export function BrowsingDataTab() {
               <option value="">Semua Kodecost</option>
               {costCodes.map((c) => <option key={c} value={c}>{c}</option>)}
             </Select>
-            {(table.isFiltered || filterActive) && <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={resetFilters}>Reset</Button>}
+            {(table.isFiltered || filterActive) && <Button size="sm" variant="ghost" icon={<FaXmark size={14} />} onClick={resetFilters}>Reset</Button>}
           </>
         }
       />
@@ -133,7 +133,7 @@ export function BrowsingDataTab() {
         <div className="animate-in-fade flex flex-wrap items-center justify-between gap-3 border-b border-brand-100 bg-brand-50 px-4 py-2.5">
           <p className="text-[13px] font-semibold text-brand-800">{selected.size} data ditandai</p>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="danger" icon={<Trash2 size={14} />} disabled={!canEdit} onClick={() => setConfirmDelete(true)}>Hapus</Button>
+            <Button size="sm" variant="danger" icon={<FaTrashCan size={14} />} disabled={!canEdit} onClick={() => setConfirmDelete(true)}>Hapus</Button>
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Batalkan</Button>
           </div>
         </div>

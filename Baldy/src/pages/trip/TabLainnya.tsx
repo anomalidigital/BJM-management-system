@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Pencil, Trash2 } from 'lucide-react'
+import { FaPen, FaTrashCan } from '../../components/ui/icons'
 import { Button, IconButton } from '../../components/ui/Button'
 import { Modal, ConfirmDialog } from '../../components/ui/Modal'
 import { Field, Input, DateInput, Textarea } from '../../components/ui/Field'
@@ -83,8 +83,8 @@ export function TabLainnya({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah:
                   <td className="px-3 py-2.5"><LampiranThumbs ids={n.attachments ?? []} ukuran={40} /></td>
                   <td className="px-3 py-2.5 text-right">
                     <div className="flex justify-end gap-1">
-                      <IconButton label="Ubah" icon={<Pencil size={14} />} disabled={!bisaUbah} onClick={() => buka(n)} />
-                      <IconButton label="Hapus" tone="danger" icon={<Trash2 size={14} />} disabled={!bisaUbah} onClick={() => setMenghapus(n)} />
+                      <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!bisaUbah} onClick={() => buka(n)} />
+                      <IconButton label="Hapus" tone="danger" icon={<FaTrashCan size={14} />} disabled={!bisaUbah} onClick={() => setMenghapus(n)} />
                     </div>
                   </td>
                 </tr>

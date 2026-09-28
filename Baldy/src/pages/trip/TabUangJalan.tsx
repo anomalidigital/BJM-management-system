@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Pencil, Trash2 } from 'lucide-react'
+import { FaPen, FaTrashCan } from '../../components/ui/icons'
 import { Button, IconButton } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Modal, ConfirmDialog } from '../../components/ui/Modal'
@@ -164,8 +164,8 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
                     <td className="px-3 py-2.5"><LampiranThumbs ids={p.attachments ?? []} ukuran={30} /></td>
                     <td className="px-3 py-2.5 text-right">
                       <div className="flex justify-end gap-1">
-                        <IconButton label="Ubah" icon={<Pencil size={14} />} disabled={!bisaUbah} onClick={() => buka(p)} />
-                        <IconButton label="Hapus" tone="danger" icon={<Trash2 size={14} />} disabled={!bisaUbah} onClick={() => setMenghapus(p)} />
+                        <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!bisaUbah} onClick={() => buka(p)} />
+                        <IconButton label="Hapus" tone="danger" icon={<FaTrashCan size={14} />} disabled={!bisaUbah} onClick={() => setMenghapus(p)} />
                       </div>
                     </td>
                   </tr>

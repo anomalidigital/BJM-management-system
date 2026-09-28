@@ -1,21 +1,22 @@
 /** Pembuat nomor & kode otomatis. */
 import type { Driver, EmployeeRole } from '../types'
 
-const hurufSaja = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '')
+/** Huruf mati saja, supaya kode acak tidak membentuk kata. */
+const KONSONAN = 'BCDFGHJKLMNPQRSTVWXYZ'
 
 /**
- * No. Route dari nama route, mengikuti pola kode lama: 4 huruf pertama asal +
- * 4 huruf pertama tujuan. "CIB - DURI" -> CIBDURI, "REBONJARO - DEPO MITRA" ->
- * REBODEPO. Bila sudah dipakai, diberi angka di belakang: CIBDURI2, CIBDURI3.
- * Keunikan route tetap dijamin id internalnya; kode ini untuk dibaca orang.
+ * Kode unik: 13 digit timestamp (Date.now) + 7 huruf mati acak, mis.
+ * 1779754321123KDFRZMP. Timestamp menjaga urutan waktu, huruf acak menambah
+ * keunikan; bila (sangat jarang) sudah dipakai, dibuat ulang.
+ * Dipakai tombol Generate pada No. Route dan ID Perjalanan/Trip.
  */
-export function kodeRouteDariNama(nama: string, terpakai: Iterable<string> = []): string {
+export function buatKodeUnik(terpakai: Iterable<string> = []): string {
   const ada = new Set([...terpakai].map((k) => k.toUpperCase()))
-  const bagian = nama.split(/\s[-–]\s|-/).map((b) => hurufSaja(b)).filter(Boolean)
-  const dasar = bagian.length >= 2 ? bagian[0].slice(0, 4) + bagian[1].slice(0, 4) : hurufSaja(nama).slice(0, 8)
-  if (!dasar) return ''
-  if (!ada.has(dasar)) return dasar
-  for (let i = 2; ; i++) if (!ada.has(`${dasar}${i}`)) return `${dasar}${i}`
+  for (;;) {
+    const text = Array.from({ length: 7 }, () => KONSONAN[Math.floor(Math.random() * KONSONAN.length)]).join('')
+    const kode = Date.now() + text
+    if (!ada.has(kode)) return kode
+  }
 }
 
 /** Awalan kode karyawan per peran: SPR001, MGR001. */

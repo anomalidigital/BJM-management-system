@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Plus } from 'lucide-react'
+import { FaPlus } from '../../components/ui/icons'
 import { Button } from '../../components/ui/Button'
 import { cn } from '../../lib/utils'
 
@@ -13,7 +13,7 @@ export function KepalaTab({ keterangan, tombol, bisaUbah, onTambah }: {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-4 py-3">
       <p className="max-w-3xl text-[12.5px] text-ink-3">{keterangan}</p>
-      <Button size="sm" variant="primary" icon={<Plus size={14} />} disabled={!bisaUbah} onClick={onTambah}>{tombol}</Button>
+      <Button size="sm" variant="primary" icon={<FaPlus size={14} />} disabled={!bisaUbah} onClick={onTambah}>{tombol}</Button>
     </div>
   )
 }
@@ -29,7 +29,7 @@ export function KosongTab({ judul, keterangan, tombol, bisaUbah, onTambah }: {
     <div className="px-6 py-14 text-center">
       <p className="text-[14px] font-semibold text-ink">{judul}</p>
       <p className="mt-1 text-[13px] text-ink-3">{keterangan}</p>
-      {bisaUbah && <Button className="mt-4" variant="primary" icon={<Plus size={15} />} onClick={onTambah}>{tombol}</Button>}
+      {bisaUbah && <Button className="mt-4" variant="primary" icon={<FaPlus size={15} />} onClick={onTambah}>{tombol}</Button>}
     </div>
   )
 }

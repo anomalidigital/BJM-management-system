@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Pencil, Plus, Trash2, X } from 'lucide-react'
+import { FaPen, FaPlus, FaTrashCan, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
@@ -119,8 +119,8 @@ export function DataMobilPage() {
       key: 'action', header: 'Action', align: 'right', width: '92px',
       render: (v) => (
         <div className="flex justify-end gap-1">
-          <IconButton label="Ubah" icon={<Pencil size={14} />} disabled={!canEdit} onClick={() => openEdit(v)} />
-          <IconButton label="Hapus" tone="danger" icon={<Trash2 size={14} />} disabled={!canEdit} onClick={() => setDeleting(v)} />
+          <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!canEdit} onClick={() => openEdit(v)} />
+          <IconButton label="Hapus" tone="danger" icon={<FaTrashCan size={14} />} disabled={!canEdit} onClick={() => setDeleting(v)} />
         </div>
       ),
     },
@@ -132,7 +132,7 @@ export function DataMobilPage() {
         title="Data Mobil"
         crumbs={[{ label: 'Master' }, { label: 'Data Mobil' }]}
         description="Master kendaraan beserta konfigurasinya, terpisah dari data sopir."
-        actions={<Button variant="primary" icon={<Plus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah Mobil</Button>}
+        actions={<Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah Mobil</Button>}
       />
 
       <Card>
@@ -154,7 +154,7 @@ export function DataMobilPage() {
                   <option value="nonaktif">Nonaktif</option>
                 </Select>
               </FilterField>
-              {(table.isFiltered || filterAktif) && <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={resetFilter}>Reset</Button>}
+              {(table.isFiltered || filterAktif) && <Button size="sm" variant="ghost" icon={<FaXmark size={14} />} onClick={resetFilter}>Reset</Button>}
             </>
           }
           right={<span className="text-[12.5px] text-ink-3">{db.vehicles.length} mobil terdaftar</span>}
@@ -170,7 +170,7 @@ export function DataMobilPage() {
           isFiltered={table.isFiltered || filterAktif}
           sort={table.sort}
           onSortChange={table.toggleSort}
-          empty={<EmptyState entity="data mobil" action={canEdit && <Button variant="primary" icon={<Plus size={15} />} onClick={openCreate}>Tambah Mobil</Button>} />}
+          empty={<EmptyState entity="data mobil" action={canEdit && <Button variant="primary" icon={<FaPlus size={15} />} onClick={openCreate}>Tambah Mobil</Button>} />}
           notFound={<NotFoundState onReset={resetFilter} />}
         />
 

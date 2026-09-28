@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Printer, Save, Trash2, X, Pencil } from 'lucide-react'
+import { FaFloppyDisk, FaPen, FaPrint, FaTrashCan, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
@@ -230,14 +230,14 @@ export function LapRitanPage() {
         description={`Ritan Sopir — bulan berjalan (${monthLabel(monthStart)}). Gunakan Sunting untuk mengubah Tgl Bon dan Bon Pribadi langsung di tabel.`}
         actions={
           <>
-            <Button icon={<Printer size={15} />} onClick={() => setPreview(true)}>Cetak</Button>
+            <Button icon={<FaPrint size={15} />} onClick={() => setPreview(true)}>Cetak</Button>
             {editMode ? (
               <>
-                <Button icon={<X size={14} />} onClick={cancelEdit}>Batal</Button>
-                <Button variant="primary" icon={<Save size={15} />} onClick={saveDrafts}>Simpan</Button>
+                <Button icon={<FaXmark size={14} />} onClick={cancelEdit}>Batal</Button>
+                <Button variant="primary" icon={<FaFloppyDisk size={15} />} onClick={saveDrafts}>Simpan</Button>
               </>
             ) : (
-              <Button variant="primary" icon={<Pencil size={15} />} disabled={!canEdit} onClick={() => setEditMode(true)}>Sunting</Button>
+              <Button variant="primary" icon={<FaPen size={15} />} disabled={!canEdit} onClick={() => setEditMode(true)}>Sunting</Button>
             )}
             <Button variant="ghost" onClick={() => navigate('/dashboard')}>Tutup</Button>
           </>
@@ -264,7 +264,7 @@ export function LapRitanPage() {
                 </Select>
               </FilterField>
               {(table.isFiltered || filterActive) && (
-                <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={() => { table.reset(); setDriverFilter(''); setCityFilter('') }}>Reset</Button>
+                <Button size="sm" variant="ghost" icon={<FaXmark size={14} />} onClick={() => { table.reset(); setDriverFilter(''); setCityFilter('') }}>Reset</Button>
               )}
             </>
           }
@@ -286,7 +286,7 @@ export function LapRitanPage() {
           <div className="animate-in-fade flex flex-wrap items-center justify-between gap-3 border-b border-brand-100 bg-brand-50 px-4 py-2.5">
             <p className="text-[13px] font-semibold text-brand-800">{selected.size} baris dipilih</p>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="danger" icon={<Trash2 size={14} />} disabled={!canEdit} onClick={() => setConfirmDelete(true)}>Hapus</Button>
+              <Button size="sm" variant="danger" icon={<FaTrashCan size={14} />} disabled={!canEdit} onClick={() => setConfirmDelete(true)}>Hapus</Button>
               <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Batalkan</Button>
             </div>
           </div>

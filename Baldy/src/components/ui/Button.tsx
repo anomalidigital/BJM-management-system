@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { Loader2 } from 'lucide-react'
+import { FaCircleNotch } from './icons'
 import { cn } from '../../lib/utils'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'subtle' | 'outlineDanger'
@@ -49,7 +49,7 @@ export function Button({
       )}
       {...rest}
     >
-      {loading ? <Loader2 size={15} className="animate-spin" /> : icon}
+      {loading ? <FaCircleNotch size={15} className="animate-spin" /> : icon}
       {children}
     </button>
   )

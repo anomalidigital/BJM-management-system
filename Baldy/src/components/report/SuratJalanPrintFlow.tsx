@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FileDown, Printer } from 'lucide-react'
+import { FaFileArrowDown, FaPrint } from '../ui/icons'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { Radio } from '../ui/Field'
@@ -101,7 +101,7 @@ export function SuratJalanPrintFlow({
       footer={
         <>
           <Button onClick={onClose}>Batal</Button>
-          <Button variant="primary" icon={output === 'pdf' ? <FileDown size={15} /> : <Printer size={15} />} onClick={() => setStage('preview')}>
+          <Button variant="primary" icon={output === 'pdf' ? <FaFileArrowDown size={15} /> : <FaPrint size={15} />} onClick={() => setStage('preview')}>
             Preview
           </Button>
         </>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { UserPlus } from 'lucide-react'
+import { FaUserPlus } from './icons'
 import { SearchableSelect } from './SearchableSelect'
 import { Input } from './Field'
 import { Button } from './Button'
@@ -91,7 +91,7 @@ export function PilihKaryawan({
         <div className="flex gap-2">
           <Input value={valueNama} placeholder="Ketik nama" autoFocus onChange={(e) => onChange('', e.target.value)} />
           <Button
-            icon={<UserPlus size={14} />}
+            icon={<FaUserPlus size={14} />}
             disabled={!canEdit || !nama}
             title={kembar ? 'Nama ini sudah terdaftar' : `Simpan ke Data Karyawan sebagai ${ROLE_LABEL[peran]}`}
             onClick={simpanBaru}

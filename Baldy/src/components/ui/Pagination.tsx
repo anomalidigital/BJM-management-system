@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { FaChevronLeft, FaChevronRight } from './icons'
 import { cn } from '../../lib/utils'
 
 interface Props {
@@ -50,7 +50,7 @@ export function Pagination({ page, pageSize, total, onPageChange, onPageSizeChan
           aria-label="Halaman sebelumnya"
           className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-hairline text-ink-2 transition hover:bg-sunken disabled:pointer-events-none disabled:opacity-40"
         >
-          <ChevronLeft size={15} />
+          <FaChevronLeft size={15} />
         </button>
         {numbers.map((n) => (
           <button
@@ -73,7 +73,7 @@ export function Pagination({ page, pageSize, total, onPageChange, onPageSizeChan
           aria-label="Halaman berikutnya"
           className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-hairline text-ink-2 transition hover:bg-sunken disabled:pointer-events-none disabled:opacity-40"
         >
-          <ChevronRight size={15} />
+          <FaChevronRight size={15} />
         </button>
       </nav>
     </div>

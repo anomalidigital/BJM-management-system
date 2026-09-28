@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { TriangleAlert } from 'lucide-react'
+import { FaTriangleExclamation } from '../../components/ui/icons'
 import { Modal } from '../../components/ui/Modal'
 import { Button } from '../../components/ui/Button'
 import { Checkbox, Textarea } from '../../components/ui/Field'
@@ -96,7 +96,7 @@ export function KonfirmasiBatalTrip({ trip, onClose, onDone }: {
       {berjalan ? (
         <div className="mt-3 rounded-lg border border-[#f3d5d5] bg-[#fdf2f2] px-3.5 py-3">
           <p className="flex items-center gap-2 text-[13px] font-semibold text-[#b02c2c]">
-            <TriangleAlert size={15} className="shrink-0" />
+            <FaTriangleExclamation size={15} className="shrink-0" />
             Trip ini sudah berjalan
           </p>
           <p className="mt-1 text-[12.5px] text-[#8a2424]">Catatan berikut menjadi arsip dan keluar dari laporan:</p>

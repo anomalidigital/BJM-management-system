@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ArrowRight, BadgeDollarSign, CircleAlert, FileText, Fuel, Receipt, Scissors, Send,
-  TrendingUp, Truck, Users, Wallet,
-} from 'lucide-react'
+  FaArrowRight, FaChartLine, FaCircleExclamation, FaFileLines, FaGasPump, FaPaperPlane, FaReceipt,
+  FaSackDollar, FaScissors, FaTruck, FaUsers, FaWallet,
+} from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader } from '../components/ui/Card'
 import { StatCard } from '../components/ui/StatCard'
@@ -170,7 +170,7 @@ export function DashboardPage() {
           <Link to="/laporan/komisi">
             <span className="inline-flex h-9 items-center gap-2 rounded-md border border-hairline bg-surface px-3.5 text-[13px] font-medium text-ink transition hover:bg-sunken">
               Buka laporan bulan ini
-              <ArrowRight size={14} />
+              <FaArrowRight size={14} />
             </span>
           </Link>
         }
@@ -181,7 +181,7 @@ export function DashboardPage() {
         <StatCard
           label="Total Transaksi Bulan Ini"
           value={formatNumber(now.transaksi)}
-          icon={<Truck size={15} />}
+          icon={<FaTruck size={15} />}
           delta={deltaPersen(now.transaksi, prev.transaksi)}
         />
         {/* Nilainya bergantung pada tarif master Route, yang belum ada di data
@@ -190,31 +190,31 @@ export function DashboardPage() {
         <StatCard
           label="Total Komisi Bulan Ini"
           value={now.komisi ? formatRupiah(now.komisi, { compact: true }) : '—'}
-          icon={<BadgeDollarSign size={15} />}
+          icon={<FaSackDollar size={15} />}
           delta={now.komisi ? deltaPersen(now.komisi, prev.komisi) : null}
         />
         <StatCard
           label="Total Pendapatan"
           value={now.pendapatan ? formatRupiah(now.pendapatan, { compact: true }) : formatRupiah(now.cost, { compact: true })}
-          icon={<Wallet size={15} />}
+          icon={<FaWallet size={15} />}
           delta={now.pendapatan ? deltaPersen(now.pendapatan, prev.pendapatan) : deltaPersen(now.cost, prev.cost)}
         />
         <StatCard
           label="Pendapatan Netto"
           value={now.netto ? formatRupiah(now.netto, { compact: true }) : '—'}
-          icon={<TrendingUp size={15} />}
+          icon={<FaChartLine size={15} />}
           delta={now.netto ? deltaPersen(now.netto, prev.netto) : null}
         />
         <StatCard
           label="Total Sopir Aktif"
           value={formatNumber(db.drivers.filter((d) => d.status === 'aktif').length)}
-          icon={<Users size={15} />}
+          icon={<FaUsers size={15} />}
           hint={`dari ${db.drivers.length} sopir terdaftar`}
         />
         <StatCard
           label="Total SI / Job Order"
           value={formatNumber(db.jobOrders.length)}
-          icon={<FileText size={15} />}
+          icon={<FaFileLines size={15} />}
           hint={`${db.jobOrders.filter((j) => j.is_complete).length} sudah Komplit`}
         />
       </div>
@@ -224,21 +224,21 @@ export function DashboardPage() {
         <StatCard
           label="Total Uang Jalan"
           value={formatRupiah(ujNow.uj, { compact: true })}
-          icon={<Wallet size={15} />}
+          icon={<FaWallet size={15} />}
           delta={deltaPersen(ujNow.uj, ujPrev.uj)}
           invertDelta
         />
-        <StatCard label="Potong Kasbon" value={formatRupiah(ujNow.kasbon, { compact: true })} icon={<Scissors size={15} />} hint="pengurang uang jalan" />
+        <StatCard label="Potong Kasbon" value={formatRupiah(ujNow.kasbon, { compact: true })} icon={<FaScissors size={15} />} hint="pengurang uang jalan" />
         <StatCard
           label="TF ke Sopir"
           value={formatRupiah(ujNow.tf, { compact: true })}
-          icon={<Send size={15} />}
+          icon={<FaPaperPlane size={15} />}
           hint={`${formatNumber(ujNow.termin)} termin pembayaran`}
         />
         <StatCard
           label="Biaya Operasional"
           value={formatRupiah(ujNow.biaya, { compact: true })}
-          icon={<Fuel size={15} />}
+          icon={<FaGasPump size={15} />}
           delta={ujNow.biaya ? deltaPersen(ujNow.biaya, ujPrev.biaya) : null}
           hint={ujNow.biaya ? undefined : 'belum ada biaya tercatat pada periode ini'}
           invertDelta
@@ -315,7 +315,7 @@ export function DashboardPage() {
                       to={a.to}
                       className="flex items-center gap-2.5 rounded-lg px-2.5 py-2.5 transition-colors hover:bg-sunken"
                     >
-                      <CircleAlert size={15} className="shrink-0 text-[color:var(--color-warning)]" />
+                      <FaCircleExclamation size={15} className="shrink-0 text-[color:var(--color-warning)]" />
                       <span className="min-w-0 flex-1 text-[13px] leading-snug text-ink-2">{a.label}</span>
                       <span className="tnum shrink-0 rounded-full bg-[#fff8e6] px-2 py-0.5 text-[12px] font-semibold text-[#8a6100]">
                         {a.count}
@@ -362,7 +362,7 @@ export function DashboardPage() {
           <ul className="divide-y divide-grid">
             {recentBilling.map((b) => (
               <li key={b.id} className="flex items-center gap-3 px-4 py-2.5">
-                <Receipt size={15} className="shrink-0 text-ink-3" />
+                <FaReceipt size={15} className="shrink-0 text-ink-3" />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="tnum text-[12.5px] font-semibold text-ink">{b.invoice_no}</span>

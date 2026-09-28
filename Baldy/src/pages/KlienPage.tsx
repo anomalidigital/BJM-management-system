@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { FaFileContract, FaPen, FaPlus, FaTrashCan } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
@@ -21,30 +22,49 @@ import type { Project } from '../types'
 type FormState = Omit<Project, 'id' | 'created_at' | 'updated_at'>
 const BLANK: FormState = { project_code: '', project_name: '', description: '', requires_document: true, status: 'aktif' }
 
-export function DataProjectPage() {
-  const { db, transactionRows, loading, error, reload, create, update, remove } = useData()
+type Baris = Project & { trip: number; uj: number; kontrakAktif: number; kontrakTotal: number; nilaiAktif: number }
+
+/**
+ * Master -> Klien. Kontrak Dedicated dikelola di halaman tiap klien,
+ * karena setiap kontrak memang milik satu klien.
+ */
+export function KlienPage() {
+  const { db, dbAll, transactionRows, loading, error, reload, create, update, remove } = useData()
   const { canEdit } = useAuth()
   const toast = useToast()
+  const navigate = useNavigate()
 
   const [editing, setEditing] = useState<Project | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<FormState>(BLANK)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
-  const [deleting, setDeleting] = useState<Project | null>(null)
+  const [deleting, setDeleting] = useState<Baris | null>(null)
 
-  const stat = useMemo(() => {
-    const m = new Map<string, { trip: number; uj: number }>()
+  const baris = useMemo<Baris[]>(() => {
+    const trip = new Map<string, { n: number; uj: number }>()
     for (const t of transactionRows) {
-      if (!t.project_id) continue
-      const a = m.get(t.project_id) ?? { trip: 0, uj: 0 }
-      a.trip += 1; a.uj += t.uj_total
-      m.set(t.project_id, a)
+      // Trip batal hanya arsip, tidak dihitung.
+      if (!t.project_id || t.status === 'batal') continue
+      const a = trip.get(t.project_id) ?? { n: 0, uj: 0 }
+      a.n += 1; a.uj += t.uj_total
+      trip.set(t.project_id, a)
     }
-    return m
-  }, [transactionRows])
+    return db.projects.map((p) => {
+      const kontrak = db.contracts.filter((c) => c.project_id === p.id)
+      const aktif = kontrak.filter((c) => c.status === 'aktif')
+      return {
+        ...p,
+        trip: trip.get(p.id)?.n ?? 0,
+        uj: trip.get(p.id)?.uj ?? 0,
+        kontrakAktif: aktif.length,
+        kontrakTotal: kontrak.length,
+        nilaiAktif: aktif.reduce((a, c) => a + c.value, 0),
+      }
+    })
+  }, [db.projects, db.contracts, transactionRows])
 
-  const search = useCallback((p: Project, q: string) => matchesQuery(q, p.project_code, p.project_name, p.description), [])
-  const table = useTable(db.projects, { search, initialSortKey: 'project_code', pageSize: 10 })
+  const search = useCallback((p: Baris, q: string) => matchesQuery(q, p.project_code, p.project_name, p.description), [])
+  const table = useTable(baris, { search, initialSortKey: 'project_code', pageSize: 10 })
 
   function openCreate() { setEditing(null); setForm(BLANK); setErrors({}); setFormOpen(true) }
   function openEdit(p: Project) {
@@ -56,10 +76,10 @@ export function DataProjectPage() {
   function validate(): boolean {
     const e: Partial<Record<keyof FormState, string>> = {}
     const kode = form.project_code.trim()
-    if (!kode) e.project_code = 'Kode project wajib diisi.'
+    if (!kode) e.project_code = 'Kode klien wajib diisi.'
     else if (db.projects.some((p) => p.project_code.toLowerCase() === kode.toLowerCase() && p.id !== editing?.id))
-      e.project_code = 'Kode project sudah dipakai.'
-    if (!form.project_name.trim()) e.project_name = 'Nama project wajib diisi.'
+      e.project_code = 'Kode klien sudah dipakai.'
+    if (!form.project_name.trim()) e.project_name = 'Nama klien wajib diisi.'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -79,26 +99,48 @@ export function DataProjectPage() {
     setDeleting(null)
   }
 
-  const columns: Column<Project>[] = [
+  /** Kontrak di workspace mana pun yang masih milik klien ini. */
+  const kontrakMilik = deleting ? dbAll.contracts.filter((c) => c.project_id === deleting.id).length : 0
+
+  const columns: Column<Baris>[] = [
     { key: 'project_code', header: 'Kode', sortable: true, width: '100px', render: (p) => <span className="tnum font-semibold text-ink">{p.project_code}</span> },
-    { key: 'project_name', header: 'Nama Klien', sortable: true, render: (p) => <span className="font-medium">{p.project_name}</span> },
-    { key: 'description', header: 'Deskripsi', render: (p) => <span className="text-ink-2">{p.description || '—'}</span> },
+    {
+      key: 'project_name', header: 'Nama Klien', sortable: true,
+      render: (p) => (
+        <div className="leading-tight">
+          <Link to={`/master/klien/${p.id}`} className="font-medium text-ink hover:text-brand-700 hover:underline">{p.project_name}</Link>
+          {p.description && <span className="mt-0.5 block text-[12px] text-ink-3">{p.description}</span>}
+        </div>
+      ),
+    },
     {
       key: 'requires_document', header: 'Alur Dokumen', sortable: true, width: '140px',
       render: (p) => (p.requires_document ? <Badge tone="brand">Pakai TR / No PI</Badge> : <Badge tone="neutral">Tanpa dokumen</Badge>),
     },
-    { key: 'trip', header: 'Trip', align: 'right', width: '80px', render: (p) => <span className="tnum text-ink-2">{formatNumber(stat.get(p.id)?.trip ?? 0)}</span> },
-    { key: 'uj', header: 'Total UJ', align: 'right', width: '140px', render: (p) => <span className="tnum text-ink-2">{formatRupiah(stat.get(p.id)?.uj ?? 0)}</span> },
+    {
+      key: 'kontrakAktif', header: 'Kontrak Dedicated', sortable: true, width: '150px',
+      render: (p) => (p.kontrakTotal === 0 ? <span className="text-ink-3">—</span> : (
+        <Link to={`/master/klien/${p.id}`} className="group block leading-tight">
+          <span className="font-medium text-brand-700 group-hover:underline">
+            {p.kontrakAktif > 0 ? `${p.kontrakAktif} aktif` : `${p.kontrakTotal} selesai`}
+          </span>
+          {p.kontrakAktif > 0 && <span className="tnum mt-0.5 block text-[11.5px] text-ink-3">{formatRupiah(p.nilaiAktif, { compact: true })}</span>}
+        </Link>
+      )),
+    },
+    { key: 'trip', header: 'Trip', sortable: true, align: 'right', width: '80px', render: (p) => <span className="tnum text-ink-2">{formatNumber(p.trip)}</span> },
+    { key: 'uj', header: 'Total UJ', sortable: true, align: 'right', width: '140px', render: (p) => <span className="tnum text-ink-2">{formatRupiah(p.uj)}</span> },
     {
       key: 'status', header: 'Status', sortable: true, width: '104px',
       render: (p) => (p.status === 'aktif' ? <Badge tone="good">Aktif</Badge> : <Badge tone="neutral">Nonaktif</Badge>),
     },
     {
-      key: 'action', header: 'Action', align: 'right', width: '92px',
+      key: 'action', header: 'Action', align: 'right', width: '124px',
       render: (p) => (
         <div className="flex justify-end gap-1">
-          <IconButton label="Ubah" icon={<Pencil size={14} />} disabled={!canEdit} onClick={() => openEdit(p)} />
-          <IconButton label="Hapus" tone="danger" icon={<Trash2 size={14} />} disabled={!canEdit} onClick={() => setDeleting(p)} />
+          <IconButton label={`Kontrak & detail ${p.project_name}`} icon={<FaFileContract size={14} />} onClick={() => navigate(`/master/klien/${p.id}`)} />
+          <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!canEdit} onClick={() => openEdit(p)} />
+          <IconButton label="Hapus" tone="danger" icon={<FaTrashCan size={14} />} disabled={!canEdit} onClick={() => setDeleting(p)} />
         </div>
       ),
     },
@@ -109,8 +151,8 @@ export function DataProjectPage() {
       <PageHeader
         title="Klien"
         crumbs={[{ label: 'Master' }, { label: 'Klien' }]}
-        description="Klien pemilik order. Alur dokumen klien menentukan apakah tripnya memakai TR / No PI."
-        actions={<Button variant="primary" icon={<Plus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah Klien</Button>}
+        description="Klien pemilik order. Buka klien untuk mengelola kontrak Dedicated-nya; alur dokumen menentukan apakah tripnya memakai TR / No PI."
+        actions={<Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah Klien</Button>}
       />
 
       <Card>
@@ -128,17 +170,16 @@ export function DataProjectPage() {
           isFiltered={table.isFiltered}
           sort={table.sort}
           onSortChange={table.toggleSort}
-          empty={<EmptyState entity="klien" action={canEdit && <Button variant="primary" icon={<Plus size={15} />} onClick={openCreate}>Tambah Klien</Button>} />}
+          empty={<EmptyState entity="klien" action={canEdit && <Button variant="primary" icon={<FaPlus size={15} />} onClick={openCreate}>Tambah Klien</Button>} />}
           notFound={<NotFoundState onReset={table.reset} />}
         />
       </Card>
-
 
       <Modal
         open={formOpen}
         onClose={() => setFormOpen(false)}
         title={editing ? 'Ubah Klien' : 'Tambah Klien'}
-        subtitle={editing ? editing.project_code : 'Tanda * wajib diisi.'}
+        subtitle={editing ? editing.project_code : 'Tanda * wajib diisi. Kontrak ditambahkan setelah klien tersimpan.'}
         footer={
           <>
             <Button onClick={() => setFormOpen(false)}>Batal</Button>
@@ -177,15 +218,20 @@ export function DataProjectPage() {
 
       <ConfirmDialog
         open={!!deleting}
-        message={
+        title={kontrakMilik ? 'Klien masih punya kontrak' : undefined}
+        confirmLabel={kontrakMilik ? 'Mengerti' : undefined}
+        tone={kontrakMilik ? 'primary' : undefined}
+        message={kontrakMilik ? (
+          `${deleting?.project_name} masih punya ${kontrakMilik} kontrak. Hapus kontraknya dulu di halaman klien, atau ubah status klien menjadi Nonaktif.`
+        ) : (
           <>
             Data yang sudah dihapus mungkin tidak dapat dikembalikan.
             <br />
             <span className="mt-2 block font-medium text-ink">{deleting?.project_code} — {deleting?.project_name}</span>
           </>
-        }
+        )}
         onCancel={() => setDeleting(null)}
-        onConfirm={onDelete}
+        onConfirm={kontrakMilik ? () => setDeleting(null) : onDelete}
       />
     </>
   )

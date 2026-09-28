@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Eye, Printer, X } from 'lucide-react'
+import { FaEye, FaPrint, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -257,9 +257,9 @@ export function LapKomisiPage() {
             {error && mode !== 'perSopir' && <FieldError>{error}</FieldError>}
 
             <div className="flex flex-wrap items-center gap-2 border-t border-hairline pt-4">
-              <Button variant="primary" icon={<Eye size={15} />} onClick={openPreview}>Preview Laporan</Button>
-              <Button icon={<Printer size={15} />} onClick={openPreview}>Cetak</Button>
-              <Button icon={<X size={14} />} variant="ghost" onClick={resetFilter}>Batal</Button>
+              <Button variant="primary" icon={<FaEye size={15} />} onClick={openPreview}>Preview Laporan</Button>
+              <Button icon={<FaPrint size={15} />} onClick={openPreview}>Cetak</Button>
+              <Button icon={<FaXmark size={14} />} variant="ghost" onClick={resetFilter}>Batal</Button>
             </div>
           </div>
         </Card>

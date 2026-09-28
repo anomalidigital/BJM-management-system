@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Plus, Printer, Save, TriangleAlert, X } from 'lucide-react'
+import { FaFloppyDisk, FaPlus, FaPrint, FaTriangleExclamation, FaWandMagicSparkles, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Button, IconButton } from '../components/ui/Button'
@@ -14,7 +14,7 @@ import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
 import { formatRupiah, todayISO } from '../lib/format'
 import { hitungKomisiTrip } from '../lib/komisi'
-import { nomorSuratJalanBerikut, nomorTripBerikut } from '../lib/kode'
+import { buatKodeUnik, nomorSuratJalanBerikut, nomorTripBerikut } from '../lib/kode'
 import { cn } from '../lib/utils'
 import type { CommissionTransaction, ServiceType, TripStatus } from '../types'
 import { STATUS_FORM, STATUS_LABEL } from './trip/status'
@@ -138,16 +138,20 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     })),
     [db.routes],
   )
+  const klienMap = useMemo(() => new Map(db.projects.map((p) => [p.id, p])), [db.projects])
   const contractOptions = useMemo(
     () => db.contracts
       .filter((c) => c.status === 'aktif' || c.id === form.contract_id)
-      .map((c) => ({
-        value: c.id,
-        label: c.contract_no,
-        meta: `${c.client_name} · sisa ${formatRupiah(c.value - (terpakaiKontrak.get(c.id) ?? 0))}`,
-        keywords: c.client_name,
-      })),
-    [db.contracts, form.contract_id, terpakaiKontrak],
+      .map((c) => {
+        const klien = klienMap.get(c.project_id)
+        return {
+          value: c.id,
+          label: c.contract_no,
+          meta: `${klien?.project_name ?? 'Klien tidak ditemukan'} · sisa ${formatRupiah(c.value - (terpakaiKontrak.get(c.id) ?? 0))}`,
+          keywords: `${klien?.project_code ?? ''} ${klien?.project_name ?? ''}`,
+        }
+      }),
+    [db.contracts, form.contract_id, terpakaiKontrak, klienMap],
   )
   /** Sopir nonaktif tetap muncul bila sudah tercatat di trip ini. */
   const sopirOptions = (pilihanIni: string) =>
@@ -239,6 +243,12 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
   const ubahId = (i: number, v: string) => setForm((f) => ({ ...f, trip_ids: f.trip_ids.map((x, j) => (j === i ? v.toUpperCase().replace(/\s+/g, '') : x)) }))
   const tambahId = () => setForm((f) => ({ ...f, trip_ids: [...f.trip_ids, ''] }))
   const hapusId = (i: number) => setForm((f) => ({ ...f, trip_ids: f.trip_ids.length > 1 ? f.trip_ids.filter((_, j) => j !== i) : [''] }))
+  /** Tombol Generate: ID unik yang belum ada di trip mana pun maupun di baris lain form ini. */
+  function generateId(i: number) {
+    const terpakai = [...dbAll.transactions.flatMap((t) => t.trip_ids ?? []), ...form.trip_ids]
+    ubahId(i, buatKodeUnik(terpakai))
+    setErrors((er) => { const { trip_ids: _t, ...sisa } = er; return sisa })
+  }
 
   const ubahSopir = (i: number, v: string | null) => setForm((f) => ({ ...f, driver_ids: f.driver_ids.map((x, j) => (j === i ? v ?? '' : x)) }))
   const tambahSopir = () => setForm((f) => ({ ...f, driver_ids: [...f.driver_ids, ''] }))
@@ -273,6 +283,13 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
   }
 
   const kontrak = db.contracts.find((c) => c.id === form.contract_id)
+  const klienKontrak = kontrak ? klienMap.get(kontrak.project_id) : undefined
+
+  /** Pilih kontrak -> klien trip ikut klien pemilik kontrak. */
+  function pilihKontrak(id: string | null) {
+    const k = db.contracts.find((c) => c.id === id)
+    setForm((f) => ({ ...f, contract_id: id ?? '', project_id: k?.project_id || f.project_id }))
+  }
 
   function save(thenPrint: boolean) {
     if (!validate()) { toast.error('Periksa kembali isian yang ditandai merah.'); return }
@@ -287,7 +304,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
       driver_id: driverIds[0] ?? '',
       manager_name: form.manager_id ? '' : form.manager_name.trim(),
       // Dedicated: penerima Surat Jalan = klien kontrak bila belum diisi.
-      recipient_name: form.recipient_name.trim() || (dedicated ? kontrak?.client_name ?? '' : ''),
+      recipient_name: form.recipient_name.trim() || (dedicated ? klienKontrak?.project_name ?? '' : ''),
       destination_detail: form.destination_detail.trim(),
     }
     const suffix = thenPrint ? '?print=1' : ''
@@ -349,11 +366,11 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                 />
               </div>
               {form.driver_ids.length > 1 && (
-                <IconButton label="Hapus sopir ini" tone="danger" icon={<X size={14} />} onClick={() => hapusSopir(i)} />
+                <IconButton label="Hapus sopir ini" tone="danger" icon={<FaXmark size={14} />} onClick={() => hapusSopir(i)} />
               )}
             </div>
           ))}
-          <Button size="sm" variant="ghost" icon={<Plus size={14} />} onClick={tambahSopir}>Tambah sopir</Button>
+          <Button size="sm" variant="ghost" icon={<FaPlus size={14} />} onClick={tambahSopir}>Tambah sopir</Button>
         </div>
       )}
     </Field>
@@ -397,7 +414,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
 
       {!canEdit && (
         <div className="mb-4 flex items-start gap-2 rounded-lg border border-[#f6e2ac] bg-[#fff8e6] px-3.5 py-2.5 text-[12.5px] text-[#8a6100]">
-          <TriangleAlert size={15} className="mt-px shrink-0" />
+          <FaTriangleExclamation size={15} className="mt-px shrink-0" />
           Peran Viewer tidak dapat menyimpan perubahan. Form ini hanya untuk melihat struktur data.
         </div>
       )}
@@ -427,17 +444,17 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                 label="No. Kontrak"
                 required
                 error={errors.contract_id}
-                hint={errors.contract_id ? undefined : db.contracts.length === 0 ? <>Belum ada kontrak. Buat dulu di <Link to="/master/kontrak" className="text-brand-700 underline">Data Kontrak</Link>.</> : 'Kontrak aktif di workspace ini.'}
+                hint={errors.contract_id ? undefined : db.contracts.length === 0 ? <>Belum ada kontrak. Tambahkan di halaman klien, menu <Link to="/master/klien" className="text-brand-700 underline">Klien</Link>.</> : 'Kontrak aktif di workspace ini.'}
               >
                 {(fid) => (
                   <SearchableSelect id={fid} options={contractOptions} value={form.contract_id || null} invalid={!!errors.contract_id}
                     placeholder="Pilih nomor kontrak..." searchPlaceholder="Ketik nomor kontrak atau klien..."
-                    onChange={(v) => set('contract_id', v ?? '')} />
+                    onChange={pilihKontrak} />
                 )}
               </Field>
               {kontrak && (
                 <div className="rounded-lg border border-brand-100 bg-brand-50/60 px-3.5 py-3">
-                  <p className="text-[12px] text-brand-800">Klien <span className="font-semibold">{kontrak.client_name}</span></p>
+                  <p className="text-[12px] text-brand-800">Klien <span className="font-semibold">{klienKontrak?.project_name ?? '—'}</span></p>
                   <dl className="mt-2 grid grid-cols-3 gap-x-4">
                     {([['Nilai kontrak', kontrak.value], ['Terpakai', kontrak.value - sisaKontrak], ['Sisa', sisaKontrak]] as const).map(([k, v]) => (
                       <div key={k}>
@@ -461,7 +478,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
               label="ID Perjalanan/Trip"
               required={wajibId}
               error={errors.trip_ids}
-              hint={errors.trip_ids ? undefined : 'Nomor container / ID perjalanan. Boleh sama dengan trip lain karena container dipakai ulang.'}
+              hint={errors.trip_ids ? undefined : 'Ketik nomor container / ID perjalanan, atau klik Generate untuk ID unik otomatis. Nomor container boleh sama dengan trip lain karena dipakai ulang.'}
             >
               {(fid) => (
                 <div className="space-y-2">
@@ -477,16 +494,19 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                         aria-label={`ID Perjalanan/Trip ${i + 1}`}
                         onChange={(e) => ubahId(i, e.target.value)}
                       />
+                      <Button icon={<FaWandMagicSparkles size={14} />} title={`Buat ID Perjalanan/Trip ${i + 1} otomatis`} onClick={() => generateId(i)}>
+                        Generate
+                      </Button>
                       <IconButton
                         label="Hapus ID ini"
                         tone="danger"
-                        icon={<X size={14} />}
+                        icon={<FaXmark size={14} />}
                         disabled={form.trip_ids.length === 1 && !v}
                         onClick={() => hapusId(i)}
                       />
                     </div>
                   ))}
-                  <Button size="sm" variant="ghost" icon={<Plus size={14} />} className="ml-6" onClick={tambahId}>
+                  <Button size="sm" variant="ghost" icon={<FaPlus size={14} />} className="ml-6" onClick={tambahId}>
                     Tambah ID Perjalanan/Trip
                   </Button>
                   {idDipakaiLain.length > 0 && (
@@ -592,9 +612,13 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                 />
               )}
             </Field>
-            <Field label="Klien" hint={routeProject && form.project_id === routeProject.id ? 'Mengikuti klien rute.' : 'Menentukan alur dokumen TR / No PI.'}>
+            <Field
+              label="Klien"
+              hint={dedicated && klienKontrak ? `Mengikuti klien kontrak ${kontrak?.contract_no}.`
+                : routeProject && form.project_id === routeProject.id ? 'Mengikuti klien rute.' : 'Menentukan alur dokumen TR / No PI.'}
+            >
               {(fid) => (
-                <Select id={fid} value={form.project_id} onChange={(e) => set('project_id', e.target.value)}>
+                <Select id={fid} value={form.project_id} disabled={dedicated && !!klienKontrak} onChange={(e) => set('project_id', e.target.value)}>
                   <option value="">— belum ditentukan —</option>
                   {db.projects.map((p) => <option key={p.id} value={p.id}>{p.project_code} — {p.project_name}</option>)}
                 </Select>
@@ -712,8 +736,8 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
           </p>
           <div className="ml-auto flex items-center gap-2">
             <Button onClick={() => navigate(existing ? `/transaksi/trip/${existing.id}` : '/transaksi/trip')}>Batal</Button>
-            <Button icon={<Printer size={15} />} disabled={!canEdit} onClick={() => save(true)}>Simpan &amp; Cetak</Button>
-            <Button variant="primary" icon={<Save size={15} />} disabled={!canEdit} onClick={() => save(false)}>Simpan</Button>
+            <Button icon={<FaPrint size={15} />} disabled={!canEdit} onClick={() => save(true)}>Simpan &amp; Cetak</Button>
+            <Button variant="primary" icon={<FaFloppyDisk size={15} />} disabled={!canEdit} onClick={() => save(false)}>Simpan</Button>
           </div>
         </div>
       </div>

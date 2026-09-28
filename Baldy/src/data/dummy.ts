@@ -617,18 +617,36 @@ function makeCommissionSchemes(): CommissionScheme[] {
   return [...aturanKomisiMeeting('jakarta', 'cms-jkt'), ...aturanKomisiMeeting('tangerang', 'cms-tng')]
 }
 
+/**
+ * Klien contoh pemilik kontrak Dedicated. Berkas data operasional belum memuat
+ * kontrak, jadi klien dan kontraknya sama-sama contoh.
+ */
+const KLIEN_KONTRAK: ReadonlyArray<readonly [Workspace, string, string, number]> = [
+  ['jakarta', 'SPD', 'PT Sumber Pangan Dingin', 100_000_000],
+  ['tangerang', 'ADN', 'PT Aneka Distribusi Nusantara', 60_000_000],
+]
+
+export function makeKlienKontrak(cap = stamp): Project[] {
+  return KLIEN_KONTRAK.map(([, code, name], i) => ({
+    id: `prj-ktr-${i + 1}`,
+    project_code: code,
+    project_name: name,
+    description: 'Klien contoh layanan Dedicated.',
+    requires_document: true,
+    status: 'aktif' as const,
+    created_at: cap,
+    updated_at: cap,
+  }))
+}
+
 /** Kontrak Dedicated contoh, supaya pilihan kontrak di form trip tidak kosong. */
 function makeContracts(): Contract[] {
   const tahun = String(now.getFullYear())
-  const seed: ReadonlyArray<readonly [Workspace, string, number]> = [
-    ['jakarta', 'PT SUMBER PANGAN DINGIN', 100_000_000],
-    ['tangerang', 'PT ANEKA DISTRIBUSI NUSANTARA', 60_000_000],
-  ]
-  return seed.map(([workspace, client, value], i) => ({
+  return KLIEN_KONTRAK.map(([workspace, , , value], i) => ({
     id: `ktr-${i + 1}`,
     workspace,
     contract_no: `KTR-${tahun}-${String(i + 1).padStart(3, '0')}`,
-    client_name: client,
+    project_id: `prj-ktr-${i + 1}`,
     value,
     start_date: `${tahun}-01-01`,
     end_date: `${tahun}-12-31`,
@@ -694,7 +712,7 @@ export function generateDatabase(): Database {
   const kasbonEntries = susunKasbonDariDataLama(ujPayments, transactions, stamp)
 
   return {
-    ...real, drivers, vehicles, routes, transactions, jobOrders, billings,
+    ...real, projects: [...real.projects, ...makeKlienKontrak()], drivers, vehicles, routes, transactions, jobOrders, billings,
     ujPayments, expenses, internalCosts, tripNotes: [], kasbonEntries, commissionSchemes, contracts: makeContracts(),
   }
 }
@@ -719,7 +737,7 @@ export function generateSampleDatabase(): Database {
   const commissionSchemes = makeCommissionSchemes()
   const kasbonEntries = susunKasbonDariDataLama(ujPayments, transactions, stamp)
   return {
-    drivers, routes, vehicles, jobOrders, projects, transactions, billings,
+    drivers, routes, vehicles, jobOrders, projects: [...projects, ...makeKlienKontrak()], transactions, billings,
     ujPayments, expenses, internalCosts, tripNotes: [], kasbonEntries, commissionSchemes, contracts: makeContracts(),
   }
 }

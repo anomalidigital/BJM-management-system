@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Hash } from 'lucide-react'
+import { FaHashtag } from '../../components/ui/icons'
 import { Card, CardHeader, InfoItem } from '../../components/ui/Card'
 import { Badge } from '../../components/ui/Badge'
 import { useData } from '../../store/DataProvider'
@@ -71,7 +71,7 @@ export function TripOverview({ trip }: { trip: TransactionRow }) {
             <InfoItem label="Klien" value={trip.project_code ? `${trip.project_code} — ${trip.project_name}` : '—'} />
             <InfoItem label="Status" value={STATUS_LABEL[trip.status]} />
             <InfoItem label="Layanan" value={SERVICE_LABEL[trip.service_type ?? 'callout']} />
-            {kontrak && <InfoItem label="Kontrak" value={`${kontrak.contract_no} — ${kontrak.client_name}`} />}
+            {kontrak && <InfoItem label="Kontrak" value={`${kontrak.contract_no} — ${trip.client_name || 'klien tidak ditemukan'}`} />}
           </dl>
         </Card>
 
@@ -131,7 +131,7 @@ export function TripOverview({ trip }: { trip: TransactionRow }) {
                 {trip.trip_ids.map((c, i) => (
                   <li key={`${c}-${i}`} className="flex items-center gap-2.5 rounded-md border border-hairline bg-sunken px-3 py-2">
                     <span className="tnum w-5 shrink-0 text-[12px] font-semibold text-ink-3">{i + 1}.</span>
-                    <Hash size={14} className="shrink-0 text-ink-3" />
+                    <FaHashtag size={14} className="shrink-0 text-ink-3" />
                     <span className="tnum text-[13px] font-medium tracking-wide text-ink">{c}</span>
                   </li>
                 ))}
@@ -156,7 +156,13 @@ export function TripOverview({ trip }: { trip: TransactionRow }) {
 
         {kontrak && (
           <Card>
-            <CardHeader title="Kontrak Dedicated" subtitle={kontrak.client_name} />
+            <CardHeader
+              title="Kontrak Dedicated"
+              subtitle={trip.client_name || 'Klien tidak ditemukan'}
+              actions={kontrak.project_id && (
+                <Link to={`/master/klien/${kontrak.project_id}`} className="text-[12.5px] font-medium text-brand-700 hover:underline">Lihat klien</Link>
+              )}
+            />
             <dl className="grid grid-cols-2 gap-4 p-4">
               <InfoItem label="No. Kontrak" value={kontrak.contract_no} mono />
               <InfoItem label="Nilai" value={formatRupiah(kontrak.value)} mono />

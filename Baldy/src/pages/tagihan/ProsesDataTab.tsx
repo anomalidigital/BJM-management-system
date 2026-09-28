@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Pencil, Plus, Save, Trash2, X } from 'lucide-react'
+import {
+  FaChevronLeft, FaChevronRight, FaFloppyDisk, FaPen, FaPlus, FaTrashCan, FaXmark,
+} from '../../components/ui/icons'
 import { Button } from '../../components/ui/Button'
 import { Field, Input, DateInput, Checkbox } from '../../components/ui/Field'
 import { SearchableSelect } from '../../components/ui/SearchableSelect'
@@ -159,7 +161,7 @@ export function ProsesDataTab() {
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-4 py-2.5">
           <div className="flex items-center gap-1.5">
             <Button
-              size="sm" icon={<ChevronLeft size={14} />} disabled={mode !== 'view' || index <= 0}
+              size="sm" icon={<FaChevronLeft size={14} />} disabled={mode !== 'view' || index <= 0}
               onClick={() => setActiveId(records[index - 1]?.id ?? null)}
             >
               Previous Record
@@ -169,7 +171,7 @@ export function ProsesDataTab() {
               onClick={() => setActiveId(records[index + 1]?.id ?? null)}
             >
               Next Record
-              <ChevronRight size={14} />
+              <FaChevronRight size={14} />
             </Button>
             {records.length > 0 && (
               <span className="tnum ml-1 text-[12px] text-ink-3">
@@ -181,14 +183,14 @@ export function ProsesDataTab() {
           <div className="flex items-center gap-2">
             {mode === 'view' ? (
               <>
-                <Button size="sm" icon={<Plus size={14} />} disabled={!canEdit} onClick={startCreate}>Tambah</Button>
-                <Button size="sm" icon={<Pencil size={14} />} disabled={!canEdit || !active} onClick={startEdit}>Edit</Button>
-                <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} disabled={!canEdit || !active} onClick={() => setDeleting(true)}>Hapus</Button>
+                <Button size="sm" icon={<FaPlus size={14} />} disabled={!canEdit} onClick={startCreate}>Tambah</Button>
+                <Button size="sm" icon={<FaPen size={14} />} disabled={!canEdit || !active} onClick={startEdit}>Edit</Button>
+                <Button size="sm" variant="ghost" icon={<FaTrashCan size={14} />} disabled={!canEdit || !active} onClick={() => setDeleting(true)}>Hapus</Button>
               </>
             ) : (
               <>
-                <Button size="sm" icon={<X size={14} />} onClick={cancel}>Batal</Button>
-                <Button size="sm" variant="primary" icon={<Save size={14} />} onClick={save}>Simpan</Button>
+                <Button size="sm" icon={<FaXmark size={14} />} onClick={cancel}>Batal</Button>
+                <Button size="sm" variant="primary" icon={<FaFloppyDisk size={14} />} onClick={save}>Simpan</Button>
               </>
             )}
           </div>
@@ -198,7 +200,7 @@ export function ProsesDataTab() {
           <div className="px-6 py-16 text-center">
             <p className="text-[14px] font-semibold text-ink">Belum ada data.</p>
             <p className="mt-1 text-[13px] text-ink-3">Tambahkan tagihan pertama untuk memulai.</p>
-            {canEdit && <Button className="mt-4" variant="primary" icon={<Plus size={15} />} onClick={startCreate}>Tambah</Button>}
+            {canEdit && <Button className="mt-4" variant="primary" icon={<FaPlus size={15} />} onClick={startCreate}>Tambah</Button>}
           </div>
         ) : (
           <div className="p-4">

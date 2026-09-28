@@ -11,8 +11,8 @@ import { DataKaryawanPage } from './pages/DataKaryawanPage'
 import { KaryawanTransaksiPage } from './pages/KaryawanTransaksiPage'
 import { DataRoutePage } from './pages/DataRoutePage'
 import { DataMobilPage } from './pages/DataMobilPage'
-import { DataProjectPage } from './pages/DataProjectPage'
-import { DataKontrakPage } from './pages/DataKontrakPage'
+import { KlienPage } from './pages/KlienPage'
+import { KlienDetailPage } from './pages/KlienDetailPage'
 import { KomisiPage } from './pages/KomisiPage'
 import { TripDetailPage } from './pages/TripDetailPage'
 import { LapUangJalanPage } from './pages/LapUangJalanPage'
@@ -51,8 +51,11 @@ export function App() {
                   <Route path="/master/sopir" element={<Navigate to="/master/karyawan" replace />} />
                   <Route path="/master/mobil" element={<DataMobilPage />} />
                   <Route path="/master/route" element={<DataRoutePage />} />
-                  <Route path="/master/project" element={<DataProjectPage />} />
-                  <Route path="/master/kontrak" element={<DataKontrakPage />} />
+                  <Route path="/master/klien" element={<KlienPage />} />
+                  <Route path="/master/klien/:id" element={<KlienDetailPage />} />
+                  {/* Alamat lama: Data Project kini Klien, dan kontrak dikelola di halaman klien */}
+                  <Route path="/master/project" element={<Navigate to="/master/klien" replace />} />
+                  <Route path="/master/kontrak" element={<Navigate to="/master/klien" replace />} />
                   <Route path="/master/komisi" element={<KomisiPage />} />
 
                   <Route path="/transaksi/trip" element={<TripListPage />} />

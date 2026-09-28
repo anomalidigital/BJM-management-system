@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BadgePercent, Pencil, Trash2 } from 'lucide-react'
+import { FaPen, FaPercent, FaTrashCan } from '../../components/ui/icons'
 import { Button, IconButton } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Modal, ConfirmDialog } from '../../components/ui/Modal'
@@ -150,7 +150,7 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
       {!batal && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline bg-brand-50/50 px-4 py-2.5">
           <p className="flex items-start gap-2 text-[12.5px] text-brand-800">
-            <BadgePercent size={15} className="mt-px shrink-0" />
+            <FaPercent size={15} className="mt-px shrink-0" />
             <span>
               Komisi sopir menurut aturan: <span className="tnum font-semibold">{formatRupiah(trip.komisi_sopir)}</span>
               {sopirUtama && <> untuk {sopirUtama.driver_name}</>}
@@ -192,8 +192,8 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
                   <td className="px-3 py-2.5"><LampiranThumbs ids={c.attachments ?? []} ukuran={30} /></td>
                   <td className="px-3 py-2.5 text-right">
                     <div className="flex justify-end gap-1">
-                      <IconButton label="Ubah" icon={<Pencil size={14} />} disabled={!bisaUbah} onClick={() => buka(c)} />
-                      <IconButton label="Hapus" tone="danger" icon={<Trash2 size={14} />} disabled={!bisaUbah} onClick={() => setMenghapus(c)} />
+                      <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!bisaUbah} onClick={() => buka(c)} />
+                      <IconButton label="Hapus" tone="danger" icon={<FaTrashCan size={14} />} disabled={!bisaUbah} onClick={() => setMenghapus(c)} />
                     </div>
                   </td>
                 </tr>

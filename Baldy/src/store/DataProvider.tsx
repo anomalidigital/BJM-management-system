@@ -419,7 +419,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         toll_paid: tol.get(t.id) ?? 0,
         vehicle_config: v?.configuration ?? '',
         contract_no: k?.contract_no ?? '',
-        client_name: k?.client_name ?? '',
+        client_name: k ? projects.get(k.project_id)?.project_name ?? '' : '',
         komisi_sopir: kSopir?.nilai ?? 0,
         komisi_manager: kManager?.nilai ?? 0,
         komisi_keterangan: batal ? 'Trip dibatalkan' : kSopir?.keterangan ?? '',

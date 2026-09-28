@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Pencil, Plus, Printer, RefreshCw, Trash2, X } from 'lucide-react'
+import { FaPen, FaPlus, FaPrint, FaTrashCan, FaWandMagicSparkles, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
@@ -20,7 +20,7 @@ import { useToast } from '../store/ToastProvider'
 import { useTable } from '../lib/useTable'
 import { matchesQuery, sum } from '../lib/utils'
 import { formatNumber, formatRupiah } from '../lib/format'
-import { kodeRouteDariNama } from '../lib/kode'
+import { buatKodeUnik } from '../lib/kode'
 import type { Route } from '../types'
 
 type FormState = Omit<Route, 'id' | 'created_at' | 'updated_at'>
@@ -58,25 +58,21 @@ export function DataRoutePage() {
   })
   const resetFilter = () => { table.reset(); setFeetFilter(''); setProjectFilter('') }
 
-  /**
-   * No. Route dibuat dari nama route (pola kode lama, mis. CIB - DURI -> CIBDURI)
-   * dan dijamin tidak kembar. Selama belum diketik manual, kode mengikuti nama.
-   */
-  const [kodeManual, setKodeManual] = useState(false)
-  const kodeDari = (nama: string) => kodeRouteDariNama(nama, db.routes.filter((r) => r.id !== editing?.id).map((r) => r.route_code))
-
   function openCreate() {
-    setEditing(null); setForm({ ...BLANK }); setKodeManual(false); setErrors({}); setFormOpen(true)
+    setEditing(null); setForm({ ...BLANK }); setErrors({}); setFormOpen(true)
   }
 
-  function ubahNama(nama: string) {
-    setForm((f) => ({ ...f, route_name: nama, route_code: !editing && !kodeManual ? kodeDari(nama) : f.route_code }))
+  /** Tombol Generate: kode unik (timestamp + 7 huruf acak) yang belum dipakai route lain. */
+  function generateKode() {
+    const terpakai = db.routes.filter((r) => r.id !== editing?.id).map((r) => r.route_code)
+    setForm((f) => ({ ...f, route_code: buatKodeUnik(terpakai) }))
+    setErrors((e) => ({ ...e, route_code: undefined }))
   }
 
   function openEdit(r: Route) {
     setEditing(r)
     setForm({ route_code: r.route_code, route_name: r.route_name, project_id: r.project_id ?? '', feet: r.feet, ujroute: r.ujroute, toll: r.toll ?? 0, commissioner: r.commissioner, price: r.price })
-    setKodeManual(true); setErrors({}); setFormOpen(true)
+    setErrors({}); setFormOpen(true)
   }
 
   const hargaWajib = !editing || editing.price > 0
@@ -84,7 +80,7 @@ export function DataRoutePage() {
   function validate(): boolean {
     const e: Partial<Record<keyof FormState, string>> = {}
     const code = form.route_code.trim()
-    if (!code) e.route_code = 'No. Route wajib diisi.'
+    if (!code) e.route_code = 'No. Route wajib diisi. Klik Generate untuk membuatnya otomatis.'
     else if (db.routes.some((r) => r.route_code.toLowerCase() === code.toLowerCase() && r.id !== editing?.id))
       e.route_code = 'No. Route sudah dipakai. Gunakan kode lain.'
     if (!form.route_name.trim()) e.route_name = 'Nama Route wajib diisi.'
@@ -132,8 +128,8 @@ export function DataRoutePage() {
       key: 'action', header: 'Action', align: 'right', width: '92px',
       render: (r) => (
         <div className="flex justify-end gap-1">
-          <IconButton label="Ubah" icon={<Pencil size={14} />} disabled={!canEdit} onClick={() => openEdit(r)} />
-          <IconButton label="Hapus" tone="danger" icon={<Trash2 size={14} />} disabled={!canEdit} onClick={() => setDeleting(r)} />
+          <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!canEdit} onClick={() => openEdit(r)} />
+          <IconButton label="Hapus" tone="danger" icon={<FaTrashCan size={14} />} disabled={!canEdit} onClick={() => setDeleting(r)} />
         </div>
       ),
     },
@@ -207,8 +203,8 @@ export function DataRoutePage() {
         crumbs={[{ label: 'Master' }, { label: 'Data Route' }]}
         actions={
           <>
-            <Button icon={<Printer size={15} />} onClick={() => setPreview(true)}>Cetak</Button>
-            <Button variant="primary" icon={<Plus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah Route</Button>
+            <Button icon={<FaPrint size={15} />} onClick={() => setPreview(true)}>Cetak</Button>
+            <Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah Route</Button>
           </>
         }
       />
@@ -231,7 +227,7 @@ export function DataRoutePage() {
                   <option value="-">Tanpa klien</option>
                 </Select>
               </FilterField>
-              {(table.isFiltered || filterAktif) && <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={resetFilter}>Reset</Button>}
+              {(table.isFiltered || filterAktif) && <Button size="sm" variant="ghost" icon={<FaXmark size={14} />} onClick={resetFilter}>Reset</Button>}
             </>
           }
           right={<span className="text-[12.5px] text-ink-3">{db.routes.length} route terdaftar</span>}
@@ -247,7 +243,7 @@ export function DataRoutePage() {
           isFiltered={table.isFiltered || filterAktif}
           sort={table.sort}
           onSortChange={table.toggleSort}
-          empty={<EmptyState entity="data route" action={canEdit && <Button variant="primary" icon={<Plus size={15} />} onClick={openCreate}>Tambah Route</Button>} />}
+          empty={<EmptyState entity="data route" action={canEdit && <Button variant="primary" icon={<FaPlus size={15} />} onClick={openCreate}>Tambah Route</Button>} />}
           notFound={<NotFoundState onReset={resetFilter} />}
           footer={
             table.total > 0 ? (
@@ -285,20 +281,15 @@ export function DataRoutePage() {
             required
             error={errors.route_code}
             className="sm:col-span-2"
-            hint={errors.route_code ? undefined : 'Terisi otomatis dari Nama Route (4 huruf asal + 4 huruf tujuan) dan dijamin unik. Boleh diganti.'}
+            hint={errors.route_code ? undefined : 'Klik Generate untuk membuat kode unik otomatis, atau ketik sendiri.'}
           >
             {(id) => (
               <div className="flex gap-2">
                 <Input id={id} value={form.route_code} invalid={!!errors.route_code} className="tnum font-medium tracking-wide"
-                  placeholder="Isi Nama Route dulu"
-                  onChange={(e) => { setKodeManual(true); setForm({ ...form, route_code: e.target.value.toUpperCase() }) }} />
-                <Button
-                  icon={<RefreshCw size={14} />}
-                  title="Buat kode dari Nama Route"
-                  disabled={!form.route_name.trim()}
-                  onClick={() => { setKodeManual(false); setForm((f) => ({ ...f, route_code: kodeDari(f.route_name) })) }}
-                >
-                  Dari nama
+                  placeholder="Klik Generate atau ketik manual"
+                  onChange={(e) => setForm({ ...form, route_code: e.target.value.toUpperCase() })} />
+                <Button icon={<FaWandMagicSparkles size={14} />} title="Buat No. Route unik otomatis" onClick={generateKode}>
+                  Generate
                 </Button>
               </div>
             )}
@@ -319,7 +310,7 @@ export function DataRoutePage() {
             )}
           </Field>
           <Field label="Nama Route" required error={errors.route_name} className="sm:col-span-2">
-            {(id) => <Input id={id} value={form.route_name} invalid={!!errors.route_name} placeholder="CIB - DURI" onChange={(e) => ubahNama(e.target.value)} />}
+            {(id) => <Input id={id} value={form.route_name} invalid={!!errors.route_name} placeholder="CIB - DURI" onChange={(e) => setForm({ ...form, route_name: e.target.value })} />}
           </Field>
           <Field label="UJROUTE" required error={errors.ujroute} hint={errors.ujroute ? undefined : 'Patokan uang jalan. Termin dicatat di trip saat dibayar.'}>
             {(id) => <CurrencyInput id={id} value={form.ujroute} invalid={!!errors.ujroute} onValueChange={(v) => setForm({ ...form, ujroute: v })} />}

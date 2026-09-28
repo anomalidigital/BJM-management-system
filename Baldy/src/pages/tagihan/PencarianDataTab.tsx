@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { RotateCcw, Search } from 'lucide-react'
+import { FaMagnifyingGlass, FaRotateLeft } from '../../components/ui/icons'
 import { Button } from '../../components/ui/Button'
 import { Field, Input, DateInput, Select, Checkbox } from '../../components/ui/Field'
 import { CurrencyInput } from '../../components/ui/CurrencyInput'
@@ -130,15 +130,15 @@ export function PencarianDataTab() {
         </div>
 
         <div className="mt-4 flex items-center gap-2">
-          <Button type="submit" variant="primary" icon={<Search size={15} />}>Cari</Button>
-          <Button icon={<RotateCcw size={14} />} onClick={() => { setDraft(BLANK); setApplied(null) }}>Reset</Button>
+          <Button type="submit" variant="primary" icon={<FaMagnifyingGlass size={15} />}>Cari</Button>
+          <Button icon={<FaRotateLeft size={14} />} onClick={() => { setDraft(BLANK); setApplied(null) }}>Reset</Button>
         </div>
       </form>
 
       {applied === null ? (
         <div className="px-6 py-16 text-center">
           <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-full border border-hairline bg-sunken text-ink-3">
-            <Search size={20} />
+            <FaMagnifyingGlass size={20} />
           </div>
           <p className="text-[14px] font-semibold text-ink">Isi kriteria lalu klik Cari.</p>
           <p className="mt-1 text-[13px] text-ink-3">Kriteria yang dikosongkan akan diabaikan.</p>

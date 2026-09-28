@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Pencil, Plus, Trash2, X } from 'lucide-react'
+import { FaPen, FaPlus, FaTrashCan, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
@@ -272,8 +272,8 @@ export function KomisiPage() {
       key: 'action', header: 'Action', align: 'right', width: '92px',
       render: (s) => (
         <div className="flex justify-end gap-1">
-          <IconButton label="Ubah" icon={<Pencil size={14} />} disabled={!canEdit} onClick={() => openEdit(s)} />
-          <IconButton label="Hapus" tone="danger" icon={<Trash2 size={14} />} disabled={!canEdit} onClick={() => setDeleting(s)} />
+          <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!canEdit} onClick={() => openEdit(s)} />
+          <IconButton label="Hapus" tone="danger" icon={<FaTrashCan size={14} />} disabled={!canEdit} onClick={() => setDeleting(s)} />
         </div>
       ),
     },
@@ -285,7 +285,7 @@ export function KomisiPage() {
         title="Komisi"
         crumbs={[{ label: 'Master' }, { label: 'Komisi' }]}
         actions={
-          <Button variant="primary" icon={<Plus size={15} />} disabled={!canEdit} onClick={openCreate}>
+          <Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}>
             Tambah Komisi
           </Button>
         }
@@ -301,7 +301,7 @@ export function KomisiPage() {
                   {EMPLOYEE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
                 </Select>
               </FilterField>
-              {peran && <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={() => setPeran('')}>Reset</Button>}
+              {peran && <Button size="sm" variant="ghost" icon={<FaXmark size={14} />} onClick={() => setPeran('')}>Reset</Button>}
             </>
           }
           right={<span className="text-[12.5px] text-ink-3">{db.commissionSchemes.length} pengaturan komisi</span>}
@@ -318,7 +318,7 @@ export function KomisiPage() {
           empty={
             <EmptyState
               entity="komisi"
-              action={canEdit && <Button variant="primary" icon={<Plus size={15} />} onClick={openCreate}>Tambah Komisi</Button>}
+              action={canEdit && <Button variant="primary" icon={<FaPlus size={15} />} onClick={openCreate}>Tambah Komisi</Button>}
             />
           }
           notFound={<NotFoundState onReset={() => setPeran('')} />}
@@ -414,7 +414,7 @@ export function KomisiPage() {
                 {form.tiers.length > 1 && (
                   <button type="button" onClick={() => hapusTingkat(i)}
                     className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[12px] font-medium text-ink-3 transition hover:bg-[#fdf2f2] hover:text-[color:var(--color-critical)]">
-                    <X size={13} /> Hapus tingkat
+                    <FaXmark size={13} /> Hapus tingkat
                   </button>
                 )}
               </header>
@@ -445,7 +445,7 @@ export function KomisiPage() {
             </section>
           ))}
 
-          <Button icon={<Plus size={15} />} onClick={tambahTingkat} className="w-full justify-center border-dashed">
+          <Button icon={<FaPlus size={15} />} onClick={tambahTingkat} className="w-full justify-center border-dashed">
             Tambah tingkat
           </Button>
 

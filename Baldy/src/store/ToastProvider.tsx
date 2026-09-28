@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { CheckCircle2, Info, TriangleAlert, X } from 'lucide-react'
+import { FaCircleCheck, FaCircleInfo, FaTriangleExclamation, FaXmark } from '../components/ui/icons'
+import type { IconComponent } from '../components/ui/icons'
 import { uid } from '../lib/utils'
 
 type ToastKind = 'success' | 'error' | 'info'
@@ -19,10 +20,10 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null)
 
-const STYLES: Record<ToastKind, { icon: typeof Info; ring: string; tint: string }> = {
-  success: { icon: CheckCircle2, ring: 'text-[color:var(--color-good)]', tint: 'bg-[#f0fbf0]' },
-  error: { icon: TriangleAlert, ring: 'text-[color:var(--color-critical)]', tint: 'bg-[#fdf2f2]' },
-  info: { icon: Info, ring: 'text-brand-600', tint: 'bg-brand-50' },
+const STYLES: Record<ToastKind, { icon: IconComponent; ring: string; tint: string }> = {
+  success: { icon: FaCircleCheck, ring: 'text-[color:var(--color-good)]', tint: 'bg-[#f0fbf0]' },
+  error: { icon: FaTriangleExclamation, ring: 'text-[color:var(--color-critical)]', tint: 'bg-[#fdf2f2]' },
+  info: { icon: FaCircleInfo, ring: 'text-brand-600', tint: 'bg-brand-50' },
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -71,7 +72,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 aria-label="Tutup notifikasi"
                 className="-mr-1 rounded p-0.5 text-ink-3 transition hover:bg-black/5 hover:text-ink"
               >
-                <X size={15} />
+                <FaXmark size={15} />
               </button>
             </div>
           )

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronsUpDown, Search, X } from 'lucide-react'
+import { FaCheck, FaMagnifyingGlass, FaSort, FaXmark } from './icons'
 import { cn, matchesQuery } from '../../lib/utils'
 
 export interface Option {
@@ -115,16 +115,16 @@ export function SearchableSelect({
             }}
             className="rounded p-0.5 text-ink-3 hover:bg-black/5 hover:text-ink"
           >
-            <X size={13} />
+            <FaXmark size={13} />
           </span>
         )}
-        <ChevronsUpDown size={14} className="shrink-0 text-ink-3" />
+        <FaSort size={14} className="shrink-0 text-ink-3" />
       </button>
 
       {open && (
         <div className="animate-in-pop absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-hairline bg-surface shadow-pop">
           <div className="flex items-center gap-2 border-b border-hairline px-2.5 py-2">
-            <Search size={14} className="shrink-0 text-ink-3" />
+            <FaMagnifyingGlass size={14} className="shrink-0 text-ink-3" />
             <input
               ref={inputRef}
               value={query}
@@ -156,7 +156,7 @@ export function SearchableSelect({
                     <span className="block truncate font-medium text-ink">{o.label}</span>
                     {o.meta && <span className="block truncate text-[11.5px] text-ink-3">{o.meta}</span>}
                   </span>
-                  {o.value === value && <Check size={14} className="shrink-0 text-brand-600" />}
+                  {o.value === value && <FaCheck size={14} className="shrink-0 text-brand-600" />}
                 </button>
               </li>
             ))}

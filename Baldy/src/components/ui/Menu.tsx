@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { MoreHorizontal } from 'lucide-react'
+import { FaEllipsis } from './icons'
 import { cn } from '../../lib/utils'
 
 export interface MenuAction {
@@ -40,7 +40,7 @@ export function OverflowMenu({ actions, label = 'Aksi lainnya' }: { actions: Men
           open && 'border-hairline bg-sunken text-ink',
         )}
       >
-        <MoreHorizontal size={15} />
+        <FaEllipsis size={15} />
       </button>
 
       {open && (

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, KeyRound, LogIn, ShieldCheck, TriangleAlert, User } from 'lucide-react'
+import {
+  FaEye, FaEyeSlash, FaKey, FaRightToBracket, FaShieldHalved, FaTriangleExclamation, FaUser,
+} from '../components/ui/icons'
 import { useAuth } from '../store/AuthProvider'
 import { Button } from '../components/ui/Button'
 import { Field, Input } from '../components/ui/Field'
@@ -53,7 +55,7 @@ export function LoginPage() {
           <ul className="mt-7 space-y-2.5 text-[13px] text-nav-ink">
             {['Master data karyawan & route', 'Trip + cetak Surat Jalan dengan/tanpa logo', 'Pencarian SI / Job Order tanpa copy-paste', 'Laporan komisi, netto, dan ritan bulan ini'].map((f) => (
               <li key={f} className="flex items-center gap-2.5">
-                <ShieldCheck size={15} className="shrink-0 text-brand-400" />
+                <FaShieldHalved size={15} className="shrink-0 text-brand-400" />
                 {f}
               </li>
             ))}
@@ -79,7 +81,7 @@ export function LoginPage() {
             <Field label="Username" required>
               {(id) => (
                 <div className="relative">
-                  <User size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-3" />
+                  <FaUser size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-3" />
                   <Input id={id} value={username} onChange={(e) => setUsername(e.target.value)} className="pl-8" autoComplete="username" />
                 </div>
               )}
@@ -88,7 +90,7 @@ export function LoginPage() {
             <Field label="Password" required>
               {(id) => (
                 <div className="relative">
-                  <KeyRound size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-3" />
+                  <FaKey size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-3" />
                   <Input
                     id={id}
                     type={lihatPassword ? 'text' : 'password'}
@@ -104,7 +106,7 @@ export function LoginPage() {
                     title={lihatPassword ? 'Sembunyikan password' : 'Tampilkan password'}
                     className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded p-1.5 text-ink-3 transition hover:bg-sunken hover:text-ink"
                   >
-                    {lihatPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    {lihatPassword ? <FaEyeSlash size={15} /> : <FaEye size={15} />}
                   </button>
                 </div>
               )}
@@ -116,12 +118,12 @@ export function LoginPage() {
                 role="alert"
                 className="flex items-start gap-2 rounded-md border border-[#f3d5d5] bg-[#fdf2f2] px-3 py-2.5 text-[12.5px] font-medium text-[#b02c2c]"
               >
-                <TriangleAlert size={15} className="mt-px shrink-0" />
+                <FaTriangleExclamation size={15} className="mt-px shrink-0" />
                 {error}
               </div>
             )}
 
-            <Button type="submit" variant="primary" loading={loading} icon={<LogIn size={15} />} className="h-10 w-full">
+            <Button type="submit" variant="primary" loading={loading} icon={<FaRightToBracket size={15} />} className="h-10 w-full">
               Masuk
             </Button>
           </form>

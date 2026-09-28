@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, FileText, ImagePlus, Loader2, X } from 'lucide-react'
+import { FaChevronLeft, FaChevronRight, FaCircleNotch, FaFileLines, FaImage, FaXmark } from './icons'
 import { TIPE_DITERIMA, simpanLampiran, urlLampiran } from '../../lib/lampiran'
 import type { Berkas } from '../../lib/lampiran'
 import { cn } from '../../lib/utils'
@@ -32,14 +32,14 @@ function Ubin({ id, ukuran, onBuka, onHapus }: {
         className="grid h-full w-full place-items-center overflow-hidden rounded-md border border-hairline bg-sunken transition hover:border-brand-300"
       >
         {data === undefined ? (
-          <Loader2 size={14} className="animate-spin text-ink-3" />
+          <FaCircleNotch size={14} className="animate-spin text-ink-3" />
         ) : data === null ? (
           <span className="px-1 text-center text-[10px] text-ink-3">hilang</span>
         ) : gambar ? (
           <img src={data.url} alt={data.berkas.name} className="h-full w-full object-cover" />
         ) : (
           <span className="flex flex-col items-center gap-0.5 px-1 text-ink-3">
-            <FileText size={ukuran > 48 ? 18 : 14} />
+            <FaFileLines size={ukuran > 48 ? 18 : 14} />
             <span className="max-w-full truncate text-[9.5px]">{data.berkas.name}</span>
           </span>
         )}
@@ -51,7 +51,7 @@ function Ubin({ id, ukuran, onBuka, onHapus }: {
           aria-label="Hapus lampiran"
           className="absolute -top-1.5 -right-1.5 grid h-5 w-5 place-items-center rounded-full border border-hairline bg-surface text-ink-3 shadow-card transition hover:text-[color:var(--color-critical)]"
         >
-          <X size={11} />
+          <FaXmark size={11} />
         </button>
       )}
     </div>
@@ -77,12 +77,12 @@ function Penampil({ ids, awal, onTutup }: { ids: string[]; awal: number; onTutup
     <div className="animate-in-fade fixed inset-0 z-[70] flex flex-col bg-black/85" onClick={onTutup}>
       <div className="flex items-center justify-between px-5 py-3 text-white" onClick={(e) => e.stopPropagation()}>
         <p className="truncate text-[13px]">{data?.berkas.name ?? 'Memuat...'} <span className="text-white/50">· {i + 1} / {ids.length}</span></p>
-        <button type="button" onClick={onTutup} aria-label="Tutup" className="rounded-md p-1.5 hover:bg-white/10"><X size={18} /></button>
+        <button type="button" onClick={onTutup} aria-label="Tutup" className="rounded-md p-1.5 hover:bg-white/10"><FaXmark size={18} /></button>
       </div>
       <div className="relative flex flex-1 items-center justify-center px-14 pb-8" onClick={(e) => e.stopPropagation()}>
         {i > 0 && (
           <button type="button" onClick={() => setI(i - 1)} aria-label="Sebelumnya" className="absolute left-3 rounded-full bg-white/10 p-2 text-white hover:bg-white/20">
-            <ChevronLeft size={20} />
+            <FaChevronLeft size={20} />
           </button>
         )}
         {data?.berkas.type.startsWith('image/') ? (
@@ -98,11 +98,11 @@ function Penampil({ ids, awal, onTutup }: { ids: string[]; awal: number; onTutup
             {data.berkas.type === 'application/pdf' ? 'Buka' : 'Unduh'} {data.berkas.name}
           </a>
         ) : (
-          <Loader2 size={22} className="animate-spin text-white/70" />
+          <FaCircleNotch size={22} className="animate-spin text-white/70" />
         )}
         {i < ids.length - 1 && (
           <button type="button" onClick={() => setI(i + 1)} aria-label="Berikutnya" className="absolute right-3 rounded-full bg-white/10 p-2 text-white hover:bg-white/20">
-            <ChevronRight size={20} />
+            <FaChevronRight size={20} />
           </button>
         )}
       </div>
@@ -181,7 +181,7 @@ export function LampiranInput({
           disabled={mengunggah}
           className="flex h-16 min-w-16 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-hairline px-3 text-[11px] font-medium text-ink-3 transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-60"
         >
-          {mengunggah ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
+          {mengunggah ? <FaCircleNotch size={16} className="animate-spin" /> : <FaImage size={16} />}
           {mengunggah ? 'Menyimpan...' : label}
         </button>
       </div>

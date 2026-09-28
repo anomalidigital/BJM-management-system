@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CalendarRange, Check, ChevronDown, LogOut, Menu, Search } from 'lucide-react'
+import { FaBars, FaCalendarDays, FaCheck, FaChevronDown, FaMagnifyingGlass, FaRightFromBracket } from '../ui/icons'
 import { useAuth } from '../../store/AuthProvider'
 import { useData } from '../../store/DataProvider'
 import { WORKSPACE_LIST, useWorkspace } from '../../store/WorkspaceProvider'
@@ -10,7 +10,6 @@ import { Badge } from '../ui/Badge'
 import { initials, monthLabel } from '../../lib/format'
 import { cn } from '../../lib/utils'
 import type { Workspace } from '../../types'
-import { KodeDepot } from './KodeDepot'
 
 /**
  * Baris atas: pencarian cepat, periode aktif, dan satu menu akun yang memuat
@@ -66,12 +65,12 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
         aria-label="Buka menu"
         className="rounded-md p-1.5 text-ink-2 transition hover:bg-sunken lg:hidden"
       >
-        <Menu size={19} />
+        <FaBars size={19} />
       </button>
 
       {/* Lompat langsung ke pencarian SI/JO tanpa copy-paste antar halaman */}
       <form onSubmit={submitQuick} className="relative hidden w-72 sm:block">
-        <Search size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-3" />
+        <FaMagnifyingGlass size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-3" />
         <input
           value={quick}
           onChange={(e) => setQuick(e.target.value)}
@@ -83,7 +82,7 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
 
       <div className="ml-auto flex items-center gap-3">
         <span className="hidden items-center gap-1.5 rounded-md border border-hairline bg-sunken px-2.5 py-1.5 text-[12px] font-medium text-ink-2 md:inline-flex">
-          <CalendarRange size={14} className="text-ink-3" />
+          <FaCalendarDays size={14} className="text-ink-3" />
           Periode: {monthLabel(periodeAktif(transactionRows.map((t) => t.transaction_date)).start)}
         </span>
 
@@ -104,12 +103,11 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
             <span className="hidden text-left sm:block">
               <span className="block text-[12.5px] leading-tight font-semibold text-ink">{user?.name}</span>
               {/* Workspace aktif ikut tampil, karena seluruh isi halaman mengikutinya */}
-              <span className="mt-0.5 flex items-center gap-1.5 text-[11px] leading-tight text-ink-3">
-                <KodeDepot kode={meta.code} warna={meta.steel} className="h-[14px] px-[4px] text-[10px]" />
+              <span className="block text-[11px] leading-tight text-ink-3">
                 {meta.label}
               </span>
             </span>
-            <ChevronDown size={14} className="text-ink-3" />
+            <FaChevronDown size={14} className="text-ink-3" />
           </button>
 
           {menuOpen && (
@@ -144,7 +142,7 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
                       )}
                     >
                       <span className="min-w-0 flex-1 truncate">{w.label}</span>
-                      {active && <Check size={15} className="shrink-0 text-brand-600" />}
+                      {active && <FaCheck size={15} className="shrink-0 text-brand-600" />}
                     </button>
                   )
                 })}
@@ -155,7 +153,7 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
                 onClick={onLogout}
                 className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-[13px] font-medium text-ink-2 transition hover:bg-sunken hover:text-ink"
               >
-                <LogOut size={15} />
+                <FaRightFromBracket size={15} />
                 Logout
               </button>
             </div>

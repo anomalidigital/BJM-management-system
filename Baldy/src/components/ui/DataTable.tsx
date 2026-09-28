@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
+import { FaArrowDown, FaArrowUp, FaSort } from './icons'
 import { cn } from '../../lib/utils'
 import type { SortDir } from '../../lib/utils'
 import { ErrorState, TableSkeleton } from './States'
@@ -122,9 +122,9 @@ export function DataTable<T>({
                     >
                       {c.header}
                       {active ? (
-                        sort!.dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                        sort!.dir === 'asc' ? <FaArrowUp size={12} /> : <FaArrowDown size={12} />
                       ) : (
-                        <ChevronsUpDown size={12} className="opacity-40" />
+                        <FaSort size={12} className="opacity-40" />
                       )}
                     </button>
                   ) : (

@@ -1,7 +1,10 @@
-import type { CommissionTransaction, Database, UjPayment } from '../types'
-import { aturanKomisiMeeting, generateDatabase, generateSampleDatabase, projectDominanPerRoute, workspaceForSeed } from '../data/dummy'
+import type { CommissionTransaction, Database, Project, UjPayment } from '../types'
+import {
+  aturanKomisiMeeting, generateDatabase, generateSampleDatabase, makeKlienKontrak, projectDominanPerRoute, workspaceForSeed,
+} from '../data/dummy'
 import { susunKasbonDariDataLama } from '../lib/kasbon'
 import { nomorTripBerikut } from '../lib/kode'
+import { uid } from '../lib/utils'
 
 const DB_KEY = 'sikotis.db.v2'
 const AUTH_KEY = 'sikotis.auth.v1'
@@ -304,6 +307,33 @@ function migrate(stored: Record<string, unknown>): Database {
   if (!Array.isArray(merged.tripNotes)) merged.tripNotes = []
   if (!Array.isArray(merged.contracts)) merged.contracts = []
 
+  // Kontrak kini milik Klien (Master -> Klien). Kontrak lama menyimpan nama client
+  // sebagai teks: dicocokkan ke Klien bernama sama, atau dibuatkan Klien baru
+  // supaya tidak ada kontrak tanpa pemilik.
+  const kontrak = merged.contracts as Array<Record<string, unknown>>
+  if (kontrak.some((c) => !('project_id' in c))) {
+    const klien = [...((merged.projects ?? []) as Project[])]
+    const contoh = makeKlienKontrak(stamp)
+    merged.contracts = kontrak.map(({ client_name, ...c }) => {
+      if ('project_id' in c) return c
+      const nama = String(client_name ?? '').trim()
+      const sama = (p: Project) => p.project_name.trim().toLowerCase() === nama.toLowerCase()
+      let pemilik = klien.find(sama)
+      if (!pemilik && nama) {
+        pemilik = contoh.find(sama) ?? klienDariNama(nama, klien, stamp)
+        klien.push(pemilik)
+      }
+      return { ...c, project_id: pemilik?.id ?? '' }
+    })
+    merged.projects = klien
+  }
+  // Trip Dedicated yang belum berklien mengikuti klien kontraknya.
+  const klienKontrak = new Map((merged.contracts as Array<Record<string, unknown>>).map((c) => [String(c.id), String(c.project_id ?? '')]))
+  merged.transactions = (merged.transactions as Array<Record<string, unknown>>).map((t) => {
+    const pemilik = t.contract_id && !t.project_id ? klienKontrak.get(String(t.contract_id)) : ''
+    return pemilik ? { ...t, project_id: pemilik } : t
+  })
+
   // Aturan komisi dari catatan meeting, ditambahkan sekali per workspace.
   if (perluAturanMeeting) {
     merged.commissionSchemes = [
@@ -331,6 +361,19 @@ function migrate(stored: Record<string, unknown>): Database {
   }
 
   return merged as unknown as Database
+}
+
+/** Klien baru untuk kontrak lama; kodenya singkatan nama (PT/CV diabaikan), dijamin unik. */
+function klienDariNama(nama: string, ada: Project[], stamp: string): Project {
+  const kata = nama.toUpperCase().split(/[^A-Z0-9]+/).filter((k) => k && !['PT', 'CV', 'UD', 'TBK'].includes(k))
+  const dasar = kata.map((k) => k[0]).join('').slice(0, 5) || 'KLIEN'
+  const terpakai = new Set(ada.map((p) => p.project_code.toUpperCase()))
+  let kode = dasar
+  for (let i = 2; terpakai.has(kode); i++) kode = `${dasar}${i}`
+  return {
+    id: uid('prj'), project_code: kode, project_name: nama, description: 'Dibuat dari data kontrak.',
+    requires_document: true, status: 'aktif', created_at: stamp, updated_at: stamp,
+  }
 }
 
 /** Data tersimpan belum mengenal aturan komisi berdasar (sebelum catatan meeting). */

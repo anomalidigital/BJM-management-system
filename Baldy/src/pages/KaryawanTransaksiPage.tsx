@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Link2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { FaArrowLeft, FaLink, FaPen, FaPlus, FaTrashCan } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader, InfoItem } from '../components/ui/Card'
 import { Tabs } from '../components/ui/Tabs'
@@ -227,8 +227,8 @@ export function KaryawanTransaksiPage() {
         crumbs={[{ label: 'Master' }, { label: 'Data Karyawan', to: '/master/karyawan' }, { label: orang.driver_name }]}
         actions={
           <>
-            <Button icon={<ArrowLeft size={15} />} onClick={() => navigate('/master/karyawan')}>Kembali</Button>
-            <Button variant="primary" icon={<Plus size={15} />} disabled={!canEdit} onClick={bukaTambah}>Tambah Transaksi</Button>
+            <Button icon={<FaArrowLeft size={15} />} onClick={() => navigate('/master/karyawan')}>Kembali</Button>
+            <Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={bukaTambah}>Tambah Transaksi</Button>
           </>
         }
       />
@@ -304,13 +304,13 @@ export function KaryawanTransaksiPage() {
                 Kasbon bertambah saat diberikan admin, dan berkurang saat dipotong dari uang jalan trip. Potongan dan
                 pembatalan trip tercatat otomatis dari halaman trip.
               </p>
-              <Button size="sm" variant="primary" icon={<Plus size={14} />} disabled={!canEdit} onClick={bukaTambah}>Tambah Transaksi</Button>
+              <Button size="sm" variant="primary" icon={<FaPlus size={14} />} disabled={!canEdit} onClick={bukaTambah}>Tambah Transaksi</Button>
             </div>
             {mutasi.length === 0 ? (
               <div className="px-6 py-14 text-center">
                 <p className="text-[14px] font-semibold text-ink">Belum ada transaksi kasbon.</p>
                 <p className="mt-1 text-[13px] text-ink-3">Catat kasbon pertama yang diberikan ke {orang.driver_name}.</p>
-                {canEdit && <Button className="mt-4" variant="primary" icon={<Plus size={15} />} onClick={bukaTambah}>Tambah Transaksi</Button>}
+                {canEdit && <Button className="mt-4" variant="primary" icon={<FaPlus size={15} />} onClick={bukaTambah}>Tambah Transaksi</Button>}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -336,13 +336,13 @@ export function KaryawanTransaksiPage() {
                           {e.uj_payment_id ? (
                             <IconButton
                               label={e.kind === 'pembatalan' ? 'Otomatis dari pembatalan trip' : 'Diatur dari termin uang jalan trip'}
-                              icon={<Link2 size={14} />}
+                              icon={<FaLink size={14} />}
                               onClick={() => navigate(`/transaksi/trip/${e.trip_id}${e.kind === 'trip' ? '?tab=uj' : ''}`)}
                             />
                           ) : (
                             <div className="flex justify-end gap-1">
-                              <IconButton label="Ubah" icon={<Pencil size={14} />} disabled={!canEdit} onClick={() => bukaUbah(e)} />
-                              <IconButton label="Hapus" tone="danger" icon={<Trash2 size={14} />} disabled={!canEdit} onClick={() => setDeleting(e)} />
+                              <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!canEdit} onClick={() => bukaUbah(e)} />
+                              <IconButton label="Hapus" tone="danger" icon={<FaTrashCan size={14} />} disabled={!canEdit} onClick={() => setDeleting(e)} />
                             </div>
                           )}
                         </td>

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { FaChevronRight } from '../ui/icons'
 import { Link } from 'react-router-dom'
 import { findNavHref } from './navigation'
 
@@ -31,7 +31,7 @@ export function PageHeader({
             const href = terakhir ? undefined : (c.to ?? findNavHref(c.label))
             return (
               <span key={`${c.label}-${i}`} className="flex items-center gap-1">
-                {i > 0 && <ChevronRight size={12} className="text-ink-3/60" />}
+                {i > 0 && <FaChevronRight size={12} className="text-ink-3/60" />}
                 {href ? (
                   <Link
                     to={href}

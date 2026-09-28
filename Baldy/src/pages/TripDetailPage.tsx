@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Ban, Pencil, Printer, Trash2 } from 'lucide-react'
+import { FaArrowLeft, FaBan, FaPen, FaPrint, FaTrashCan } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { Tabs } from '../components/ui/Tabs'
@@ -144,14 +144,14 @@ export function TripDetailPage() {
         actions={
           <>
             <Badge tone={STATUS_TONE[trip.status]}>{STATUS_LABEL[trip.status]}</Badge>
-            <Button icon={<ArrowLeft size={15} />} onClick={() => navigate('/transaksi/trip')}>Kembali</Button>
-            <Button icon={<Pencil size={15} />} disabled={!bisaUbah} onClick={() => navigate(`/transaksi/trip/${trip.id}/edit`)}>Edit</Button>
-            <Button variant="outlineDanger" icon={<Ban size={15} />} disabled={!bisaUbah} onClick={() => setMembatalkan(true)}>
+            <Button icon={<FaArrowLeft size={15} />} onClick={() => navigate('/transaksi/trip')}>Kembali</Button>
+            <Button icon={<FaPen size={15} />} disabled={!bisaUbah} onClick={() => navigate(`/transaksi/trip/${trip.id}/edit`)}>Edit</Button>
+            <Button variant="outlineDanger" icon={<FaBan size={15} />} disabled={!bisaUbah} onClick={() => setMembatalkan(true)}>
               Batalkan Trip
             </Button>
-            <Button variant="primary" icon={<Printer size={15} />} onClick={() => setPrinting(true)}>Cetak Surat Jalan</Button>
+            <Button variant="primary" icon={<FaPrint size={15} />} onClick={() => setPrinting(true)}>Cetak Surat Jalan</Button>
             <OverflowMenu
-              actions={[{ label: 'Hapus Trip', icon: <Trash2 size={14} />, tone: 'danger', disabled: !canEdit, onSelect: () => setMenghapus(true) }]}
+              actions={[{ label: 'Hapus Trip', icon: <FaTrashCan size={14} />, tone: 'danger', disabled: !canEdit, onSelect: () => setMenghapus(true) }]}
             />
           </>
         }
@@ -159,7 +159,7 @@ export function TripDetailPage() {
 
       {batal && (
         <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-[#f3d5d5] bg-[#fdf2f2] px-4 py-3 text-[13px] text-[#8a2424]">
-          <Ban size={16} className="mt-px shrink-0 text-[#b02c2c]" />
+          <FaBan size={16} className="mt-px shrink-0 text-[#b02c2c]" />
           <div>
             <p>
               <span className="font-semibold text-[#b02c2c]">
