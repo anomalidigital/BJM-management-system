@@ -1,5 +1,7 @@
-import type { Database } from '../types'
-import { generateDatabase, generateSampleDatabase, workspaceForSeed } from '../data/dummy'
+import type { CommissionTransaction, Database, UjPayment } from '../types'
+import { aturanKomisiMeeting, generateDatabase, generateSampleDatabase, projectDominanPerRoute, workspaceForSeed } from '../data/dummy'
+import { susunKasbonDariDataLama } from '../lib/kasbon'
+import { nomorTripBerikut } from '../lib/kode'
 
 const DB_KEY = 'sikotis.db.v2'
 const AUTH_KEY = 'sikotis.auth.v1'
@@ -8,7 +10,7 @@ const WORKSPACE_KEY = 'sikotis.workspace.v1'
 /** Koleksi inti yang sudah ada sejak versi pertama. */
 const CORE_KEYS: Array<keyof Database> = ['drivers', 'routes', 'vehicles', 'jobOrders', 'transactions', 'billings']
 /** Koleksi yang ditambahkan belakangan - boleh belum ada di data tersimpan. */
-const ADDED_KEYS: Array<keyof Database> = ['deliveryNotes', 'projects', 'ujPayments', 'expenses', 'internalCosts', 'commissionSchemes']
+const ADDED_KEYS: Array<keyof Database> = ['projects', 'ujPayments', 'expenses', 'internalCosts', 'commissionSchemes']
 
 function hasCore(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false
@@ -35,29 +37,66 @@ function migrate(stored: Record<string, unknown>): Database {
   //    tersimpan tetap terbaca dan tidak ada kolom kosong di tabel.
   const trx = merged.transactions as Array<Record<string, unknown>> | undefined
   if (Array.isArray(trx)) {
-    merged.transactions = trx.map((t) => ({
-      project_id: '',
-      tr_reference: '',
-      pi_number: '',
-      pi_status: '',
-      cost_value: 0,
-      notes: '',
-      ...t,
-      // Field lama is_done dipetakan ke status baru, bukan dibuang.
-      status: t.status ?? (t.is_done ? 'selesai' : 'aktif'),
-    }))
+    merged.transactions = trx.map((t) => {
+      const sopir = String(t.driver_id ?? '')
+      const kont = String(t.container_no ?? '').trim()
+      return {
+        project_id: '',
+        tr_reference: '',
+        pi_number: '',
+        pi_status: '',
+        cost_value: 0,
+        notes: '',
+        // Trip menyerap field Surat Jalan: ID Perjalanan (dulu Kont), banyak sopir,
+        // manager, penerima, dan rincian pengiriman.
+        trip_ids: kont ? [kont] : [],
+        driver_ids: sopir ? [sopir] : [],
+        manager_id: '',
+        manager_name: '',
+        sj_no: '',
+        recipient_name: '',
+        recipient_address_1: '',
+        recipient_address_2: '',
+        party: '',
+        goods_type: '',
+        kosongan: '',
+        location: '',
+        ship: '',
+        printed_at: null,
+        service_type: 'callout',
+        contract_id: '',
+        cancelled_at: null,
+        cancel_reason: '',
+        cancel_settlement: [],
+        ...t,
+        container_no: '',
+        // Field lama is_done dipetakan ke status baru, bukan dibuang.
+        status: t.status ?? (t.is_done ? 'selesai' : 'aktif'),
+      }
+    })
   }
+
+  // Karyawan: peran baru, semua data lama adalah sopir.
+  const drv = merged.drivers as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(drv)) merged.drivers = drv.map((d) => ({ role: 'sopir', attachments: [], ...d }))
 
   const veh = merged.vehicles as Array<Record<string, unknown>> | undefined
   if (Array.isArray(veh)) {
-    merged.vehicles = veh.map((v) => ({ configuration: '', ...v }))
+    merged.vehicles = veh.map((v) => ({ configuration: '', attachments: [], ...v }))
   }
 
   // Kolom ukuran container semula bernama "fart" (salah baca dari "feet").
-  // Uang Tol baru ditambahkan, jadi route lama diberi nilai awal 0.
+  // Uang Tol dan Project baru ditambahkan, jadi route lama diberi nilai awal.
+  // Project route lama diambil dari project yang paling sering dipakai trip
+  // pada route itu; route yang belum pernah dipakai dibiarkan kosong.
   const rte = merged.routes as Array<Record<string, unknown>> | undefined
   if (Array.isArray(rte)) {
-    merged.routes = rte.map(({ fart, ...r }) => ({ feet: fart ?? '', toll: 0, ...r }))
+    const projectRoute = rte.some((r) => !('project_id' in r))
+      ? projectDominanPerRoute((merged.transactions ?? []) as CommissionTransaction[])
+      : new Map<string, string>()
+    merged.routes = rte.map(({ fart, ...r }) => ({
+      feet: fart ?? '', toll: 0, project_id: projectRoute.get(String(r.id)) ?? '', ...r,
+    }))
   }
 
   /* Workspace (Jakarta / Tangerang).
@@ -67,6 +106,9 @@ function migrate(stored: Record<string, unknown>): Database {
    * Surat Jalan yang memakai kendaraan itu jatuh ke cabang yang sama.
    * Tagihan mengikuti SI/JO-nya. Pembagian ini SEMENTARA - begitu klien
    * memberi daftar armada per cabang, cukup ganti workspaceForSeed(). */
+  const tagihanTanpaWs = new Set(
+    ((merged.billings ?? []) as Array<Record<string, unknown>>).filter((b) => !b.workspace).map((b) => String(b.id)),
+  )
   const beriWorkspace = (
     key: 'transactions' | 'deliveryNotes' | 'billings',
     seedField: string,
@@ -85,37 +127,50 @@ function migrate(stored: Record<string, unknown>): Database {
   beriWorkspace('deliveryNotes', 'vehicle_id')
   beriWorkspace('billings', 'job_order_id')
 
-  // Pengaturan Komisi: Nama, Target, Komisi Dasar, Komisi Target, Catatan.
-  // Realisasi dan periode dibuang - halaman ini hanya mengatur nilai, bukan
-  // memantau pencapaian. Bentuk ringkas sebelumnya (satu kolom `commission`)
-  // dipakai untuk kedua nilai sekaligus.
+  // Pengaturan Komisi kini bertingkat (target awal - akhir) untuk satu peran.
+  // Bentuk lama "komisi dasar sampai target, komisi target setelahnya" diubah
+  // tepat menjadi dua tingkat, jadi tidak ada nilai yang hilang.
   const skema = merged.commissionSchemes as Array<Record<string, unknown>> | undefined
+  const perluAturanMeeting = perluAturanMeetingAwal(skema)
+  // Aturan lama adalah contoh sebelum catatan meeting: disimpan tapi dinonaktifkan
+  // supaya tidak menghasilkan komisi untuk kendaraan di luar aturan meeting.
+  const aturanDefault = { service_type: 'callout', configurations: [], basis: 'nilai', base_deduction_pct: 0, is_active: !perluAturanMeeting }
   if (Array.isArray(skema)) {
     merged.commissionSchemes = skema.map((c) => {
-      const { commission, commission_unit, realization, period, ...tetap } = c
+      if (Array.isArray(c.tiers)) return { role: 'sopir', notes: '', ...aturanDefault, ...c }
+      const {
+        target, base_commission, base_commission_unit, target_commission, target_commission_unit,
+        commission, commission_unit, realization, period, ...tetap
+      } = c
       void realization
       void period
+      const batas = Number(target ?? 0)
       return {
+        ...aturanDefault,
         ...tetap,
+        role: 'sopir',
         notes: tetap.notes ?? '',
-        base_commission: tetap.base_commission ?? commission ?? 0,
-        base_commission_unit: tetap.base_commission_unit ?? commission_unit ?? 'rp',
-        target_commission: tetap.target_commission ?? commission ?? 0,
-        target_commission_unit: tetap.target_commission_unit ?? commission_unit ?? 'rp',
+        tiers: [
+          { target_awal: 0, target_akhir: batas, commission: Number(base_commission ?? commission ?? 0), commission_unit: base_commission_unit ?? commission_unit ?? 'rp' },
+          { target_awal: batas, target_akhir: 0, commission: Number(target_commission ?? commission ?? 0), commission_unit: target_commission_unit ?? commission_unit ?? 'rp' },
+        ],
       }
     })
   }
 
-  // Tagihan sebisa mungkin mengikuti workspace trip pada SI/JO yang sama.
+  // Tagihan yang baru diberi workspace sebisa mungkin mengikuti trip pada SI/JO
+  // yang sama. Hanya sekali saat migrasi: tagihan yang sudah punya workspace
+  // tidak dipindah-pindah mengikuti trip yang dibuat belakangan.
   const trxWs = merged.transactions as Array<Record<string, unknown>> | undefined
   const bil = merged.billings as Array<Record<string, unknown>> | undefined
-  if (Array.isArray(trxWs) && Array.isArray(bil)) {
+  if (Array.isArray(trxWs) && Array.isArray(bil) && tagihanTanpaWs.size > 0) {
     const wsPerJo = new Map<string, unknown>()
     for (const t of trxWs) {
       const jo = String(t.job_order_id ?? '')
       if (jo && !wsPerJo.has(jo)) wsPerJo.set(jo, t.workspace)
     }
     merged.billings = bil.map((b) => {
+      if (!tagihanTanpaWs.has(String(b.id))) return b
       const ws = wsPerJo.get(String(b.job_order_id ?? ''))
       return ws ? { ...b, workspace: ws } : b
     })
@@ -163,7 +218,124 @@ function migrate(stored: Record<string, unknown>): Database {
     })
   }
 
+  const stamp = new Date().toISOString()
+  const trips = (merged.transactions as Array<Record<string, unknown>> | undefined) ?? []
+
+  /* Surat Jalan digabung ke Trip.
+   *
+   * Tiap Surat Jalan menjadi satu trip dengan rincian dokumennya utuh. Tidak ada
+   * yang dicocokkan ke trip lama: pengujian sebelumnya menunjukkan tidak satu pun
+   * Surat Jalan punya pasangan trip (SI/JO + kendaraan), jadi menebak pasangan
+   * justru berisiko menempelkan dokumen ke perjalanan yang salah. */
+  const sj = merged.deliveryNotes as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(sj) && sj.length > 0) {
+    const nomor = trips.map((t) => String(t.transaction_no ?? ''))
+    const idAda = new Set(trips.map((t) => String(t.id)))
+    for (const n of sj) {
+      const tanggal = String(n.sj_date ?? '') || stamp.slice(0, 10)
+      const no = nomorTripBerikut(nomor, tanggal)
+      nomor.push(no)
+      const sopir = String(n.driver_id ?? '')
+      const id = idAda.has(String(n.id)) ? `trp-${n.id}` : String(n.id)
+      trips.push({
+        id,
+        workspace: n.workspace,
+        transaction_no: no,
+        transaction_date: tanggal,
+        trip_ids: Array.isArray(n.containers) ? (n.containers as unknown[]).map(String).filter(Boolean) : [],
+        route_id: String(n.route_id ?? ''),
+        sj_no: String(n.sj_no ?? ''),
+        manager_id: '',
+        manager_name: '',
+        project_id: '',
+        status: n.printed_at ? 'aktif' : 'draft',
+        recipient_name: String(n.recipient_name ?? ''),
+        recipient_address_1: String(n.recipient_address_1 ?? ''),
+        recipient_address_2: String(n.recipient_address_2 ?? ''),
+        vehicle_id: String(n.vehicle_id ?? ''),
+        driver_id: sopir,
+        driver_ids: sopir ? [sopir] : [],
+        job_order_id: String(n.job_order_id ?? ''),
+        party: String(n.party ?? ''),
+        goods_type: String(n.goods_type ?? ''),
+        kosongan: String(n.kosongan ?? ''),
+        location: String(n.location ?? ''),
+        ship: String(n.ship ?? ''),
+        destination_detail: String(n.destination ?? ''),
+        tr_reference: '',
+        pi_number: '',
+        pi_status: '',
+        cost_value: 0,
+        notes: '',
+        is_marked: false,
+        bon_date: null,
+        personal_bon: 0,
+        printed_at: n.printed_at ?? null,
+        service_type: 'callout',
+        contract_id: '',
+        cancelled_at: null,
+        cancel_reason: '',
+        cancel_settlement: [],
+        container_no: '',
+        created_at: n.created_at ?? stamp,
+        updated_at: n.updated_at ?? stamp,
+      })
+    }
+    merged.transactions = trips
+  }
+  delete merged.deliveryNotes
+
+  // Anak trip: lampiran, penerima termin, dan penerima komisi.
+  const sopirTrip = new Map(trips.map((t) => [String(t.id), String(t.driver_id ?? '')]))
+  const uj = merged.ujPayments as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(uj)) {
+    merged.ujPayments = uj.map((p) => ({
+      attachments: [],
+      ...p,
+      driver_id: p.driver_id ?? sopirTrip.get(String(p.trip_id)) ?? '',
+    }))
+  }
+  const exp = merged.expenses as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(exp)) merged.expenses = exp.map((e) => ({ attachments: [], ...e }))
+  const intr = merged.internalCosts as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(intr)) {
+    merged.internalCosts = intr.map((c) => ({ attachments: [], recipient_role: '', recipient_id: '', recipient_name: '', ...c }))
+  }
+  if (!Array.isArray(merged.tripNotes)) merged.tripNotes = []
+  if (!Array.isArray(merged.contracts)) merged.contracts = []
+
+  // Aturan komisi dari catatan meeting, ditambahkan sekali per workspace.
+  if (perluAturanMeeting) {
+    merged.commissionSchemes = [
+      ...aturanKomisiMeeting('jakarta', 'cms-meeting-jkt', stamp),
+      ...aturanKomisiMeeting('tangerang', 'cms-meeting-tng', stamp),
+      ...(merged.commissionSchemes as unknown[]),
+    ]
+  }
+
+  // Biaya internal jenis "Uang Jalan" dihapus: UJ hanya dicatat di tab Uang Jalan.
+  const intr2 = merged.internalCosts as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(intr2)) {
+    merged.internalCosts = intr2.map((c) => (c.cost_type === 'Uang Jalan'
+      ? { ...c, cost_type: 'Lainnya', notes: ['Uang jalan internal (jenis lama)', c.notes].filter(Boolean).join(' - ') }
+      : c))
+  }
+
+  // Kasbon karyawan baru ada sekarang: disusun dari potong kasbon yang tercatat.
+  if (!Array.isArray(merged.kasbonEntries)) {
+    merged.kasbonEntries = susunKasbonDariDataLama(
+      (merged.ujPayments ?? []) as UjPayment[],
+      (merged.transactions ?? []) as CommissionTransaction[],
+      stamp,
+    )
+  }
+
   return merged as unknown as Database
+}
+
+/** Data tersimpan belum mengenal aturan komisi berdasar (sebelum catatan meeting). */
+function perluAturanMeetingAwal(skema: unknown): boolean {
+  return Array.isArray(skema) && !skema.some((c) => c && typeof c === 'object' && 'basis' in c)
 }
 
 /** Muat dari localStorage; jika kosong / rusak, bangun ulang dari dummy. */

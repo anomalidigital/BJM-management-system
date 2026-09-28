@@ -51,7 +51,8 @@ export function LapRitanPage() {
   const cities = useMemo(() => Array.from(new Set(db.drivers.map((d) => d.city))).sort(), [db.drivers])
 
   const monthRows = useMemo(
-    () => transactionRows.filter((t) => t.transaction_date >= monthStart && t.transaction_date <= monthEnd),
+    // Trip batal bukan ritan.
+    () => transactionRows.filter((t) => t.status !== 'batal' && t.transaction_date >= monthStart && t.transaction_date <= monthEnd),
     [transactionRows, monthStart, monthEnd],
   )
 
@@ -61,7 +62,8 @@ export function LapRitanPage() {
   )
   const extraFilter = useCallback(
     (t: TransactionRow) =>
-      (!driverFilter || t.driver_id === driverFilter) &&
+      // Sopir tambahan ikut menempuh ritan yang sama.
+      (!driverFilter || t.driver_ids.includes(driverFilter)) &&
       (!cityFilter || driverCity.get(t.driver_id) === cityFilter),
     [driverFilter, cityFilter, driverCity],
   )

@@ -1,7 +1,7 @@
 /**
  * SIKOTIS - domain types.
  * Nama field mengikuti kosakata bisnis yang dipakai PT Bimajaya Mustika:
- * SIJO, Data Cost, Kode Cust, UJROUTE, Komisioner, S/JO, Ritan, Bon Pribadi.
+ * SIJO, Data Cost, Kode Cust, UJROUTE, Komisi Sopir, S/JO, Ritan, Bon Pribadi.
  */
 
 export type Role = 'admin' | 'viewer'
@@ -27,16 +27,33 @@ export interface WorkspaceScoped {
   workspace?: Workspace
 }
 
-/** Master -> Data Sopir */
+/**
+ * Lampiran (gambar / PDF) tidak disimpan di dalam record: isinya tinggal di
+ * IndexedDB (lib/lampiran.ts), record hanya menyimpan daftar id-nya.
+ */
+export type Lampiran = string[]
+
+/** Peran karyawan. Sopir adalah karyawan yang membawa kendaraan. */
+export const EMPLOYEE_ROLES = ['sopir', 'manager'] as const
+export type EmployeeRole = (typeof EMPLOYEE_ROLES)[number]
+export const ROLE_LABEL: Record<EmployeeRole, string> = { sopir: 'Sopir', manager: 'Manager' }
+
+/**
+ * Master -> Data Karyawan (dulu Data Sopir).
+ * Nama tipe dan koleksinya tetap `Driver` / `drivers` supaya data lama tetap
+ * terbaca; yang berubah adalah maknanya: karyawan dengan peran.
+ */
 export interface Driver {
   id: string
   driver_code: string            // Kode
-  driver_name: string            // Nama Sopir
+  driver_name: string            // Nama
+  role: EmployeeRole             // Peran: sopir / manager
   address_1: string              // Alamat   (alamat jalan)
-  address_2: string              // Alamat 2 (kecamatan / area - lihat catatan bagian 4 dokumen)
+  address_2: string              // Alamat 2 (kecamatan / area)
   city: string                   // Kota
   phone: string
   status: 'aktif' | 'nonaktif'
+  attachments: Lampiran          // KTP, SIM, dan dokumen lain karyawan
   created_at: string
   updated_at: string
 }
@@ -46,24 +63,30 @@ export interface Route {
   id: string
   route_code: string             // No. Route
   route_name: string             // Nama Route
+  project_id: string             // Project pemilik route - satu route, satu project
   feet: string                   // Feet - ukuran container, mis. 1X40 (1 x 40 kaki)
   ujroute: number                // UJROUTE - uang jalan baku untuk route ini
-  toll: number                   // Uang Tol - biaya tol baku untuk route ini
-  commissioner: number           // Komisi Sopir (dulu berlabel "Komisioner")
+  toll: number                   // Uang Tol - patokan tol; yang dibayar dicatat di biaya operasional
+  /**
+   * Peninggalan kolom "Komisioner" aplikasi lama. Tidak dipakai lagi: komisi
+   * kini dihitung dari master Komisi (bertingkat per kendaraan & layanan).
+   */
+  commissioner: number
   price: number                  // Harga
   created_at: string
   updated_at: string
 }
 
 /** Konfigurasi kendaraan - sebelumnya menempel pada nama sopir di spreadsheet. */
-export const VEHICLE_CONFIGS = ['6X6', '4X4', 'DL', 'LB', 'HB', 'EXT', 'TRONTON', 'DOLLY'] as const
+export const VEHICLE_CONFIGS = ['6X6', '4X4', 'DL', 'LB', 'HB', 'EXT', 'TRONTON', 'DOLLY', 'CDD'] as const
 
 export interface Vehicle {
   id: string
-  plate_number: string           // No Mobil / No. Polisi
+  plate_number: string           // No. Kendaraan
   vehicle_type: string
   configuration: string          // 6X6, DL, LB, HB, EXT, TRONTON, DOLLY - boleh kosong
   status: 'aktif' | 'servis' | 'nonaktif'
+  attachments: Lampiran          // Foto kendaraan, STNK, dsb.
   created_at: string
   updated_at: string
 }
@@ -100,30 +123,100 @@ export interface JobOrder {
 export type TripStatus = 'draft' | 'aktif' | 'selesai' | 'batal'
 
 /**
- * Transaksi -> Data Trip / Komisi.
- * Entity operasional inti. Identifier TR / SIJO / No PI sengaja DIPISAH -
- * belum ada bukti ketiganya merujuk hal yang sama.
+ * Jenis layanan, dipilih di awal form trip.
+ * - callout   : order per perjalanan (form lengkap)
+ * - dedicated : kendaraan dikontrak satu client; wajib nomor kontrak
+ */
+export const SERVICE_TYPES = ['callout', 'dedicated'] as const
+export type ServiceType = (typeof SERVICE_TYPES)[number]
+export const SERVICE_LABEL: Record<ServiceType, string> = { callout: 'Callout', dedicated: 'Dedicated' }
+
+/** Master -> Data Kontrak: kontrak layanan Dedicated dengan satu client. */
+export interface Contract extends WorkspaceScoped {
+  id: string
+  contract_no: string            // Nomor Kontrak
+  client_name: string            // Nama client
+  value: number                  // Nilai kontrak
+  start_date: string
+  end_date: string
+  status: 'aktif' | 'selesai'
+  notes: string
+  attachments: Lampiran          // Dokumen kontrak
+  created_at: string
+  updated_at: string
+}
+
+/** Penyelesaian uang jalan yang sudah diterima sopir saat trip dibatalkan. */
+export interface PenyelesaianUj {
+  uj_payment_id: string
+  driver_id: string
+  tf: number                     // yang sudah ditransfer ke sopir
+  cara: 'kembali' | 'kasbon'     // dikembalikan tunai / dijadikan kasbon sopir
+}
+
+/**
+ * Transaksi -> Trip.
+ *
+ * Satu record = satu perjalanan beserta dokumen Surat Jalan-nya DAN catatan
+ * keuangannya (uang jalan, biaya operasional, biaya internal, lainnya).
+ * Dulu terpisah menjadi Surat Jalan dan Data Pengeluaran; keduanya digabung
+ * supaya setiap perjalanan punya satu tempat untuk seluruh catatannya.
+ *
+ * Nama tipe dan koleksi (`transactions`) dipertahankan karena seluruh laporan
+ * membaca dari sini.
  */
 export interface CommissionTransaction extends WorkspaceScoped {
   id: string
-  transaction_no: string         // NoTrans
+  transaction_no: string         // Nomor Trip (NoTrans)
   transaction_date: string       // Tanggal (ISO yyyy-mm-dd)
-  driver_id: string              // Kode Sopir / Nama Sopir
-  vehicle_id: string             // No Mobil
-  job_order_id: string           // S / JO
-  route_id: string               // Kode Route
-  destination_detail: string     // Detail Tujuan
-  container_no: string           // Kont
+  service_type: ServiceType      // Callout / Dedicated
+  contract_id: string            // Kontrak, wajib untuk Dedicated
+
+  /* Konfigurasi */
+  trip_ids: string[]             // ID Perjalanan / Trip - boleh lebih dari satu
+  route_id: string               // Rute - satu per trip
+
+  /* Informasi dokumen */
+  sj_no: string                  // Nomor Surat Jalan (dokumen cetak)
+  manager_id: string             // Manager terdaftar (karyawan berperan manager)
+  manager_name: string           // ...atau diisi manual
   project_id: string             // Project (SLB / CASH / ATLAS / PDT)
-  tr_reference: string           // TR  - JANGAN disamakan dengan SIJO (TBD-08)
-  pi_number: string              // No PI (nomor saja)
-  pi_status: string              // status yang di spreadsheet tercampur ke No PI
-  cost_value: number             // COST - makna bisnis belum dikonfirmasi (TBD-02)
   status: TripStatus
+
+  /* Penerima */
+  recipient_name: string         // Kepada Yth
+  recipient_address_1: string    // di (baris 1)
+  recipient_address_2: string    // di (baris 2)
+
+  /* Pengiriman */
+  vehicle_id: string             // No. Kendaraan
+  driver_id: string              // Sopir utama = driver_ids[0]; dipakai laporan
+  driver_ids: string[]           // Seluruh sopir trip ini
+  job_order_id: string           // SI / BL
+  party: string
+  goods_type: string             // Jenis Brg
+  kosongan: string
+  location: string               // Lokasi
+  ship: string                   // Kapal
+  destination_detail: string     // Tujuan
+
+  /* Identifier dokumen - TR / SIJO / No PI sengaja DIPISAH (TBD-08) */
+  tr_reference: string
+  pi_number: string
+  pi_status: string
+  cost_value: number             // COST - makna bisnis belum dikonfirmasi (TBD-02)
+
   notes: string
-  is_marked: boolean             // Tandai
+  is_marked: boolean
   bon_date: string | null        // Tgl Bon     (dipakai di Cek Ritan)
   personal_bon: number           // Bon Pribadi (dipakai di Cek Ritan)
+  printed_at: string | null      // null = belum dicetak
+  /* Pembatalan: catatan keuangan tetap disimpan sebagai arsip. */
+  cancelled_at: string | null
+  cancel_reason: string
+  cancel_settlement: PenyelesaianUj[]
+  /** Peninggalan data lama; nilainya kini ada di trip_ids. */
+  container_no: string
   created_at: string
   updated_at: string
 }
@@ -137,9 +230,11 @@ export interface UjPayment {
   trip_id: string
   sequence: number               // Termin ke-
   payment_date: string
+  driver_id: string              // Sopir penerima; kasbon yang dipotong milik sopir ini
   uj_amount: number              // UJ
   kasbon_deduction: number       // Potong Kasbon
   notes: string
+  attachments: Lampiran
   created_at: string
   updated_at: string
 }
@@ -155,19 +250,20 @@ export interface OperationalExpense {
   amount: number
   expense_date: string
   notes: string
+  attachments: Lampiran
   created_at: string
   updated_at: string
 }
 
 /**
- * Jenis biaya internal - pengeluaran perusahaan sendiri atas satu trip
- * (uang jalan, uang makan, kernet, dst). Dipisah dari biaya operasional
- * yang ditagihkan / dikeluarkan di jalan.
+ * Jenis biaya internal - pengeluaran perusahaan sendiri atas satu trip.
+ * "Komisi" meminta penerimanya: peran dan nama (terdaftar atau manual).
+ * Uang jalan tidak ada di sini: UJ hanya dicatat di tab Uang Jalan.
  */
-export const INTERNAL_COST_TYPES = ['Uang Jalan', 'Uang Makan', 'Kernet', 'Servis & Sparepart', 'Gaji Sopir', 'Administrasi', 'Lainnya'] as const
+export const INTERNAL_COST_TYPES = ['Uang Makan', 'Kernet', 'Komisi', 'Servis & Sparepart', 'Gaji Sopir', 'Administrasi', 'Lainnya'] as const
 export type InternalCostType = (typeof INTERNAL_COST_TYPES)[number]
 
-/** Transaksi -> Data Pengeluaran -> detail trip -> Biaya Internal. */
+/** Trip -> Biaya Internal. */
 export interface InternalCost {
   id: string
   trip_id: string
@@ -175,6 +271,63 @@ export interface InternalCost {
   amount: number
   cost_date: string
   notes: string
+  /* Diisi bila cost_type = Komisi */
+  recipient_role: EmployeeRole | ''
+  recipient_id: string           // karyawan terdaftar
+  recipient_name: string         // ...atau diisi manual
+  attachments: Lampiran
+  created_at: string
+  updated_at: string
+}
+
+/** Trip -> Lainnya: berkas atau catatan lain yang menyertai perjalanan. */
+export interface TripNote {
+  id: string
+  trip_id: string
+  note_date: string
+  title: string
+  notes: string
+  attachments: Lampiran
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Jenis mutasi kasbon karyawan.
+ * - admin      : kasbon diberikan perusahaan          (menambah)
+ * - trip       : dipotong dari uang jalan sebuah trip (mengurangi)
+ * - pembatalan : trip dibatalkan, potongannya kembali (menambah)
+ * - manual     : penyesuaian, arahnya dipilih         (menambah / mengurangi)
+ */
+export const KASBON_KINDS = ['admin', 'trip', 'pembatalan', 'manual'] as const
+export type KasbonKind = (typeof KASBON_KINDS)[number]
+export const KASBON_LABEL: Record<KasbonKind, string> = {
+  admin: 'Kasbon dari Admin',
+  trip: 'Potong dari Trip',
+  pembatalan: 'Pembatalan Trip',
+  manual: 'Penyesuaian Manual',
+}
+
+/**
+ * Satu mutasi kasbon. `amount` bertanda: positif menambah kasbon (utang
+ * karyawan ke perusahaan), negatif menguranginya. Saldo = jumlah seluruh
+ * mutasi milik karyawan itu.
+ *
+ * Mutasi berjenis "trip" dibuat otomatis dari termin uang jalan yang memotong
+ * kasbon, dan tertaut lewat uj_payment_id. Saat trip dibatalkan, tiap potongan
+ * dikembalikan dengan mutasi "pembatalan" yang menunjuk termin yang sama.
+ * uj_payment_id terisi = mutasi otomatis, tidak bisa diubah manual.
+ */
+export interface KasbonEntry {
+  id: string
+  employee_id: string
+  entry_date: string
+  kind: KasbonKind
+  amount: number
+  trip_id: string
+  uj_payment_id: string
+  notes: string
+  attachments: Lampiran
   created_at: string
   updated_at: string
 }
@@ -201,52 +354,48 @@ export interface Billing extends WorkspaceScoped {
   updated_at: string
 }
 
-/**
- * Transaksi -> Surat Jalan (addendum modul Surat Jalan).
- * Label field mengikuti dokumen: Kepada Yth, di, No.Polisi, Party, SI/BL,
- * Jenis Brg, Kosongan, Lokasi, Kapal, Tujuan.
- */
-export interface DeliveryNote extends WorkspaceScoped {
-  id: string
-  sj_no: string                  // Nomor Surat Jalan
-  sj_date: string                // Tanggal (ISO yyyy-mm-dd)
-  recipient_name: string         // Kepada Yth
-  recipient_address_1: string    // di (baris 1)
-  recipient_address_2: string    // di (baris 2)
-  vehicle_id: string             // No.Polisi
-  driver_id: string              // Kode Sopir / Nama Sopir (mengikuti trip terkait)
-  route_id: string               // Kode Route (mengikuti trip terkait)
-  party: string                  // Party
-  job_order_id: string           // SI/BL  -> relasi ke SI / Job Order
-  goods_type: string             // Jenis Brg
-  kosongan: string               // Kosongan
-  location: string               // Lokasi
-  ship: string                   // Kapal
-  destination: string            // Tujuan
-  containers: string[]           // No.Container (dinamis, tanpa batas jumlah)
-  printed_at: string | null      // null = Draft, terisi = Tercetak
-  created_at: string
-  updated_at: string
-}
-
 /** Satuan nilai komisi: nominal Rupiah, atau persen. */
 export type CommissionUnit = 'rp' | 'persen'
 
 /**
- * Master -> Komisi. Daftar tarif komisi, bukan pemantauan.
- * Satu baris = satu aturan: komisi dasar dipakai selama target belum tercapai,
- * setelah tercapai memakai komisi target. Tiap nilai boleh nominal Rupiah atau
- * persen. Apa yang diukur target masih TBD-16.
+ * Nilai yang menjadi dasar tingkat komisi.
+ * - nilai   : nilai trip = COST trip, atau Harga route bila COST kosong
+ * - uj      : uang jalan = UJROUTE route, atau UJ yang dibayar bila UJROUTE kosong
+ * - kontrak : nilai kontrak Dedicated (dihitung per kontrak, bukan per trip)
+ */
+export const DASAR_KOMISI = ['nilai', 'uj', 'kontrak'] as const
+export type DasarKomisi = (typeof DASAR_KOMISI)[number]
+export const DASAR_KOMISI_LABEL: Record<DasarKomisi, string> = {
+  nilai: 'Nilai trip (COST / Harga)',
+  uj: 'Uang jalan (UJ)',
+  kontrak: 'Nilai kontrak',
+}
+
+/** Satu tingkat komisi: bila capaian di antara target awal dan akhir. */
+export interface CommissionTier {
+  target_awal: number
+  /** 0 berarti tanpa batas atas. */
+  target_akhir: number
+  commission: number
+  commission_unit: CommissionUnit
+}
+
+/**
+ * Master -> Komisi: satu-satunya sumber aturan komisi.
+ * Satu pengaturan = satu peran + layanan + jenis kendaraan, dengan beberapa
+ * tingkat. Komisi tiap trip dihitung otomatis dari aturan yang paling cocok.
  */
 export interface CommissionScheme extends WorkspaceScoped {
   id: string
-  name: string                   // Nama
-  target: number                 // Target
-  base_commission: number        // Komisi Dasar
-  base_commission_unit: CommissionUnit
-  target_commission: number      // Komisi Apabila Target Tercapai
-  target_commission_unit: CommissionUnit
-  notes: string                  // Catatan
+  name: string
+  role: EmployeeRole             // Untuk: sopir / manager
+  service_type: ServiceType | 'semua'
+  configurations: string[]       // Konfigurasi kendaraan; kosong = semua
+  basis: DasarKomisi             // Dasar hitung tingkat
+  base_deduction_pct: number     // Potongan dasar sebelum komisi, mis. 5 (%)
+  is_active: boolean             // Nonaktif = disimpan, tidak dipakai hitungan
+  tiers: CommissionTier[]
+  notes: string
   created_at: string
   updated_at: string
 }
@@ -258,20 +407,24 @@ export interface Database {
   jobOrders: JobOrder[]
   transactions: CommissionTransaction[]
   billings: Billing[]
-  deliveryNotes: DeliveryNote[]
   projects: Project[]
   ujPayments: UjPayment[]
   expenses: OperationalExpense[]
   internalCosts: InternalCost[]
+  tripNotes: TripNote[]
+  kasbonEntries: KasbonEntry[]
   commissionSchemes: CommissionScheme[]
+  contracts: Contract[]
 }
 
 export type EntityKey = keyof Database
 
-/** Baris transaksi yang sudah di-join untuk ditampilkan di tabel */
+/** Baris trip yang sudah di-join untuk ditampilkan di tabel */
 export interface TransactionRow extends CommissionTransaction {
   driver_code: string
   driver_name: string
+  /** Nama seluruh sopir, dipisah koma. */
+  driver_names: string
   plate_number: string
   sijo: string
   route_code: string
@@ -282,6 +435,8 @@ export interface TransactionRow extends CommissionTransaction {
   commissioner: number
   project_code: string
   project_name: string
+  /** Nama manager: dari karyawan terdaftar, atau isian manual. */
+  manager_label: string
   /** Agregat dari uj_payments milik trip ini. */
   uj_total: number
   kasbon_total: number
@@ -290,6 +445,16 @@ export interface TransactionRow extends CommissionTransaction {
   expense_total: number
   /** Agregat biaya internal milik trip ini. */
   internal_total: number
+  /** Tol yang benar-benar dibayar: biaya operasional jenis Tol. */
+  toll_paid: number
+  vehicle_config: string
+  contract_no: string
+  client_name: string
+  /* Komisi otomatis dari master Komisi (0 untuk trip batal). */
+  komisi_sopir: number
+  komisi_manager: number
+  /** Penjelasan singkat aturan & tingkat yang dipakai. */
+  komisi_keterangan: string
 }
 
 export interface BillingRow extends Billing {
@@ -297,15 +462,4 @@ export interface BillingRow extends Billing {
   customer_name: string
   customer_code: string
   party: string
-}
-
-export interface DeliveryNoteRow extends DeliveryNote {
-  plate_number: string
-  driver_code: string
-  driver_name: string
-  route_code: string
-  route_name: string
-  sijo: string
-  container_no: string
-  container_count: number
 }

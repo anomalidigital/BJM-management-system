@@ -21,17 +21,19 @@ export function ToolsPage() {
   const [confirmReset, setConfirmReset] = useState(false)
 
   const counts: Array<[string, number]> = [
-    ['Sopir', db.drivers.length],
+    ['Karyawan', db.drivers.length],
     ['Route', db.routes.length],
     ['Mobil', db.vehicles.length],
     ['Project', db.projects.length],
+    ['Kontrak', db.contracts.length],
     ['SI / Job Order', db.jobOrders.length],
-    ['Trip / Transaksi', db.transactions.length],
+    ['Trip', db.transactions.length],
     ['Data Tagihan', db.billings.length],
-    ['Surat Jalan', db.deliveryNotes.length],
     ['Termin Uang Jalan', db.ujPayments.length],
     ['Biaya Operasional', db.expenses.length],
     ['Biaya Internal', db.internalCosts.length],
+    ['Catatan Lainnya', db.tripNotes.length],
+    ['Mutasi Kasbon', db.kasbonEntries.length],
     ['Pengaturan Komisi', db.commissionSchemes.length],
   ]
 

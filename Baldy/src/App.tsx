@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { AuthProvider } from './store/AuthProvider'
 import { WorkspaceProvider } from './store/WorkspaceProvider'
 import { DataProvider } from './store/DataProvider'
@@ -7,18 +7,18 @@ import { AppShell } from './components/layout/AppShell'
 
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
-import { DataSopirPage } from './pages/DataSopirPage'
+import { DataKaryawanPage } from './pages/DataKaryawanPage'
+import { KaryawanTransaksiPage } from './pages/KaryawanTransaksiPage'
 import { DataRoutePage } from './pages/DataRoutePage'
 import { DataMobilPage } from './pages/DataMobilPage'
 import { DataProjectPage } from './pages/DataProjectPage'
+import { DataKontrakPage } from './pages/DataKontrakPage'
 import { KomisiPage } from './pages/KomisiPage'
 import { TripDetailPage } from './pages/TripDetailPage'
 import { LapUangJalanPage } from './pages/LapUangJalanPage'
 import { LapBiayaPage } from './pages/LapBiayaPage'
-import { SuratJalanListPage } from './pages/SuratJalanListPage'
-import { SuratJalanFormPage } from './pages/SuratJalanFormPage'
-import { SuratJalanDetailPage } from './pages/SuratJalanDetailPage'
-import { DataKomisiPage } from './pages/DataKomisiPage'
+import { TripListPage } from './pages/TripListPage'
+import { TripFormPage } from './pages/TripFormPage'
 import { DataTagihanPage } from './pages/DataTagihanPage'
 import { SijoSearchPage } from './pages/SijoSearchPage'
 import { LapKomisiPage } from './pages/LapKomisiPage'
@@ -26,6 +26,12 @@ import { LapNettoPage } from './pages/LapNettoPage'
 import { LapRitanPage } from './pages/LapRitanPage'
 import { ToolsPage } from './pages/ToolsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+
+/** Tautan lama Surat Jalan -> trip hasil penggabungannya (id-nya dipertahankan). */
+function AlihkanSuratJalan({ edit = false }: { edit?: boolean }) {
+  const { id } = useParams()
+  return <Navigate to={`/transaksi/trip/${id}${edit ? '/edit' : ''}`} replace />
+}
 
 export function App() {
   return (
@@ -40,18 +46,25 @@ export function App() {
                   <Route index element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<DashboardPage />} />
 
-                  <Route path="/master/sopir" element={<DataSopirPage />} />
+                  <Route path="/master/karyawan" element={<DataKaryawanPage />} />
+                  <Route path="/master/karyawan/:id" element={<KaryawanTransaksiPage />} />
+                  <Route path="/master/sopir" element={<Navigate to="/master/karyawan" replace />} />
                   <Route path="/master/mobil" element={<DataMobilPage />} />
                   <Route path="/master/route" element={<DataRoutePage />} />
                   <Route path="/master/project" element={<DataProjectPage />} />
+                  <Route path="/master/kontrak" element={<DataKontrakPage />} />
                   <Route path="/master/komisi" element={<KomisiPage />} />
 
-                  <Route path="/transaksi/surat-jalan" element={<SuratJalanListPage />} />
-                  <Route path="/transaksi/surat-jalan/tambah" element={<SuratJalanFormPage mode="create" />} />
-                  <Route path="/transaksi/surat-jalan/:id" element={<SuratJalanDetailPage />} />
-                  <Route path="/transaksi/surat-jalan/:id/edit" element={<SuratJalanFormPage mode="edit" />} />
-                  <Route path="/transaksi/komisi" element={<DataKomisiPage />} />
+                  <Route path="/transaksi/trip" element={<TripListPage />} />
+                  <Route path="/transaksi/trip/tambah" element={<TripFormPage mode="create" />} />
                   <Route path="/transaksi/trip/:id" element={<TripDetailPage />} />
+                  <Route path="/transaksi/trip/:id/edit" element={<TripFormPage mode="edit" />} />
+                  {/* Alamat lama: Surat Jalan dan Data Pengeluaran kini menjadi Trip */}
+                  <Route path="/transaksi/surat-jalan" element={<Navigate to="/transaksi/trip" replace />} />
+                  <Route path="/transaksi/surat-jalan/tambah" element={<Navigate to="/transaksi/trip/tambah" replace />} />
+                  <Route path="/transaksi/surat-jalan/:id" element={<AlihkanSuratJalan />} />
+                  <Route path="/transaksi/surat-jalan/:id/edit" element={<AlihkanSuratJalan edit />} />
+                  <Route path="/transaksi/komisi" element={<Navigate to="/transaksi/trip" replace />} />
                   <Route path="/transaksi/tagihan" element={<DataTagihanPage />} />
 
                   <Route path="/laporan/komisi" element={<LapKomisiPage />} />

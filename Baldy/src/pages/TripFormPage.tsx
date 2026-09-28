@@ -1,0 +1,705 @@
+import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Plus, Printer, Save, TriangleAlert, X } from 'lucide-react'
+import { PageHeader } from '../components/layout/PageHeader'
+import { Card, CardHeader } from '../components/ui/Card'
+import { Button, IconButton } from '../components/ui/Button'
+import { Field, Input, DateInput, Radio, Select, Textarea } from '../components/ui/Field'
+import { CurrencyInput } from '../components/ui/CurrencyInput'
+import { SearchableSelect } from '../components/ui/SearchableSelect'
+import { PilihKaryawan } from '../components/ui/PilihKaryawan'
+import { useData } from '../store/DataProvider'
+import { useAuth } from '../store/AuthProvider'
+import { useToast } from '../store/ToastProvider'
+import { formatRupiah, todayISO } from '../lib/format'
+import { hitungKomisiTrip } from '../lib/komisi'
+import { nomorSuratJalanBerikut, nomorTripBerikut } from '../lib/kode'
+import { cn } from '../lib/utils'
+import type { CommissionTransaction, ServiceType, TripStatus } from '../types'
+import { STATUS_FORM, STATUS_LABEL } from './trip/status'
+
+type FormState = Omit<CommissionTransaction, 'id' | 'created_at' | 'updated_at' | 'workspace'>
+
+const BLANK: FormState = {
+  transaction_no: '', transaction_date: '', service_type: 'callout', contract_id: '',
+  trip_ids: [''], route_id: '',
+  sj_no: '', manager_id: '', manager_name: '', project_id: '', status: 'aktif',
+  recipient_name: '', recipient_address_1: '', recipient_address_2: '',
+  vehicle_id: '', driver_id: '', driver_ids: [''], job_order_id: '', party: '', goods_type: '', kosongan: '',
+  location: '', ship: '', destination_detail: '',
+  tr_reference: '', pi_number: '', pi_status: '', cost_value: 0,
+  notes: '', is_marked: false, bon_date: null, personal_bon: 0, printed_at: null,
+  cancelled_at: null, cancel_reason: '', cancel_settlement: [], container_no: '',
+}
+
+const bersih = (v: string) => v.trim().toUpperCase().replace(/\s+/g, '')
+
+function Section({ title, description, actions, children }: { title: string; description?: string; actions?: ReactNode; children: ReactNode }) {
+  return (
+    <Card>
+      <CardHeader title={title} subtitle={description} actions={actions} />
+      <div className="p-4">{children}</div>
+    </Card>
+  )
+}
+
+/** Tunggu data ter-hidrasi dulu: nomor otomatis dan pencarian record bergantung padanya. */
+export function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
+  const { loading } = useData()
+  const { id } = useParams()
+
+  if (loading) {
+    return (
+      <>
+        <PageHeader title={mode === 'edit' ? 'Memuat trip...' : 'Tambah Trip'} crumbs={[{ label: 'Transaksi' }, { label: 'Trip' }]} />
+        <div className="skeleton h-40 rounded-xl" />
+        <div className="mt-4 grid gap-4 xl:grid-cols-2">
+          <div className="skeleton h-56 rounded-xl" />
+          <div className="skeleton h-56 rounded-xl" />
+        </div>
+      </>
+    )
+  }
+  return <TripForm mode={mode} key={id ?? 'baru'} />
+}
+
+function TripForm({ mode }: { mode: 'create' | 'edit' }) {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const { db, dbAll, transactionRows, buatTrip, ubahTrip } = useData()
+  const { canEdit } = useAuth()
+  const toast = useToast()
+
+  const existing = mode === 'edit' ? db.transactions.find((t) => t.id === id) : undefined
+
+  const [form, setForm] = useState<FormState>(() => {
+    if (existing) {
+      const sopir = existing.driver_ids?.length ? existing.driver_ids : existing.driver_id ? [existing.driver_id] : []
+      return {
+        ...BLANK,
+        ...existing,
+        trip_ids: existing.trip_ids?.length ? [...existing.trip_ids] : [''],
+        driver_ids: sopir.length ? [...sopir] : [''],
+      }
+    }
+    // Nomor dihitung dari seluruh workspace supaya tidak pernah kembar.
+    const hariIni = todayISO()
+    return {
+      ...BLANK,
+      transaction_date: hariIni,
+      transaction_no: nomorTripBerikut(dbAll.transactions.map((t) => t.transaction_no), hariIni),
+      sj_no: nomorSuratJalanBerikut(dbAll.transactions.map((t) => t.sj_no).filter(Boolean)),
+    }
+  })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const dedicated = form.service_type === 'dedicated'
+
+  /** Trip lama bisa saja belum lengkap; jangan paksa diisi hanya karena diubah. */
+  const wajib = (adaSebelumnya: boolean) => mode === 'create' || adaSebelumnya
+  const wajibId = !dedicated && wajib(!!existing?.trip_ids?.length)
+  const wajibRoute = !dedicated && wajib(!!existing?.route_id)
+  const wajibSopir = wajib(!!(existing?.driver_ids?.length || existing?.driver_id))
+  const wajibKendaraan = wajib(!!existing?.vehicle_id)
+
+  const sopirTerdaftar = useMemo(() => db.drivers.filter((d) => d.role === 'sopir'), [db.drivers])
+  const managerTerdaftar = useMemo(() => db.drivers.filter((d) => d.role === 'manager'), [db.drivers])
+
+  /** Terpakai per kontrak: uang jalan + biaya seluruh trip kontrak (selain trip ini). */
+  const terpakaiKontrak = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const t of transactionRows) {
+      if (!t.contract_id || t.status === 'batal' || t.id === existing?.id) continue
+      m.set(t.contract_id, (m.get(t.contract_id) ?? 0) + t.uj_total + t.expense_total + t.internal_total)
+    }
+    return m
+  }, [transactionRows, existing?.id])
+
+  const joOptions = useMemo(
+    () => db.jobOrders.map((j) => ({ value: j.id, label: j.sijo, meta: `${j.customer_name} · ${j.party}`, keywords: `${j.customer_code} ${j.goods} ${j.ship}` })),
+    [db.jobOrders],
+  )
+  const vehicleOptions = useMemo(
+    () => db.vehicles.map((v) => ({
+      value: v.id,
+      label: v.plate_number,
+      meta: [v.configuration, v.vehicle_type, v.status !== 'aktif' ? v.status : ''].filter(Boolean).join(' · '),
+    })),
+    [db.vehicles],
+  )
+  const routeOptions = useMemo(
+    () => db.routes.map((r) => ({
+      value: r.id,
+      label: r.route_name || r.route_code,
+      meta: `${r.route_code}${r.feet ? ` · ${r.feet}` : ''} · UJ ${formatRupiah(r.ujroute)}`,
+      keywords: `${r.route_code} ${r.feet}`,
+    })),
+    [db.routes],
+  )
+  const contractOptions = useMemo(
+    () => db.contracts
+      .filter((c) => c.status === 'aktif' || c.id === form.contract_id)
+      .map((c) => ({
+        value: c.id,
+        label: c.contract_no,
+        meta: `${c.client_name} · sisa ${formatRupiah(c.value - (terpakaiKontrak.get(c.id) ?? 0))}`,
+        keywords: c.client_name,
+      })),
+    [db.contracts, form.contract_id, terpakaiKontrak],
+  )
+  /** Sopir nonaktif tetap muncul bila sudah tercatat di trip ini. */
+  const sopirOptions = (pilihanIni: string) =>
+    sopirTerdaftar
+      .filter((d) => d.status === 'aktif' || d.id === pilihanIni)
+      .filter((d) => d.id === pilihanIni || !form.driver_ids.includes(d.id))
+      .map((d) => ({ value: d.id, label: `${d.driver_code} — ${d.driver_name}`, meta: [d.address_2, d.city].filter(Boolean).join(', '), keywords: d.driver_name }))
+
+  if (mode === 'edit' && !existing) {
+    return (
+      <>
+        <PageHeader title="Trip tidak ditemukan" crumbs={[{ label: 'Transaksi' }, { label: 'Trip' }]} />
+        <Card>
+          <div className="px-6 py-14 text-center">
+            <p className="text-[14px] font-semibold text-ink">Data tidak ditemukan.</p>
+            <p className="mt-1 text-[13px] text-ink-3">Trip mungkin sudah dihapus, atau milik workspace lain.</p>
+            <Button className="mt-4" onClick={() => navigate('/transaksi/trip')}>Kembali ke daftar</Button>
+          </div>
+        </Card>
+      </>
+    )
+  }
+
+  if (existing?.status === 'batal') {
+    return (
+      <>
+        <PageHeader title={`Trip ${existing.transaction_no}`} crumbs={[{ label: 'Transaksi' }, { label: 'Trip' }, { label: existing.transaction_no }]} />
+        <Card>
+          <div className="px-6 py-14 text-center">
+            <p className="text-[14px] font-semibold text-ink">Trip ini sudah dibatalkan.</p>
+            <p className="mt-1 text-[13px] text-ink-3">Trip yang dibatalkan disimpan sebagai arsip dan tidak bisa diubah.</p>
+            <Button className="mt-4" onClick={() => navigate(`/transaksi/trip/${existing.id}`)}>Lihat trip</Button>
+          </div>
+        </Card>
+      </>
+    )
+  }
+
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }))
+
+  /** Tanggal berganti bulan -> nomor trip otomatis ikut bulan barunya. */
+  function ubahTanggal(tanggal: string) {
+    setForm((f) => {
+      if (mode === 'edit' || !tanggal) return { ...f, transaction_date: tanggal }
+      const lamaOtomatis = nomorTripBerikut(dbAll.transactions.map((t) => t.transaction_no), f.transaction_date)
+      const nomor = f.transaction_no === lamaOtomatis
+        ? nomorTripBerikut(dbAll.transactions.map((t) => t.transaction_no), tanggal)
+        : f.transaction_no
+      return { ...f, transaction_date: tanggal, transaction_no: nomor }
+    })
+  }
+
+  /** Isi otomatis dari SI/JO yang dipilih - hanya field yang datanya memang ada. */
+  function applyJobOrder(joId: string | null) {
+    if (!joId) { set('job_order_id', ''); return }
+    const jo = db.jobOrders.find((j) => j.id === joId)
+    if (!jo) return
+    const [line1, ...rest] = jo.customer_address.split(',')
+    setForm((f) => ({
+      ...f,
+      job_order_id: joId,
+      recipient_name: jo.customer_name,
+      recipient_address_1: line1.trim(),
+      recipient_address_2: rest.join(',').trim(),
+      party: jo.party,
+      ship: jo.ship,
+      goods_type: f.goods_type || jo.goods,
+    }))
+    toast.info(`Data customer diambil dari SI/JO ${jo.sijo}.`)
+  }
+
+  /** Pilih rute -> Tujuan dan Project ikut terisi, kecuali sudah diganti manual. */
+  function applyRoute(routeId: string | null) {
+    const route = db.routes.find((r) => r.id === routeId)
+    setForm((f) => {
+      const sebelumnya = db.routes.find((r) => r.id === f.route_id)
+      const tujuanBoleh = !f.destination_detail.trim() || f.destination_detail.trim() === (sebelumnya?.route_name ?? '').trim()
+      const projectBoleh = !f.project_id || f.project_id === (sebelumnya?.project_id ?? '')
+      return {
+        ...f,
+        route_id: routeId ?? '',
+        destination_detail: route && tujuanBoleh ? route.route_name : f.destination_detail,
+        project_id: route?.project_id && projectBoleh ? route.project_id : f.project_id,
+      }
+    })
+  }
+
+  /* ── Daftar dinamis: ID Perjalanan/Trip dan Sopir ─────────── */
+  const ubahId = (i: number, v: string) => setForm((f) => ({ ...f, trip_ids: f.trip_ids.map((x, j) => (j === i ? v.toUpperCase().replace(/\s+/g, '') : x)) }))
+  const tambahId = () => setForm((f) => ({ ...f, trip_ids: [...f.trip_ids, ''] }))
+  const hapusId = (i: number) => setForm((f) => ({ ...f, trip_ids: f.trip_ids.length > 1 ? f.trip_ids.filter((_, j) => j !== i) : [''] }))
+
+  const ubahSopir = (i: number, v: string | null) => setForm((f) => ({ ...f, driver_ids: f.driver_ids.map((x, j) => (j === i ? v ?? '' : x)) }))
+  const tambahSopir = () => setForm((f) => ({ ...f, driver_ids: [...f.driver_ids, ''] }))
+  const hapusSopir = (i: number) => setForm((f) => ({ ...f, driver_ids: f.driver_ids.length > 1 ? f.driver_ids.filter((_, j) => j !== i) : [''] }))
+
+  /**
+   * ID Perjalanan/Trip berisi nomor container yang memang dipakai ulang di trip
+   * lain, jadi kesamaan dengan trip lain hanya diingatkan, tidak ditolak.
+   */
+  const idTerisi = form.trip_ids.map(bersih).filter(Boolean)
+  const idDipakaiLain = idTerisi
+    .map((v) => ({ v, trip: dbAll.transactions.find((t) => t.id !== existing?.id && t.status !== 'batal' && (t.trip_ids ?? []).some((x) => bersih(x) === v)) }))
+    .filter((x) => x.trip)
+
+  function validate(): boolean {
+    const e: Record<string, string> = {}
+    const no = form.transaction_no.trim()
+    if (!no) e.transaction_no = 'Nomor Trip wajib diisi.'
+    else if (dbAll.transactions.some((t) => t.transaction_no === no && t.id !== existing?.id)) e.transaction_no = 'Nomor Trip sudah dipakai.'
+    const sj = form.sj_no.trim()
+    if (sj && dbAll.transactions.some((t) => t.sj_no.toLowerCase() === sj.toLowerCase() && t.id !== existing?.id)) e.sj_no = 'Nomor Surat Jalan sudah dipakai.'
+    if (!form.transaction_date) e.transaction_date = 'Tanggal wajib diisi.'
+    if (dedicated && !form.contract_id) e.contract_id = 'Layanan Dedicated wajib memilih nomor kontrak.'
+    if (wajibRoute && !form.route_id) e.route_id = 'Rute wajib dipilih.'
+    if (wajibKendaraan && !form.vehicle_id) e.vehicle_id = 'No. Kendaraan wajib dipilih.'
+    if (wajibSopir && !form.driver_ids.some(Boolean)) e.driver_ids = 'Pilih minimal satu sopir.'
+    if (wajibId && idTerisi.length === 0) e.trip_ids = 'Isi minimal satu ID Perjalanan/Trip.'
+    const kembar = idTerisi.find((v, i) => idTerisi.indexOf(v) !== i)
+    if (kembar) e.trip_ids = `ID ${kembar} tertulis dua kali di trip ini.`
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
+  const kontrak = db.contracts.find((c) => c.id === form.contract_id)
+
+  function save(thenPrint: boolean) {
+    if (!validate()) { toast.error('Periksa kembali isian yang ditandai merah.'); return }
+    const driverIds = [...new Set(form.driver_ids.filter(Boolean))]
+    const payload = {
+      ...form,
+      contract_id: dedicated ? form.contract_id : '',
+      transaction_no: form.transaction_no.trim(),
+      sj_no: form.sj_no.trim(),
+      trip_ids: idTerisi,
+      driver_ids: driverIds,
+      driver_id: driverIds[0] ?? '',
+      manager_name: form.manager_id ? '' : form.manager_name.trim(),
+      // Dedicated: penerima Surat Jalan = client kontrak bila belum diisi.
+      recipient_name: form.recipient_name.trim() || (dedicated ? kontrak?.client_name ?? '' : ''),
+      destination_detail: form.destination_detail.trim(),
+    }
+    const suffix = thenPrint ? '?print=1' : ''
+    if (existing) {
+      ubahTrip(existing.id, payload)
+      toast.success('Trip berhasil diperbarui.')
+      navigate(`/transaksi/trip/${existing.id}${suffix}`)
+    } else {
+      const created = buatTrip(payload)
+      toast.success('Trip berhasil disimpan. Catat uang jalan di tab Uang Jalan saat dibayar.')
+      navigate(`/transaksi/trip/${created.id}${suffix}`)
+    }
+  }
+
+  const selectedJo = db.jobOrders.find((j) => j.id === form.job_order_id)
+  const selectedRoute = db.routes.find((r) => r.id === form.route_id)
+  const selectedVehicle = db.vehicles.find((v) => v.id === form.vehicle_id)
+  const routeProject = db.projects.find((p) => p.id === selectedRoute?.project_id)
+  const judul = mode === 'edit' ? `Ubah Trip ${existing?.transaction_no}` : 'Tambah Trip'
+
+  /** Perkiraan komisi sopir dari master Komisi, dengan isian form saat ini. */
+  const perkiraanKomisi = hitungKomisiTrip(db.commissionSchemes, {
+    role: 'sopir',
+    layanan: form.service_type,
+    konfigurasi: selectedVehicle?.configuration ?? '',
+    cost_value: form.cost_value,
+    route_price: selectedRoute?.price ?? 0,
+    ujroute: selectedRoute?.ujroute ?? 0,
+    uj_total: existing ? transactionRows.find((t) => t.id === existing.id)?.uj_total ?? 0 : 0,
+  })
+  const sisaKontrak = kontrak ? kontrak.value - (terpakaiKontrak.get(kontrak.id) ?? 0) : 0
+
+  function gantiLayanan(l: ServiceType) {
+    setForm((f) => ({ ...f, service_type: l }))
+    setErrors({})
+  }
+
+  const fieldSopir = (
+    <Field
+      label="Sopir"
+      required={wajibSopir}
+      error={errors.driver_ids}
+      hint={errors.driver_ids ? undefined : form.driver_ids.length > 1 ? 'Sopir pertama adalah sopir utama (penerima komisi).' : 'Bisa lebih dari satu sopir.'}
+    >
+      {(fid) => (
+        <div className="space-y-2">
+          {form.driver_ids.map((v, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <SearchableSelect
+                  id={i === 0 ? fid : undefined}
+                  options={sopirOptions(v)}
+                  value={v || null}
+                  invalid={!!errors.driver_ids && i === 0 && !v}
+                  placeholder={i === 0 ? 'Cari kode / nama sopir...' : 'Sopir tambahan...'}
+                  onChange={(nv) => ubahSopir(i, nv)}
+                />
+              </div>
+              {form.driver_ids.length > 1 && (
+                <IconButton label="Hapus sopir ini" tone="danger" icon={<X size={14} />} onClick={() => hapusSopir(i)} />
+              )}
+            </div>
+          ))}
+          <Button size="sm" variant="ghost" icon={<Plus size={14} />} onClick={tambahSopir}>Tambah sopir</Button>
+        </div>
+      )}
+    </Field>
+  )
+
+  const fieldKendaraan = (
+    <Field
+      label="No. Kendaraan"
+      required={wajibKendaraan}
+      error={errors.vehicle_id}
+      hint={errors.vehicle_id ? undefined : selectedVehicle?.configuration ? `Konfigurasi ${selectedVehicle.configuration}` : undefined}
+    >
+      {(fid) => (
+        <SearchableSelect id={fid} options={vehicleOptions} value={form.vehicle_id || null} invalid={!!errors.vehicle_id}
+          placeholder="Pilih nomor kendaraan..." onChange={(v) => set('vehicle_id', v ?? '')} />
+      )}
+    </Field>
+  )
+
+  const fieldTujuan = (
+    <Field label="Tujuan" hint="Terisi otomatis dari rute, masih bisa diubah.">
+      {(fid) => (
+        <Input id={fid} value={form.destination_detail} placeholder="CIB - DURI"
+          onChange={(e) => set('destination_detail', e.target.value)} />
+      )}
+    </Field>
+  )
+
+  return (
+    <div className="pb-20">
+      <PageHeader
+        title={judul}
+        crumbs={[
+          { label: 'Transaksi' },
+          { label: 'Trip', to: '/transaksi/trip' },
+          ...(existing ? [{ label: existing.transaction_no, to: `/transaksi/trip/${existing.id}` }] : []),
+          { label: mode === 'edit' ? 'Ubah' : 'Tambah' },
+        ]}
+        description="Pilih jenis layanan dulu, lalu isi data perjalanannya. Uang jalan, biaya, dan lampiran dicatat di halaman detail trip."
+      />
+
+      {!canEdit && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-[#f6e2ac] bg-[#fff8e6] px-3.5 py-2.5 text-[12.5px] text-[#8a6100]">
+          <TriangleAlert size={15} className="mt-px shrink-0" />
+          Peran Viewer tidak dapat menyimpan perubahan. Form ini hanya untuk melihat struktur data.
+        </div>
+      )}
+
+      <div className="mb-4">
+        <Section title="Jenis Layanan">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Radio
+              name="layanan"
+              checked={!dedicated}
+              onChange={() => gantiLayanan('callout')}
+              label="Callout"
+              description="Order per perjalanan. Form lengkap dengan penerima, SI/BL, dan identifier dokumen."
+            />
+            <Radio
+              name="layanan"
+              checked={dedicated}
+              onChange={() => gantiLayanan('dedicated')}
+              label="Dedicated"
+              description="Kendaraan dikontrak satu client. Form ringkas, wajib memilih nomor kontrak."
+            />
+          </div>
+
+          {dedicated && (
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <Field
+                label="No. Kontrak"
+                required
+                error={errors.contract_id}
+                hint={errors.contract_id ? undefined : db.contracts.length === 0 ? <>Belum ada kontrak. Buat dulu di <Link to="/master/kontrak" className="text-brand-700 underline">Data Kontrak</Link>.</> : 'Kontrak aktif di workspace ini.'}
+              >
+                {(fid) => (
+                  <SearchableSelect id={fid} options={contractOptions} value={form.contract_id || null} invalid={!!errors.contract_id}
+                    placeholder="Pilih nomor kontrak..." searchPlaceholder="Ketik nomor kontrak atau client..."
+                    onChange={(v) => set('contract_id', v ?? '')} />
+                )}
+              </Field>
+              {kontrak && (
+                <div className="rounded-lg border border-brand-100 bg-brand-50/60 px-3.5 py-3">
+                  <p className="text-[12px] text-brand-800">Client <span className="font-semibold">{kontrak.client_name}</span></p>
+                  <dl className="mt-2 grid grid-cols-3 gap-x-4">
+                    {([['Nilai kontrak', kontrak.value], ['Terpakai', kontrak.value - sisaKontrak], ['Sisa', sisaKontrak]] as const).map(([k, v]) => (
+                      <div key={k}>
+                        <dt className="text-[11px] font-semibold tracking-wide text-brand-700/80 uppercase">{k}</dt>
+                        <dd className={cn('tnum text-[13px] font-semibold', v < 0 ? 'text-[color:var(--color-critical)]' : 'text-brand-900')}>{formatRupiah(v)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              )}
+            </div>
+          )}
+        </Section>
+      </div>
+
+      <div className="mb-4">
+        <Card>
+          <CardHeader title="Konfigurasi" subtitle="Satu trip boleh memuat beberapa ID Perjalanan/Trip, dengan satu rute." />
+          <div className="grid gap-4 p-4 lg:grid-cols-2">
+            <Field
+              label="ID Perjalanan/Trip"
+              required={wajibId}
+              error={errors.trip_ids}
+              hint={errors.trip_ids ? undefined : 'Nomor container / ID perjalanan. Boleh sama dengan trip lain karena container dipakai ulang.'}
+            >
+              {(fid) => (
+                <div className="space-y-2">
+                  {form.trip_ids.map((v, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="tnum w-5 shrink-0 text-right text-[12px] font-semibold text-ink-3">{i + 1}.</span>
+                      <Input
+                        id={i === 0 ? fid : undefined}
+                        value={v}
+                        invalid={!!errors.trip_ids && !v.trim()}
+                        placeholder="TCLU1234567"
+                        className="tnum font-medium tracking-wide"
+                        aria-label={`ID Perjalanan/Trip ${i + 1}`}
+                        onChange={(e) => ubahId(i, e.target.value)}
+                      />
+                      <IconButton
+                        label="Hapus ID ini"
+                        tone="danger"
+                        icon={<X size={14} />}
+                        disabled={form.trip_ids.length === 1 && !v}
+                        onClick={() => hapusId(i)}
+                      />
+                    </div>
+                  ))}
+                  <Button size="sm" variant="ghost" icon={<Plus size={14} />} className="ml-6" onClick={tambahId}>
+                    Tambah ID Perjalanan/Trip
+                  </Button>
+                  {idDipakaiLain.length > 0 && (
+                    <p className="ml-6 text-[12px] text-[#8a6100]">
+                      {idDipakaiLain.map((x) => `${x.v} juga ada di Trip ${x.trip!.transaction_no}`).join('; ')}. Pastikan memang benar.
+                    </p>
+                  )}
+                </div>
+              )}
+            </Field>
+
+            <div className="space-y-3">
+              <Field label="Rute" required={wajibRoute} error={errors.route_id} hint={errors.route_id ? undefined : 'UJROUTE rute menjadi patokan uang jalan trip.'}>
+                {(fid) => (
+                  <SearchableSelect
+                    id={fid}
+                    options={routeOptions}
+                    value={form.route_id || null}
+                    invalid={!!errors.route_id}
+                    placeholder="Pilih rute..."
+                    searchPlaceholder="Ketik nama atau kode rute..."
+                    onChange={applyRoute}
+                  />
+                )}
+              </Field>
+              {(selectedRoute || perkiraanKomisi.aturan) && (
+                <div className="rounded-lg border border-brand-100 bg-brand-50/60 px-3.5 py-3">
+                  {selectedRoute && (
+                    <>
+                      <p className="text-[12px] text-brand-800">
+                        <span className="tnum font-semibold">{selectedRoute.route_code}</span>
+                        {selectedRoute.feet && <> · {selectedRoute.feet}</>}
+                        {routeProject && <> · Project {routeProject.project_code}</>}
+                      </p>
+                      <dl className="mt-2 grid grid-cols-3 gap-x-4 gap-y-1.5">
+                        {([
+                          ['UJROUTE (patokan)', selectedRoute.ujroute],
+                          ['Uang Tol (patokan)', selectedRoute.toll ?? 0],
+                          ['Harga', selectedRoute.price],
+                        ] as const).map(([k, v]) => (
+                          <div key={k}>
+                            <dt className="text-[11px] font-semibold tracking-wide text-brand-700/80 uppercase">{k}</dt>
+                            <dd className="tnum text-[13px] font-semibold text-brand-900">{formatRupiah(v)}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </>
+                  )}
+                  <p className={cn('text-[12px] text-brand-800', selectedRoute && 'mt-2 border-t border-brand-100 pt-2')}>
+                    Perkiraan komisi sopir: <span className="tnum font-semibold">{formatRupiah(perkiraanKomisi.nilai)}</span>
+                    <span className="block text-[11.5px] text-brand-700">{perkiraanKomisi.keterangan}</span>
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      <div className={cn('grid gap-4', !dedicated && 'xl:grid-cols-2')}>
+        <Section title="Informasi Dokumen">
+          <div className={cn('grid gap-4 sm:grid-cols-2', dedicated && 'lg:grid-cols-3')}>
+            <Field label="Tanggal" required error={errors.transaction_date}>
+              {(fid) => <DateInput id={fid} value={form.transaction_date} invalid={!!errors.transaction_date} onChange={(e) => ubahTanggal(e.target.value)} />}
+            </Field>
+            <Field label="Nomor Trip" required error={errors.transaction_no} hint={errors.transaction_no ? undefined : 'Nomor urut otomatis per bulan.'}>
+              {(fid) => <Input id={fid} value={form.transaction_no} invalid={!!errors.transaction_no} className="tnum" onChange={(e) => set('transaction_no', e.target.value)} />}
+            </Field>
+            <Field label="Nomor Surat Jalan" error={errors.sj_no} hint={errors.sj_no ? undefined : form.sj_no ? 'Nomor urut otomatis.' : 'Kosong = dicetak memakai Nomor Trip.'}>
+              {(fid) => <Input id={fid} value={form.sj_no} invalid={!!errors.sj_no} className="tnum" placeholder="SJ-000001" onChange={(e) => set('sj_no', e.target.value)} />}
+            </Field>
+            <Field label="Status" hint="Pembatalan lewat tombol Batalkan Trip.">
+              {(fid) => (
+                <Select id={fid} value={form.status} onChange={(e) => set('status', e.target.value as TripStatus)}>
+                  {STATUS_FORM.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+                </Select>
+              )}
+            </Field>
+            <Field label="Manager" hint={managerTerdaftar.length ? 'Pilih manager terdaftar, atau isi nama sendiri.' : 'Belum ada manager di Data Karyawan — isi nama sendiri.'}>
+              {(fid) => (
+                <PilihKaryawan
+                  id={fid}
+                  karyawan={managerTerdaftar}
+                  valueId={form.manager_id}
+                  valueNama={form.manager_name}
+                  peran="manager"
+                  placeholder="Pilih manager..."
+                  onChange={(mid, nama) => setForm((f) => ({ ...f, manager_id: mid, manager_name: nama }))}
+                />
+              )}
+            </Field>
+            <Field label="Project" hint={routeProject && form.project_id === routeProject.id ? 'Mengikuti project rute.' : 'Menentukan alur dokumen TR / No PI.'}>
+              {(fid) => (
+                <Select id={fid} value={form.project_id} onChange={(e) => set('project_id', e.target.value)}>
+                  <option value="">— belum ditentukan —</option>
+                  {db.projects.map((p) => <option key={p.id} value={p.id}>{p.project_code} — {p.project_name}</option>)}
+                </Select>
+              )}
+            </Field>
+          </div>
+        </Section>
+
+        {!dedicated && (
+          <Section title="Penerima" description="Dicetak pada Surat Jalan.">
+            <div className="space-y-4">
+              <Field label="Kepada Yth">
+                {(fid) => (
+                  <Input id={fid} value={form.recipient_name} placeholder="PT PINDODELI PULP &amp; PAPER MILLS"
+                    onChange={(e) => set('recipient_name', e.target.value)} />
+                )}
+              </Field>
+              <Field label="di" hint="Dua baris alamat penerima.">
+                {(fid) => (
+                  <div className="space-y-2">
+                    <Input id={fid} value={form.recipient_address_1} placeholder="Kawasan Industri Pindodeli"
+                      onChange={(e) => set('recipient_address_1', e.target.value)} />
+                    <Input value={form.recipient_address_2} placeholder="Karawang"
+                      onChange={(e) => set('recipient_address_2', e.target.value)} />
+                  </div>
+                )}
+              </Field>
+            </div>
+          </Section>
+        )}
+      </div>
+
+      <div className="mt-4">
+        {dedicated ? (
+          <Section title="Informasi Pengiriman" description="Penerima Surat Jalan otomatis memakai nama client kontrak.">
+            <div className="grid gap-4 sm:grid-cols-2">
+              {fieldKendaraan}
+              {fieldSopir}
+              {fieldTujuan}
+              <Field label="Catatan">
+                {(fid) => <Textarea id={fid} rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} />}
+              </Field>
+            </div>
+          </Section>
+        ) : (
+          <Section title="Informasi Pengiriman" description="Pilih SI/BL untuk mengisi otomatis Customer, Party, dan Kapal dari data SI / Job Order.">
+            <div className="grid gap-4 sm:grid-cols-2">
+              {fieldKendaraan}
+              {fieldSopir}
+              <Field label="Party">
+                {(fid) => <Input id={fid} value={form.party} placeholder="40 X 40" onChange={(e) => set('party', e.target.value)} />}
+              </Field>
+              <Field label="SI / BL" hint={selectedJo ? `Customer: ${selectedJo.customer_name}` : 'Cari nomor SI / Job Order.'}>
+                {(fid) => (
+                  <SearchableSelect id={fid} options={joOptions} value={form.job_order_id || null}
+                    placeholder="Cari SI / Job Order..." onChange={applyJobOrder} />
+                )}
+              </Field>
+              <Field label="Jenis Brg">
+                {(fid) => <Input id={fid} value={form.goods_type} placeholder="Container" onChange={(e) => set('goods_type', e.target.value)} />}
+              </Field>
+              <Field label="Kosongan">
+                {(fid) => <Input id={fid} value={form.kosongan} placeholder="DEPO MUSTIKA CAKUNG" onChange={(e) => set('kosongan', e.target.value)} />}
+              </Field>
+              <Field label="Lokasi">
+                {(fid) => <Input id={fid} value={form.location} placeholder="JICT 1" onChange={(e) => set('location', e.target.value)} />}
+              </Field>
+              <Field label="Kapal">
+                {(fid) => <Input id={fid} value={form.ship} placeholder="MV. ORIENTAL DIAMOND" onChange={(e) => set('ship', e.target.value)} />}
+              </Field>
+              {fieldTujuan}
+            </div>
+          </Section>
+        )}
+      </div>
+
+      {!dedicated && (
+        <div className="mt-4">
+          <Section title="Identifier & Catatan" description="TR, SI/JO, dan No PI disimpan terpisah; COST dipakai sebagai nilai trip untuk komisi.">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Field label="TR" hint="Nomor referensi dari customer.">
+                {(fid) => <Input id={fid} value={form.tr_reference} placeholder="2600305331" onChange={(e) => set('tr_reference', e.target.value)} />}
+              </Field>
+              <Field label="No PI">
+                {(fid) => <Input id={fid} value={form.pi_number} placeholder="0473" onChange={(e) => set('pi_number', e.target.value)} />}
+              </Field>
+              <Field label="Status PI" hint="mis. di pool, masih moving.">
+                {(fid) => <Input id={fid} value={form.pi_status} onChange={(e) => set('pi_status', e.target.value)} />}
+              </Field>
+              <Field label="COST" hint="Nilai trip; dasar tingkat komisi.">
+                {(fid) => <CurrencyInput id={fid} value={form.cost_value} onValueChange={(v) => set('cost_value', v)} />}
+              </Field>
+              <Field label="Tgl Bon">
+                {(fid) => <DateInput id={fid} value={form.bon_date ?? ''} onChange={(e) => set('bon_date', e.target.value || null)} />}
+              </Field>
+              <Field label="Bon Pribadi">
+                {(fid) => <CurrencyInput id={fid} value={form.personal_bon} onValueChange={(v) => set('personal_bon', v)} />}
+              </Field>
+              <Field label="Catatan" className="sm:col-span-2">
+                {(fid) => <Textarea id={fid} rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} />}
+              </Field>
+            </div>
+          </Section>
+        </div>
+      )}
+
+      {/* Bar dimulai setelah rel sidebar (68px) supaya teks kirinya tidak tertutup. */}
+      <div className={cn('no-print fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-surface/95 backdrop-blur', 'px-4 py-3 lg:left-[68px] lg:px-6')}>
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3">
+          <p className="hidden truncate text-[12.5px] text-ink-3 sm:block">
+            {form.transaction_no || 'nomor belum diisi'}
+            {' · '}
+            {dedicated ? `Dedicated ${kontrak?.contract_no ?? '(kontrak belum dipilih)'}` : `${idTerisi.length} ID Perjalanan/Trip`}
+            {selectedRoute && <> · patokan UJ {formatRupiah(selectedRoute.ujroute)}</>}
+          </p>
+          <div className="ml-auto flex items-center gap-2">
+            <Button onClick={() => navigate(existing ? `/transaksi/trip/${existing.id}` : '/transaksi/trip')}>Batal</Button>
+            <Button icon={<Printer size={15} />} disabled={!canEdit} onClick={() => save(true)}>Simpan &amp; Cetak</Button>
+            <Button variant="primary" icon={<Save size={15} />} disabled={!canEdit} onClick={() => save(false)}>Simpan</Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

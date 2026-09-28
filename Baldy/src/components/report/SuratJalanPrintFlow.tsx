@@ -6,7 +6,7 @@ import { Radio } from '../ui/Field'
 import { ReportPreview } from './ReportPreview'
 import { PrintDocument } from './PrintDocument'
 import { SuratJalanDocument } from './SuratJalanDocument'
-import type { DeliveryNoteRow } from '../../types'
+import type { TransactionRow } from '../../types'
 
 type Template = 'logo' | 'nologo'
 type Output = 'print' | 'pdf'
@@ -22,7 +22,7 @@ export function SuratJalanPrintFlow({
   onClose,
   onPrinted,
 }: {
-  notes: DeliveryNoteRow[]
+  notes: TransactionRow[]
   open: boolean
   onClose: () => void
   onPrinted?: (ids: string[]) => void
@@ -72,7 +72,7 @@ export function SuratJalanPrintFlow({
               <p className="text-[12px] font-semibold text-ink-2">{notes.length} dokumen</p>
               <ul className="tnum mt-1.5 max-h-56 space-y-0.5 overflow-y-auto text-[11.5px] text-ink-3">
                 {notes.map((n) => (
-                  <li key={n.id}>{n.sj_no}</li>
+                  <li key={n.id}>{n.sj_no || n.transaction_no}</li>
                 ))}
               </ul>
             </div>

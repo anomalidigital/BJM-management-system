@@ -10,7 +10,7 @@ import { PrintTable, PRow, PCell } from '../components/report/PrintTable'
 import { ReportPreview, barisPerLembar } from '../components/report/ReportPreview'
 import { useData } from '../store/DataProvider'
 import { useToast } from '../store/ToastProvider'
-import { nettoTransaksi, pendapatanTransaksi, ringkas } from '../lib/calculations'
+import { komisiTransaksi, nettoTransaksi, pendapatanTransaksi, ringkas, tripDihitung } from '../lib/calculations'
 import { formatDate, formatNumber, formatRupiah } from '../lib/format'
 import { groupBy } from '../lib/utils'
 import { usePeriodeDefault } from '../lib/periode'
@@ -27,7 +27,7 @@ export function LapNettoPage() {
   const [preview, setPreview] = useState(false)
 
   const rows = useMemo(
-    () => transactionRows.filter((t) => t.transaction_date >= from && t.transaction_date <= to),
+    () => transactionRows.filter((t) => tripDihitung(t) && t.transaction_date >= from && t.transaction_date <= to),
     [transactionRows, from, to],
   )
   const totals = useMemo(() => ringkas(rows), [rows])
@@ -41,7 +41,7 @@ export function LapNettoPage() {
         ritan: group.length,
         pendapatan: group.reduce((a, r) => a + pendapatanTransaksi(r), 0),
         ujroute: group.reduce((a, r) => a + r.ujroute, 0),
-        komisi: group.reduce((a, r) => a + r.commissioner, 0),
+        komisi: group.reduce((a, r) => a + komisiTransaksi(r), 0),
         netto: group.reduce((a, r) => a + nettoTransaksi(r), 0),
       }))
       .sort((a, b) => b.netto - a.netto)
@@ -79,7 +79,7 @@ export function LapNettoPage() {
               <PrintTable
                 cols={[
                   { label: 'No.', align: 'right', width: '6%' },
-                  { label: 'No. Mobil', width: '16%' },
+                  { label: 'No. Kendaraan', width: '16%' },
                   { label: 'Ritan', align: 'right', width: '10%' },
                   { label: 'Pendapatan', align: 'right' },
                   { label: 'UJROUTE', align: 'right' },
@@ -232,7 +232,7 @@ export function LapNettoPage() {
                 <table className="w-full text-[13px]">
                   <thead className="sticky top-0 bg-sunken">
                     <tr className="border-b border-hairline">
-                      <th className="px-4 py-2 text-left text-[11.5px] font-semibold tracking-wide text-ink-2 uppercase">No. Mobil</th>
+                      <th className="px-4 py-2 text-left text-[11.5px] font-semibold tracking-wide text-ink-2 uppercase">No. Kendaraan</th>
                       <th className="px-4 py-2 text-right text-[11.5px] font-semibold tracking-wide text-ink-2 uppercase">Ritan</th>
                       <th className="px-4 py-2 text-right text-[11.5px] font-semibold tracking-wide text-ink-2 uppercase">Pendapatan</th>
                       <th className="px-4 py-2 text-right text-[11.5px] font-semibold tracking-wide text-ink-2 uppercase">Netto</th>

@@ -296,3 +296,204 @@ CREATE INDEX idx_trx_workspace ON commission_transactions(workspace, transaction
   berlaku) **belum** dibuat. Data real menunjukkan COST pada rute yang sama bisa berbeda
   (`CIB - DURI`: 35jt / 42jt / 43jt), tetapi penentunya belum diketahui — menunggu
   jawaban TBD-02 sebelum strukturnya dikunci.
+
+---
+
+# Perubahan 25 September 2026 — Trip, Karyawan, Kasbon, Lampiran
+
+Surat Jalan dan Data Pengeluaran **digabung menjadi Trip**: satu perjalanan menyimpan
+dokumen Surat Jalan-nya sekaligus seluruh catatan keuangannya. Tabel `delivery_notes`
+dan `delivery_note_containers` tidak dipakai lagi; datanya dipindah ke
+`commission_transactions` (nama tabel dipertahankan karena seluruh laporan membacanya).
+
+```sql
+-- Data Sopir -> Data Karyawan: tabel yang sama, ditambah peran.
+ALTER TABLE drivers ADD COLUMN role VARCHAR(10) NOT NULL DEFAULT 'sopir';  -- sopir | manager
+
+-- Satu route milik satu project; UJ route ikut terhitung ke project itu.
+-- route_code kini dibuat otomatis: 13 digit timestamp + 7 huruf mati acak.
+ALTER TABLE routes ADD COLUMN project_id BIGINT REFERENCES projects(id);
+ALTER TABLE routes ALTER COLUMN route_code TYPE VARCHAR(30);
+
+-- Trip menyerap field Surat Jalan.
+ALTER TABLE commission_transactions
+  ADD COLUMN sj_no               VARCHAR(30) UNIQUE,              -- Nomor Surat Jalan (boleh kosong)
+  ADD COLUMN manager_id          BIGINT REFERENCES drivers(id),   -- manager terdaftar...
+  ADD COLUMN manager_name        VARCHAR(120),                    -- ...atau diisi manual
+  ADD COLUMN recipient_name      VARCHAR(160),                    -- Kepada Yth
+  ADD COLUMN recipient_address_1 VARCHAR(180),
+  ADD COLUMN recipient_address_2 VARCHAR(180),
+  ADD COLUMN party               VARCHAR(40),
+  ADD COLUMN goods_type          VARCHAR(80),                     -- Jenis Brg
+  ADD COLUMN kosongan            VARCHAR(80),
+  ADD COLUMN location            VARCHAR(80),                     -- Lokasi
+  ADD COLUMN ship                VARCHAR(120),                    -- Kapal
+  ADD COLUMN printed_at          DATE;                            -- NULL = belum dicetak
+ALTER TABLE commission_transactions ALTER COLUMN driver_id    DROP NOT NULL;  -- = sopir utama
+ALTER TABLE commission_transactions ALTER COLUMN vehicle_id   DROP NOT NULL;
+ALTER TABLE commission_transactions ALTER COLUMN job_order_id DROP NOT NULL;
+ALTER TABLE commission_transactions DROP COLUMN container_no;   -- pindah ke trip_refs
+
+-- ID Perjalanan/Trip (dulu No. Container / Kont): boleh lebih dari satu per trip.
+CREATE TABLE trip_refs (
+  id         BIGSERIAL PRIMARY KEY,
+  trip_id    BIGINT      NOT NULL REFERENCES commission_transactions(id) ON DELETE CASCADE,
+  trip_ref   VARCHAR(30) NOT NULL,
+  sort_order INT         NOT NULL DEFAULT 0,
+  UNIQUE (trip_id, trip_ref)
+);
+CREATE INDEX idx_trip_ref ON trip_refs(trip_ref);   -- cek kembar antar trip yang belum batal
+
+-- Sopir: boleh lebih dari satu per trip; urutan 0 = sopir utama.
+CREATE TABLE trip_drivers (
+  trip_id    BIGINT NOT NULL REFERENCES commission_transactions(id) ON DELETE CASCADE,
+  driver_id  BIGINT NOT NULL REFERENCES drivers(id),
+  sort_order INT    NOT NULL DEFAULT 0,
+  PRIMARY KEY (trip_id, driver_id)
+);
+
+-- Termin UJ mencatat sopir penerima; potong kasbon diambil dari kasbon sopir itu.
+ALTER TABLE uj_payments ADD COLUMN driver_id BIGINT REFERENCES drivers(id);
+
+-- Biaya internal jenis "Komisi" mencatat penerimanya.
+ALTER TABLE internal_costs
+  ADD COLUMN recipient_role VARCHAR(10),                    -- sopir | manager
+  ADD COLUMN recipient_id   BIGINT REFERENCES drivers(id),  -- terdaftar...
+  ADD COLUMN recipient_name VARCHAR(120);                   -- ...atau manual
+
+-- Tab "Lainnya" (dulu Dokumen): berkas, gambar, atau catatan bebas per trip.
+CREATE TABLE trip_notes (
+  id         BIGSERIAL PRIMARY KEY,
+  trip_id    BIGINT       NOT NULL REFERENCES commission_transactions(id) ON DELETE CASCADE,
+  note_date  DATE         NOT NULL,
+  title      VARCHAR(160) NOT NULL,
+  notes      TEXT,
+  created_at TIMESTAMP    NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+-- Kasbon karyawan sebagai buku mutasi. amount bertanda: + menambah kasbon, - mengurangi.
+-- Saldo = SUM(amount) per karyawan.
+CREATE TABLE kasbon_entries (
+  id            BIGSERIAL PRIMARY KEY,
+  employee_id   BIGINT      NOT NULL REFERENCES drivers(id),
+  entry_date    DATE        NOT NULL,
+  kind          VARCHAR(12) NOT NULL,   -- admin | trip | pembatalan | manual
+  amount        BIGINT      NOT NULL,
+  trip_id       BIGINT REFERENCES commission_transactions(id) ON DELETE SET NULL,
+  uj_payment_id BIGINT REFERENCES uj_payments(id) ON DELETE SET NULL,  -- mutasi "trip" otomatis
+  notes         TEXT,
+  created_at    TIMESTAMP   NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMP   NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_kasbon_employee ON kasbon_entries(employee_id, entry_date);
+
+-- Lampiran untuk seluruh record (foto kendaraan, bukti UJ / biaya, berkas Lainnya,
+-- bukti kasbon). Prototype menyimpan isinya di IndexedDB browser.
+CREATE TABLE attachments (
+  id          BIGSERIAL PRIMARY KEY,
+  owner_table VARCHAR(40)  NOT NULL,   -- vehicles, uj_payments, operational_expenses, ...
+  owner_id    BIGINT       NOT NULL,
+  file_name   VARCHAR(200) NOT NULL,
+  mime_type   VARCHAR(80)  NOT NULL,
+  size_bytes  BIGINT       NOT NULL,
+  storage_key VARCHAR(200) NOT NULL,   -- lokasi di object storage
+  created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_attachment_owner ON attachments(owner_table, owner_id);
+
+-- Komisi bertingkat: satu pengaturan untuk satu peran, berisi beberapa tingkat target.
+ALTER TABLE commission_schemes
+  ADD COLUMN role VARCHAR(10) NOT NULL DEFAULT 'sopir',
+  DROP COLUMN target, DROP COLUMN base_commission, DROP COLUMN base_commission_unit,
+  DROP COLUMN target_commission, DROP COLUMN target_commission_unit;
+CREATE TABLE commission_tiers (
+  id              BIGSERIAL PRIMARY KEY,
+  scheme_id       BIGINT        NOT NULL REFERENCES commission_schemes(id) ON DELETE CASCADE,
+  target_awal     BIGINT        NOT NULL DEFAULT 0,
+  target_akhir    BIGINT,                          -- NULL = tanpa batas atas
+  commission      NUMERIC(14,2) NOT NULL DEFAULT 0,
+  commission_unit VARCHAR(10)   NOT NULL DEFAULT 'rp'  -- rp | persen
+);
+
+DROP TABLE delivery_note_containers;
+DROP TABLE delivery_notes;
+```
+
+## Aturan yang dijalankan aplikasi
+
+- **UJ ikut route.** Saat trip dibuat, termin 1 terisi otomatis sebesar UJROUTE route.
+  Bila route diganti dan termin itu belum diubah tangan, nilainya ikut route baru.
+- **Potong kasbon** tidak boleh melebihi UJ termin maupun saldo kasbon sopir penerima.
+  Menyimpan termin otomatis membuat / memperbarui mutasi kasbon jenis `trip`.
+- **Batalkan Trip**: status menjadi `batal`, seluruh termin, biaya, biaya internal, dan
+  catatan Lainnya dihapus. Potongan kasbon tetap di riwayat, lalu dikembalikan lewat
+  mutasi `pembatalan` sehingga saldo kembali seperti sebelum trip.
+- **Hapus Trip**: trip dan seluruh catatannya hilang, termasuk mutasi kasbon yang tertaut.
+
+---
+
+# Perubahan 28 September 2026 — Komisi dari meeting, Dedicated, pembatalan tanpa hapus
+
+```sql
+-- Karyawan: dokumen (KTP, SIM, dll) lewat tabel attachments (owner_table = 'drivers').
+-- Status piutang = saldo kasbon > 0 (dihitung, tidak disimpan).
+
+-- Layanan trip dipilih di awal form: callout (per order) atau dedicated (kontrak).
+CREATE TABLE contracts (
+  id           BIGSERIAL PRIMARY KEY,
+  workspace    VARCHAR(20)  NOT NULL DEFAULT 'jakarta',
+  contract_no  VARCHAR(30)  NOT NULL UNIQUE,      -- KTR-2026-001
+  client_name  VARCHAR(160) NOT NULL,
+  value        BIGINT       NOT NULL,             -- nilai kontrak
+  start_date   DATE,
+  end_date     DATE,
+  status       VARCHAR(10)  NOT NULL DEFAULT 'aktif',
+  notes        TEXT,
+  created_at   TIMESTAMP    NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+ALTER TABLE commission_transactions
+  ADD COLUMN service_type      VARCHAR(10) NOT NULL DEFAULT 'callout',  -- callout | dedicated
+  ADD COLUMN contract_id       BIGINT REFERENCES contracts(id),         -- wajib untuk dedicated
+  ADD COLUMN cancelled_at      DATE,
+  ADD COLUMN cancel_reason     TEXT;
+-- Penyelesaian UJ saat trip batal: TF yang sudah diterima sopir dikembalikan atau jadi kasbon.
+CREATE TABLE trip_cancel_settlements (
+  trip_id       BIGINT NOT NULL REFERENCES commission_transactions(id) ON DELETE CASCADE,
+  uj_payment_id BIGINT NOT NULL REFERENCES uj_payments(id),
+  driver_id     BIGINT REFERENCES drivers(id),
+  tf            BIGINT NOT NULL,
+  method        VARCHAR(10) NOT NULL,          -- kembali | kasbon
+  PRIMARY KEY (trip_id, uj_payment_id)
+);
+
+-- Komisi: satu-satunya sumber aturan. Kolom routes.commissioner tidak dipakai lagi.
+ALTER TABLE commission_schemes
+  ADD COLUMN service_type       VARCHAR(10) NOT NULL DEFAULT 'callout', -- callout | dedicated | semua
+  ADD COLUMN basis              VARCHAR(10) NOT NULL DEFAULT 'nilai',   -- nilai | uj | kontrak
+  ADD COLUMN base_deduction_pct NUMERIC(5,2) NOT NULL DEFAULT 0,        -- mis. 5 untuk (nilai - 5%)
+  ADD COLUMN is_active          BOOLEAN NOT NULL DEFAULT TRUE;
+CREATE TABLE commission_scheme_vehicles (          -- kosong = semua kendaraan
+  scheme_id     BIGINT NOT NULL REFERENCES commission_schemes(id) ON DELETE CASCADE,
+  configuration VARCHAR(20) NOT NULL,              -- HB, LB, DL, TRONTON, CDD, ...
+  PRIMARY KEY (scheme_id, configuration)
+);
+```
+
+## Aturan yang dijalankan aplikasi (menggantikan bagian sebelumnya)
+
+- **UJROUTE = patokan.** Membuat trip tidak lagi mencatat uang jalan otomatis. Termin
+  dicatat saat uang benar-benar dibayar; tab Uang Jalan menampilkan sisa terhadap patokan.
+- **Batalkan Trip tidak menghapus apa pun.** Status menjadi `batal`, semua catatan tetap
+  ada sebagai arsip dan dikeluarkan dari seluruh laporan. Potongan kasbon dikembalikan;
+  TF yang sudah diterima sopir dicatat dikembalikan tunai, atau dijadikan kasbon sopir.
+- **Komisi trip** = aturan aktif yang paling cocok (peran, layanan, konfigurasi kendaraan).
+  Dasar `nilai` = COST trip, atau Harga route bila COST kosong. Nilai di antara dua tingkat
+  ikut tingkat berikutnya; di bawah tingkat pertama tidak dapat komisi. Penerimanya sopir
+  utama; sopir tambahan lewat biaya operasional "Double Driver".
+- **Komisi Dedicated** dihitung per kontrak: (nilai kontrak - potongan dasar) x persen.
+- **Tol**: Uang Tol route = patokan; yang dihitung hanya biaya operasional jenis Tol.
+- **Biaya internal** tidak punya jenis "Uang Jalan" lagi (data lama diubah ke "Lainnya").
+- **Kasbon manual** hanya "Kasbon dari Admin" dan "Penyesuaian" (wajib catatan).
+- **No. Route** dibuat dari nama route: 4 huruf asal + 4 huruf tujuan (CIB - DURI -> CIBDURI).

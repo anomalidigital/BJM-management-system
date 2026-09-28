@@ -51,7 +51,7 @@ export function LoginPage() {
             terpusat — lengkap dengan pencarian SI / Job Order, laporan bulan berjalan, dan export PDF.
           </p>
           <ul className="mt-7 space-y-2.5 text-[13px] text-nav-ink">
-            {['Master data sopir & route', 'Surat Jalan + cetak dengan/tanpa logo', 'Pencarian SI / Job Order tanpa copy-paste', 'Laporan komisi, netto, dan ritan bulan ini'].map((f) => (
+            {['Master data karyawan & route', 'Trip + cetak Surat Jalan dengan/tanpa logo', 'Pencarian SI / Job Order tanpa copy-paste', 'Laporan komisi, netto, dan ritan bulan ini'].map((f) => (
               <li key={f} className="flex items-center gap-2.5">
                 <ShieldCheck size={15} className="shrink-0 text-brand-400" />
                 {f}

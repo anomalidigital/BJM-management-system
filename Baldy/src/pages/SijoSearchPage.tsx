@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Printer, Search, Ship, X } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader, InfoItem } from '../components/ui/Card'
@@ -18,7 +18,7 @@ import type { TransactionRow } from '../types'
 /**
  * Pencarian nomor SI - Job Order.
  * Bisa diakses langsung dengan mengetik nomor, atau otomatis terisi ketika
- * user mengklik nilai Sijo dari Browsing Data / Data Pengeluaran / Surat Jalan.
+ * user mengklik nilai Sijo dari Browsing Data / Trip.
  */
 export function SijoSearchPage() {
   const [params, setParams] = useSearchParams()
@@ -81,9 +81,16 @@ export function SijoSearchPage() {
   const columns: Column<TransactionRow>[] = [
     { key: 'sijo', header: 'Sijo', width: '110px', render: (t) => <span className="tnum font-semibold text-ink">{t.sijo}</span> },
     { key: 'transaction_date', header: 'Tgltrans', sortable: true, width: '116px', render: (t) => <span className="tnum text-ink-2">{formatDate(t.transaction_date)}</span> },
-    { key: 'plate_number', header: 'No.Mobil', sortable: true, width: '136px', render: (t) => <span className="tnum font-medium">{t.plate_number || '—'}</span> },
-    { key: 'driver_name', header: 'Sopir', sortable: true, render: (t) => <span className="font-medium">{t.driver_name || '—'}</span> },
-    { key: 'container_no', header: 'Kont', sortable: true, width: '160px', render: (t) => <span className="tnum text-ink-2">{t.container_no || '—'}</span> },
+    { key: 'plate_number', header: 'No. Kendaraan', sortable: true, width: '136px', render: (t) => <span className="tnum font-medium">{t.plate_number || '—'}</span> },
+    {
+      key: 'driver_names', header: 'Sopir', sortable: true,
+      render: (t) => (
+        <Link to={`/transaksi/trip/${t.id}`} className="font-medium text-ink hover:text-brand-700 hover:underline" title={`Buka Trip ${t.transaction_no}`}>
+          {t.driver_names || '—'}
+        </Link>
+      ),
+    },
+    { key: 'trip_ids', header: 'ID Perjalanan/Trip', width: '180px', render: (t) => <span className="tnum text-ink-2">{t.trip_ids.join(', ') || '—'}</span> },
   ]
 
 
@@ -113,7 +120,7 @@ export function SijoSearchPage() {
               <table className="w-full border-collapse text-[10px]">
                 <thead>
                   <tr className="bg-neutral-100">
-                    {['No.', 'Sijo', 'Tgltrans', 'No.Mobil', 'Sopir', 'Kont'].map((h) => (
+                    {['No.', 'Sijo', 'Tgltrans', 'No. Kendaraan', 'Sopir', 'ID Perjalanan/Trip'].map((h) => (
                       <th key={h} className="border border-neutral-400 px-1.5 py-1 text-left font-semibold">{h}</th>
                     ))}
                   </tr>
@@ -125,8 +132,8 @@ export function SijoSearchPage() {
                       <td className="border border-neutral-400 px-1.5 py-1">{t.sijo}</td>
                       <td className="border border-neutral-400 px-1.5 py-1">{formatDate(t.transaction_date)}</td>
                       <td className="border border-neutral-400 px-1.5 py-1 font-medium">{t.plate_number}</td>
-                      <td className="border border-neutral-400 px-1.5 py-1">{t.driver_name}</td>
-                      <td className="border border-neutral-400 px-1.5 py-1">{t.container_no || '-'}</td>
+                      <td className="border border-neutral-400 px-1.5 py-1">{t.driver_names}</td>
+                      <td className="border border-neutral-400 px-1.5 py-1">{t.trip_ids.join(', ') || '-'}</td>
                     </tr>
                   ))}
                   {i === printPages.length - 1 && (
@@ -250,7 +257,7 @@ export function SijoSearchPage() {
                 empty={
                   <div className="px-6 py-12 text-center">
                     <p className="text-[13.5px] font-semibold text-ink">Belum ada transaksi untuk SI/JO ini.</p>
-                    <p className="mt-1 text-[13px] text-ink-3">Buat transaksi pada halaman Data Pengeluaran.</p>
+                    <p className="mt-1 text-[13px] text-ink-3">Buat trip dengan SI / BL ini pada halaman Trip.</p>
                   </div>
                 }
               />

@@ -1,6 +1,6 @@
 import {
-  BadgeDollarSign, FileSpreadsheet, FileText, FolderKanban, LayoutDashboard, Percent, Receipt,
-  Route as RouteIcon, Search, Settings2, TrendingUp, Truck, Users, Wallet,
+  BadgeDollarSign, FileSpreadsheet, FolderKanban, Handshake, LayoutDashboard, Percent, Receipt,
+  Route as RouteIcon, Search, Settings2, TrendingUp, Truck, Users, Wallet, Waypoints,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -24,18 +24,18 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Master',
     items: [
-      { label: 'Data Sopir', to: '/master/sopir', icon: Users },
+      { label: 'Data Karyawan', to: '/master/karyawan', icon: Users },
       { label: 'Data Mobil', to: '/master/mobil', icon: Truck },
       { label: 'Data Route', to: '/master/route', icon: RouteIcon },
       { label: 'Data Project', to: '/master/project', icon: FolderKanban },
+      { label: 'Data Kontrak', to: '/master/kontrak', icon: Handshake },
       { label: 'Komisi', to: '/master/komisi', icon: Percent },
     ],
   },
   {
     title: 'Transaksi',
     items: [
-      { label: 'Surat Jalan', to: '/transaksi/surat-jalan', icon: FileText },
-      { label: 'Data Pengeluaran', to: '/transaksi/komisi', icon: Truck },
+      { label: 'Trip', to: '/transaksi/trip', icon: Waypoints },
       { label: 'Data Tagihan', to: '/transaksi/tagihan', icon: Receipt },
     ],
   },

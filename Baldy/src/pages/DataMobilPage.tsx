@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2, X } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
@@ -11,6 +11,7 @@ import { Modal, ConfirmDialog } from '../components/ui/Modal'
 import { Field, Input, Select } from '../components/ui/Field'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState, NotFoundState } from '../components/ui/States'
+import { LampiranInput, LampiranThumbs } from '../components/ui/Lampiran'
 import { useData } from '../store/DataProvider'
 import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
@@ -21,7 +22,7 @@ import { VEHICLE_CONFIGS } from '../types'
 import type { Vehicle } from '../types'
 
 type FormState = Omit<Vehicle, 'id' | 'created_at' | 'updated_at'>
-const BLANK: FormState = { plate_number: '', vehicle_type: '', configuration: '', status: 'aktif' }
+const BLANK: FormState = { plate_number: '', vehicle_type: '', configuration: '', status: 'aktif', attachments: [] }
 const TYPES = ['Tronton 6x2', 'Trailer 20 FT', 'Trailer 40 FT', 'Head Truck', 'Wingbox']
 
 export function DataMobilPage() {
@@ -35,6 +36,7 @@ export function DataMobilPage() {
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
   const [deleting, setDeleting] = useState<Vehicle | null>(null)
   const [configFilter, setConfigFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
 
   /** Jumlah trip per kendaraan, untuk konteks sebelum menghapus. */
   const tripCount = useMemo(() => {
@@ -48,25 +50,33 @@ export function DataMobilPage() {
   }, [transactionRows])
 
   const search = useCallback((v: Vehicle, q: string) => matchesQuery(q, v.plate_number, v.vehicle_type, v.configuration), [])
-  const extraFilter = useCallback((v: Vehicle) => (configFilter ? v.configuration === configFilter : true), [configFilter])
+  const extraFilter = useCallback(
+    (v: Vehicle) => (!configFilter || v.configuration === configFilter) && (!statusFilter || v.status === statusFilter),
+    [configFilter, statusFilter],
+  )
+  const filterAktif = Boolean(configFilter || statusFilter)
   const table = useTable(db.vehicles, {
-    search, extraFilter, extraFilterActive: !!configFilter, initialSortKey: 'plate_number', pageSize: 10,
+    search, extraFilter, extraFilterActive: filterAktif, initialSortKey: 'plate_number', pageSize: 10,
   })
+  const resetFilter = () => { table.reset(); setConfigFilter(''); setStatusFilter('') }
 
   function openCreate() { setEditing(null); setForm(BLANK); setErrors({}); setFormOpen(true) }
   function openEdit(v: Vehicle) {
     setEditing(v)
-    setForm({ plate_number: v.plate_number, vehicle_type: v.vehicle_type, configuration: v.configuration, status: v.status })
+    setForm({ plate_number: v.plate_number, vehicle_type: v.vehicle_type, configuration: v.configuration, status: v.status, attachments: v.attachments ?? [] })
     setErrors({}); setFormOpen(true)
   }
+
+  /** Data kendaraan asli belum punya jenis; jangan paksa diisi hanya untuk menambah foto. */
+  const jenisWajib = !editing || !!editing.vehicle_type
 
   function validate(): boolean {
     const e: Partial<Record<keyof FormState, string>> = {}
     const plat = form.plate_number.trim()
-    if (!plat) e.plate_number = 'No. Polisi wajib diisi.'
+    if (!plat) e.plate_number = 'No. Kendaraan wajib diisi.'
     else if (db.vehicles.some((v) => v.plate_number.toLowerCase() === plat.toLowerCase() && v.id !== editing?.id))
-      e.plate_number = 'No. Polisi sudah terdaftar.'
-    if (!form.vehicle_type.trim()) e.vehicle_type = 'Jenis kendaraan wajib diisi.'
+      e.plate_number = 'No. Kendaraan sudah terdaftar.'
+    if (jenisWajib && !form.vehicle_type.trim()) e.vehicle_type = 'Jenis kendaraan wajib diisi.'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -87,7 +97,8 @@ export function DataMobilPage() {
   }
 
   const columns: Column<Vehicle>[] = [
-    { key: 'plate_number', header: 'No. Polisi', sortable: true, width: '140px', render: (v) => <span className="tnum font-semibold text-ink">{v.plate_number}</span> },
+    { key: 'plate_number', header: 'No. Kendaraan', sortable: true, width: '140px', render: (v) => <span className="tnum font-semibold text-ink">{v.plate_number}</span> },
+    { key: 'foto', header: 'Foto', width: '120px', render: (v) => <LampiranThumbs ids={v.attachments ?? []} ukuran={30} /> },
     { key: 'vehicle_type', header: 'Jenis Kendaraan', sortable: true, render: (v) => <span className="text-ink-2">{v.vehicle_type}</span> },
     {
       key: 'configuration', header: 'Konfigurasi', sortable: true, width: '130px',
@@ -128,13 +139,22 @@ export function DataMobilPage() {
         <Toolbar
           left={
             <>
-              <SearchInput value={table.query} onChange={table.setQuery} placeholder="Cari nomor polisi atau jenis..." />
+              <SearchInput value={table.query} onChange={table.setQuery} placeholder="Cari nomor kendaraan atau jenis..." />
               <FilterField label="Konfigurasi">
                 <Select value={configFilter} onChange={(e) => setConfigFilter(e.target.value)} className="w-32">
                   <option value="">Semua</option>
                   {VEHICLE_CONFIGS.map((c) => <option key={c} value={c}>{c}</option>)}
                 </Select>
               </FilterField>
+              <FilterField label="Status">
+                <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-32">
+                  <option value="">Semua</option>
+                  <option value="aktif">Aktif</option>
+                  <option value="servis">Servis</option>
+                  <option value="nonaktif">Nonaktif</option>
+                </Select>
+              </FilterField>
+              {(table.isFiltered || filterAktif) && <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={resetFilter}>Reset</Button>}
             </>
           }
           right={<span className="text-[12.5px] text-ink-3">{db.vehicles.length} mobil terdaftar</span>}
@@ -147,11 +167,11 @@ export function DataMobilPage() {
           loading={loading}
           error={error}
           onRetry={reload}
-          isFiltered={table.isFiltered}
+          isFiltered={table.isFiltered || filterAktif}
           sort={table.sort}
           onSortChange={table.toggleSort}
           empty={<EmptyState entity="data mobil" action={canEdit && <Button variant="primary" icon={<Plus size={15} />} onClick={openCreate}>Tambah Mobil</Button>} />}
-          notFound={<NotFoundState onReset={() => { table.reset(); setConfigFilter('') }} />}
+          notFound={<NotFoundState onReset={resetFilter} />}
         />
 
         {table.total > 0 && (
@@ -173,13 +193,13 @@ export function DataMobilPage() {
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="No. Polisi" required error={errors.plate_number}>
+          <Field label="No. Kendaraan" required error={errors.plate_number}>
             {(id) => (
               <Input id={id} value={form.plate_number} invalid={!!errors.plate_number} placeholder="B 9015 UWW"
                 onChange={(e) => setForm({ ...form, plate_number: e.target.value })} />
             )}
           </Field>
-          <Field label="Jenis Kendaraan" required error={errors.vehicle_type}>
+          <Field label="Jenis Kendaraan" required={jenisWajib} error={errors.vehicle_type}>
             {(id) => (
               <Select id={id} value={form.vehicle_type} invalid={!!errors.vehicle_type}
                 onChange={(e) => setForm({ ...form, vehicle_type: e.target.value })}>
@@ -204,6 +224,9 @@ export function DataMobilPage() {
                 <option value="nonaktif">Nonaktif</option>
               </Select>
             )}
+          </Field>
+          <Field label="Foto & dokumen" className="sm:col-span-2" hint="Foto kendaraan, STNK, KIR, atau informasi lain tentang kendaraan ini.">
+            {(id) => <LampiranInput id={id} value={form.attachments} onChange={(v) => setForm((f) => ({ ...f, attachments: v }))} />}
           </Field>
         </div>
       </Modal>

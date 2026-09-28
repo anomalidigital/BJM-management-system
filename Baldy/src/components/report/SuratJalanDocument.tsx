@@ -1,21 +1,24 @@
-import type { DeliveryNoteRow } from '../../types'
+import type { TransactionRow } from '../../types'
 import { formatDateLong } from '../../lib/format'
 import { cn } from '../../lib/utils'
 
 /**
- * Layout dokumen Surat Jalan ukuran A4 (bukan screenshot UI).
+ * Layout dokumen Surat Jalan ukuran A4 (bukan screenshot UI) untuk satu trip.
  * Dua varian: Dengan Logo dan Tanpa Logo.
  */
-export function SuratJalanDocument({ note, withLogo = true }: { note: DeliveryNoteRow; withLogo?: boolean }) {
+export function SuratJalanDocument({ note, withLogo = true }: { note: TransactionRow; withLogo?: boolean }) {
+  const nomor = note.sj_no || note.transaction_no
+  const idTrip = note.trip_ids ?? []
   const rows: Array<[string, string]> = [
-    ['No. Polisi', note.plate_number || '-'],
+    ['No. Kendaraan', note.plate_number || '-'],
+    ['Sopir', note.driver_names || '-'],
     ['Party', note.party || '-'],
     ['SI / BL', note.sijo || '-'],
     ['Jenis Brg', note.goods_type || '-'],
     ['Kosongan', note.kosongan || '-'],
     ['Lokasi', note.location || '-'],
     ['Kapal', note.ship || '-'],
-    ['Tujuan', note.destination || '-'],
+    ['Tujuan', note.destination_detail || '-'],
   ]
 
   return (
@@ -40,14 +43,15 @@ export function SuratJalanDocument({ note, withLogo = true }: { note: DeliveryNo
           </div>
         </div>
         <div className="pt-1 text-right text-[10.5px]">
-          <p>Jakarta, {formatDateLong(note.sj_date)}</p>
+          <p>Jakarta, {formatDateLong(note.transaction_date)}</p>
         </div>
       </header>
 
       {/* Judul */}
       <div className="mt-5 mb-4 text-center">
         <h1 className="inline-block border-b-2 border-black px-3 pb-0.5 text-[16px] font-bold tracking-[.12em]">SURAT JALAN</h1>
-        <p className="mt-1.5 text-[11.5px] font-semibold">Nomor: {note.sj_no}</p>
+        <p className="mt-1.5 text-[11.5px] font-semibold">Nomor: {nomor}</p>
+        {note.sj_no && <p className="text-[10px] text-neutral-600">Trip {note.transaction_no}</p>}
       </div>
 
       {/* Penerima */}
@@ -82,25 +86,25 @@ export function SuratJalanDocument({ note, withLogo = true }: { note: DeliveryNo
         </tbody>
       </table>
 
-      {/* Container */}
+      {/* ID Perjalanan / Trip */}
       <div className="mb-5">
         <p className="mb-1.5 text-[11.5px] font-semibold">
-          No. Container <span className="font-normal text-neutral-600">({note.containers.length} container)</span>
+          ID Perjalanan/Trip <span className="font-normal text-neutral-600">({idTrip.length} ID)</span>
         </p>
-        {note.containers.length === 0 ? (
+        {idTrip.length === 0 ? (
           <p className="border border-neutral-500 px-2 py-3 text-center text-[10.5px] text-neutral-500">
-            Tidak ada nomor container.
+            Belum ada ID Perjalanan/Trip.
           </p>
         ) : (
           <table className="w-full border-collapse text-[11px]">
             <thead>
               <tr className="bg-neutral-100">
                 <th className="w-12 border border-neutral-500 px-2 py-[5px] text-left font-semibold">No.</th>
-                <th className="border border-neutral-500 px-2 py-[5px] text-left font-semibold">Nomor Container</th>
+                <th className="border border-neutral-500 px-2 py-[5px] text-left font-semibold">ID Perjalanan/Trip</th>
               </tr>
             </thead>
             <tbody>
-              {note.containers.map((c, i) => (
+              {idTrip.map((c, i) => (
                 <tr key={`${c}-${i}`}>
                   <td className="border border-neutral-500 px-2 py-[5px]">{i + 1}.</td>
                   <td className="border border-neutral-500 px-2 py-[5px] font-medium tracking-wide">{c}</td>
@@ -129,7 +133,7 @@ export function SuratJalanDocument({ note, withLogo = true }: { note: DeliveryNo
       </div>
 
       <footer className="mt-5 border-t border-neutral-400 pt-1.5 text-[8.5px] text-neutral-500">
-        SIKOTIS — Sistem Komisi Otomatis · PT Bimajaya Mustika · Surat Jalan {note.sj_no}
+        SIKOTIS — Sistem Komisi Otomatis · PT Bimajaya Mustika · Surat Jalan {nomor}
       </footer>
     </section>
   )

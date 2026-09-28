@@ -6,10 +6,12 @@
  * berisi data, kapan pun prototype ini dibuka.
  */
 import type {
-  Billing, CommissionScheme, CommissionTransaction, CommissionUnit, Database, DeliveryNote, Driver,
+  Billing, CommissionScheme, CommissionTransaction, CommissionUnit, Contract, Database, Driver,
   InternalCost, InternalCostType, JobOrder, OperationalExpense, Project, Route, TripStatus, UjPayment, Vehicle, Workspace,
 } from '../types'
 import { EXPENSE_TYPES, VEHICLE_CONFIGS } from '../types'
+import { susunKasbonDariDataLama } from '../lib/kasbon'
+import { nomorTripBerikut } from '../lib/kode'
 import REAL from './real.json'
 import { toISO } from '../lib/format'
 
@@ -130,7 +132,9 @@ function makeDrivers(count: number): Driver[] {
       address_2: area,
       city,
       phone: `08${int(11, 89)}${int(1000000, 9999999)}`,
+      role: 'sopir',
       status: i % 13 === 12 ? 'nonaktif' : 'aktif',
+      attachments: [],
       created_at: stamp,
       updated_at: stamp,
     })
@@ -159,6 +163,7 @@ function makeRoutes(count: number): Route[] {
       id: `rte-${i + 1}`,
       route_code: code,
       route_name: `${from[1]}-${to[1]} ${nameSize}${suffix ? '(K)' : ''}`,
+      project_id: '',
       feet,
       ujroute: money(620_000, 1_150_000),
       toll: money(120_000, 640_000, 5_000),
@@ -191,6 +196,7 @@ function makeVehicles(count: number): Vehicle[] {
       // Konfigurasi disimpan di kendaraan, bukan ditempel ke nama sopir.
       configuration: rand() > 0.45 ? pick(VEHICLE_CONFIGS) : '',
       status: i % 11 === 10 ? 'servis' : 'aktif',
+      attachments: [],
       created_at: stamp,
       updated_at: stamp,
     })
@@ -261,12 +267,15 @@ function makeTransactions(
       transaction_no: `${ym}${String(seqPerMonth[ym]).padStart(4, '0')}`,
       transaction_date: date,
       driver_id: driver.id,
+      driver_ids: [driver.id],
       vehicle_id: vehicle.id,
       job_order_id: jo.id,
       route_id: route.id,
       destination_detail: route.route_name,
       // sengaja ada beberapa yang kosong -> muncul di panel "Perlu perhatian"
-      container_no: rand() > 0.08 ? `${pick(CONT_PREFIX)} ${int(1000000, 9999999)}` : '',
+      trip_ids: rand() > 0.08 ? [`${pick(CONT_PREFIX)}${int(1000000, 9999999)}`] : [],
+      container_no: '',
+      ...tanpaDokumen(),
       // Project tanpa alur dokumen tidak punya TR maupun No PI - pola ini nyata.
       project_id: project.id,
       tr_reference: withDoc && rand() > 0.05 ? String(2600280000 + int(1, 39999)) : '',
@@ -329,44 +338,118 @@ const GOODS_TYPE = ['Container', 'Paper Roll', 'General Cargo', 'Curah Kering', 
 const KOSONGAN = ['DEPO MUSTIKA CAKUNG', 'DEPO PRIOK 3', 'DEPO CIBITUNG', '-', 'DEPO MERAK']
 const LOKASI = ['JICT 1', 'NPCT1', 'KOJA', 'MAL PRIOK', 'TPK PALARAN']
 
-function makeDeliveryNotes(
+/** Field dokumen yang kosong, untuk trip yang belum punya Surat Jalan. */
+const tanpaDokumen = (): Pick<CommissionTransaction,
+  'manager_id' | 'manager_name' | 'sj_no' | 'recipient_name' | 'recipient_address_1' | 'recipient_address_2' |
+  'party' | 'goods_type' | 'kosongan' | 'location' | 'ship' | 'printed_at' | 'service_type' | 'contract_id' |
+  'cancelled_at' | 'cancel_reason' | 'cancel_settlement'> => ({
+  manager_id: '', manager_name: '', sj_no: '',
+  recipient_name: '', recipient_address_1: '', recipient_address_2: '',
+  party: '', goods_type: '', kosongan: '', location: '', ship: '',
+  printed_at: null,
+  service_type: 'callout', contract_id: '',
+  cancelled_at: null, cancel_reason: '', cancel_settlement: [],
+})
+
+/**
+ * Trip contoh yang lengkap dengan rincian Surat Jalan (penerima, party, kapal,
+ * dsb.). Dulu dibangkitkan sebagai koleksi Surat Jalan tersendiri; kini Surat
+ * Jalan adalah bagian dari trip.
+ */
+function makeTripSuratJalan(
   db: Pick<Database, 'jobOrders' | 'vehicles' | 'transactions'>,
   count: number,
-): DeliveryNote[] {
-  const out: DeliveryNote[] = []
-  // Ambil dari transaksi nyata supaya relasi SI/BL, mobil, dan tanggal konsisten.
+  nomorAda: string[],
+): CommissionTransaction[] {
+  const out: CommissionTransaction[] = []
+  // Ambil dari transaksi contoh supaya relasi SI/BL, mobil, dan tanggal konsisten.
   const source = [...db.transactions].sort((a, b) => b.transaction_date.localeCompare(a.transaction_date)).slice(0, count)
   source.forEach((t, i) => {
     const jo = db.jobOrders.find((j) => j.id === t.job_order_id)!
     const veh = db.vehicles.find((v) => v.id === t.vehicle_id)!
-    // Satu Surat Jalan memuat satu nomor container.
-    const containers = [`${pick(CONT_PREFIX)}${int(1000000, 9999999)}`]
     const printed = rand() > 0.4
+    const no = nomorTripBerikut(nomorAda, t.transaction_date)
+    nomorAda.push(no)
     out.push({
       id: `sj-${i + 1}`,
       workspace: t.workspace ?? workspaceForSeed(veh.id),
+      transaction_no: no,
+      transaction_date: t.transaction_date,
+      trip_ids: [`${pick(CONT_PREFIX)}${int(1000000, 9999999)}`],
+      route_id: t.route_id,
       sj_no: `SJ-${String(count - i).padStart(6, '0')}`,
-      sj_date: t.transaction_date,
+      manager_id: '',
+      manager_name: '',
+      project_id: '',
+      status: printed ? 'aktif' : 'draft',
       recipient_name: jo.customer_name,
       recipient_address_1: jo.customer_address.split(',')[0].trim(),
       recipient_address_2: jo.customer_address.split(',').slice(1).join(',').trim() || 'Jakarta',
       vehicle_id: veh.id,
       driver_id: t.driver_id,
-      route_id: t.route_id,
-      party: jo.party,
+      driver_ids: [t.driver_id],
       job_order_id: jo.id,
+      party: jo.party,
       goods_type: pick(GOODS_TYPE),
       kosongan: pick(KOSONGAN),
       location: pick(LOKASI),
       ship: jo.ship,
-      destination: t.destination_detail,
-      containers,
+      destination_detail: t.destination_detail,
+      tr_reference: '',
+      pi_number: '',
+      pi_status: '',
+      cost_value: 0,
+      notes: '',
+      is_marked: false,
+      bon_date: null,
+      personal_bon: 0,
       printed_at: printed ? t.transaction_date : null,
+      service_type: 'callout',
+      contract_id: '',
+      cancelled_at: null,
+      cancel_reason: '',
+      cancel_settlement: [],
+      container_no: '',
       created_at: stamp,
       updated_at: stamp,
     })
   })
   return out
+}
+
+/** Satu manager contoh, supaya pilihan Manager di form trip tidak kosong. */
+function makeManager(): Driver {
+  return {
+    id: 'mgr-1',
+    driver_code: 'MGR001',
+    driver_name: 'Hendra Wijaya',
+    role: 'manager',
+    address_1: 'Jl. Yos Sudarso No. 12',
+    address_2: 'Tanjung Priok',
+    city: 'Jakarta',
+    phone: '081234567890',
+    status: 'aktif',
+    attachments: [],
+    created_at: stamp,
+    updated_at: stamp,
+  }
+}
+
+/**
+ * Project tiap route diturunkan dari trip yang menempuhnya: project yang paling
+ * sering muncul. Dipakai untuk route lama yang belum pernah diberi project.
+ */
+export function projectDominanPerRoute(trips: Array<Pick<CommissionTransaction, 'route_id' | 'project_id'>>): Map<string, string> {
+  const hitung = new Map<string, Map<string, number>>()
+  for (const t of trips) {
+    if (!t.route_id || !t.project_id) continue
+    const m = hitung.get(t.route_id) ?? new Map<string, number>()
+    m.set(t.project_id, (m.get(t.project_id) ?? 0) + 1)
+    hitung.set(t.route_id, m)
+  }
+  const hasil = new Map<string, string>()
+  for (const [route, m] of hitung) hasil.set(route, [...m.entries()].sort((a, b) => b[1] - a[1])[0][0])
+  return hasil
 }
 
 /* Uang Jalan - multi termin (data real: 1 sampai 4 termin per trip) */
@@ -385,9 +468,11 @@ function makeUjPayments(trips: CommissionTransaction[]): UjPayment[] {
         trip_id: t.id,
         sequence: i,
         payment_date: i === 1 ? t.transaction_date : addDays(t.transaction_date, i * int(1, 4)),
+        driver_id: t.driver_id,
         uj_amount: uj,
         kasbon_deduction: rand() > 0.68 ? money(100_000, 400_000, 50_000) : 0,
         notes: '',
+        attachments: [],
         created_at: stamp,
         updated_at: stamp,
       })
@@ -425,6 +510,7 @@ function makeExpenses(trips: CommissionTransaction[]): OperationalExpense[] {
         amount: nominal,
         expense_date: t.transaction_date,
         notes: '',
+        attachments: [],
         created_at: stamp,
         updated_at: stamp,
       })
@@ -435,7 +521,6 @@ function makeExpenses(trips: CommissionTransaction[]): OperationalExpense[] {
 
 /* Biaya internal - pengeluaran perusahaan sendiri atas satu trip */
 const INTERNAL_SEED: ReadonlyArray<readonly [InternalCostType, number, number]> = [
-  ['Uang Jalan', 800_000, 2_600_000],
   ['Uang Makan', 100_000, 350_000],
   ['Kernet', 150_000, 450_000],
   ['Servis & Sparepart', 250_000, 1_900_000],
@@ -461,6 +546,10 @@ function makeInternalCosts(trips: CommissionTransaction[]): InternalCost[] {
         amount: money(min, max, 25_000),
         cost_date: t.transaction_date,
         notes: '',
+        recipient_role: '',
+        recipient_id: '',
+        recipient_name: '',
+        attachments: [],
         created_at: stamp,
         updated_at: stamp,
       })
@@ -474,24 +563,78 @@ function makeInternalCosts(trips: CommissionTransaction[]): InternalCost[] {
  * Contoh mengikuti pola yang diberikan klien: satu aturan bernominal Rupiah
  * dan satu aturan berpersen, supaya kedua bentuk isian terlihat.
  */
-function makeCommissionSchemes(): CommissionScheme[] {
-  // nama, workspace, target, komisi dasar, komisi target, satuan
-  const seed: ReadonlyArray<readonly [string, Workspace, number, number, number, CommissionUnit]> = [
-    ['Komisi Standar', 'jakarta', 1_000_000, 25_000, 40_000, 'rp'],
-    ['Komisi Senior', 'jakarta', 5_000_000, 10, 15, 'persen'],
-    ['Komisi Standar', 'tangerang', 1_000_000, 25_000, 40_000, 'rp'],
-    ['Komisi Senior', 'tangerang', 5_000_000, 10, 15, 'persen'],
+/**
+ * Aturan komisi dari catatan meeting:
+ * - HB / LB / DL / TRONTON, layanan Callout: bertingkat per nilai trip
+ *   (1-10 jt = 50 rb ... di atas 41 jt = 250 rb).
+ * - CDD layanan Dedicated: (nilai kontrak - 5%) x 2,5%.
+ */
+export function aturanKomisiMeeting(workspace: Workspace, idAwal: string, cap = stamp): CommissionScheme[] {
+  const tingkat = (awal: number, akhir: number, nilai: number, unit: CommissionUnit) =>
+    ({ target_awal: awal, target_akhir: akhir, commission: nilai, commission_unit: unit })
+  const jt = 1_000_000
+  return [
+    {
+      id: `${idAwal}-callout`,
+      workspace,
+      name: 'Komisi Sopir HB / LB / DL / TRONTON',
+      role: 'sopir',
+      service_type: 'callout',
+      configurations: ['HB', 'LB', 'DL', 'TRONTON'],
+      basis: 'nilai',
+      base_deduction_pct: 0,
+      is_active: true,
+      tiers: [
+        tingkat(1 * jt, 10 * jt, 50_000, 'rp'),
+        tingkat(11 * jt, 20 * jt, 100_000, 'rp'),
+        tingkat(21 * jt, 30 * jt, 150_000, 'rp'),
+        tingkat(31 * jt, 40 * jt, 200_000, 'rp'),
+        tingkat(41 * jt, 0, 250_000, 'rp'),
+      ],
+      notes: 'Dari catatan meeting. Dasar hitung masih perlu dikonfirmasi: nilai trip atau uang jalan.',
+      created_at: cap,
+      updated_at: cap,
+    },
+    {
+      id: `${idAwal}-dedicated`,
+      workspace,
+      name: 'Komisi Dedicated CDD',
+      role: 'sopir',
+      service_type: 'dedicated',
+      configurations: ['CDD'],
+      basis: 'kontrak',
+      base_deduction_pct: 5,
+      is_active: true,
+      tiers: [tingkat(0, 0, 2.5, 'persen')],
+      notes: 'Dari catatan meeting: nilai kontrak dikurangi 5%, lalu dikali 2,5%. Penerima dan waktu bayarnya belum dikonfirmasi.',
+      created_at: cap,
+      updated_at: cap,
+    },
   ]
-  return seed.map(([name, workspace, target, dasar, tercapai, unit], i) => ({
-    id: `cms-${i + 1}`,
+}
+
+function makeCommissionSchemes(): CommissionScheme[] {
+  return [...aturanKomisiMeeting('jakarta', 'cms-jkt'), ...aturanKomisiMeeting('tangerang', 'cms-tng')]
+}
+
+/** Kontrak Dedicated contoh, supaya pilihan kontrak di form trip tidak kosong. */
+function makeContracts(): Contract[] {
+  const tahun = String(now.getFullYear())
+  const seed: ReadonlyArray<readonly [Workspace, string, number]> = [
+    ['jakarta', 'PT SUMBER PANGAN DINGIN', 100_000_000],
+    ['tangerang', 'PT ANEKA DISTRIBUSI NUSANTARA', 60_000_000],
+  ]
+  return seed.map(([workspace, client, value], i) => ({
+    id: `ktr-${i + 1}`,
     workspace,
-    name,
-    target,
-    base_commission: dasar,
-    base_commission_unit: unit,
-    target_commission: tercapai,
-    target_commission_unit: unit,
-    notes: '',
+    contract_no: `KTR-${tahun}-${String(i + 1).padStart(3, '0')}`,
+    client_name: client,
+    value,
+    start_date: `${tahun}-01-01`,
+    end_date: `${tahun}-12-31`,
+    status: 'aktif' as const,
+    notes: 'Kontrak contoh.',
+    attachments: [],
     created_at: stamp,
     updated_at: stamp,
   }))
@@ -512,26 +655,48 @@ export function generateDatabase(): Database {
 
   const jobOrders = makeJobOrders(42)
   // Dataset contoh untuk modul yang belum tercakup data operasional. Trip contoh ini
-  // hanya dipakai untuk membangkitkan tagihan dan surat jalan, tidak ikut disimpan.
+  // hanya dipakai untuk membangkitkan tagihan dan trip bersurat jalan.
   const trxContoh = makeTransactions(
     { drivers: real.drivers, routes: real.routes, vehicles: real.vehicles, jobOrders, projects: real.projects },
     60,
   )
   const billings = makeBillings({ jobOrders, transactions: trxContoh }, 46)
-  const deliveryNotes = makeDeliveryNotes({ jobOrders, vehicles: real.vehicles, transactions: trxContoh }, 34)
 
-  // Kolom / modul yang ditambahkan setelah impor: diberi nilai awal di sini
-  // supaya tampilan pertama tidak kosong.
-  const routes = real.routes.map((r) => ({ ...r, toll: r.toll ?? 0 }))
-  const transactions = real.transactions.map((t) => ({
-    ...t,
-    // Trip tanpa kendaraan memakai id-nya sendiri sebagai seed.
-    workspace: t.workspace ?? workspaceForSeed(t.vehicle_id || t.id),
-  }))
-  const internalCosts = makeInternalCosts(transactions)
+  // Trip asli: field yang ditambahkan setelah impor diberi nilai awal.
+  const tripAsli: CommissionTransaction[] = real.transactions.map((t) => {
+    const kont = (t.container_no ?? '').trim()
+    return {
+      ...tanpaDokumen(),
+      ...t,
+      trip_ids: kont ? [kont] : [],
+      driver_ids: t.driver_id ? [t.driver_id] : [],
+      container_no: '',
+      // Trip tanpa kendaraan memakai id-nya sendiri sebagai seed.
+      workspace: t.workspace ?? workspaceForSeed(t.vehicle_id || t.id),
+    }
+  })
+  const tripSuratJalan = makeTripSuratJalan(
+    { jobOrders, vehicles: real.vehicles, transactions: trxContoh },
+    34,
+    tripAsli.map((t) => t.transaction_no),
+  )
+  const transactions = [...tripAsli, ...tripSuratJalan]
+
+  const projectRoute = projectDominanPerRoute(tripAsli)
+  const routes = real.routes.map((r) => ({ ...r, toll: r.toll ?? 0, project_id: projectRoute.get(r.id) ?? '' }))
+  const drivers: Driver[] = [...real.drivers.map((d) => ({ ...d, role: 'sopir' as const, attachments: [] })), makeManager()]
+  const vehicles = real.vehicles.map((v) => ({ ...v, attachments: [] }))
+  const sopirTrip = new Map(transactions.map((t) => [t.id, t.driver_id]))
+  const ujPayments = real.ujPayments.map((p) => ({ ...p, driver_id: sopirTrip.get(p.trip_id) ?? '', attachments: [] }))
+  const expenses = real.expenses.map((e) => ({ ...e, attachments: [] }))
+  const internalCosts = makeInternalCosts(tripAsli)
   const commissionSchemes = makeCommissionSchemes()
+  const kasbonEntries = susunKasbonDariDataLama(ujPayments, transactions, stamp)
 
-  return { ...real, routes, transactions, jobOrders, billings, deliveryNotes, internalCosts, commissionSchemes }
+  return {
+    ...real, drivers, vehicles, routes, transactions, jobOrders, billings,
+    ujPayments, expenses, internalCosts, tripNotes: [], kasbonEntries, commissionSchemes, contracts: makeContracts(),
+  }
 }
 
 /**
@@ -539,25 +704,27 @@ export function generateDatabase(): Database {
  * Berguna bila prototype perlu ditunjukkan ke pihak luar.
  */
 export function generateSampleDatabase(): Database {
-  const drivers = makeDrivers(26)
+  const drivers = [...makeDrivers(26), makeManager()]
   const routes = makeRoutes(18)
   const vehicles = makeVehicles(16)
   const jobOrders = makeJobOrders(42)
   const projects = makeProjects()
-  const transactions = makeTransactions({ drivers, routes, vehicles, jobOrders, projects }, 88)
-  const billings = makeBillings({ jobOrders, transactions }, 46)
-  const deliveryNotes = makeDeliveryNotes({ jobOrders, vehicles, transactions }, 34)
-  const ujPayments = makeUjPayments(transactions)
-  const expenses = makeExpenses(transactions)
-  const internalCosts = makeInternalCosts(transactions)
+  const tripDasar = makeTransactions({ drivers: drivers.filter((d) => d.role === 'sopir'), routes, vehicles, jobOrders, projects }, 88)
+  const billings = makeBillings({ jobOrders, transactions: tripDasar }, 46)
+  const tripSuratJalan = makeTripSuratJalan({ jobOrders, vehicles, transactions: tripDasar }, 34, tripDasar.map((t) => t.transaction_no))
+  const transactions = [...tripDasar, ...tripSuratJalan]
+  const ujPayments = makeUjPayments(tripDasar)
+  const expenses = makeExpenses(tripDasar)
+  const internalCosts = makeInternalCosts(tripDasar)
   const commissionSchemes = makeCommissionSchemes()
+  const kasbonEntries = susunKasbonDariDataLama(ujPayments, transactions, stamp)
   return {
-    drivers, routes, vehicles, jobOrders, projects, transactions, billings, deliveryNotes,
-    ujPayments, expenses, internalCosts, commissionSchemes,
+    drivers, routes, vehicles, jobOrders, projects, transactions, billings,
+    ujPayments, expenses, internalCosts, tripNotes: [], kasbonEntries, commissionSchemes, contracts: makeContracts(),
   }
 }
 
 /** Entitas yang datanya berasal dari berkas data operasional. */
 export const SUMBER_REAL = ['drivers', 'vehicles', 'projects', 'routes', 'transactions', 'ujPayments', 'expenses'] as const
 /** Entitas yang masih memakai dataset contoh. */
-export const SUMBER_CONTOH = ['jobOrders', 'billings', 'deliveryNotes', 'internalCosts', 'commissionSchemes'] as const
+export const SUMBER_CONTOH = ['jobOrders', 'billings', 'internalCosts', 'commissionSchemes', 'contracts'] as const

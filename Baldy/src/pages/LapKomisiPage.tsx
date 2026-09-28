@@ -11,7 +11,7 @@ import { PrintTable, PRow, PCell } from '../components/report/PrintTable'
 import { ReportPreview, barisPerLembar } from '../components/report/ReportPreview'
 import { useData } from '../store/DataProvider'
 import { useToast } from '../store/ToastProvider'
-import { komisiTransaksi, ringkas } from '../lib/calculations'
+import { komisiTransaksi, ringkas, tripDihitung } from '../lib/calculations'
 import { formatDate, formatNumber, formatRupiah } from '../lib/format'
 import { groupBy } from '../lib/utils'
 import { usePeriodeDefault } from '../lib/periode'
@@ -43,7 +43,8 @@ export function LapKomisiPage() {
   const rows = useMemo(
     () =>
       transactionRows
-        .filter((t) => t.transaction_date >= from && t.transaction_date <= to)
+        .filter((t) => tripDihitung(t) && t.transaction_date >= from && t.transaction_date <= to)
+        // Komisi trip diterima sopir utama.
         .filter((t) => (mode === 'perSopir' && driverId ? t.driver_id === driverId : true))
         .sort((a, b) => a.driver_name.localeCompare(b.driver_name) || a.transaction_date.localeCompare(b.transaction_date)),
     [transactionRows, from, to, mode, driverId],
@@ -169,7 +170,7 @@ export function LapKomisiPage() {
                   { label: 'NoTrans', width: '13%' },
                   { label: 'Tanggal', width: '11%' },
                   { label: 'Sopir' },
-                  { label: 'No Mobil', width: '13%' },
+                  { label: 'No. Kendaraan', width: '13%' },
                   { label: 'Route', width: '11%' },
                   { label: 'Komisi (Rp)', align: 'right', width: '15%' },
                 ]}

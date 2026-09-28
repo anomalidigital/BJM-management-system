@@ -14,13 +14,13 @@ import { LineChart } from '../components/charts/LineChart'
 import { RankingBars } from '../components/charts/RankingBars'
 import { VIZ } from '../components/charts/chartUtils'
 import { useData } from '../store/DataProvider'
-import { deltaPersen, komisiTransaksi, pendapatanTransaksi, ringkas } from '../lib/calculations'
+import { deltaPersen, komisiTransaksi, pendapatanTransaksi, ringkas, tripDihitung } from '../lib/calculations'
 import { formatDate, formatDateShort, formatNumber, formatRupiah, monthLabel, todayISO } from '../lib/format'
 import { groupBy } from '../lib/utils'
 import { periodeAktif, periodeSebelumnya } from '../lib/periode'
 
 export function DashboardPage() {
-  const { db, transactionRows, billingRows, deliveryNoteRows, loading } = useData()
+  const { db, transactionRows, billingRows, loading } = useData()
 
   const model = useMemo(() => {
     const periode = periodeAktif(transactionRows.map((t) => t.transaction_date))
@@ -34,8 +34,9 @@ export function DashboardPage() {
       ? transactionRows.map((t) => t.transaction_date).filter((d) => d <= monthEnd).sort().at(-1)!
       : todayISO()
 
-    const thisMonth = transactionRows.filter((t) => t.transaction_date >= monthStart && t.transaction_date <= monthEnd)
-    const lastMonth = transactionRows.filter((t) => t.transaction_date >= prevStart && t.transaction_date <= prevEnd)
+    // Trip batal tidak dihitung di ringkasan mana pun.
+    const thisMonth = transactionRows.filter((t) => tripDihitung(t) && t.transaction_date >= monthStart && t.transaction_date <= monthEnd)
+    const lastMonth = transactionRows.filter((t) => tripDihitung(t) && t.transaction_date >= prevStart && t.transaction_date <= prevEnd)
     const now = ringkas(thisMonth)
     const prev = ringkas(lastMonth)
 
@@ -74,16 +75,16 @@ export function DashboardPage() {
     // Data yang butuh perhatian.
     const attention = [
       {
-        id: 'kont',
-        label: 'Transaksi tanpa nomor container',
-        count: thisMonth.filter((t) => !t.container_no).length,
-        to: '/transaksi/komisi',
+        id: 'id-trip',
+        label: 'Trip tanpa ID Perjalanan/Trip',
+        count: thisMonth.filter((t) => t.status !== 'batal' && (t.trip_ids ?? []).length === 0).length,
+        to: '/transaksi/trip',
       },
       {
         id: 'belum-selesai',
         label: 'Trip belum ditandai Selesai',
         count: thisMonth.filter((t) => t.status !== 'selesai' && t.status !== 'batal').length,
-        to: '/transaksi/komisi',
+        to: '/transaksi/trip',
       },
       {
         id: 'ditolak',
@@ -105,9 +106,9 @@ export function DashboardPage() {
       },
       {
         id: 'sj-draft',
-        label: 'Surat Jalan masih Draft (belum dicetak)',
-        count: deliveryNoteRows.filter((n) => !n.printed_at).length,
-        to: '/transaksi/surat-jalan',
+        label: 'Surat Jalan trip belum dicetak',
+        count: transactionRows.filter((t) => t.sj_no && !t.printed_at && t.status !== 'batal').length,
+        to: '/transaksi/trip',
       },
     ].filter((a) => a.count > 0)
 
@@ -125,7 +126,7 @@ export function DashboardPage() {
       biaya: lastMonth.reduce((a, t) => a + t.expense_total, 0),
     }
     return { now, prev, daily, days, revenue, commission, topDrivers, attention, thisMonth, ujNow, ujPrev, periode }
-  }, [transactionRows, billingRows, deliveryNoteRows, db.jobOrders])
+  }, [transactionRows, billingRows, db.jobOrders])
 
   const recentTrx = useMemo(
     () => [...transactionRows].sort((a, b) => b.transaction_date.localeCompare(a.transaction_date) || b.transaction_no.localeCompare(a.transaction_no)).slice(0, 6),
@@ -326,8 +327,8 @@ export function DashboardPage() {
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         <Card>
           <CardHeader
-            title="Transaksi terbaru"
-            actions={<Link to="/transaksi/komisi" className="text-[12px] font-medium text-brand-600 hover:underline">Lihat semua</Link>}
+            title="Trip terbaru"
+            actions={<Link to="/transaksi/trip" className="text-[12px] font-medium text-brand-600 hover:underline">Lihat semua</Link>}
           />
           <ul className="divide-y divide-grid">
             {recentTrx.map((t) => (

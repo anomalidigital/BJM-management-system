@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react'
-import { Pencil, Plus, Printer, Trash2 } from 'lucide-react'
+import { useCallback, useMemo, useState } from 'react'
+import { Pencil, Plus, Printer, RefreshCw, Trash2, X } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
@@ -20,11 +20,12 @@ import { useToast } from '../store/ToastProvider'
 import { useTable } from '../lib/useTable'
 import { matchesQuery, sum } from '../lib/utils'
 import { formatNumber, formatRupiah } from '../lib/format'
+import { kodeRouteDariNama } from '../lib/kode'
 import type { Route } from '../types'
 
 type FormState = Omit<Route, 'id' | 'created_at' | 'updated_at'>
 
-const BLANK: FormState = { route_code: '', route_name: '', feet: '1X40', ujroute: 0, toll: 0, commissioner: 0, price: 0 }
+const BLANK: FormState = { route_code: '', route_name: '', project_id: '', feet: '1X40', ujroute: 0, toll: 0, commissioner: 0, price: 0 }
 const FEET_OPTIONS = ['1X20', '1X40', '2X20', '1X20K', '1X40K']
 
 export function DataRoutePage() {
@@ -38,23 +39,47 @@ export function DataRoutePage() {
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
   const [deleting, setDeleting] = useState<Route | null>(null)
   const [feetFilter, setFeetFilter] = useState('')
+  const [projectFilter, setProjectFilter] = useState('')
+
+  const projectMap = useMemo(() => new Map(db.projects.map((p) => [p.id, p])), [db.projects])
   const [preview, setPreview] = useState(false)
 
-  const search = useCallback((r: Route, q: string) => matchesQuery(q, r.route_code, r.route_name, r.feet), [])
-  const extraFilter = useCallback((r: Route) => (feetFilter ? r.feet === feetFilter : true), [feetFilter])
+  const search = useCallback(
+    (r: Route, q: string) => matchesQuery(q, r.route_code, r.route_name, r.feet, projectMap.get(r.project_id)?.project_code),
+    [projectMap],
+  )
+  const extraFilter = useCallback(
+    (r: Route) => (!feetFilter || r.feet === feetFilter) && (!projectFilter || (projectFilter === '-' ? !r.project_id : r.project_id === projectFilter)),
+    [feetFilter, projectFilter],
+  )
+  const filterAktif = Boolean(feetFilter || projectFilter)
   const table = useTable(db.routes, {
-    search, extraFilter, extraFilterActive: !!feetFilter, initialSortKey: 'route_code', pageSize: 10,
+    search, extraFilter, extraFilterActive: filterAktif, initialSortKey: 'route_code', pageSize: 10,
   })
+  const resetFilter = () => { table.reset(); setFeetFilter(''); setProjectFilter('') }
+
+  /**
+   * No. Route dibuat dari nama route (pola kode lama, mis. CIB - DURI -> CIBDURI)
+   * dan dijamin tidak kembar. Selama belum diketik manual, kode mengikuti nama.
+   */
+  const [kodeManual, setKodeManual] = useState(false)
+  const kodeDari = (nama: string) => kodeRouteDariNama(nama, db.routes.filter((r) => r.id !== editing?.id).map((r) => r.route_code))
 
   function openCreate() {
-    setEditing(null); setForm(BLANK); setErrors({}); setFormOpen(true)
+    setEditing(null); setForm({ ...BLANK }); setKodeManual(false); setErrors({}); setFormOpen(true)
+  }
+
+  function ubahNama(nama: string) {
+    setForm((f) => ({ ...f, route_name: nama, route_code: !editing && !kodeManual ? kodeDari(nama) : f.route_code }))
   }
 
   function openEdit(r: Route) {
     setEditing(r)
-    setForm({ route_code: r.route_code, route_name: r.route_name, feet: r.feet, ujroute: r.ujroute, toll: r.toll ?? 0, commissioner: r.commissioner, price: r.price })
-    setErrors({}); setFormOpen(true)
+    setForm({ route_code: r.route_code, route_name: r.route_name, project_id: r.project_id ?? '', feet: r.feet, ujroute: r.ujroute, toll: r.toll ?? 0, commissioner: r.commissioner, price: r.price })
+    setKodeManual(true); setErrors({}); setFormOpen(true)
   }
+
+  const hargaWajib = !editing || editing.price > 0
 
   function validate(): boolean {
     const e: Partial<Record<keyof FormState, string>> = {}
@@ -63,10 +88,10 @@ export function DataRoutePage() {
     else if (db.routes.some((r) => r.route_code.toLowerCase() === code.toLowerCase() && r.id !== editing?.id))
       e.route_code = 'No. Route sudah dipakai. Gunakan kode lain.'
     if (!form.route_name.trim()) e.route_name = 'Nama Route wajib diisi.'
-    if (form.price <= 0) e.price = 'Harga harus lebih dari 0.'
+    // Route dari data asli belum punya harga; jangan paksa diisi saat hanya mengubah UJ / tol.
+    if (hargaWajib && form.price <= 0) e.price = 'Harga harus lebih dari 0.'
     if (form.ujroute < 0) e.ujroute = 'UJROUTE tidak boleh negatif.'
     if (form.toll < 0) e.toll = 'Uang Tol tidak boleh negatif.'
-    if (form.commissioner < 0) e.commissioner = 'Komisi Sopir tidak boleh negatif.'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -90,12 +115,18 @@ export function DataRoutePage() {
   const printRows = table.filtered
 
   const columns: Column<Route>[] = [
-    { key: 'route_code', header: 'No. Route', sortable: true, width: '116px', render: (r) => <span className="tnum font-semibold text-ink">{r.route_code}</span> },
+    { key: 'route_code', header: 'No. Route', sortable: true, width: '190px', render: (r) => <span className="tnum font-semibold break-all text-ink">{r.route_code}</span> },
     { key: 'route_name', header: 'Nama Route', sortable: true, render: (r) => <span className="font-medium">{r.route_name}</span> },
+    {
+      key: 'project_id', header: 'Project', sortable: true, width: '104px',
+      render: (r) => {
+        const pr = projectMap.get(r.project_id)
+        return pr ? <Badge tone="brand">{pr.project_code}</Badge> : <span className="text-ink-3">—</span>
+      },
+    },
     { key: 'feet', header: 'Feet', sortable: true, width: '86px', render: (r) => <Badge tone="neutral">{r.feet}</Badge> },
     { key: 'ujroute', header: 'UJROUTE', sortable: true, align: 'right', width: '128px', render: (r) => <span className="tnum">{formatRupiah(r.ujroute)}</span> },
     { key: 'toll', header: 'Uang Tol', sortable: true, align: 'right', width: '128px', render: (r) => <span className="tnum">{formatRupiah(r.toll ?? 0)}</span> },
-    { key: 'commissioner', header: 'Komisi Sopir', sortable: true, align: 'right', width: '128px', render: (r) => <span className="tnum">{formatRupiah(r.commissioner)}</span> },
     { key: 'price', header: 'Harga', sortable: true, align: 'right', width: '134px', render: (r) => <span className="tnum font-semibold text-ink">{formatRupiah(r.price)}</span> },
     {
       key: 'action', header: 'Action', align: 'right', width: '92px',
@@ -126,13 +157,12 @@ export function DataRoutePage() {
                 { label: 'Jumlah route', value: `${formatNumber(printRows.length)} route` },
                 { label: 'Total Harga', value: formatRupiah(sum(printRows, (r) => r.price)) },
                 { label: 'Total Uang Tol', value: formatRupiah(sum(printRows, (r) => r.toll ?? 0)) },
-                { label: 'Total Komisi Sopir', value: formatRupiah(sum(printRows, (r) => r.commissioner)) },
               ]}
             >
               <table className="w-full border-collapse text-[10px]">
                 <thead>
                   <tr className="bg-neutral-100">
-                    {['No.', 'No. Route', 'Nama Route', 'Feet', 'UJROUTE', 'Uang Tol', 'Komisi Sopir', 'Harga'].map((h, hi) => (
+                    {['No.', 'No. Route', 'Nama Route', 'Feet', 'UJROUTE', 'Uang Tol', 'Harga'].map((h, hi) => (
                       <th key={h} className={`border border-neutral-400 px-1.5 py-1 font-semibold ${hi > 3 ? 'text-right' : 'text-left'}`}>
                         {h}
                       </th>
@@ -148,7 +178,6 @@ export function DataRoutePage() {
                       <td className="border border-neutral-400 px-1.5 py-1">{r.feet}</td>
                       <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(r.ujroute)}</td>
                       <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(r.toll ?? 0)}</td>
-                      <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(r.commissioner)}</td>
                       <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(r.price)}</td>
                     </tr>
                   ))}
@@ -157,7 +186,6 @@ export function DataRoutePage() {
                       <td className="border border-neutral-400 px-1.5 py-1 text-right" colSpan={4}>TOTAL</td>
                       <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(sum(printRows, (r) => r.ujroute))}</td>
                       <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(sum(printRows, (r) => r.toll ?? 0))}</td>
-                      <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(sum(printRows, (r) => r.commissioner))}</td>
                       <td className="border border-neutral-400 px-1.5 py-1 text-right">{formatNumber(sum(printRows, (r) => r.price))}</td>
                     </tr>
                   )}
@@ -196,6 +224,14 @@ export function DataRoutePage() {
                   {FEET_OPTIONS.map((f) => <option key={f} value={f}>{f}</option>)}
                 </Select>
               </FilterField>
+              <FilterField label="Project">
+                <Select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="h-9 w-40">
+                  <option value="">Semua</option>
+                  {db.projects.map((p) => <option key={p.id} value={p.id}>{p.project_code}</option>)}
+                  <option value="-">Tanpa project</option>
+                </Select>
+              </FilterField>
+              {(table.isFiltered || filterAktif) && <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={resetFilter}>Reset</Button>}
             </>
           }
           right={<span className="text-[12.5px] text-ink-3">{db.routes.length} route terdaftar</span>}
@@ -208,18 +244,17 @@ export function DataRoutePage() {
           loading={loading}
           error={error}
           onRetry={reload}
-          isFiltered={table.isFiltered}
+          isFiltered={table.isFiltered || filterAktif}
           sort={table.sort}
           onSortChange={table.toggleSort}
           empty={<EmptyState entity="data route" action={canEdit && <Button variant="primary" icon={<Plus size={15} />} onClick={openCreate}>Tambah Route</Button>} />}
-          notFound={<NotFoundState onReset={() => { table.reset(); setFeetFilter('') }} />}
+          notFound={<NotFoundState onReset={resetFilter} />}
           footer={
             table.total > 0 ? (
               <tr>
-                <td className="px-3 py-2 text-[12px] text-ink-2" colSpan={3}>Total {formatNumber(table.total)} route</td>
+                <td className="px-3 py-2 text-[12px] text-ink-2" colSpan={4}>Total {formatNumber(table.total)} route</td>
                 <td className="tnum px-3 py-2 text-right text-[12.5px]">{formatRupiah(sum(table.filtered, (r) => r.ujroute))}</td>
                 <td className="tnum px-3 py-2 text-right text-[12.5px]">{formatRupiah(sum(table.filtered, (r) => r.toll ?? 0))}</td>
-                <td className="tnum px-3 py-2 text-right text-[12.5px]">{formatRupiah(sum(table.filtered, (r) => r.commissioner))}</td>
                 <td className="tnum px-3 py-2 text-right text-[12.5px] text-ink">{formatRupiah(sum(table.filtered, (r) => r.price))}</td>
                 <td />
               </tr>
@@ -245,8 +280,36 @@ export function DataRoutePage() {
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="No. Route" required error={errors.route_code} hint={errors.route_code ? undefined : 'Harus unik, mis. PRKSRG43.'}>
-            {(id) => <Input id={id} value={form.route_code} invalid={!!errors.route_code} placeholder="PRKSRG43" onChange={(e) => setForm({ ...form, route_code: e.target.value })} />}
+          <Field
+            label="No. Route"
+            required
+            error={errors.route_code}
+            className="sm:col-span-2"
+            hint={errors.route_code ? undefined : 'Terisi otomatis dari Nama Route (4 huruf asal + 4 huruf tujuan) dan dijamin unik. Boleh diganti.'}
+          >
+            {(id) => (
+              <div className="flex gap-2">
+                <Input id={id} value={form.route_code} invalid={!!errors.route_code} className="tnum font-medium tracking-wide"
+                  placeholder="Isi Nama Route dulu"
+                  onChange={(e) => { setKodeManual(true); setForm({ ...form, route_code: e.target.value.toUpperCase() }) }} />
+                <Button
+                  icon={<RefreshCw size={14} />}
+                  title="Buat kode dari Nama Route"
+                  disabled={!form.route_name.trim()}
+                  onClick={() => { setKodeManual(false); setForm((f) => ({ ...f, route_code: kodeDari(f.route_name) })) }}
+                >
+                  Dari nama
+                </Button>
+              </div>
+            )}
+          </Field>
+          <Field label="Project" hint="Uang jalan route ini ikut terhitung ke project tersebut.">
+            {(id) => (
+              <Select id={id} value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })}>
+                <option value="">— belum ditentukan —</option>
+                {db.projects.map((p) => <option key={p.id} value={p.id}>{p.project_code} — {p.project_name}</option>)}
+              </Select>
+            )}
           </Field>
           <Field label="Feet" required>
             {(id) => (
@@ -256,18 +319,15 @@ export function DataRoutePage() {
             )}
           </Field>
           <Field label="Nama Route" required error={errors.route_name} className="sm:col-span-2">
-            {(id) => <Input id={id} value={form.route_name} invalid={!!errors.route_name} placeholder="PRIOK-SERANG 40'(K)" onChange={(e) => setForm({ ...form, route_name: e.target.value })} />}
+            {(id) => <Input id={id} value={form.route_name} invalid={!!errors.route_name} placeholder="CIB - DURI" onChange={(e) => ubahNama(e.target.value)} />}
           </Field>
-          <Field label="UJROUTE" required error={errors.ujroute}>
+          <Field label="UJROUTE" required error={errors.ujroute} hint={errors.ujroute ? undefined : 'Patokan uang jalan. Termin dicatat di trip saat dibayar.'}>
             {(id) => <CurrencyInput id={id} value={form.ujroute} invalid={!!errors.ujroute} onValueChange={(v) => setForm({ ...form, ujroute: v })} />}
           </Field>
-          <Field label="Uang Tol" error={errors.toll} hint={errors.toll ? undefined : 'Biaya tol baku untuk route ini.'}>
+          <Field label="Uang Tol" error={errors.toll} hint={errors.toll ? undefined : 'Patokan tol. Yang dibayar dicatat di biaya operasional trip.'}>
             {(id) => <CurrencyInput id={id} value={form.toll} invalid={!!errors.toll} onValueChange={(v) => setForm({ ...form, toll: v })} />}
           </Field>
-          <Field label="Komisi Sopir" required error={errors.commissioner}>
-            {(id) => <CurrencyInput id={id} value={form.commissioner} invalid={!!errors.commissioner} onValueChange={(v) => setForm({ ...form, commissioner: v })} />}
-          </Field>
-          <Field label="Harga" required error={errors.price}>
+          <Field label="Harga" required={hargaWajib} error={errors.price} hint={errors.price ? undefined : 'Komisi sopir kini diatur di Master → Komisi.'}>
             {(id) => <CurrencyInput id={id} value={form.price} invalid={!!errors.price} onValueChange={(v) => setForm({ ...form, price: v })} />}
           </Field>
         </div>

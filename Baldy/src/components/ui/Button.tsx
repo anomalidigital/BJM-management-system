@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'subtle'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'subtle' | 'outlineDanger'
 type Size = 'sm' | 'md'
 
 const VARIANTS: Record<Variant, string> = {
@@ -11,6 +11,7 @@ const VARIANTS: Record<Variant, string> = {
   ghost: 'bg-transparent text-ink-2 border border-transparent hover:bg-black/[.045] hover:text-ink',
   danger: 'bg-[color:var(--color-critical)] text-white border border-transparent hover:brightness-95 active:brightness-90',
   subtle: 'bg-brand-50 text-brand-700 border border-brand-100 hover:bg-brand-100',
+  outlineDanger: 'bg-surface text-[color:var(--color-critical)] border border-[#f3d5d5] hover:bg-[#fdf2f2] active:bg-[#fbe6e6]',
 }
 
 const SIZES: Record<Size, string> = {
