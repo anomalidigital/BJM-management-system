@@ -1,8 +1,12 @@
-import type { CommissionTransaction, Database, Project, UjPayment } from '../types'
+import type {
+  CommissionTransaction, Database, InternalCost, KasbonEntry, OperationalExpense, Project, Route, UjPayment,
+} from '../types'
 import {
   aturanKomisiMeeting, generateDatabase, generateSampleDatabase, makeKlienKontrak, projectDominanPerRoute, workspaceForSeed,
 } from '../data/dummy'
+import { kasbonBelumLunasContoh, kasbonTerminContoh, keuanganTripContoh, lengkapiNominalRoute } from '../data/lengkapi'
 import { susunKasbonDariDataLama } from '../lib/kasbon'
+import { todayISO } from '../lib/format'
 import { nomorTripBerikut } from '../lib/kode'
 import { uid } from '../lib/utils'
 
@@ -358,6 +362,28 @@ function migrate(stored: Record<string, unknown>): Database {
       (merged.transactions ?? []) as CommissionTransaction[],
       stamp,
     )
+  }
+
+  // Angka yang dulu kosong, diisi sekali (penandanya: route belum punya estimated_fields).
+  // Nominal route diturunkan dari trip asli; trip contoh yang sudah jalan diberi
+  // uang jalan, biaya, dan potong kasbon; beberapa sopirnya diberi kasbon yang belum
+  // dipotong (status Piutang). Catatan yang sudah ada tidak diubah.
+  const rute = merged.routes as Route[]
+  if (rute.some((r) => !r.estimated_fields)) {
+    const trips = merged.transactions as CommissionTransaction[]
+    const bayar = (merged.ujPayments ?? []) as UjPayment[]
+    const biaya = (merged.expenses ?? []) as OperationalExpense[]
+    const internal = (merged.internalCosts ?? []) as InternalCost[]
+    const routes = lengkapiNominalRoute(rute, trips, bayar, biaya)
+    const contoh = keuanganTripContoh(trips, routes, { payments: bayar, expenses: biaya, internal }, todayISO(), stamp)
+    merged.routes = routes
+    merged.ujPayments = [...bayar, ...contoh.ujPayments]
+    merged.expenses = [...biaya, ...contoh.expenses]
+    merged.internalCosts = [...internal, ...contoh.internalCosts]
+    const kasbon = merged.kasbonEntries as KasbonEntry[]
+    const idKasbon = new Set(kasbon.map((k) => k.id))
+    const piutang = kasbonBelumLunasContoh(trips, todayISO(), stamp).filter((k) => !idKasbon.has(k.id))
+    merged.kasbonEntries = [...kasbon, ...kasbonTerminContoh(contoh.ujPayments, stamp), ...piutang]
   }
 
   return merged as unknown as Database

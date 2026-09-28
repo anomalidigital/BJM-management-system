@@ -13,6 +13,7 @@ import { EXPENSE_TYPES, VEHICLE_CONFIGS } from '../types'
 import { susunKasbonDariDataLama } from '../lib/kasbon'
 import { nomorTripBerikut } from '../lib/kode'
 import REAL from './real.json'
+import { kasbonBelumLunasContoh, kasbonTerminContoh, keuanganTripContoh, lengkapiNominalRoute } from './lengkapi'
 import { toISO } from '../lib/format'
 
 /* PRNG deterministik (mulberry32) */
@@ -155,8 +156,8 @@ function makeRoutes(count: number): Route[] {
     const sizeCode = feet.startsWith('2') ? '2' + feet.slice(2, 4) : feet.slice(2, 4)
     const suffix = feet.endsWith('K') ? 'K' : ''
     let code = `${from[0]}${to[0]}${sizeCode}${suffix}`.toUpperCase().slice(0, 8)
-    let n = 1
-    while (used.has(code)) code = `${from[0]}${to[0]}${sizeCode}${n++}`.slice(0, 8)
+    // Kode kembar: ekornya diganti nomor urut, tetap maksimal 8 karakter.
+    for (let n = 1; used.has(code); n++) code = `${from[0]}${to[0]}${sizeCode}`.toUpperCase().slice(0, 8 - String(n).length) + n
     used.add(code)
     const nameSize = feet.startsWith('2') ? '2X20' : feet.includes('40') ? "40'" : "20'"
     out.push({
@@ -169,6 +170,7 @@ function makeRoutes(count: number): Route[] {
       toll: money(120_000, 640_000, 5_000),
       commissioner: money(100_000, 250_000),
       price: money(1_650_000, 3_600_000, 50_000),
+      estimated_fields: [],
       created_at: stamp,
       updated_at: stamp,
     })
@@ -701,15 +703,27 @@ export function generateDatabase(): Database {
   const transactions = [...tripAsli, ...tripSuratJalan]
 
   const projectRoute = projectDominanPerRoute(tripAsli)
-  const routes = real.routes.map((r) => ({ ...r, toll: r.toll ?? 0, project_id: projectRoute.get(r.id) ?? '' }))
   const drivers: Driver[] = [...real.drivers.map((d) => ({ ...d, role: 'sopir' as const, attachments: [] })), makeManager()]
   const vehicles = real.vehicles.map((v) => ({ ...v, attachments: [] }))
   const sopirTrip = new Map(transactions.map((t) => [t.id, t.driver_id]))
-  const ujPayments = real.ujPayments.map((p) => ({ ...p, driver_id: sopirTrip.get(p.trip_id) ?? '', attachments: [] }))
-  const expenses = real.expenses.map((e) => ({ ...e, attachments: [] }))
-  const internalCosts = makeInternalCosts(tripAsli)
+  const ujAsli = real.ujPayments.map((p) => ({ ...p, driver_id: sopirTrip.get(p.trip_id) ?? '', attachments: [] }))
+  const biayaAsli = real.expenses.map((e) => ({ ...e, attachments: [] }))
+  // Spreadsheet tidak memuat nominal route: diturunkan dari trip asli (lihat lengkapi.ts).
+  const routes = lengkapiNominalRoute(
+    real.routes.map((r) => ({ ...r, toll: r.toll ?? 0, project_id: projectRoute.get(r.id) ?? '' })),
+    tripAsli, ujAsli, biayaAsli,
+  )
+  // Trip contoh yang sudah jalan diberi uang jalan & biaya, supaya laporan bulan berjalan terisi.
+  const contoh = keuanganTripContoh(tripSuratJalan, routes, { payments: [], expenses: [], internal: [] }, toISO(now), stamp)
+  const ujPayments = [...ujAsli, ...contoh.ujPayments]
+  const expenses = [...biayaAsli, ...contoh.expenses]
+  const internalCosts = [...makeInternalCosts(tripAsli), ...contoh.internalCosts]
   const commissionSchemes = makeCommissionSchemes()
-  const kasbonEntries = susunKasbonDariDataLama(ujPayments, transactions, stamp)
+  const kasbonEntries = [
+    ...susunKasbonDariDataLama(ujAsli, transactions, stamp),
+    ...kasbonTerminContoh(contoh.ujPayments, stamp),
+    ...kasbonBelumLunasContoh(tripSuratJalan, toISO(now), stamp),
+  ]
 
   return {
     ...real, projects: [...real.projects, ...makeKlienKontrak()], drivers, vehicles, routes, transactions, jobOrders, billings,
@@ -731,11 +745,17 @@ export function generateSampleDatabase(): Database {
   const billings = makeBillings({ jobOrders, transactions: tripDasar }, 46)
   const tripSuratJalan = makeTripSuratJalan({ jobOrders, vehicles, transactions: tripDasar }, 34, tripDasar.map((t) => t.transaction_no))
   const transactions = [...tripDasar, ...tripSuratJalan]
-  const ujPayments = makeUjPayments(tripDasar)
-  const expenses = makeExpenses(tripDasar)
-  const internalCosts = makeInternalCosts(tripDasar)
+  const ujDasar = makeUjPayments(tripDasar)
+  const contoh = keuanganTripContoh(tripSuratJalan, routes, { payments: [], expenses: [], internal: [] }, toISO(now), stamp)
+  const ujPayments = [...ujDasar, ...contoh.ujPayments]
+  const expenses = [...makeExpenses(tripDasar), ...contoh.expenses]
+  const internalCosts = [...makeInternalCosts(tripDasar), ...contoh.internalCosts]
   const commissionSchemes = makeCommissionSchemes()
-  const kasbonEntries = susunKasbonDariDataLama(ujPayments, transactions, stamp)
+  const kasbonEntries = [
+    ...susunKasbonDariDataLama(ujDasar, transactions, stamp),
+    ...kasbonTerminContoh(contoh.ujPayments, stamp),
+    ...kasbonBelumLunasContoh(tripSuratJalan, toISO(now), stamp),
+  ]
   return {
     drivers, routes, vehicles, jobOrders, projects: [...projects, ...makeKlienKontrak()], transactions, billings,
     ujPayments, expenses, internalCosts, tripNotes: [], kasbonEntries, commissionSchemes, contracts: makeContracts(),

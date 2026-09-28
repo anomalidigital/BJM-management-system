@@ -162,6 +162,12 @@ export const TBD_NOTES: TbdNote[] = [
     current: 'Belum dibuat. Satu trip masih satu penerima.',
     question: 'Multi drop = satu route, beberapa penerima di satu area? Tiap drop punya TR dan keterangan sendiri? Perlu tanggal terima barang per drop? Alamat penerima perlu disimpan untuk dipakai ulang? Surat Jalan dicetak per drop atau satu untuk semua?',
   },
+  {
+    id: 'TBD-22',
+    title: 'Nominal route (UJROUTE, Harga, Uang Tol)',
+    current: 'Spreadsheet belum memuat nominal route. Sementara diisi dari trip asli (median uang jalan, COST, dan biaya Tol per route); route tanpa data diberi perkiraan dan bertanda "perkiraan" di Data Route.',
+    question: 'Mohon daftar resmi UJROUTE, Harga, dan Uang Tol per route, supaya nilai perkiraan bisa diganti.',
+  },
 ]
 
 /**

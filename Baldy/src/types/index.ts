@@ -59,6 +59,9 @@ export interface Driver {
 }
 
 /** Master -> Data Route */
+/** Nominal pada route yang bisa berstatus perkiraan. */
+export type RouteNominal = 'ujroute' | 'toll' | 'price'
+
 export interface Route {
   id: string
   route_code: string             // No. Route
@@ -73,6 +76,11 @@ export interface Route {
    */
   commissioner: number
   price: number                  // Harga
+  /**
+   * Nominal yang masih perkiraan: belum ada di data trip maupun diisi admin.
+   * Ditampilkan bertanda "perkiraan" sampai nilainya diubah lewat form route.
+   */
+  estimated_fields?: RouteNominal[]
   created_at: string
   updated_at: string
 }

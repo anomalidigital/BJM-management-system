@@ -96,7 +96,12 @@ export function hitungKomisiTrip(
   p: { role: EmployeeRole; layanan: ServiceType; konfigurasi: string } & DataTripKomisi,
 ): HasilKomisi {
   const s = pilihAturan(aturan, p)
-  if (!s) return { nilai: 0, dasar: 0, aturan: null, tingkat: null, keterangan: 'Belum ada aturan komisi yang cocok' }
+  if (!s) {
+    const keterangan = p.konfigurasi.trim()
+      ? `Belum ada aturan komisi untuk kendaraan ${p.konfigurasi.trim()}`
+      : 'Konfigurasi kendaraan belum diisi di Data Mobil, jadi aturan komisi belum bisa dipilih'
+    return { nilai: 0, dasar: 0, aturan: null, tingkat: null, keterangan }
+  }
   return terapkan(s, dasarTrip(s.basis, p))
 }
 
