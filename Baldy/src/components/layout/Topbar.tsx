@@ -143,8 +143,6 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
                         active ? 'font-semibold text-ink' : 'text-ink-2',
                       )}
                     >
-                      {/* Kotak kode berwarna baja rel workspace itu: terlihat rel mana yang akan dipakai. */}
-                      <KodeDepot kode={w.code} warna={w.steel} />
                       <span className="min-w-0 flex-1 truncate">{w.label}</span>
                       {active && <Check size={15} className="shrink-0 text-brand-600" />}
                     </button>
