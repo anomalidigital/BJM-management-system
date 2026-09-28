@@ -54,7 +54,8 @@ export function KaryawanTransaksiPage() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<KasbonEntry | null>(null)
   const [form, setForm] = useState<Form>(kosong())
-  const [err, setErr] = useState('')
+  /** Pesan salah per kolom, ditampilkan langsung di bawah kolomnya. */
+  const [galat, setGalat] = useState<Partial<Record<'amount' | 'notes' | 'trip_id' | 'entry_date', string>>>({})
   const [deleting, setDeleting] = useState<KasbonEntry | null>(null)
 
   const orang = db.drivers.find((d) => d.id === id)
@@ -137,7 +138,7 @@ export function KaryawanTransaksiPage() {
   }
 
   function bukaTambah() {
-    setEditing(null); setForm(kosong()); setErr(''); setOpen(true)
+    setEditing(null); setForm(kosong()); setGalat({}); setOpen(true)
   }
 
   function bukaUbah(e: KasbonEntry) {
@@ -146,7 +147,7 @@ export function KaryawanTransaksiPage() {
       amount: Math.abs(e.amount), kind: e.kind, arah: e.amount < 0 ? -1 : 1, trip_id: e.trip_id,
       entry_date: e.entry_date, notes: e.notes, attachments: e.attachments ?? [],
     })
-    setErr(''); setOpen(true)
+    setGalat({}); setOpen(true)
   }
 
   const arah = ARAH_KASBON[form.kind] || form.arah
@@ -155,18 +156,20 @@ export function KaryawanTransaksiPage() {
   const saldoSetelah = saldoTanpaIni + arah * form.amount
 
   function simpan() {
-    if (form.amount <= 0) { setErr('Jumlah harus lebih dari 0.'); return }
-    if (form.kind === 'manual' && !form.notes.trim()) { setErr('Penyesuaian wajib diberi catatan alasannya.'); return }
-    if (perluTrip && !form.trip_id) { setErr('Pilih trip yang terkait.'); return }
-    if (!form.entry_date) { setErr('Tanggal wajib diisi.'); return }
+    const g: typeof galat = {}
+    if (form.amount <= 0) g.amount = 'Jumlah harus lebih dari 0.'
+    if (form.kind === 'manual' && !form.notes.trim()) g.notes = 'Penyesuaian wajib diberi catatan alasannya.'
+    if (perluTrip && !form.trip_id) g.trip_id = 'Pilih trip yang terkait.'
+    if (!form.entry_date) g.entry_date = 'Tanggal wajib diisi.'
     // Saldo tidak boleh minus: potongan tidak melebihi kasbon, dan kasbon yang
     // sudah terpotong tidak bisa diperkecil melewati potongannya.
-    if (saldoSetelah < 0) {
-      setErr(arah < 0
+    if (!g.amount && saldoSetelah < 0) {
+      g.amount = arah < 0
         ? `Potongan melebihi saldo kasbon (${formatRupiah(saldoTanpaIni)}).`
-        : `Kasbon ini sudah terpotong; saldo akan menjadi minus ${formatRupiah(-saldoSetelah)}.`)
-      return
+        : `Kasbon ini sudah terpotong; saldo akan menjadi minus ${formatRupiah(-saldoSetelah)}.`
     }
+    setGalat(g)
+    if (Object.keys(g).length > 0) return
     const isi = {
       employee_id: orang!.id,
       entry_date: form.entry_date,
@@ -177,8 +180,13 @@ export function KaryawanTransaksiPage() {
       attachments: form.attachments,
     }
     if (editing) { update('kasbonEntries', editing.id, isi); toast.success('Transaksi berhasil diperbarui.') }
-    else { create('kasbonEntries', { ...isi, uj_payment_id: '' }); toast.success('Transaksi berhasil ditambahkan.') }
+    else {
+      create('kasbonEntries', { ...isi, uj_payment_id: '' })
+      toast.success(`${KASBON_LABEL[form.kind]} ${formatRupiah(form.amount)} untuk ${orang!.driver_name} tersimpan.`)
+    }
     setOpen(false)
+    // Tampilkan daftar kasbon supaya transaksi yang baru disimpan langsung terlihat.
+    setTab('kasbon')
   }
 
   function hapus() {
@@ -423,12 +431,12 @@ export function KaryawanTransaksiPage() {
         footer={
           <>
             <Button onClick={() => setOpen(false)}>Batal</Button>
-            <Button variant="primary" onClick={simpan}>Submit</Button>
+            <Button variant="primary" onClick={simpan}>Simpan</Button>
           </>
         }
       >
         <div className="space-y-4">
-          <Field label="Jumlah" required>
+          <Field label="Jumlah" required error={galat.amount}>
             {(fid) => <CurrencyInput id={fid} value={form.amount} onValueChange={(v) => setForm({ ...form, amount: v })} />}
           </Field>
           <Field label="Jenis" required>
@@ -452,17 +460,17 @@ export function KaryawanTransaksiPage() {
             </Field>
           )}
           {perluTrip && (
-            <Field label="Trip" required hint={tripOptions.length === 0 ? 'Karyawan ini belum pernah membawa trip.' : undefined}>
+            <Field label="Trip" required error={galat.trip_id} hint={tripOptions.length === 0 ? 'Karyawan ini belum pernah membawa trip.' : undefined}>
               {(fid) => (
                 <SearchableSelect id={fid} options={tripOptions} value={form.trip_id || null}
                   placeholder="Pilih nomor trip..." onChange={(v) => setForm({ ...form, trip_id: v ?? '' })} />
               )}
             </Field>
           )}
-          <Field label="Tanggal" required>
+          <Field label="Tanggal" required error={galat.entry_date}>
             {(fid) => <DateInput id={fid} value={form.entry_date} onChange={(e) => setForm({ ...form, entry_date: e.target.value })} />}
           </Field>
-          <Field label="Catatan" required={form.kind === 'manual'} hint={form.kind === 'manual' ? 'Tulis alasan penyesuaian.' : undefined}>
+          <Field label="Catatan" required={form.kind === 'manual'} error={galat.notes} hint={form.kind === 'manual' ? 'Tulis alasan penyesuaian.' : undefined}>
             {(fid) => <Textarea id={fid} rows={2} value={form.notes} className="resize-y" onChange={(e) => setForm({ ...form, notes: e.target.value })} />}
           </Field>
           <Field label="Bukti" hint="Foto nota, bukti transfer, dan sejenisnya.">
@@ -479,7 +487,6 @@ export function KaryawanTransaksiPage() {
               <span className={cn('tnum', saldoSetelah < 0 && 'text-[color:var(--color-critical)]')}>{formatRupiah(saldoSetelah)}</span>
             </p>
           </div>
-          {err && <p className="text-[12px] font-medium text-[color:var(--color-critical)]">{err}</p>}
         </div>
       </Modal>
 
