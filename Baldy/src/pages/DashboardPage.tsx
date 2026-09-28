@@ -348,7 +348,7 @@ export function DashboardPage() {
                     {t.driver_name} &middot; {t.plate_number} &middot; {t.route_code}
                   </span>
                 </span>
-                <span className="tnum shrink-0 text-[12.5px] font-semibold text-ink">{formatRupiah(t.route_price, { compact: true })}</span>
+                <span className="tnum shrink-0 text-[12.5px] font-semibold text-ink">{formatRupiah(t.harga, { compact: true })}</span>
               </li>
             ))}
           </ul>

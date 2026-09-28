@@ -18,7 +18,7 @@ import { useWorkspace } from '../store/WorkspaceProvider'
 import { formatDate, formatRupiah, todayISO } from '../lib/format'
 import { hitungKomisiKontrak } from '../lib/komisi'
 import { nomorKontrakBerikut } from '../lib/kode'
-import { SERVICE_LABEL } from '../types'
+import { CLIENT_TYPE_LABEL, SERVICE_LABEL } from '../types'
 import type { Contract } from '../types'
 import { STATUS_LABEL, STATUS_TONE } from './trip/status'
 
@@ -29,8 +29,9 @@ const KONTRAK_KOSONG: FormKontrak = { contract_no: '', value: 0, start_date: '',
 type BarisKontrak = Contract & { trip: number; terpakai: number; sisa: number; komisi: number }
 
 /**
- * Master -> Klien -> satu klien: kontrak Dedicated milik klien ini dan trip-tripnya.
- * Sisa kontrak = nilai kontrak dikurangi uang jalan dan biaya seluruh trip kontrak itu.
+ * Master -> Klien -> satu klien. Klien kontrak: kontrak Dedicated dan sisanya
+ * (nilai kontrak dikurangi uang jalan & biaya trip kontrak itu). Klien tetap:
+ * ringkasan trip dan pendapatannya.
  */
 export function KlienDetailPage() {
   const { id } = useParams()
@@ -96,6 +97,7 @@ export function KlienDetailPage() {
 
   const aktif = kontrak.filter((c) => c.status === 'aktif')
   const tripDihitung = tripKlien.filter((t) => t.status !== 'batal')
+  const klienKontrak = klien.client_type === 'kontrak'
 
   function openCreate() {
     setEditing(null)
@@ -194,11 +196,16 @@ export function KlienDetailPage() {
     },
   ]
 
-  const ringkasan: Array<[string, string, string]> = [
+  const ringkasan: Array<[string, string, string]> = klienKontrak ? [
     ['Kontrak Aktif', String(aktif.length), `dari ${kontrak.length} kontrak di ${meta.label}`],
     ['Nilai Kontrak Aktif', formatRupiah(aktif.reduce((a, c) => a + c.value, 0)), 'total nilai kontrak berjalan'],
     ['Sisa Kontrak Aktif', formatRupiah(aktif.reduce((a, c) => a + c.sisa, 0)), 'nilai dikurangi biaya trip kontrak'],
     ['Jumlah Trip', String(tripDihitung.length), `total UJ ${formatRupiah(tripDihitung.reduce((a, t) => a + t.uj_total, 0))}`],
+  ] : [
+    ['Jumlah Trip', String(tripDihitung.length), `di ${meta.label}, tanpa trip batal`],
+    ['Pendapatan', formatRupiah(tripDihitung.reduce((a, t) => a + t.harga, 0)), 'jumlah harga trip'],
+    ['Total Uang Jalan', formatRupiah(tripDihitung.reduce((a, t) => a + t.uj_total, 0)), 'termin yang sudah dibayar'],
+    ['Trip Terakhir', tripDihitung[0] ? formatDate(tripDihitung[0].transaction_date) : '—', tripDihitung[0]?.transaction_no ?? 'belum ada trip'],
   ]
 
   return (
@@ -207,6 +214,7 @@ export function KlienDetailPage() {
         title={klien.project_name}
         description={[
           klien.project_code,
+          CLIENT_TYPE_LABEL[klien.client_type ?? 'tetap'],
           klien.requires_document ? 'Pakai TR / No PI' : 'Tanpa dokumen',
           klien.status === 'aktif' ? 'Aktif' : 'Nonaktif',
           klien.description,
@@ -215,7 +223,7 @@ export function KlienDetailPage() {
         actions={
           <>
             <Button icon={<FaArrowLeft size={15} />} onClick={() => navigate('/master/klien')}>Kembali</Button>
-            <Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah Kontrak</Button>
+            {klienKontrak && <Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah Kontrak</Button>}
           </>
         }
       />
@@ -230,6 +238,7 @@ export function KlienDetailPage() {
         ))}
       </div>
 
+      {klienKontrak ? (
       <Card className="mb-4">
         <CardHeader
           title="Kontrak Dedicated"
@@ -248,6 +257,15 @@ export function KlienDetailPage() {
           )}
         />
       </Card>
+      ) : (
+        <Card className="mb-4 px-4 py-3.5">
+          <p className="text-[13px] font-semibold text-ink">Klien tetap, tanpa kontrak</p>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-ink-3">
+            Trip klien ini order per perjalanan (layanan Callout). Bila perusahaan ini memakai jasa lewat kontrak,
+            ubah jenisnya menjadi Klien kontrak di <Link to="/master/klien" className="text-brand-700 hover:underline">daftar Klien</Link>.
+          </p>
+        </Card>
+      )}
 
       <Card>
         <CardHeader title="Trip terakhir" subtitle={`${tripKlien.length} trip tercatat untuk klien ini`} />

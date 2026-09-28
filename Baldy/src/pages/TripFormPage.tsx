@@ -18,6 +18,7 @@ import { buatKodeUnik, nomorSuratJalanBerikut, nomorTripBerikut } from '../lib/k
 import { cn } from '../lib/utils'
 import type { CommissionTransaction, ServiceType, TripStatus } from '../types'
 import { STATUS_FORM, STATUS_LABEL } from './trip/status'
+import { PakaiNilai } from './trip/bagian'
 
 type FormState = Omit<CommissionTransaction, 'id' | 'created_at' | 'updated_at' | 'workspace'>
 
@@ -223,16 +224,18 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     toast.info(`Data customer diambil dari SI/JO ${jo.sijo}.`)
   }
 
-  /** Pilih rute -> Tujuan dan Klien ikut terisi, kecuali sudah diganti manual. */
+  /** Pilih rute -> Tujuan, Klien, dan Harga ikut terisi, kecuali sudah diganti manual. */
   function applyRoute(routeId: string | null) {
     const route = db.routes.find((r) => r.id === routeId)
     setForm((f) => {
       const sebelumnya = db.routes.find((r) => r.id === f.route_id)
       const tujuanBoleh = !f.destination_detail.trim() || f.destination_detail.trim() === (sebelumnya?.route_name ?? '').trim()
       const projectBoleh = !f.project_id || f.project_id === (sebelumnya?.project_id ?? '')
+      const hargaBoleh = !f.cost_value || f.cost_value === (sebelumnya?.price ?? 0)
       return {
         ...f,
         route_id: routeId ?? '',
+        cost_value: route && hargaBoleh ? route.price : f.cost_value,
         destination_detail: route && tujuanBoleh ? route.route_name : f.destination_detail,
         project_id: route?.project_id && projectBoleh ? route.project_id : f.project_id,
       }
@@ -336,6 +339,15 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     uj_total: existing ? transactionRows.find((t) => t.id === existing.id)?.uj_total ?? 0 : 0,
   })
   const sisaKontrak = kontrak ? kontrak.value - (terpakaiKontrak.get(kontrak.id) ?? 0) : 0
+
+  /** Harga trip: terisi dari Harga route, boleh diubah bila harga trip ini beda. */
+  const petunjukHarga: ReactNode = !selectedRoute
+    ? 'Terisi dari Harga route setelah rute dipilih. Dasar komisi & pendapatan.'
+    : !form.cost_value
+      ? <>Kosong: memakai Harga route {formatRupiah(selectedRoute.price)} · <PakaiNilai label="Isi" onClick={() => set('cost_value', selectedRoute.price)} /></>
+      : form.cost_value === selectedRoute.price
+        ? 'Sama dengan Harga route. Ubah bila harga trip ini beda; komisi & pendapatan ikut harga ini.'
+        : <>Harga khusus trip ini (Harga route {formatRupiah(selectedRoute.price)}) · <PakaiNilai label="Pakai Harga route" onClick={() => set('cost_value', selectedRoute.price)} /></>
 
   function gantiLayanan(l: ServiceType) {
     setForm((f) => ({ ...f, service_type: l }))
@@ -532,6 +544,11 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                   />
                 )}
               </Field>
+              {!dedicated && (
+                <Field label="Harga" hint={petunjukHarga}>
+                  {(fid) => <CurrencyInput id={fid} value={form.cost_value} onValueChange={(v) => set('cost_value', v)} />}
+                </Field>
+              )}
               {(selectedRoute || perkiraanKomisi.aturan) && (
                 <div className="rounded-lg border border-brand-100 bg-brand-50/60 px-3.5 py-3">
                   {selectedRoute && (
@@ -545,7 +562,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                         {([
                           ['UJROUTE (patokan)', selectedRoute.ujroute],
                           ['Uang Tol (patokan)', selectedRoute.toll ?? 0],
-                          ['Harga', selectedRoute.price],
+                          ['Harga route', selectedRoute.price],
                         ] as const).map(([k, v]) => (
                           <div key={k}>
                             <dt className="text-[11px] font-semibold tracking-wide text-brand-700/80 uppercase">{k}</dt>
@@ -557,7 +574,9 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                   )}
                   <p className={cn('text-[12px] text-brand-800', selectedRoute && 'mt-2 border-t border-brand-100 pt-2')}>
                     Perkiraan komisi sopir: <span className="tnum font-semibold">{formatRupiah(perkiraanKomisi.nilai)}</span>
-                    <span className="block text-[11.5px] text-brand-700">{perkiraanKomisi.keterangan}</span>
+                    <span className="block text-[11.5px] text-brand-700">
+                      {!perkiraanKomisi.aturan && !form.vehicle_id ? 'Pilih No. Kendaraan dulu; aturan komisi tergantung jenis kendaraan.' : perkiraanKomisi.keterangan}
+                    </span>
                   </p>
                 </div>
               )}
@@ -697,7 +716,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
 
       {!dedicated && (
         <div className="mt-4">
-          <Section title="Identifier & Catatan" description="TR, SI/JO, dan No PI disimpan terpisah; COST dipakai sebagai nilai trip untuk komisi.">
+          <Section title="Identifier & Catatan" description="TR, SI/JO, dan No PI disimpan terpisah.">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Field label="TR" hint="Nomor referensi dari customer.">
                 {(fid) => <Input id={fid} value={form.tr_reference} placeholder="2600305331" onChange={(e) => set('tr_reference', e.target.value)} />}
@@ -707,9 +726,6 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
               </Field>
               <Field label="Status PI" hint="mis. di pool, masih moving.">
                 {(fid) => <Input id={fid} value={form.pi_status} onChange={(e) => set('pi_status', e.target.value)} />}
-              </Field>
-              <Field label="COST" hint="Nilai trip; dasar tingkat komisi.">
-                {(fid) => <CurrencyInput id={fid} value={form.cost_value} onValueChange={(v) => set('cost_value', v)} />}
               </Field>
               <Field label="Tgl Bon">
                 {(fid) => <DateInput id={fid} value={form.bon_date ?? ''} onChange={(e) => set('bon_date', e.target.value || null)} />}

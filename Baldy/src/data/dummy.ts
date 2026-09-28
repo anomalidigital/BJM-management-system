@@ -107,6 +107,7 @@ function makeProjects(): Project[] {
     id: `prj-${i + 1}`,
     project_code: code,
     project_name: name,
+    client_type: 'tetap' as const,
     description: desc,
     requires_document: doc,
     status: 'aktif' as const,
@@ -633,6 +634,7 @@ export function makeKlienKontrak(cap = stamp): Project[] {
     id: `prj-ktr-${i + 1}`,
     project_code: code,
     project_name: name,
+    client_type: 'kontrak' as const,
     description: 'Klien contoh layanan Dedicated.',
     requires_document: true,
     status: 'aktif' as const,
@@ -726,7 +728,7 @@ export function generateDatabase(): Database {
   ]
 
   return {
-    ...real, projects: [...real.projects, ...makeKlienKontrak()], drivers, vehicles, routes, transactions, jobOrders, billings,
+    ...real, projects: [...real.projects.map((p) => ({ ...p, client_type: 'tetap' as const })), ...makeKlienKontrak()], drivers, vehicles, routes, transactions, jobOrders, billings,
     ujPayments, expenses, internalCosts, tripNotes: [], kasbonEntries, commissionSchemes, contracts: makeContracts(),
   }
 }

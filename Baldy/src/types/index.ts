@@ -99,11 +99,21 @@ export interface Vehicle {
   updated_at: string
 }
 
+/**
+ * Jenis klien:
+ * - tetap   : pelanggan rutin, order per perjalanan (layanan Callout)
+ * - kontrak : perusahaan lain yang memakai jasa lewat kontrak (layanan Dedicated)
+ */
+export const CLIENT_TYPES = ['tetap', 'kontrak'] as const
+export type ClientType = (typeof CLIENT_TYPES)[number]
+export const CLIENT_TYPE_LABEL: Record<ClientType, string> = { tetap: 'Klien tetap', kontrak: 'Klien kontrak' }
+
 /** Master -> Klien (SLB, ATLAS, PDT, ...): pemilik trip dan kontrak Dedicated. */
 export interface Project {
   id: string
   project_code: string
   project_name: string
+  client_type: ClientType
   description: string
   /** CASH tidak punya alur dokumen (tanpa TR / No PI) - lihat TBD-09. */
   requires_document: boolean
@@ -215,7 +225,7 @@ export interface CommissionTransaction extends WorkspaceScoped {
   tr_reference: string
   pi_number: string
   pi_status: string
-  cost_value: number             // COST - makna bisnis belum dikonfirmasi (TBD-02)
+  cost_value: number             // Harga trip (kolom COST di spreadsheet); 0 = memakai Harga route
 
   notes: string
   is_marked: boolean
@@ -370,14 +380,14 @@ export type CommissionUnit = 'rp' | 'persen'
 
 /**
  * Nilai yang menjadi dasar tingkat komisi.
- * - nilai   : nilai trip = COST trip, atau Harga route bila COST kosong
+ * - nilai   : harga trip = Harga yang diisi di trip, atau Harga route bila kosong
  * - uj      : uang jalan = UJROUTE route, atau UJ yang dibayar bila UJROUTE kosong
  * - kontrak : nilai kontrak Dedicated (dihitung per kontrak, bukan per trip)
  */
 export const DASAR_KOMISI = ['nilai', 'uj', 'kontrak'] as const
 export type DasarKomisi = (typeof DASAR_KOMISI)[number]
 export const DASAR_KOMISI_LABEL: Record<DasarKomisi, string> = {
-  nilai: 'Nilai trip (COST / Harga)',
+  nilai: 'Harga trip',
   uj: 'Uang jalan (UJ)',
   kontrak: 'Nilai kontrak',
 }
@@ -441,6 +451,10 @@ export interface TransactionRow extends CommissionTransaction {
   route_code: string
   route_name: string
   route_price: number
+  /** Harga trip yang dipakai komisi & pendapatan: Harga trip, atau Harga route bila kosong. */
+  harga: number
+  /** true bila trip punya harga sendiri (bukan mengikuti Harga route). */
+  harga_khusus: boolean
   ujroute: number
   toll: number
   commissioner: number

@@ -71,6 +71,13 @@ export function TripOverview({ trip }: { trip: TransactionRow }) {
             <InfoItem label="Klien" value={trip.project_code ? `${trip.project_code} — ${trip.project_name}` : '—'} />
             <InfoItem label="Status" value={STATUS_LABEL[trip.status]} />
             <InfoItem label="Layanan" value={SERVICE_LABEL[trip.service_type ?? 'callout']} />
+            {trip.service_type !== 'dedicated' && (
+              <InfoItem
+                label="Harga"
+                mono
+                value={<>{formatRupiah(trip.harga)}{!trip.harga_khusus && trip.harga > 0 && <span className="ml-1.5 font-sans text-[11.5px] font-normal text-ink-3">ikut Harga route</span>}</>}
+              />
+            )}
             {kontrak && <InfoItem label="Kontrak" value={`${kontrak.contract_no} — ${trip.client_name || 'klien tidak ditemukan'}`} />}
           </dl>
         </Card>
@@ -107,7 +114,6 @@ export function TripOverview({ trip }: { trip: TransactionRow }) {
             <InfoItem label="TR" value={strip(trip.tr_reference)} mono />
             <InfoItem label="No PI" value={strip(trip.pi_number)} mono />
             <InfoItem label="Status PI" value={strip(trip.pi_status)} />
-            <InfoItem label="COST" value={trip.cost_value ? formatRupiah(trip.cost_value) : '—'} mono />
             <InfoItem label="Tgl Bon" value={trip.bon_date ? formatDate(trip.bon_date) : '—'} mono />
             <InfoItem label="Bon Pribadi" value={trip.personal_bon ? formatRupiah(trip.personal_bon) : '—'} mono />
           </dl>
@@ -147,7 +153,7 @@ export function TripOverview({ trip }: { trip: TransactionRow }) {
               <InfoItem label="No. Route" value={<span className="break-all whitespace-normal">{trip.route_code}</span>} mono />
               <InfoItem label="UJROUTE" value={formatRupiah(trip.ujroute)} mono />
               <InfoItem label="Uang Tol (patokan)" value={formatRupiah(trip.toll)} mono />
-              <InfoItem label="Harga" value={formatRupiah(trip.route_price)} mono />
+              <InfoItem label="Harga route" value={formatRupiah(trip.route_price)} mono />
             </dl>
           ) : (
             <p className="px-4 py-6 text-center text-[13px] text-ink-3">Trip ini belum memakai route.</p>

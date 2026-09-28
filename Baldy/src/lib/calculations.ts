@@ -39,20 +39,20 @@ export const TBD_NOTES: TbdNote[] = [
   {
     id: 'TBD-01',
     title: 'Komisi sopir per transaksi',
-    current: 'Dihitung dari master Komisi (catatan meeting): bertingkat per nilai trip untuk HB / LB / DL / TRONTON. Penerimanya sopir utama.',
-    question: 'Dasar tingkatnya nilai trip (COST / Harga) atau uang jalan? Di data asli UJ per trip maksimal 17 jt, jadi tingkat 21 jt ke atas hanya terpakai bila dasarnya nilai trip. Nilai di bawah 1 jt dapat komisi atau tidak?',
+    current: 'Dasar tingkatnya harga trip (dikonfirmasi atasan, 28 Sep 2026): harga yang diisi di trip, atau Harga route bila kosong. Berlaku untuk HB / LB / DL / TRONTON; penerimanya sopir utama.',
+    question: 'Harga di bawah Rp 1 jt dapat komisi atau tidak? Harga di sela tingkat (mis. Rp 10,5 jt) sementara masuk tingkat berikutnya; benarkah?',
   },
   {
     id: 'TBD-02',
     title: 'Pendapatan bruto per transaksi',
-    current: 'Trip menyimpan cost_value apa adanya; maknanya belum diubah.',
-    question: 'COST pada spreadsheet hanya terisi di 107 dari 241 trip dan nilainya berbeda-beda pada rute yang sama. Apakah COST = harga ke customer, pendapatan bruto, biaya, atau nilai kontrak?',
+    current: 'Pendapatan = harga trip, sama dengan dasar komisi. Kolom COST di spreadsheet dibaca sebagai harga trip (93 dari 105 trip ber-COST sama persis dengan Harga route-nya). Trip baru terisi Harga route dan boleh diubah.',
+    question: 'Benarkah COST di spreadsheet adalah harga yang ditagihkan ke klien untuk trip itu?',
   },
   {
     id: 'TBD-03',
     title: 'Pendapatan netto',
-    current: 'Sementara: Harga - UJROUTE - Komisi (dari aturan). Biaya operasional belum ikut dikurangkan. Trip batal tidak dihitung.',
-    question: 'Apakah DEX, tol, SPSI, nginap, dan biaya lain menjadi pengurang pendapatan netto?',
+    current: 'Sementara: harga trip - UJROUTE - komisi (dari aturan). Biaya operasional belum ikut dikurangkan. Trip batal tidak dihitung.',
+    question: 'Solar (DEX), tol, SPSI, dan nginap dibayar dari uang jalan atau di luar uang jalan? Kalau di luar, biaya itu perlu ikut mengurangi netto. Sisa uang jalan menjadi hak sopir atau dikembalikan?',
   },
   {
     id: 'TBD-04',
@@ -182,13 +182,13 @@ export function komisiTransaksi(row: Pick<TransactionRow, 'komisi_sopir'>): numb
 }
 
 /** TBD-02 — pendapatan bruto untuk satu transaksi. */
-export function pendapatanTransaksi(row: Pick<TransactionRow, 'route_price' | 'status'>): number {
-  return tripDihitung(row) ? row.route_price : 0
+export function pendapatanTransaksi(row: Pick<TransactionRow, 'harga' | 'status'>): number {
+  return tripDihitung(row) ? row.harga : 0
 }
 
 /** TBD-03 — pendapatan netto untuk satu transaksi. */
-export function nettoTransaksi(row: Pick<TransactionRow, 'route_price' | 'ujroute' | 'komisi_sopir' | 'status'>): number {
-  return tripDihitung(row) ? row.route_price - row.ujroute - komisiTransaksi(row) : 0
+export function nettoTransaksi(row: Pick<TransactionRow, 'harga' | 'ujroute' | 'komisi_sopir' | 'status'>): number {
+  return tripDihitung(row) ? row.harga - row.ujroute - komisiTransaksi(row) : 0
 }
 
 /** TBD-05 — jumlah ritan untuk satu transaksi. */
@@ -207,7 +207,7 @@ export function ringkas(semua: TransactionRow[]) {
     ujroute: rows.reduce((a, r) => a + r.ujroute, 0),
     netto: rows.reduce((a, r) => a + nettoTransaksi(r), 0),
     bonPribadi: rows.reduce((a, r) => a + r.personal_bon, 0),
-    /** Nilai COST apa adanya dari data operasional; makna bisnisnya TBD-02. */
+    /** Harga yang diisi di trip saja (kolom COST data lama), tanpa Harga route. */
     cost: rows.reduce((a, r) => a + r.cost_value, 0),
   }
 }

@@ -7,7 +7,7 @@ import { loadDatabase, resetDatabase, resetToSampleDatabase, saveDatabase } from
 import { nowISO, uid } from '../lib/utils'
 import { todayISO } from '../lib/format'
 import { petaSaldoKasbon } from '../lib/kasbon'
-import { hitungKomisiTrip } from '../lib/komisi'
+import { hargaTrip, hitungKomisiTrip } from '../lib/komisi'
 import { bersihkanLampiran, hapusLampiran } from '../lib/lampiran'
 import { useWorkspace } from './WorkspaceProvider'
 
@@ -404,6 +404,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         route_code: r?.route_code ?? '',
         route_name: r?.route_name ?? '',
         route_price: r?.price ?? 0,
+        harga: hargaTrip({ cost_value: t.cost_value ?? 0, route_price: r?.price ?? 0 }),
+        harga_khusus: (t.cost_value ?? 0) > 0,
         ujroute: r?.ujroute ?? 0,
         toll: r?.toll ?? 0,
         commissioner: r?.commissioner ?? 0,
@@ -422,7 +424,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         client_name: k ? projects.get(k.project_id)?.project_name ?? '' : '',
         komisi_sopir: kSopir?.nilai ?? 0,
         komisi_manager: kManager?.nilai ?? 0,
-        komisi_keterangan: batal ? 'Trip dibatalkan' : kSopir?.keterangan ?? '',
+        komisi_keterangan: batal ? 'Trip dibatalkan'
+          : !kSopir?.aturan && !t.vehicle_id ? 'Kendaraan trip belum diisi, jadi aturan komisi belum bisa dipilih'
+          : kSopir?.keterangan ?? '',
       }
     })
   }, [scopedDb])

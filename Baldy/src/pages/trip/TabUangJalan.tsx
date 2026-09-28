@@ -61,6 +61,10 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
   const saldo = form.driver_id ? hitungSaldo(dbAll.kasbonEntries, form.driver_id, editing?.id) : 0
   const maksPotong = Math.max(0, Math.min(saldo, form.uj_amount))
   const namaSopir = drivers.get(form.driver_id)?.driver_name ?? ''
+  /** Potongan melebihi kasbon yang masih ada: tidak bisa disimpan. */
+  const potongLebih = !!form.driver_id && form.kasbon_deduction > Math.max(0, saldo)
+  /** Sopir tanpa kasbon: tidak ada yang bisa dipotong, jadi kolomnya dikunci. */
+  const tanpaKasbon = !!form.driver_id && saldo <= 0 && form.kasbon_deduction === 0
   /** Total UJ setelah termin ini disimpan, untuk dibandingkan dengan patokan. */
   const totalSetelah = uj.uj - (editing?.uj_amount ?? 0) + form.uj_amount
   const sisaSebelumIni = patokan - (uj.uj - (editing?.uj_amount ?? 0))
@@ -224,14 +228,28 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
           </Field>
           <Field
             label="Potong Kasbon"
-            hint={form.driver_id
-              ? <>
-                  Kasbon {namaSopir}: <span className="tnum font-semibold text-ink-2">{formatRupiah(saldo)}</span>
-                  {maksPotong > 0 && form.kasbon_deduction !== maksPotong && <> · <PakaiNilai label={`Potong ${formatRupiah(maksPotong)}`} onClick={() => setForm((f) => ({ ...f, kasbon_deduction: maksPotong }))} /></>}
-                </>
-              : 'Pilih sopir untuk melihat kasbonnya.'}
+            error={potongLebih ? `Melebihi kasbon ${namaSopir} (${formatRupiah(Math.max(0, saldo))}). Kosongkan, atau catat kasbonnya dulu.` : undefined}
+            hint={!form.driver_id
+              ? 'Pilih sopir untuk melihat kasbonnya.'
+              : saldo <= 0
+                ? <>
+                    {namaSopir} tidak punya kasbon, jadi tidak ada yang dipotong. Kasbon baru dicatat di{' '}
+                    <Link to={`/master/karyawan/${form.driver_id}`} target="_blank" className="font-medium text-brand-700 hover:underline">halaman {namaSopir}</Link>.
+                  </>
+                : <>
+                    Kasbon {namaSopir}: <span className="tnum font-semibold text-ink-2">{formatRupiah(saldo)}</span>
+                    {maksPotong > 0 && form.kasbon_deduction !== maksPotong && <> · <PakaiNilai label={`Potong ${formatRupiah(maksPotong)}`} onClick={() => setForm((f) => ({ ...f, kasbon_deduction: maksPotong }))} /></>}
+                  </>}
           >
-            {(fid) => <CurrencyInput id={fid} value={form.kasbon_deduction} onValueChange={(v) => setForm((f) => ({ ...f, kasbon_deduction: v }))} />}
+            {(fid) => (
+              <CurrencyInput
+                id={fid}
+                value={form.kasbon_deduction}
+                invalid={potongLebih}
+                disabled={tanpaKasbon}
+                onValueChange={(v) => setForm((f) => ({ ...f, kasbon_deduction: v }))}
+              />
+            )}
           </Field>
           <div className="rounded-lg border border-brand-100 bg-brand-50 px-3.5 py-3 sm:col-span-2">
             <p className="flex items-center justify-between gap-3">
@@ -240,7 +258,7 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
             </p>
             <p className="mt-1 text-[11.5px] text-brand-700">
               Dihitung otomatis: UJ − Potong Kasbon
-              {form.kasbon_deduction > 0 && form.driver_id && <> · sisa kasbon {namaSopir} menjadi {formatRupiah(saldo - form.kasbon_deduction)}</>}
+              {form.kasbon_deduction > 0 && form.driver_id && !potongLebih && <> · sisa kasbon {namaSopir} menjadi {formatRupiah(saldo - form.kasbon_deduction)}</>}
             </p>
             {patokan > 0 && totalSetelah > patokan && (
               <p className="mt-1 text-[11.5px] font-medium text-[#8a6100]">

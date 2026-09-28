@@ -5,10 +5,10 @@ import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
 import type { Column } from '../components/ui/DataTable'
-import { SearchInput, Toolbar } from '../components/ui/Toolbar'
+import { FilterField, SearchInput, Toolbar } from '../components/ui/Toolbar'
 import { Button, IconButton } from '../components/ui/Button'
 import { Modal, ConfirmDialog } from '../components/ui/Modal'
-import { Field, Input, Select, Checkbox } from '../components/ui/Field'
+import { Field, Input, Select, Checkbox, Radio } from '../components/ui/Field'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState, NotFoundState } from '../components/ui/States'
 import { useData } from '../store/DataProvider'
@@ -17,16 +17,23 @@ import { useToast } from '../store/ToastProvider'
 import { useTable } from '../lib/useTable'
 import { matchesQuery } from '../lib/utils'
 import { formatNumber, formatRupiah } from '../lib/format'
-import type { Project } from '../types'
+import { CLIENT_TYPE_LABEL } from '../types'
+import type { ClientType, Project } from '../types'
 
 type FormState = Omit<Project, 'id' | 'created_at' | 'updated_at'>
-const BLANK: FormState = { project_code: '', project_name: '', description: '', requires_document: true, status: 'aktif' }
+const BLANK: FormState = { project_code: '', project_name: '', client_type: 'tetap', description: '', requires_document: true, status: 'aktif' }
 
-type Baris = Project & { trip: number; uj: number; kontrakAktif: number; kontrakTotal: number; nilaiAktif: number }
+/** Penjelasan singkat tiap jenis klien, dipakai di form. */
+const PENJELASAN_JENIS: Record<ClientType, string> = {
+  tetap: 'Pelanggan rutin. Order per perjalanan (layanan Callout), tanpa kontrak.',
+  kontrak: 'Perusahaan lain yang memakai jasa lewat kontrak (layanan Dedicated). Kontraknya dikelola di halaman klien.',
+}
+
+type Baris = Project & { trip: number; uj: number; kontrakAktif: number; kontrakTotal: number; kontrakLain: number; nilaiAktif: number }
 
 /**
- * Master -> Klien. Kontrak Dedicated dikelola di halaman tiap klien,
- * karena setiap kontrak memang milik satu klien.
+ * Master -> Klien. Klien tetap order per perjalanan (Callout); klien kontrak
+ * memakai layanan Dedicated, dan kontraknya dikelola di halaman tiap klien.
  */
 export function KlienPage() {
   const { db, dbAll, transactionRows, loading, error, reload, create, update, remove } = useData()
@@ -39,6 +46,7 @@ export function KlienPage() {
   const [form, setForm] = useState<FormState>(BLANK)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
   const [deleting, setDeleting] = useState<Baris | null>(null)
+  const [jenis, setJenis] = useState('')
 
   const baris = useMemo<Baris[]>(() => {
     const trip = new Map<string, { n: number; uj: number }>()
@@ -58,18 +66,25 @@ export function KlienPage() {
         uj: trip.get(p.id)?.uj ?? 0,
         kontrakAktif: aktif.length,
         kontrakTotal: kontrak.length,
+        // Kontrak dicatat per workspace; yang di workspace lain disebut saja.
+        kontrakLain: dbAll.contracts.filter((c) => c.project_id === p.id).length - kontrak.length,
         nilaiAktif: aktif.reduce((a, c) => a + c.value, 0),
       }
     })
-  }, [db.projects, db.contracts, transactionRows])
+  }, [db.projects, db.contracts, dbAll.contracts, transactionRows])
 
   const search = useCallback((p: Baris, q: string) => matchesQuery(q, p.project_code, p.project_name, p.description), [])
-  const table = useTable(baris, { search, initialSortKey: 'project_code', pageSize: 10 })
+  const extraFilter = useCallback((p: Baris) => !jenis || p.client_type === jenis, [jenis])
+  const table = useTable(baris, { search, extraFilter, extraFilterActive: !!jenis, initialSortKey: 'project_code', pageSize: 10 })
+  const resetFilter = () => { table.reset(); setJenis('') }
 
   function openCreate() { setEditing(null); setForm(BLANK); setErrors({}); setFormOpen(true) }
   function openEdit(p: Project) {
     setEditing(p)
-    setForm({ project_code: p.project_code, project_name: p.project_name, description: p.description, requires_document: p.requires_document, status: p.status })
+    setForm({
+      project_code: p.project_code, project_name: p.project_name, client_type: p.client_type ?? 'tetap',
+      description: p.description, requires_document: p.requires_document, status: p.status,
+    })
     setErrors({}); setFormOpen(true)
   }
 
@@ -80,6 +95,10 @@ export function KlienPage() {
     else if (db.projects.some((p) => p.project_code.toLowerCase() === kode.toLowerCase() && p.id !== editing?.id))
       e.project_code = 'Kode klien sudah dipakai.'
     if (!form.project_name.trim()) e.project_name = 'Nama klien wajib diisi.'
+    // Klien yang masih punya kontrak tidak bisa dijadikan klien tetap.
+    const kontrakAda = editing ? dbAll.contracts.filter((c) => c.project_id === editing.id).length : 0
+    if (form.client_type === 'tetap' && kontrakAda > 0)
+      e.client_type = `Klien ini masih punya ${kontrakAda} kontrak. Hapus kontraknya dulu di halaman klien bila ingin menjadikannya klien tetap.`
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -114,12 +133,24 @@ export function KlienPage() {
       ),
     },
     {
+      key: 'client_type', header: 'Jenis', sortable: true, width: '110px',
+      render: (p) => (p.client_type === 'kontrak' ? <Badge tone="brand">Kontrak</Badge> : <Badge tone="neutral">Tetap</Badge>),
+    },
+    {
       key: 'requires_document', header: 'Alur Dokumen', sortable: true, width: '140px',
       render: (p) => (p.requires_document ? <Badge tone="brand">Pakai TR / No PI</Badge> : <Badge tone="neutral">Tanpa dokumen</Badge>),
     },
     {
       key: 'kontrakAktif', header: 'Kontrak Dedicated', sortable: true, width: '150px',
-      render: (p) => (p.kontrakTotal === 0 ? <span className="text-ink-3">—</span> : (
+      render: (p) => (p.kontrakTotal === 0 ? (
+        p.client_type === 'kontrak'
+          ? (
+            <Link to={`/master/klien/${p.id}`} className="text-[12.5px] text-ink-3 hover:text-brand-700 hover:underline">
+              {p.kontrakLain > 0 ? `${p.kontrakLain} di workspace lain` : 'Belum ada kontrak'}
+            </Link>
+          )
+          : <span className="text-ink-3">—</span>
+      ) : (
         <Link to={`/master/klien/${p.id}`} className="group block leading-tight">
           <span className="font-medium text-brand-700 group-hover:underline">
             {p.kontrakAktif > 0 ? `${p.kontrakAktif} aktif` : `${p.kontrakTotal} selesai`}
@@ -151,14 +182,29 @@ export function KlienPage() {
       <PageHeader
         title="Klien"
         crumbs={[{ label: 'Master' }, { label: 'Klien' }]}
-        description="Klien pemilik order. Buka klien untuk mengelola kontrak Dedicated-nya; alur dokumen menentukan apakah tripnya memakai TR / No PI."
+        description="Klien tetap order per perjalanan (Callout). Klien kontrak memakai layanan Dedicated; kontraknya dikelola di halaman klien."
         actions={<Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah Klien</Button>}
       />
 
       <Card>
         <Toolbar
-          left={<SearchInput value={table.query} onChange={table.setQuery} placeholder="Cari kode atau nama klien..." />}
-          right={<span className="text-[12.5px] text-ink-3">{db.projects.length} klien terdaftar</span>}
+          left={
+            <>
+              <SearchInput value={table.query} onChange={table.setQuery} placeholder="Cari kode atau nama klien..." />
+              <FilterField label="Jenis">
+                <Select value={jenis} onChange={(e) => setJenis(e.target.value)} className="w-36">
+                  <option value="">Semua</option>
+                  <option value="tetap">{CLIENT_TYPE_LABEL.tetap}</option>
+                  <option value="kontrak">{CLIENT_TYPE_LABEL.kontrak}</option>
+                </Select>
+              </FilterField>
+            </>
+          }
+          right={(
+            <span className="text-[12.5px] text-ink-3">
+              {db.projects.length} klien · {baris.filter((p) => p.client_type === 'kontrak').length} kontrak
+            </span>
+          )}
         />
         <DataTable
           columns={columns}
@@ -167,11 +213,11 @@ export function KlienPage() {
           loading={loading}
           error={error}
           onRetry={reload}
-          isFiltered={table.isFiltered}
+          isFiltered={table.isFiltered || !!jenis}
           sort={table.sort}
           onSortChange={table.toggleSort}
           empty={<EmptyState entity="klien" action={canEdit && <Button variant="primary" icon={<FaPlus size={15} />} onClick={openCreate}>Tambah Klien</Button>} />}
-          notFound={<NotFoundState onReset={table.reset} />}
+          notFound={<NotFoundState onReset={resetFilter} />}
         />
       </Card>
 
@@ -179,7 +225,7 @@ export function KlienPage() {
         open={formOpen}
         onClose={() => setFormOpen(false)}
         title={editing ? 'Ubah Klien' : 'Tambah Klien'}
-        subtitle={editing ? editing.project_code : 'Tanda * wajib diisi. Kontrak ditambahkan setelah klien tersimpan.'}
+        subtitle={editing ? editing.project_code : 'Tanda * wajib diisi. Kontrak klien kontrak ditambahkan setelah klien tersimpan.'}
         footer={
           <>
             <Button onClick={() => setFormOpen(false)}>Batal</Button>
@@ -197,6 +243,22 @@ export function KlienPage() {
                 <option value="aktif">Aktif</option>
                 <option value="nonaktif">Nonaktif</option>
               </Select>
+            )}
+          </Field>
+          <Field label="Jenis Klien" required error={errors.client_type} className="sm:col-span-2">
+            {() => (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {(['tetap', 'kontrak'] as const).map((j) => (
+                  <Radio
+                    key={j}
+                    name="jenis-klien"
+                    checked={form.client_type === j}
+                    onChange={() => setForm({ ...form, client_type: j })}
+                    label={CLIENT_TYPE_LABEL[j]}
+                    description={PENJELASAN_JENIS[j]}
+                  />
+                ))}
+              </div>
             )}
           </Field>
           <Field label="Nama Klien" required error={errors.project_name} className="sm:col-span-2">

@@ -268,7 +268,7 @@ ALTER TABLE commission_transactions
   ADD COLUMN tr_reference VARCHAR(30),   -- TR, DIPISAH dari sijo (TBD-08)
   ADD COLUMN pi_number    VARCHAR(30),   -- No PI, nomor saja
   ADD COLUMN pi_status    VARCHAR(40),   -- "di pool", "masih moving" - dulu menumpang di No PI
-  ADD COLUMN cost_value   BIGINT DEFAULT 0,  -- COST, makna belum dikonfirmasi (TBD-02)
+  ADD COLUMN cost_value   BIGINT DEFAULT 0,  -- Harga trip (COST di spreadsheet); 0 = ikut Harga route
   ADD COLUMN status       VARCHAR(10) NOT NULL DEFAULT 'draft', -- draft/aktif/selesai/batal
   ADD COLUMN notes        TEXT;
 
@@ -497,4 +497,20 @@ CREATE TABLE commission_scheme_vehicles (          -- kosong = semua kendaraan
 - **Tol**: Uang Tol route = patokan; yang dihitung hanya biaya operasional jenis Tol.
 - **Biaya internal** tidak punya jenis "Uang Jalan" lagi (data lama diubah ke "Lainnya").
 - **Kasbon manual** hanya "Kasbon dari Admin" dan "Penyesuaian" (wajib catatan).
-- **No. Route** dibuat dari nama route: 4 huruf asal + 4 huruf tujuan (CIB - DURI -> CIBDURI).
+- **No. Route** dibuat tombol Generate: 13 digit waktu + 7 huruf mati acak, dijamin unik; boleh diketik manual.
+
+---
+
+# Perubahan 28 September 2026 (lanjutan) — Harga trip, jenis klien
+
+```sql
+-- Jenis klien: tetap (order per perjalanan, Callout) atau kontrak (perusahaan lain
+-- yang memakai jasa lewat kontrak Dedicated). Kontrak hanya untuk klien kontrak.
+ALTER TABLE projects ADD COLUMN client_type VARCHAR(10) NOT NULL DEFAULT 'tetap';  -- tetap | kontrak
+```
+
+- **Harga trip** = `cost_value` bila diisi, selain itu Harga route. Trip baru terisi Harga
+  route dan boleh diubah. Harga trip menjadi dasar komisi (tabel HB/LB/DL/TRONTON) dan
+  pendapatan; netto sementara = harga trip - UJROUTE - komisi.
+- **Nominal route** yang belum ada di spreadsheet diturunkan dari trip asli (median);
+  sisanya perkiraan dan ditandai sampai diisi admin (khusus prototype).

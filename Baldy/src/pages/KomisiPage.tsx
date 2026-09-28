@@ -32,7 +32,7 @@ const LAYANAN_LABEL: Record<ServiceType | 'semua', string> = { ...SERVICE_LABEL,
 
 /** Penjelasan dasar hitung, ditampilkan di bawah pilihan. */
 const PENJELASAN_DASAR: Record<DasarKomisi, string> = {
-  nilai: 'COST trip; bila kosong memakai Harga route.',
+  nilai: 'Harga yang diisi di trip; bila kosong memakai Harga route.',
   uj: 'UJROUTE route; bila kosong memakai total UJ yang dibayar.',
   kontrak: 'Nilai kontrak Dedicated, dihitung per kontrak (bukan per trip).',
 }
@@ -452,7 +452,7 @@ export function KomisiPage() {
           <div className="rounded-lg border border-brand-100 bg-brand-50/60 px-3.5 py-3">
             <p className="text-[12px] font-semibold tracking-wide text-brand-800">Coba hitung</p>
             <div className="mt-2 grid items-center gap-3 sm:grid-cols-[220px_1fr]">
-              <CurrencyInput value={coba} onValueChange={setCoba} aria-label="Nilai contoh" />
+              <CurrencyInput value={coba} onValueChange={setCoba} aria-label="Harga contoh" />
               <p className="text-[12.5px] text-brand-800">
                 {hasilCoba.tingkat
                   ? <>Masuk tingkat <span className="tnum font-semibold">{tulisRentang(hasilCoba.tingkat)}</span> → komisi <span className="tnum font-semibold">{formatRupiah(hasilCoba.nilai)}</span></>

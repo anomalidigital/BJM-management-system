@@ -331,6 +331,12 @@ function migrate(stored: Record<string, unknown>): Database {
     })
     merged.projects = klien
   }
+  // Jenis klien: yang punya kontrak (di workspace mana pun) = klien kontrak, lainnya klien tetap.
+  const prj = merged.projects as Array<Record<string, unknown>> | undefined
+  if (Array.isArray(prj) && prj.some((p) => !p.client_type)) {
+    const berkontrak = new Set((merged.contracts as Array<Record<string, unknown>>).map((c) => String(c.project_id ?? '')))
+    merged.projects = prj.map((p) => (p.client_type ? p : { ...p, client_type: berkontrak.has(String(p.id)) ? 'kontrak' : 'tetap' }))
+  }
   // Trip Dedicated yang belum berklien mengikuti klien kontraknya.
   const klienKontrak = new Map((merged.contracts as Array<Record<string, unknown>>).map((c) => [String(c.id), String(c.project_id ?? '')]))
   merged.transactions = (merged.transactions as Array<Record<string, unknown>>).map((t) => {
@@ -397,7 +403,7 @@ function klienDariNama(nama: string, ada: Project[], stamp: string): Project {
   let kode = dasar
   for (let i = 2; terpakai.has(kode); i++) kode = `${dasar}${i}`
   return {
-    id: uid('prj'), project_code: kode, project_name: nama, description: 'Dibuat dari data kontrak.',
+    id: uid('prj'), project_code: kode, project_name: nama, client_type: 'kontrak', description: 'Dibuat dari data kontrak.',
     requires_document: true, status: 'aktif', created_at: stamp, updated_at: stamp,
   }
 }
