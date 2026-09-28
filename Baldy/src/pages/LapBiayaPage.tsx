@@ -108,7 +108,7 @@ export function LapBiayaPage() {
     <>
       <PageHeader
         title="Rekap Biaya Operasional"
-        crumbs={[{ label: 'Lap. Bulan Ini' }, { label: 'Rekap Biaya Operasional' }]}
+        crumbs={[{ label: 'Invoice' }, { label: 'Rekap Biaya Operasional' }]}
         description="Rekap DEX, tol, SPSI, nginap, dan biaya lain yang tercatat pada setiap trip."
       />
 

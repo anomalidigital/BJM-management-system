@@ -178,7 +178,7 @@ export function LapNettoPage() {
     <>
       <PageHeader
         title="Pendapatan Netto Bulan Berjalan"
-        crumbs={[{ label: 'Lap. Bulan Ini' }, { label: 'Netto Bulan Berjalan' }]}
+        crumbs={[{ label: 'Invoice' }, { label: 'Netto Bulan Berjalan' }]}
         description="Pilih periode dan tipe laporan, buka preview, lalu cetak atau simpan sebagai PDF."
       />
 

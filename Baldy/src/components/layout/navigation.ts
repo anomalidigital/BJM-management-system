@@ -1,5 +1,5 @@
 import {
-  BadgeDollarSign, FileSpreadsheet, FolderKanban, Handshake, LayoutDashboard, Percent, Receipt,
+  BadgeDollarSign, Building2, FileSpreadsheet, Handshake, LayoutDashboard, Percent, Receipt,
   Route as RouteIcon, Search, Settings2, TrendingUp, Truck, Users, Wallet, Waypoints,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -27,7 +27,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Data Karyawan', to: '/master/karyawan', icon: Users },
       { label: 'Data Mobil', to: '/master/mobil', icon: Truck },
       { label: 'Data Route', to: '/master/route', icon: RouteIcon },
-      { label: 'Data Project', to: '/master/project', icon: FolderKanban },
+      { label: 'Klien', to: '/master/project', icon: Building2 },
       { label: 'Data Kontrak', to: '/master/kontrak', icon: Handshake },
       { label: 'Komisi', to: '/master/komisi', icon: Percent },
     ],
@@ -40,7 +40,7 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    title: 'Lap. Bulan Ini',
+    title: 'Invoice',
     items: [
       { label: 'Komisi Bulan Berjalan', to: '/laporan/komisi', icon: BadgeDollarSign },
       { label: 'Netto Bulan Berjalan', to: '/laporan/netto', icon: TrendingUp },

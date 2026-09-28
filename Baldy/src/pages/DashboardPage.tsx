@@ -81,6 +81,12 @@ export function DashboardPage() {
         to: '/transaksi/trip',
       },
       {
+        id: 'menunggu-sopir',
+        label: 'Trip menunggu sopir',
+        count: thisMonth.filter((t) => t.status === 'menunggu_sopir').length,
+        to: '/transaksi/trip',
+      },
+      {
         id: 'belum-selesai',
         label: 'Trip belum ditandai Selesai',
         count: thisMonth.filter((t) => t.status !== 'selesai' && t.status !== 'batal').length,

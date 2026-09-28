@@ -179,7 +179,7 @@ export function DataKontrakPage() {
         <Toolbar
           left={
             <>
-              <SearchInput value={table.query} onChange={table.setQuery} placeholder="Cari nomor kontrak atau client..." />
+              <SearchInput value={table.query} onChange={table.setQuery} placeholder="Cari nomor kontrak atau klien..." />
               <FilterField label="Status">
                 <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-32">
                   <option value="">Semua</option>
@@ -234,7 +234,7 @@ export function DataKontrakPage() {
               </Select>
             )}
           </Field>
-          <Field label="Nama Client" required error={errors.client_name} className="sm:col-span-2">
+          <Field label="Nama Klien" required error={errors.client_name} className="sm:col-span-2">
             {(id) => <Input id={id} value={form.client_name} invalid={!!errors.client_name} placeholder="PT ..." onChange={(e) => setForm({ ...form, client_name: e.target.value })} />}
           </Field>
           <Field label="Nilai Kontrak" required error={errors.value} className="sm:col-span-2">

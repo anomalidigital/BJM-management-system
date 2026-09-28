@@ -74,9 +74,9 @@ export const TBD_NOTES: TbdNote[] = [
   },
   {
     id: 'TBD-09',
-    title: 'Status CASH pada kolom Project',
-    current: 'Project punya penanda "alur dokumen"; CASH ditandai tanpa dokumen.',
-    question: 'Seluruh 34 trip CASH tercatat tanpa TR dan tanpa No PI. Apakah CASH memang nama project, atau sebenarnya jenis order / cara bayar yang seharusnya jadi field tersendiri?',
+    title: 'Status CASH pada kolom Klien',
+    current: 'Klien punya penanda "alur dokumen"; CASH ditandai tanpa dokumen.',
+    question: 'Seluruh 34 trip CASH tercatat tanpa TR dan tanpa No PI. Apakah CASH memang nama klien, atau sebenarnya jenis order / cara bayar yang seharusnya jadi field tersendiri?',
   },
   {
     id: 'TBD-10',

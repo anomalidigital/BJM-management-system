@@ -167,7 +167,7 @@ export function LapUangJalanPage() {
     <>
       <PageHeader
         title="Rekap Uang Jalan"
-        crumbs={[{ label: 'Lap. Bulan Ini' }, { label: 'Rekap Uang Jalan' }]}
+        crumbs={[{ label: 'Invoice' }, { label: 'Rekap Uang Jalan' }]}
         description="Rekap pembayaran uang jalan beserta potongan kasbon dan nilai transfer ke sopir."
       />
 

@@ -100,7 +100,8 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
   const wajib = (adaSebelumnya: boolean) => mode === 'create' || adaSebelumnya
   const wajibId = !dedicated && wajib(!!existing?.trip_ids?.length)
   const wajibRoute = !dedicated && wajib(!!existing?.route_id)
-  const wajibSopir = wajib(!!(existing?.driver_ids?.length || existing?.driver_id))
+  const menungguSopir = form.status === 'menunggu_sopir'
+  const wajibSopir = !menungguSopir && wajib(!!(existing?.driver_ids?.length || existing?.driver_id))
   const wajibKendaraan = wajib(!!existing?.vehicle_id)
 
   const sopirTerdaftar = useMemo(() => db.drivers.filter((d) => d.role === 'sopir'), [db.drivers])
@@ -218,7 +219,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     toast.info(`Data customer diambil dari SI/JO ${jo.sijo}.`)
   }
 
-  /** Pilih rute -> Tujuan dan Project ikut terisi, kecuali sudah diganti manual. */
+  /** Pilih rute -> Tujuan dan Klien ikut terisi, kecuali sudah diganti manual. */
   function applyRoute(routeId: string | null) {
     const route = db.routes.find((r) => r.id === routeId)
     setForm((f) => {
@@ -263,7 +264,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     if (dedicated && !form.contract_id) e.contract_id = 'Layanan Dedicated wajib memilih nomor kontrak.'
     if (wajibRoute && !form.route_id) e.route_id = 'Rute wajib dipilih.'
     if (wajibKendaraan && !form.vehicle_id) e.vehicle_id = 'No. Kendaraan wajib dipilih.'
-    if (wajibSopir && !form.driver_ids.some(Boolean)) e.driver_ids = 'Pilih minimal satu sopir.'
+    if (wajibSopir && !form.driver_ids.some(Boolean)) e.driver_ids = 'Pilih minimal satu sopir, atau ubah status ke Menunggu Sopir.'
     if (wajibId && idTerisi.length === 0) e.trip_ids = 'Isi minimal satu ID Perjalanan/Trip.'
     const kembar = idTerisi.find((v, i) => idTerisi.indexOf(v) !== i)
     if (kembar) e.trip_ids = `ID ${kembar} tertulis dua kali di trip ini.`
@@ -285,7 +286,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
       driver_ids: driverIds,
       driver_id: driverIds[0] ?? '',
       manager_name: form.manager_id ? '' : form.manager_name.trim(),
-      // Dedicated: penerima Surat Jalan = client kontrak bila belum diisi.
+      // Dedicated: penerima Surat Jalan = klien kontrak bila belum diisi.
       recipient_name: form.recipient_name.trim() || (dedicated ? kontrak?.client_name ?? '' : ''),
       destination_detail: form.destination_detail.trim(),
     }
@@ -329,7 +330,9 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
       label="Sopir"
       required={wajibSopir}
       error={errors.driver_ids}
-      hint={errors.driver_ids ? undefined : form.driver_ids.length > 1 ? 'Sopir pertama adalah sopir utama (penerima komisi).' : 'Bisa lebih dari satu sopir.'}
+      hint={errors.driver_ids ? undefined
+        : menungguSopir && !form.driver_ids.some(Boolean) ? 'Boleh dikosongkan selama status Menunggu Sopir.'
+        : form.driver_ids.length > 1 ? 'Sopir pertama adalah sopir utama (penerima komisi).' : 'Bisa lebih dari satu sopir.'}
     >
       {(fid) => (
         <div className="space-y-2">
@@ -414,7 +417,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
               checked={dedicated}
               onChange={() => gantiLayanan('dedicated')}
               label="Dedicated"
-              description="Kendaraan dikontrak satu client. Form ringkas, wajib memilih nomor kontrak."
+              description="Kendaraan dikontrak satu klien. Form ringkas, wajib memilih nomor kontrak."
             />
           </div>
 
@@ -428,13 +431,13 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
               >
                 {(fid) => (
                   <SearchableSelect id={fid} options={contractOptions} value={form.contract_id || null} invalid={!!errors.contract_id}
-                    placeholder="Pilih nomor kontrak..." searchPlaceholder="Ketik nomor kontrak atau client..."
+                    placeholder="Pilih nomor kontrak..." searchPlaceholder="Ketik nomor kontrak atau klien..."
                     onChange={(v) => set('contract_id', v ?? '')} />
                 )}
               </Field>
               {kontrak && (
                 <div className="rounded-lg border border-brand-100 bg-brand-50/60 px-3.5 py-3">
-                  <p className="text-[12px] text-brand-800">Client <span className="font-semibold">{kontrak.client_name}</span></p>
+                  <p className="text-[12px] text-brand-800">Klien <span className="font-semibold">{kontrak.client_name}</span></p>
                   <dl className="mt-2 grid grid-cols-3 gap-x-4">
                     {([['Nilai kontrak', kontrak.value], ['Terpakai', kontrak.value - sisaKontrak], ['Sisa', sisaKontrak]] as const).map(([k, v]) => (
                       <div key={k}>
@@ -516,7 +519,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                       <p className="text-[12px] text-brand-800">
                         <span className="tnum font-semibold">{selectedRoute.route_code}</span>
                         {selectedRoute.feet && <> · {selectedRoute.feet}</>}
-                        {routeProject && <> · Project {routeProject.project_code}</>}
+                        {routeProject && <> · Klien {routeProject.project_code}</>}
                       </p>
                       <dl className="mt-2 grid grid-cols-3 gap-x-4 gap-y-1.5">
                         {([
@@ -555,9 +558,23 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
             <Field label="Nomor Surat Jalan" error={errors.sj_no} hint={errors.sj_no ? undefined : form.sj_no ? 'Nomor urut otomatis.' : 'Kosong = dicetak memakai Nomor Trip.'}>
               {(fid) => <Input id={fid} value={form.sj_no} invalid={!!errors.sj_no} className="tnum" placeholder="SJ-000001" onChange={(e) => set('sj_no', e.target.value)} />}
             </Field>
-            <Field label="Status" hint="Pembatalan lewat tombol Batalkan Trip.">
+            <Field
+              label="Status"
+              hint={menungguSopir && form.driver_ids.some(Boolean)
+                ? 'Sopir sudah dipilih. Ubah ke Aktif bila trip sudah jalan.'
+                : 'Pembatalan lewat tombol Batalkan Trip.'}
+            >
               {(fid) => (
-                <Select id={fid} value={form.status} onChange={(e) => set('status', e.target.value as TripStatus)}>
+                <Select
+                  id={fid}
+                  value={form.status}
+                  onChange={(e) => {
+                    const next = e.target.value as TripStatus
+                    set('status', next)
+                    // Menunggu Sopir membolehkan sopir kosong, jadi pesan wajib sopir ikut hilang.
+                    if (next === 'menunggu_sopir') setErrors((er) => { const { driver_ids: _d, ...sisa } = er; return sisa })
+                  }}
+                >
                   {STATUS_FORM.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
                 </Select>
               )}
@@ -575,7 +592,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                 />
               )}
             </Field>
-            <Field label="Project" hint={routeProject && form.project_id === routeProject.id ? 'Mengikuti project rute.' : 'Menentukan alur dokumen TR / No PI.'}>
+            <Field label="Klien" hint={routeProject && form.project_id === routeProject.id ? 'Mengikuti klien rute.' : 'Menentukan alur dokumen TR / No PI.'}>
               {(fid) => (
                 <Select id={fid} value={form.project_id} onChange={(e) => set('project_id', e.target.value)}>
                   <option value="">— belum ditentukan —</option>
@@ -612,7 +629,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
 
       <div className="mt-4">
         {dedicated ? (
-          <Section title="Informasi Pengiriman" description="Penerima Surat Jalan otomatis memakai nama client kontrak.">
+          <Section title="Informasi Pengiriman" description="Penerima Surat Jalan otomatis memakai nama klien kontrak.">
             <div className="grid gap-4 sm:grid-cols-2">
               {fieldKendaraan}
               {fieldSopir}

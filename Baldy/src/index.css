@@ -2,6 +2,9 @@
 
 @theme {
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Rel navigasi: label menu memakai huruf rambu jalan, kode depo memakai stensil kontainer. */
+  --font-rail: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-stencil: "Big Shoulders Stencil Text", "Barlow Semi Condensed", Impact, sans-serif;
 
   /* ── Brand / accent ─────────────────────────────────────── */
   --color-brand-50:  #eff6ff;
@@ -25,11 +28,13 @@
   --color-hairline: #e4e5e9;
   --color-grid:     #eceef1;
 
-  /* ── Sidebar (dark navy) ────────────────────────────────── */
-  --color-nav-900: #0d1523;
-  --color-nav-800: #131d2f;
-  --color-nav-700: #1c2942;
-  --color-nav-ink: #93a1b8;
+  /* ── Rel navigasi: baja kontainer (ditimpa tema workspace) ── */
+  --color-nav-900: #0f3561;   /* pelat baja */
+  --color-nav-800: #164277;   /* pelat datar menu aktif */
+  --color-nav-700: #2a5a93;   /* sambungan / garis */
+  --color-nav-ink: #a9bedb;   /* cat pada baja */
+  /* Kuning sinyal: marka menu aktif. Tetap, tidak ikut workspace. */
+  --color-signal:  #f5c518;
 
   /* ── Status (fixed, never themed) ───────────────────────── */
   --color-good:     #0ca30c;
@@ -94,6 +99,13 @@ html.ws-switching *::after {
 
 @layer utilities {
   .tnum { font-variant-numeric: tabular-nums; }
+  /* Sisi kontainer bergelombang: rusuk terang-gelap tegak, sangat samar supaya teks tetap terbaca. */
+  .rail-steel {
+    background-color: var(--color-nav-900);
+    background-image: repeating-linear-gradient(90deg,
+      rgba(255,255,255,.045) 0 1px, transparent 1px 8px,
+      rgba(0,0,0,.13) 8px 11px, transparent 11px 18px);
+  }
   .shadow-card { box-shadow: 0 1px 2px rgba(11,11,11,.05), 0 1px 1px rgba(11,11,11,.03); }
   .shadow-pop  { box-shadow: 0 10px 32px -8px rgba(11,11,11,.18), 0 2px 8px rgba(11,11,11,.06); }
   .animate-in-fade { animation: inFade .16s ease-out both; }

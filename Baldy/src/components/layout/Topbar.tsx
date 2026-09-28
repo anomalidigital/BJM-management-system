@@ -4,26 +4,13 @@ import { CalendarRange, Check, ChevronDown, LogOut, Menu, Search } from 'lucide-
 import { useAuth } from '../../store/AuthProvider'
 import { useData } from '../../store/DataProvider'
 import { WORKSPACE_LIST, useWorkspace } from '../../store/WorkspaceProvider'
-import type { WorkspaceMeta } from '../../store/WorkspaceProvider'
 import { useToast } from '../../store/ToastProvider'
 import { periodeAktif } from '../../lib/periode'
 import { Badge } from '../ui/Badge'
 import { initials, monthLabel } from '../../lib/format'
 import { cn } from '../../lib/utils'
 import type { Workspace } from '../../types'
-
-/** Avatar bulat berisi inisial workspace. */
-function AvatarWorkspace({ meta }: { meta: WorkspaceMeta }) {
-  return (
-    <span
-      aria-hidden
-      className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[9.5px] font-bold text-white"
-      style={{ background: `linear-gradient(135deg, ${meta.color}, ${meta.colorSoft})` }}
-    >
-      {meta.initial}
-    </span>
-  )
-}
+import { KodeDepot } from './KodeDepot'
 
 /**
  * Baris atas: pencarian cepat, periode aktif, dan satu menu akun yang memuat
@@ -117,8 +104,8 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
             <span className="hidden text-left sm:block">
               <span className="block text-[12.5px] leading-tight font-semibold text-ink">{user?.name}</span>
               {/* Workspace aktif ikut tampil, karena seluruh isi halaman mengikutinya */}
-              <span className="flex items-center gap-1.5 text-[11px] leading-tight text-ink-3">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: meta.color }} />
+              <span className="mt-0.5 flex items-center gap-1.5 text-[11px] leading-tight text-ink-3">
+                <KodeDepot kode={meta.code} warna={meta.steel} className="h-[14px] px-[4px] text-[10px]" />
                 {meta.label}
               </span>
             </span>
@@ -141,9 +128,7 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
               </div>
 
               <div className="border-b border-hairline py-1.5">
-                <p className="px-3.5 pt-1 pb-1.5 text-[10.5px] font-semibold tracking-[.08em] text-ink-3 uppercase">
-                  Workspace
-                </p>
+                <p className="px-3.5 pt-1 pb-1.5 text-[12px] font-semibold text-ink-3">Pindah workspace</p>
                 {WORKSPACE_LIST.map((w) => {
                   const active = w.id === workspace
                   return (
@@ -158,7 +143,8 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
                         active ? 'font-semibold text-ink' : 'text-ink-2',
                       )}
                     >
-                      <AvatarWorkspace meta={w} />
+                      {/* Kotak kode berwarna baja rel workspace itu: terlihat rel mana yang akan dipakai. */}
+                      <KodeDepot kode={w.code} warna={w.steel} />
                       <span className="min-w-0 flex-1 truncate">{w.label}</span>
                       {active && <Check size={15} className="shrink-0 text-brand-600" />}
                     </button>

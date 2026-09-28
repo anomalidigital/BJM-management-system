@@ -119,8 +119,11 @@ export interface JobOrder {
   updated_at: string
 }
 
-/** Status trip. Spreadsheet mencampur status ke kolom dokumen, jadi dipisah. */
-export type TripStatus = 'draft' | 'aktif' | 'selesai' | 'batal'
+/**
+ * Status trip. Spreadsheet mencampur status ke kolom dokumen, jadi dipisah.
+ * menunggu_sopir: order sudah ada tetapi sopirnya belum ditentukan / belum datang.
+ */
+export type TripStatus = 'draft' | 'menunggu_sopir' | 'aktif' | 'selesai' | 'batal'
 
 /**
  * Jenis layanan, dipilih di awal form trip.

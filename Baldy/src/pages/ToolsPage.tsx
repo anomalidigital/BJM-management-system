@@ -24,7 +24,7 @@ export function ToolsPage() {
     ['Karyawan', db.drivers.length],
     ['Route', db.routes.length],
     ['Mobil', db.vehicles.length],
-    ['Project', db.projects.length],
+    ['Klien', db.projects.length],
     ['Kontrak', db.contracts.length],
     ['SI / Job Order', db.jobOrders.length],
     ['Trip', db.transactions.length],

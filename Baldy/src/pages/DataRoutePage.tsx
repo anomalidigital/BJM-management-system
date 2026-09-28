@@ -118,7 +118,7 @@ export function DataRoutePage() {
     { key: 'route_code', header: 'No. Route', sortable: true, width: '190px', render: (r) => <span className="tnum font-semibold break-all text-ink">{r.route_code}</span> },
     { key: 'route_name', header: 'Nama Route', sortable: true, render: (r) => <span className="font-medium">{r.route_name}</span> },
     {
-      key: 'project_id', header: 'Project', sortable: true, width: '104px',
+      key: 'project_id', header: 'Klien', sortable: true, width: '104px',
       render: (r) => {
         const pr = projectMap.get(r.project_id)
         return pr ? <Badge tone="brand">{pr.project_code}</Badge> : <span className="text-ink-3">—</span>
@@ -224,11 +224,11 @@ export function DataRoutePage() {
                   {FEET_OPTIONS.map((f) => <option key={f} value={f}>{f}</option>)}
                 </Select>
               </FilterField>
-              <FilterField label="Project">
+              <FilterField label="Klien">
                 <Select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className="h-9 w-40">
                   <option value="">Semua</option>
                   {db.projects.map((p) => <option key={p.id} value={p.id}>{p.project_code}</option>)}
-                  <option value="-">Tanpa project</option>
+                  <option value="-">Tanpa klien</option>
                 </Select>
               </FilterField>
               {(table.isFiltered || filterAktif) && <Button size="sm" variant="ghost" icon={<X size={14} />} onClick={resetFilter}>Reset</Button>}
@@ -303,7 +303,7 @@ export function DataRoutePage() {
               </div>
             )}
           </Field>
-          <Field label="Project" hint="Uang jalan route ini ikut terhitung ke project tersebut.">
+          <Field label="Klien" hint="Uang jalan route ini ikut terhitung ke klien tersebut.">
             {(id) => (
               <Select id={id} value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })}>
                 <option value="">— belum ditentukan —</option>

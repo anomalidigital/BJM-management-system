@@ -68,7 +68,7 @@ export function TripOverview({ trip }: { trip: TransactionRow }) {
                 ? <Link to={`/master/karyawan/${manager.id}`} className="hover:text-brand-700 hover:underline">{manager.driver_name}</Link>
                 : trip.manager_name || '—'}
             />
-            <InfoItem label="Project" value={trip.project_code ? `${trip.project_code} — ${trip.project_name}` : '—'} />
+            <InfoItem label="Klien" value={trip.project_code ? `${trip.project_code} — ${trip.project_name}` : '—'} />
             <InfoItem label="Status" value={STATUS_LABEL[trip.status]} />
             <InfoItem label="Layanan" value={SERVICE_LABEL[trip.service_type ?? 'callout']} />
             {kontrak && <InfoItem label="Kontrak" value={`${kontrak.contract_no} — ${kontrak.client_name}`} />}

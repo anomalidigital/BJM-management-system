@@ -81,7 +81,7 @@ export function DataProjectPage() {
 
   const columns: Column<Project>[] = [
     { key: 'project_code', header: 'Kode', sortable: true, width: '100px', render: (p) => <span className="tnum font-semibold text-ink">{p.project_code}</span> },
-    { key: 'project_name', header: 'Nama Project', sortable: true, render: (p) => <span className="font-medium">{p.project_name}</span> },
+    { key: 'project_name', header: 'Nama Klien', sortable: true, render: (p) => <span className="font-medium">{p.project_name}</span> },
     { key: 'description', header: 'Deskripsi', render: (p) => <span className="text-ink-2">{p.description || '—'}</span> },
     {
       key: 'requires_document', header: 'Alur Dokumen', sortable: true, width: '140px',
@@ -107,16 +107,16 @@ export function DataProjectPage() {
   return (
     <>
       <PageHeader
-        title="Data Project"
-        crumbs={[{ label: 'Master' }, { label: 'Data Project' }]}
-        description="Project menentukan apakah sebuah trip memiliki alur dokumen TR / No PI."
-        actions={<Button variant="primary" icon={<Plus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah Project</Button>}
+        title="Klien"
+        crumbs={[{ label: 'Master' }, { label: 'Klien' }]}
+        description="Klien pemilik order. Alur dokumen klien menentukan apakah tripnya memakai TR / No PI."
+        actions={<Button variant="primary" icon={<Plus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah Klien</Button>}
       />
 
       <Card>
         <Toolbar
-          left={<SearchInput value={table.query} onChange={table.setQuery} placeholder="Cari kode atau nama project..." />}
-          right={<span className="text-[12.5px] text-ink-3">{db.projects.length} project terdaftar</span>}
+          left={<SearchInput value={table.query} onChange={table.setQuery} placeholder="Cari kode atau nama klien..." />}
+          right={<span className="text-[12.5px] text-ink-3">{db.projects.length} klien terdaftar</span>}
         />
         <DataTable
           columns={columns}
@@ -128,7 +128,7 @@ export function DataProjectPage() {
           isFiltered={table.isFiltered}
           sort={table.sort}
           onSortChange={table.toggleSort}
-          empty={<EmptyState entity="data project" action={canEdit && <Button variant="primary" icon={<Plus size={15} />} onClick={openCreate}>Tambah Project</Button>} />}
+          empty={<EmptyState entity="klien" action={canEdit && <Button variant="primary" icon={<Plus size={15} />} onClick={openCreate}>Tambah Klien</Button>} />}
           notFound={<NotFoundState onReset={table.reset} />}
         />
       </Card>
@@ -137,7 +137,7 @@ export function DataProjectPage() {
       <Modal
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        title={editing ? 'Ubah Data Project' : 'Tambah Data Project'}
+        title={editing ? 'Ubah Klien' : 'Tambah Klien'}
         subtitle={editing ? editing.project_code : 'Tanda * wajib diisi.'}
         footer={
           <>
@@ -147,7 +147,7 @@ export function DataProjectPage() {
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Kode Project" required error={errors.project_code}>
+          <Field label="Kode Klien" required error={errors.project_code}>
             {(id) => <Input id={id} value={form.project_code} invalid={!!errors.project_code} placeholder="ARM" onChange={(e) => setForm({ ...form, project_code: e.target.value })} />}
           </Field>
           <Field label="Status">
@@ -158,7 +158,7 @@ export function DataProjectPage() {
               </Select>
             )}
           </Field>
-          <Field label="Nama Project" required error={errors.project_name} className="sm:col-span-2">
+          <Field label="Nama Klien" required error={errors.project_name} className="sm:col-span-2">
             {(id) => <Input id={id} value={form.project_name} invalid={!!errors.project_name} placeholder="Armada Migas Riau" onChange={(e) => setForm({ ...form, project_name: e.target.value })} />}
           </Field>
           <Field label="Deskripsi" className="sm:col-span-2">
@@ -166,7 +166,7 @@ export function DataProjectPage() {
           </Field>
           <div className="sm:col-span-2">
             <Checkbox
-              label="Trip project ini memakai alur dokumen (TR / No PI)"
+              label="Trip klien ini memakai alur dokumen (TR / No PI)"
               checked={form.requires_document}
               onChange={(e) => setForm({ ...form, requires_document: e.target.checked })}
             />

@@ -22,7 +22,7 @@ import { useTable } from '../lib/useTable'
 import { matchesQuery } from '../lib/utils'
 import { formatDate, formatRupiah, startOfMonthISO, todayISO } from '../lib/format'
 import type { TransactionRow } from '../types'
-import { STATUS_LABEL, STATUS_TONE } from './trip/status'
+import { STATUS_LABEL, STATUS_TONE, STATUS_URUT } from './trip/status'
 
 /**
  * Transaksi -> Trip (dulu Surat Jalan + Data Pengeluaran).
@@ -229,7 +229,7 @@ export function TripListPage() {
               <FilterField label="Status">
                 <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-32">
                   <option value="">Semua</option>
-                  {(['draft', 'aktif', 'selesai', 'batal'] as const).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+                  {STATUS_URUT.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
                 </Select>
               </FilterField>
               <FilterField label="Cetak">
@@ -245,7 +245,7 @@ export function TripListPage() {
                   {daftarSopir.map(([id, nama]) => <option key={id} value={id}>{nama}</option>)}
                 </Select>
               </FilterField>
-              <FilterField label="Project">
+              <FilterField label="Klien">
                 <Select value={project} onChange={(e) => setProject(e.target.value)} className="w-28">
                   <option value="">Semua</option>
                   {db.projects.map((p) => <option key={p.id} value={p.id}>{p.project_code}</option>)}

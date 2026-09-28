@@ -2,7 +2,7 @@
  * Generator dummy data SIKOTIS.
  *
  * Deterministik (seeded PRNG) supaya data tidak berubah tiap render, tetapi
- * TANGGALNYA relatif terhadap hari ini -- jadi menu "Lap. Bulan Ini" selalu
+ * TANGGALNYA relatif terhadap hari ini -- jadi laporan di grup menu "Invoice" selalu
  * berisi data, kapan pun prototype ini dibuka.
  */
 import type {

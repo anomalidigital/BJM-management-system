@@ -226,7 +226,7 @@ export function LapRitanPage() {
     <>
       <PageHeader
         title="Cek Ritan Bulan Ini"
-        crumbs={[{ label: 'Lap. Bulan Ini' }, { label: 'Cek Ritan Bulan Ini' }]}
+        crumbs={[{ label: 'Invoice' }, { label: 'Cek Ritan Bulan Ini' }]}
         description={`Ritan Sopir — bulan berjalan (${monthLabel(monthStart)}). Gunakan Sunting untuk mengubah Tgl Bon dan Bon Pribadi langsung di tabel.`}
         actions={
           <>
