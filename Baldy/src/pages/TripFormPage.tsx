@@ -16,7 +16,7 @@ import { formatRupiah, todayISO } from '../lib/format'
 import { hitungKomisiTrip } from '../lib/komisi'
 import { buatKodeUnik, nomorSuratJalanBerikut, nomorTripBerikut } from '../lib/kode'
 import { cn } from '../lib/utils'
-import type { CommissionTransaction, ServiceType, TripStatus } from '../types'
+import type { CommissionTransaction, JobOrder, ServiceType, TripStatus } from '../types'
 import { STATUS_FORM, STATUS_LABEL } from './trip/status'
 import { PakaiNilai } from './trip/bagian'
 import { KodeInput } from '../components/ui/KodeInput'
@@ -36,6 +36,13 @@ const BLANK: FormState = {
 }
 
 const bersih = (v: string) => v.trim().toUpperCase().replace(/\s+/g, '')
+
+/** Alamat customer SI/JO dipecah jadi dua baris "di". */
+function alamatJo(jo?: JobOrder): [string, string] {
+  if (!jo) return ['', '']
+  const [baris1, ...sisa] = jo.customer_address.split(',')
+  return [baris1.trim(), sisa.join(',').trim()]
+}
 
 function Section({ title, description, actions, children }: { title: string; description?: string; actions?: ReactNode; children: ReactNode }) {
   return (
@@ -208,23 +215,33 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     })
   }
 
-  /** Isi otomatis dari SI/JO yang dipilih - hanya field yang datanya memang ada. */
+  /**
+   * Pilih, ganti, atau kosongkan SI/BL. Kolom yang masih kosong atau masih berisi data
+   * SI/JO sebelumnya ikut diganti (atau dikosongkan saat SI/BL dihapus), jadi salah pilih
+   * tidak perlu dihapus satu per satu. Kolom yang sudah diketik sendiri dibiarkan.
+   */
   function applyJobOrder(joId: string | null) {
-    if (!joId) { set('job_order_id', ''); return }
-    const jo = db.jobOrders.find((j) => j.id === joId)
-    if (!jo) return
-    const [line1, ...rest] = jo.customer_address.split(',')
-    setForm((f) => ({
-      ...f,
-      job_order_id: joId,
-      recipient_name: jo.customer_name,
-      recipient_address_1: line1.trim(),
-      recipient_address_2: rest.join(',').trim(),
-      party: jo.party,
-      ship: jo.ship,
-      goods_type: f.goods_type || jo.goods,
-    }))
-    toast.info(`Data customer diambil dari SI/JO ${jo.sijo}.`)
+    const baru = joId ? db.jobOrders.find((j) => j.id === joId) : undefined
+    if (joId && !baru) return
+    const lama = db.jobOrders.find((j) => j.id === form.job_order_id)
+    setForm((f) => {
+      const sebelumnya = db.jobOrders.find((j) => j.id === f.job_order_id)
+      const [lama1, lama2] = alamatJo(sebelumnya)
+      const [baru1, baru2] = alamatJo(baru)
+      const ikut = (isi: string, dariLama: string, dariBaru: string) => (!isi.trim() || isi === dariLama ? dariBaru : isi)
+      return {
+        ...f,
+        job_order_id: joId ?? '',
+        recipient_name: ikut(f.recipient_name, sebelumnya?.customer_name ?? '', baru?.customer_name ?? ''),
+        recipient_address_1: ikut(f.recipient_address_1, lama1, baru1),
+        recipient_address_2: ikut(f.recipient_address_2, lama2, baru2),
+        party: ikut(f.party, sebelumnya?.party ?? '', baru?.party ?? ''),
+        ship: ikut(f.ship, sebelumnya?.ship ?? '', baru?.ship ?? ''),
+        goods_type: ikut(f.goods_type, sebelumnya?.goods ?? '', baru?.goods ?? ''),
+      }
+    })
+    if (baru) toast.info(`Data customer diambil dari SI/JO ${baru.sijo}. Kolom yang sudah diisi sendiri tidak ditimpa.`)
+    else if (lama) toast.info(`Isian dari SI/JO ${lama.sijo} ikut dikosongkan.`)
   }
 
   /** Pilih rute -> Tujuan, Klien, dan Harga ikut terisi, kecuali sudah diganti manual. */
@@ -714,14 +731,14 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
             </div>
           </Section>
         ) : (
-          <Section title="Informasi Pengiriman" description="Pilih SI/BL untuk mengisi otomatis Customer, Party, dan Kapal dari data SI / Job Order.">
+          <Section title="Informasi Pengiriman" description="SI/BL hanya untuk order container. Memilihnya mengisi Kepada Yth, alamat, Party, Jenis Brg, dan Kapal.">
             <div className="grid gap-4 sm:grid-cols-2">
               {fieldKendaraan}
               {fieldSopir}
               <Field label="Party">
                 {(fid) => <Input id={fid} value={form.party} placeholder="40 X 40" onChange={(e) => set('party', e.target.value)} />}
               </Field>
-              <Field label="SI / BL" hint={selectedJo ? `Customer: ${selectedJo.customer_name}` : 'Cari nomor SI / Job Order.'}>
+              <Field label="SI / BL" hint={selectedJo ? `Customer: ${selectedJo.customer_name}. Kosongkan untuk menghapus isian darinya.` : 'Kosongkan bila bukan order container.'}>
                 {(fid) => (
                   <SearchableSelect id={fid} options={joOptions} value={form.job_order_id || null}
                     placeholder="Cari SI / Job Order..." onChange={applyJobOrder} />
