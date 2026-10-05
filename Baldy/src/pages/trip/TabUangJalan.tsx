@@ -112,7 +112,7 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
     'Trip dibatalkan: termin di bawah hanya arsip dan tidak dihitung di laporan.'
   ) : patokan > 0 ? (
     <>
-      Patokan UJROUTE route <span className="tnum font-semibold text-ink-2">{trip.route_code}</span>: {formatRupiah(patokan)} ·
+      Patokan UJROUTE route <span className="font-semibold text-ink-2">{trip.route_name || trip.route_code}</span>: {formatRupiah(patokan)} ·
       dibayar {formatRupiah(uj.uj)} ·{' '}
       {sisa >= 0
         ? <>sisa <span className="tnum font-semibold text-ink-2">{formatRupiah(sisa)}</span></>
@@ -130,9 +130,6 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
         <KosongTab
           judul="Belum ada uang jalan yang dibayar."
           keterangan={patokan > 0 ? `Patokan dari route: ${formatRupiah(patokan)}. Termin pertama akan terisi nilai itu.` : 'Tambahkan termin saat uang jalan dibayar.'}
-          tombol="Tambah Termin"
-          bisaUbah={bisaUbah}
-          onTambah={() => buka()}
         />
       ) : (
         <div className="overflow-x-auto">

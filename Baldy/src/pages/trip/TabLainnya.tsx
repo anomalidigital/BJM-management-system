@@ -66,9 +66,6 @@ export function TabLainnya({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah:
         <KosongTab
           judul="Belum ada catatan lain."
           keterangan="Unggah berkas atau tulis catatan untuk trip ini."
-          tombol="Tambah Catatan"
-          bisaUbah={bisaUbah}
-          onTambah={() => buka()}
         />
       ) : (
         <div className="overflow-x-auto">

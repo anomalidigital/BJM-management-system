@@ -189,7 +189,8 @@ export interface PenyelesaianUj {
 export interface CommissionTransaction extends WorkspaceScoped {
   id: string
   transaction_no: string         // Nomor Trip (NoTrans)
-  transaction_date: string       // Tanggal (ISO yyyy-mm-dd)
+  transaction_date: string       // Tanggal Berangkat: hari trip jalan (ISO yyyy-mm-dd)
+  order_date?: string            // Tanggal Order: hari permintaan klien masuk; trip lama boleh kosong
   service_type: ServiceType      // Callout / Dedicated
   contract_id: string            // Kontrak, wajib untuk Dedicated
 

@@ -117,7 +117,7 @@ export function TripListPage() {
   }
 
   const columns: Column<TransactionRow>[] = [
-    { key: 'transaction_date', header: 'Tanggal', sortable: true, width: '92px', render: (t) => <span className="tnum text-ink-2">{formatDate(t.transaction_date)}</span> },
+    { key: 'transaction_date', header: 'Berangkat', sortable: true, width: '92px', render: (t) => <span className="tnum text-ink-2">{formatDate(t.transaction_date)}</span> },
     {
       key: 'transaction_no', header: 'No. Trip', sortable: true, width: '130px',
       render: (t) => (
@@ -221,11 +221,11 @@ export function TripListPage() {
             <>
               <SearchInput value={table.query} onChange={table.setQuery} width="w-80"
                 placeholder="Cari No. Trip, ID Perjalanan, sopir, route, S/JO..." />
-              <FilterField label="Tanggal">
-                <DateInput value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-[150px]" aria-label="Tanggal dari" />
+              <FilterField label="Berangkat">
+                <DateInput value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-[150px]" aria-label="Berangkat dari" />
               </FilterField>
               <FilterField label="s/d">
-                <DateInput value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-[150px]" aria-label="Tanggal sampai" />
+                <DateInput value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-[150px]" aria-label="Berangkat sampai" />
               </FilterField>
               <Button size="sm" variant="ghost" onClick={() => { setDateFrom(startOfMonthISO()); setDateTo('') }}>Bulan ini</Button>
               <FilterField label="Status">

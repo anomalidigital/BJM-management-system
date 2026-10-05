@@ -74,9 +74,6 @@ export function TabBiaya({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah: b
         <KosongTab
           judul="Belum ada biaya operasional."
           keterangan="Trip ini belum mencatat DEX, tol, nginap, atau biaya lain."
-          tombol="Tambah Biaya"
-          bisaUbah={bisaUbah}
-          onTambah={() => buka()}
         />
       ) : (
         <div className="overflow-x-auto">

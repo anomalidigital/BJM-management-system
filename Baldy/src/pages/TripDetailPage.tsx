@@ -139,7 +139,7 @@ export function TripDetailPage() {
     <>
       <PageHeader
         title={`Trip ${trip.transaction_no}`}
-        description={`${formatDateLong(trip.transaction_date)} · ${trip.driver_names || 'tanpa sopir'} · ${trip.plate_number || 'tanpa kendaraan'}`}
+        description={`Berangkat ${formatDateLong(trip.transaction_date)} · ${trip.driver_names || 'tanpa sopir'} · ${trip.plate_number || 'tanpa kendaraan'}`}
         crumbs={[{ label: 'Transaksi' }, { label: 'Trip', to: '/transaksi/trip' }, { label: trip.transaction_no }]}
         actions={
           <>

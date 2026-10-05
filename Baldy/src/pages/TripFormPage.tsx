@@ -24,7 +24,7 @@ import { KodeInput } from '../components/ui/KodeInput'
 type FormState = Omit<CommissionTransaction, 'id' | 'created_at' | 'updated_at' | 'workspace'>
 
 const BLANK: FormState = {
-  transaction_no: '', transaction_date: '', service_type: 'callout', contract_id: '',
+  transaction_no: '', transaction_date: '', order_date: '', service_type: 'callout', contract_id: '',
   trip_ids: [''], route_id: '',
   sj_no: '', manager_id: '', manager_name: '', project_id: '', status: 'aktif',
   recipient_name: '', recipient_address_1: '', recipient_address_2: '',
@@ -89,6 +89,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     const hariIni = todayISO()
     return {
       ...BLANK,
+      order_date: hariIni,
       transaction_date: hariIni,
       transaction_no: nomorTripBerikut(dbAll.transactions.map((t) => t.transaction_no), hariIni),
       sj_no: nomorSuratJalanBerikut(dbAll.transactions.map((t) => t.sj_no).filter(Boolean)),
@@ -279,7 +280,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     else if (dbAll.transactions.some((t) => t.transaction_no === no && t.id !== existing?.id)) e.transaction_no = 'Nomor Trip sudah dipakai.'
     const sj = form.sj_no.trim()
     if (sj && dbAll.transactions.some((t) => t.sj_no.toLowerCase() === sj.toLowerCase() && t.id !== existing?.id)) e.sj_no = 'Nomor Surat Jalan sudah dipakai.'
-    if (!form.transaction_date) e.transaction_date = 'Tanggal wajib diisi.'
+    if (!form.transaction_date) e.transaction_date = 'Tanggal Berangkat wajib diisi.'
     if (dedicated && !form.contract_id) e.contract_id = 'Layanan Dedicated wajib memilih nomor kontrak.'
     if (wajibRoute && !form.route_id) e.route_id = 'Rute wajib dipilih.'
     if (wajibKendaraan && !form.vehicle_id) e.vehicle_id = 'No. Kendaraan wajib dipilih.'
@@ -593,7 +594,17 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
       <div className={cn('grid gap-4', !dedicated && 'xl:grid-cols-2')}>
         <Section title="Informasi Dokumen">
           <div className={cn('grid gap-4 sm:grid-cols-2', dedicated && 'lg:grid-cols-3')}>
-            <Field label="Tanggal" required error={errors.transaction_date}>
+            <Field label="Tanggal Order" hint="Hari permintaan klien masuk.">
+              {(fid) => <DateInput id={fid} value={form.order_date ?? ''} onChange={(e) => set('order_date', e.target.value)} />}
+            </Field>
+            <Field
+              label="Tanggal Berangkat"
+              required
+              error={errors.transaction_date}
+              hint={form.order_date && form.transaction_date && form.transaction_date < form.order_date
+                ? 'Lebih awal dari Tanggal Order. Pastikan memang benar.'
+                : 'Hari trip jalan. Dipakai untuk Nomor Trip, Surat Jalan, dan laporan.'}
+            >
               {(fid) => <DateInput id={fid} value={form.transaction_date} invalid={!!errors.transaction_date} onChange={(e) => ubahTanggal(e.target.value)} />}
             </Field>
             <Field label="Nomor Trip" required error={errors.transaction_no} hint={errors.transaction_no ? undefined : 'Nomor urut otomatis per bulan.'}>

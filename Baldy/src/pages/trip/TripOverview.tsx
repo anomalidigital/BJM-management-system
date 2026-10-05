@@ -59,7 +59,8 @@ export function TripOverview({ trip }: { trip: TransactionRow }) {
             actions={trip.printed_at ? <Badge tone="good">Tercetak {formatDate(trip.printed_at)}</Badge> : <Badge tone="warning">Belum dicetak</Badge>}
           />
           <dl className="grid gap-4 p-4 sm:grid-cols-3">
-            <InfoItem label="Tanggal" value={formatDate(trip.transaction_date)} mono />
+            <InfoItem label="Tanggal Order" value={trip.order_date ? formatDate(trip.order_date) : '—'} mono />
+            <InfoItem label="Tanggal Berangkat" value={formatDate(trip.transaction_date)} mono />
             <InfoItem label="Nomor Trip" value={trip.transaction_no} mono />
             <InfoItem label="Nomor Surat Jalan" value={strip(trip.sj_no)} mono />
             <InfoItem

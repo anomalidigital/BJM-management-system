@@ -170,9 +170,6 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
         <KosongTab
           judul="Belum ada biaya internal."
           keterangan="Trip ini belum mencatat komisi, kernet, atau biaya internal lain."
-          tombol="Tambah Biaya Internal"
-          bisaUbah={bisaUbah}
-          onTambah={() => buka()}
         />
       ) : (
         <div className="overflow-x-auto">

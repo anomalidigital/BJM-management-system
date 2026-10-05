@@ -18,18 +18,12 @@ export function KepalaTab({ keterangan, tombol, bisaUbah, onTambah }: {
   )
 }
 
-export function KosongTab({ judul, keterangan, tombol, bisaUbah, onTambah }: {
-  judul: string
-  keterangan: string
-  tombol: string
-  bisaUbah: boolean
-  onTambah: () => void
-}) {
+/** Tab tanpa isi: cukup pesan. Tombol tambah hanya satu, di KepalaTab kanan atas. */
+export function KosongTab({ judul, keterangan }: { judul: string; keterangan: string }) {
   return (
     <div className="px-6 py-14 text-center">
       <p className="text-[14px] font-semibold text-ink">{judul}</p>
       <p className="mt-1 text-[13px] text-ink-3">{keterangan}</p>
-      {bisaUbah && <Button className="mt-4" variant="primary" icon={<FaPlus size={15} />} onClick={onTambah}>{tombol}</Button>}
     </div>
   )
 }
