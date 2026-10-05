@@ -17,6 +17,8 @@ import { useToast } from '../store/ToastProvider'
 import { useTable } from '../lib/useTable'
 import { matchesQuery } from '../lib/utils'
 import { formatNumber, formatRupiah } from '../lib/format'
+import { kodeKlienBerikut } from '../lib/kode'
+import { KodeInput } from '../components/ui/KodeInput'
 import { CLIENT_TYPE_LABEL } from '../types'
 import type { ClientType, Project } from '../types'
 
@@ -78,7 +80,16 @@ export function KlienPage() {
   const table = useTable(baris, { search, extraFilter, extraFilterActive: !!jenis, initialSortKey: 'project_code', pageSize: 10 })
   const resetFilter = () => { table.reset(); setJenis('') }
 
-  function openCreate() { setEditing(null); setForm(BLANK); setErrors({}); setFormOpen(true) }
+  function openCreate() {
+    setEditing(null); setForm({ ...BLANK, project_code: kodeKlienBerikut('', db.projects.map((p) => p.project_code)) }); setErrors({}); setFormOpen(true)
+  }
+
+  /** Generate: singkatan Nama Klien bila sudah diisi, selain itu nomor urut KLN. */
+  function generateKode() {
+    const terpakai = db.projects.filter((p) => p.id !== editing?.id).map((p) => p.project_code)
+    setForm((f) => ({ ...f, project_code: kodeKlienBerikut(f.project_name, terpakai) }))
+    setErrors((e) => ({ ...e, project_code: undefined }))
+  }
   function openEdit(p: Project) {
     setEditing(p)
     setForm({
@@ -234,8 +245,12 @@ export function KlienPage() {
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Kode Klien" required error={errors.project_code}>
-            {(id) => <Input id={id} value={form.project_code} invalid={!!errors.project_code} placeholder="ARM" onChange={(e) => setForm({ ...form, project_code: e.target.value })} />}
+          <Field label="Kode Klien" required error={errors.project_code} hint={errors.project_code ? undefined : 'Generate setelah mengisi nama = singkatan nama (PT Sumber Pangan Dingin → SPD).'}>
+            {(id) => (
+              <KodeInput id={id} value={form.project_code} invalid={!!errors.project_code} placeholder="ARM" uppercase
+                generateTitle="Buat kode klien otomatis"
+                onChange={(v) => setForm({ ...form, project_code: v })} onGenerate={generateKode} />
+            )}
           </Field>
           <Field label="Status">
             {(id) => (

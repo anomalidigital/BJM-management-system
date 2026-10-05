@@ -7,7 +7,7 @@ import {
 import { kasbonBelumLunasContoh, kasbonTerminContoh, keuanganTripContoh, lengkapiNominalRoute } from '../data/lengkapi'
 import { susunKasbonDariDataLama } from '../lib/kasbon'
 import { todayISO } from '../lib/format'
-import { nomorTripBerikut } from '../lib/kode'
+import { kodeKlienBerikut, nomorTripBerikut } from '../lib/kode'
 import { uid } from '../lib/utils'
 
 const DB_KEY = 'sikotis.db.v2'
@@ -397,11 +397,7 @@ function migrate(stored: Record<string, unknown>): Database {
 
 /** Klien baru untuk kontrak lama; kodenya singkatan nama (PT/CV diabaikan), dijamin unik. */
 function klienDariNama(nama: string, ada: Project[], stamp: string): Project {
-  const kata = nama.toUpperCase().split(/[^A-Z0-9]+/).filter((k) => k && !['PT', 'CV', 'UD', 'TBK'].includes(k))
-  const dasar = kata.map((k) => k[0]).join('').slice(0, 5) || 'KLIEN'
-  const terpakai = new Set(ada.map((p) => p.project_code.toUpperCase()))
-  let kode = dasar
-  for (let i = 2; terpakai.has(kode); i++) kode = `${dasar}${i}`
+  const kode = kodeKlienBerikut(nama, ada.map((p) => p.project_code))
   return {
     id: uid('prj'), project_code: kode, project_name: nama, client_type: 'kontrak', description: 'Dibuat dari data kontrak.',
     requires_document: true, status: 'aktif', created_at: stamp, updated_at: stamp,

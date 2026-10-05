@@ -16,6 +16,8 @@ import { useToast } from '../../store/ToastProvider'
 import { formatDate, formatRupiah, todayISO } from '../../lib/format'
 import { cn, matchesQuery } from '../../lib/utils'
 import type { Billing, BillingRow } from '../../types'
+import { KodeInput } from '../../components/ui/KodeInput'
+import { nomorBerurut } from '../../lib/kode'
 
 type FormState = Omit<Billing, 'id' | 'created_at' | 'updated_at' | 'is_marked'>
 
@@ -29,7 +31,7 @@ const blank = (): FormState => ({
  * Daftar record dapat diklik langsung, dilengkapi tombol Previous / Next Record.
  */
 export function ProsesDataTab() {
-  const { db, billingRows, loading, create, update, remove } = useData()
+  const { db, dbAll, billingRows, loading, create, update, remove } = useData()
   const { canEdit } = useAuth()
   const toast = useToast()
 
@@ -73,8 +75,20 @@ export function ProsesDataTab() {
   const selectedJo = db.jobOrders.find((j) => j.id === form.job_order_id)
   const readOnly = mode === 'view'
 
+  /** Nomor faktur & invoice berikutnya, dari seluruh workspace supaya tidak kembar. */
+  const nomorLain = (ambil: (b: Billing) => string) =>
+    dbAll.billings.filter((b) => b.id !== (mode === 'edit' ? active?.id : undefined)).map(ambil)
+  const fakturBerikut = () => nomorBerurut('INV-', nomorLain((b) => b.invoice_no), 3)
+  const invoiceBerikut = () => nomorBerurut('FK-', nomorLain((b) => b.invoice_ref), 4)
+
   function startCreate() {
-    setMode('create'); setForm(blank()); setErrors({})
+    setMode('create')
+    setForm({
+      ...blank(),
+      invoice_no: nomorBerurut('INV-', dbAll.billings.map((b) => b.invoice_no), 3),
+      invoice_ref: nomorBerurut('FK-', dbAll.billings.map((b) => b.invoice_ref), 4),
+    })
+    setErrors({})
   }
 
   function startEdit() {
@@ -226,8 +240,13 @@ export function ProsesDataTab() {
               <Field label="Data Cost" required error={errors.cost_code} hint={errors.cost_code ? undefined : 'Kode biaya (Kodecost).'}>
                 {(fid) => <Input id={fid} value={form.cost_code} readOnly={readOnly} invalid={!!errors.cost_code} onChange={(e) => setForm({ ...form, cost_code: e.target.value })} />}
               </Field>
-              <Field label="No Faktur" required error={errors.invoice_no}>
-                {(fid) => <Input id={fid} value={form.invoice_no} readOnly={readOnly} invalid={!!errors.invoice_no} placeholder="INV-047" onChange={(e) => setForm({ ...form, invoice_no: e.target.value })} />}
+              <Field label="No Faktur" required error={errors.invoice_no} hint={readOnly || errors.invoice_no ? undefined : 'Terisi otomatis, boleh diganti.'}>
+                {(fid) => (
+                  <KodeInput id={fid} value={form.invoice_no} readOnly={readOnly} invalid={!!errors.invoice_no} placeholder="INV-047" uppercase
+                    generateTitle="Buat nomor faktur berikutnya"
+                    onChange={(v) => setForm({ ...form, invoice_no: v })}
+                    onGenerate={() => setForm((f) => ({ ...f, invoice_no: fakturBerikut() }))} />
+                )}
               </Field>
               <Field label="Customer" hint="Diambil dari SI/JO.">
                 {(fid) => <Input id={fid} value={selectedJo?.customer_name ?? ''} readOnly />}
@@ -271,7 +290,13 @@ export function ProsesDataTab() {
               </summary>
               <div className="grid gap-4 border-t border-hairline p-3.5 sm:grid-cols-3">
                 <Field label="BL No">{(fid) => <Input id={fid} value={form.bl_no} readOnly={readOnly} onChange={(e) => setForm({ ...form, bl_no: e.target.value })} />}</Field>
-                <Field label="Invoice No">{(fid) => <Input id={fid} value={form.invoice_ref} readOnly={readOnly} onChange={(e) => setForm({ ...form, invoice_ref: e.target.value })} />}</Field>
+                <Field label="Invoice No">
+                  {(fid) => (
+                    <KodeInput id={fid} value={form.invoice_ref} readOnly={readOnly} uppercase generateTitle="Buat nomor invoice berikutnya"
+                      onChange={(v) => setForm({ ...form, invoice_ref: v })}
+                      onGenerate={() => setForm((f) => ({ ...f, invoice_ref: invoiceBerikut() }))} />
+                  )}
+                </Field>
                 <Field label="Catatan">{(fid) => <Input id={fid} value={form.notes} readOnly={readOnly} onChange={(e) => setForm({ ...form, notes: e.target.value })} />}</Field>
               </div>
             </details>

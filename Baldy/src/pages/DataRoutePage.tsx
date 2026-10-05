@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { FaPen, FaPlus, FaPrint, FaTrashCan, FaWandMagicSparkles, FaXmark } from '../components/ui/icons'
+import { FaPen, FaPlus, FaPrint, FaTrashCan, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
@@ -21,6 +21,7 @@ import { useTable } from '../lib/useTable'
 import { matchesQuery, sum } from '../lib/utils'
 import { formatNumber, formatRupiah } from '../lib/format'
 import { buatKodeUnik } from '../lib/kode'
+import { KodeInput } from '../components/ui/KodeInput'
 import type { Route, RouteNominal } from '../types'
 
 type FormState = Omit<Route, 'id' | 'created_at' | 'updated_at'>
@@ -73,7 +74,7 @@ export function DataRoutePage() {
   const resetFilter = () => { table.reset(); setFeetFilter(''); setProjectFilter('') }
 
   function openCreate() {
-    setEditing(null); setForm({ ...BLANK }); setErrors({}); setFormOpen(true)
+    setEditing(null); setForm({ ...BLANK, route_code: buatKodeUnik(db.routes.map((r) => r.route_code)) }); setErrors({}); setFormOpen(true)
   }
 
   /** Tombol Generate: kode unik (timestamp + 7 huruf acak) yang belum dipakai route lain. */
@@ -317,17 +318,12 @@ export function DataRoutePage() {
             required
             error={errors.route_code}
             className="sm:col-span-2"
-            hint={errors.route_code ? undefined : 'Klik Generate untuk membuat kode unik otomatis, atau ketik sendiri.'}
+            hint={errors.route_code ? undefined : 'Terisi otomatis dan dijamin unik. Klik Generate untuk kode baru, atau ketik sendiri.'}
           >
             {(id) => (
-              <div className="flex gap-2">
-                <Input id={id} value={form.route_code} invalid={!!errors.route_code} className="tnum font-medium tracking-wide"
-                  placeholder="Klik Generate atau ketik manual"
-                  onChange={(e) => setForm({ ...form, route_code: e.target.value.toUpperCase() })} />
-                <Button icon={<FaWandMagicSparkles size={14} />} title="Buat No. Route unik otomatis" onClick={generateKode}>
-                  Generate
-                </Button>
-              </div>
+              <KodeInput id={id} value={form.route_code} invalid={!!errors.route_code} uppercase
+                placeholder="Klik Generate atau ketik manual" generateTitle="Buat No. Route unik otomatis"
+                onChange={(v) => setForm({ ...form, route_code: v })} onGenerate={generateKode} />
             )}
           </Field>
           <Field label="Klien" hint="Uang jalan route ini ikut terhitung ke klien tersebut.">

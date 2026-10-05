@@ -7,7 +7,7 @@ import { DataTable } from '../components/ui/DataTable'
 import type { Column } from '../components/ui/DataTable'
 import { Button, IconButton } from '../components/ui/Button'
 import { Modal, ConfirmDialog } from '../components/ui/Modal'
-import { Field, Input, DateInput, Select, Textarea } from '../components/ui/Field'
+import { Field, DateInput, Select, Textarea } from '../components/ui/Field'
 import { CurrencyInput } from '../components/ui/CurrencyInput'
 import { Badge } from '../components/ui/Badge'
 import { LampiranInput, LampiranThumbs } from '../components/ui/Lampiran'
@@ -18,6 +18,7 @@ import { useWorkspace } from '../store/WorkspaceProvider'
 import { formatDate, formatRupiah, todayISO } from '../lib/format'
 import { hitungKomisiKontrak } from '../lib/komisi'
 import { nomorKontrakBerikut } from '../lib/kode'
+import { KodeInput } from '../components/ui/KodeInput'
 import { CLIENT_TYPE_LABEL, SERVICE_LABEL } from '../types'
 import type { Contract } from '../types'
 import { STATUS_LABEL, STATUS_TONE } from './trip/status'
@@ -308,7 +309,18 @@ export function KlienDetailPage() {
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="No. Kontrak" required error={errors.contract_no} hint={errors.contract_no ? undefined : 'Nomor urut otomatis per tahun, boleh diganti.'}>
-            {(fid) => <Input id={fid} value={form.contract_no} invalid={!!errors.contract_no} className="tnum" onChange={(e) => setForm({ ...form, contract_no: e.target.value })} />}
+            {(fid) => (
+              <KodeInput id={fid} value={form.contract_no} invalid={!!errors.contract_no} uppercase
+                generateTitle="Buat nomor kontrak berikutnya"
+                onChange={(v) => setForm({ ...form, contract_no: v })}
+                onGenerate={() => setForm((f) => ({
+                  ...f,
+                  contract_no: nomorKontrakBerikut(
+                    dbAll.contracts.filter((c) => c.id !== editing?.id).map((c) => c.contract_no),
+                    (f.start_date || todayISO()).slice(0, 4),
+                  ),
+                }))} />
+            )}
           </Field>
           <Field label="Status">
             {(fid) => (

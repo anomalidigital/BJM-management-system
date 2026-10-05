@@ -20,6 +20,7 @@ import { useTable } from '../lib/useTable'
 import { matchesQuery } from '../lib/utils'
 import { formatRupiah } from '../lib/format'
 import { kodeKaryawanBerikut } from '../lib/kode'
+import { KodeInput } from '../components/ui/KodeInput'
 import { EMPLOYEE_ROLES, ROLE_LABEL } from '../types'
 import type { Driver, EmployeeRole } from '../types'
 
@@ -260,10 +261,12 @@ export function DataKaryawanPage() {
               </Select>
             )}
           </Field>
-          <Field label="Kode" required error={errors.driver_code}>
+          <Field label="Kode" required error={errors.driver_code} hint={errors.driver_code ? undefined : 'Terisi otomatis: SPR untuk sopir, MGR untuk manager.'}>
             {(id) => (
-              <Input id={id} value={form.driver_code} invalid={!!errors.driver_code} placeholder="SPR027"
-                onChange={(e) => setForm({ ...form, driver_code: e.target.value })} />
+              <KodeInput id={id} value={form.driver_code} invalid={!!errors.driver_code} placeholder="SPR027" uppercase
+                generateTitle="Buat kode karyawan berikutnya"
+                onChange={(v) => setForm({ ...form, driver_code: v })}
+                onGenerate={() => setForm((f) => ({ ...f, driver_code: kodeKaryawanBerikut(db.drivers.filter((d) => d.id !== editing?.id), f.role) }))} />
             )}
           </Field>
           <Field label="Nama" required error={errors.driver_name} className="sm:col-span-2">

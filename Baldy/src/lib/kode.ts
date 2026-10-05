@@ -19,6 +19,30 @@ export function buatKodeUnik(terpakai: Iterable<string> = []): string {
   }
 }
 
+/** Nomor berurut berawalan tetap: INV-001, FK-0001, KLN001. */
+export function nomorBerurut(awalan: string, nomorAda: Iterable<string>, digit: number): string {
+  let maks = 0
+  for (const n of nomorAda) {
+    if (n.toUpperCase().startsWith(awalan)) maks = Math.max(maks, Number(n.slice(awalan.length).replace(/\D/g, '')) || 0)
+  }
+  return `${awalan}${String(maks + 1).padStart(digit, '0')}`
+}
+
+/**
+ * Kode klien: singkatan nama (PT Sumber Pangan Dingin -> SPD, Atlas -> ATLAS),
+ * dijamin unik; KLN001 dan seterusnya bila nama belum diisi.
+ */
+export function kodeKlienBerikut(nama: string, terpakai: Iterable<string>): string {
+  const daftar = [...terpakai]
+  const ada = new Set(daftar.map((k) => k.toUpperCase()))
+  const kata = nama.toUpperCase().split(/[^A-Z0-9]+/).filter((k) => k && !['PT', 'CV', 'UD', 'TBK'].includes(k))
+  const dasar = (kata.length > 1 ? kata.map((k) => k[0]).join('') : kata[0] ?? '').slice(0, 5)
+  if (!dasar) return nomorBerurut('KLN', daftar, 3)
+  let kode = dasar
+  for (let i = 2; ada.has(kode); i++) kode = `${dasar}${i}`
+  return kode
+}
+
 /** Awalan kode karyawan per peran: SPR001, MGR001. */
 export const AWALAN_KARYAWAN: Record<EmployeeRole, string> = { sopir: 'SPR', manager: 'MGR' }
 

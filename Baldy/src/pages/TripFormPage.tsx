@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { FaFloppyDisk, FaPlus, FaPrint, FaTriangleExclamation, FaWandMagicSparkles, FaXmark } from '../components/ui/icons'
+import { FaFloppyDisk, FaPlus, FaPrint, FaTriangleExclamation, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Button, IconButton } from '../components/ui/Button'
@@ -19,6 +19,7 @@ import { cn } from '../lib/utils'
 import type { CommissionTransaction, ServiceType, TripStatus } from '../types'
 import { STATUS_FORM, STATUS_LABEL } from './trip/status'
 import { PakaiNilai } from './trip/bagian'
+import { KodeInput } from '../components/ui/KodeInput'
 
 type FormState = Omit<CommissionTransaction, 'id' | 'created_at' | 'updated_at' | 'workspace'>
 
@@ -91,6 +92,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
       transaction_date: hariIni,
       transaction_no: nomorTripBerikut(dbAll.transactions.map((t) => t.transaction_no), hariIni),
       sj_no: nomorSuratJalanBerikut(dbAll.transactions.map((t) => t.sj_no).filter(Boolean)),
+      trip_ids: [buatKodeUnik(dbAll.transactions.flatMap((t) => t.trip_ids ?? []))],
     }
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -244,7 +246,11 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
 
   /* ── Daftar dinamis: ID Perjalanan/Trip dan Sopir ─────────── */
   const ubahId = (i: number, v: string) => setForm((f) => ({ ...f, trip_ids: f.trip_ids.map((x, j) => (j === i ? v.toUpperCase().replace(/\s+/g, '') : x)) }))
-  const tambahId = () => setForm((f) => ({ ...f, trip_ids: [...f.trip_ids, ''] }))
+  /** Baris ID baru langsung terisi ID unik; tetap bisa diganti nomor container. */
+  const tambahId = () => setForm((f) => ({
+    ...f,
+    trip_ids: [...f.trip_ids, buatKodeUnik([...dbAll.transactions.flatMap((t) => t.trip_ids ?? []), ...f.trip_ids])],
+  }))
   const hapusId = (i: number) => setForm((f) => ({ ...f, trip_ids: f.trip_ids.length > 1 ? f.trip_ids.filter((_, j) => j !== i) : [''] }))
   /** Tombol Generate: ID unik yang belum ada di trip mana pun maupun di baris lain form ini. */
   function generateId(i: number) {
@@ -490,25 +496,24 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
               label="ID Perjalanan/Trip"
               required={wajibId}
               error={errors.trip_ids}
-              hint={errors.trip_ids ? undefined : 'Ketik nomor container / ID perjalanan, atau klik Generate untuk ID unik otomatis. Nomor container boleh sama dengan trip lain karena dipakai ulang.'}
+              hint={errors.trip_ids ? undefined : 'Terisi ID unik otomatis; ganti dengan nomor container / ID perjalanan bila ada. Nomor container boleh sama dengan trip lain karena dipakai ulang.'}
             >
               {(fid) => (
                 <div className="space-y-2">
                   {form.trip_ids.map((v, i) => (
                     <div key={i} className="flex items-center gap-2">
                       <span className="tnum w-5 shrink-0 text-right text-[12px] font-semibold text-ink-3">{i + 1}.</span>
-                      <Input
+                      <KodeInput
                         id={i === 0 ? fid : undefined}
                         value={v}
                         invalid={!!errors.trip_ids && !v.trim()}
                         placeholder="TCLU1234567"
-                        className="tnum font-medium tracking-wide"
+                        className="min-w-0 flex-1"
                         aria-label={`ID Perjalanan/Trip ${i + 1}`}
-                        onChange={(e) => ubahId(i, e.target.value)}
+                        generateTitle={`Buat ID Perjalanan/Trip ${i + 1} otomatis`}
+                        onChange={(nilai) => ubahId(i, nilai)}
+                        onGenerate={() => generateId(i)}
                       />
-                      <Button icon={<FaWandMagicSparkles size={14} />} title={`Buat ID Perjalanan/Trip ${i + 1} otomatis`} onClick={() => generateId(i)}>
-                        Generate
-                      </Button>
                       <IconButton
                         label="Hapus ID ini"
                         tone="danger"
@@ -592,10 +597,25 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
               {(fid) => <DateInput id={fid} value={form.transaction_date} invalid={!!errors.transaction_date} onChange={(e) => ubahTanggal(e.target.value)} />}
             </Field>
             <Field label="Nomor Trip" required error={errors.transaction_no} hint={errors.transaction_no ? undefined : 'Nomor urut otomatis per bulan.'}>
-              {(fid) => <Input id={fid} value={form.transaction_no} invalid={!!errors.transaction_no} className="tnum" onChange={(e) => set('transaction_no', e.target.value)} />}
+              {(fid) => (
+                <KodeInput id={fid} value={form.transaction_no} invalid={!!errors.transaction_no}
+                  generateTitle="Buat nomor trip berikutnya untuk bulan tanggal trip"
+                  onChange={(v) => set('transaction_no', v)}
+                  onGenerate={() => set('transaction_no', nomorTripBerikut(
+                    dbAll.transactions.filter((t) => t.id !== existing?.id).map((t) => t.transaction_no),
+                    form.transaction_date || todayISO(),
+                  ))} />
+              )}
             </Field>
             <Field label="Nomor Surat Jalan" error={errors.sj_no} hint={errors.sj_no ? undefined : form.sj_no ? 'Nomor urut otomatis.' : 'Kosong = dicetak memakai Nomor Trip.'}>
-              {(fid) => <Input id={fid} value={form.sj_no} invalid={!!errors.sj_no} className="tnum" placeholder="SJ-000001" onChange={(e) => set('sj_no', e.target.value)} />}
+              {(fid) => (
+                <KodeInput id={fid} value={form.sj_no} invalid={!!errors.sj_no} placeholder="SJ-000001" uppercase
+                  generateTitle="Buat nomor Surat Jalan berikutnya"
+                  onChange={(v) => set('sj_no', v)}
+                  onGenerate={() => set('sj_no', nomorSuratJalanBerikut(
+                    dbAll.transactions.filter((t) => t.id !== existing?.id).map((t) => t.sj_no).filter(Boolean),
+                  ))} />
+              )}
             </Field>
             <Field
               label="Status"
