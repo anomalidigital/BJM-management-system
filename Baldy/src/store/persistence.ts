@@ -4,7 +4,8 @@ import type {
 import {
   aturanKomisiMeeting, generateDatabase, generateSampleDatabase, makeKlienKontrak, projectDominanPerRoute, workspaceForSeed,
 } from '../data/dummy'
-import { kasbonBelumLunasContoh, kasbonTerminContoh, keuanganTripContoh, lengkapiNominalRoute } from '../data/lengkapi'
+import { kasbonTerminContoh, keuanganTripContoh, lengkapiNominalRoute } from '../data/lengkapi'
+import { petaSaldoKasbon } from '../lib/kasbon'
 import { susunKasbonDariDataLama } from '../lib/kasbon'
 import { todayISO } from '../lib/format'
 import { kodeKlienBerikut, nomorTripBerikut } from '../lib/kode'
@@ -372,8 +373,7 @@ function migrate(stored: Record<string, unknown>): Database {
 
   // Angka yang dulu kosong, diisi sekali (penandanya: route belum punya estimated_fields).
   // Nominal route diturunkan dari trip asli; trip contoh yang sudah jalan diberi
-  // uang jalan, biaya, dan potong kasbon; beberapa sopirnya diberi kasbon yang belum
-  // dipotong (status Piutang). Catatan yang sudah ada tidak diubah.
+  // uang jalan, biaya, dan potong kasbon. Catatan yang sudah ada tidak diubah.
   const rute = merged.routes as Route[]
   if (rute.some((r) => !r.estimated_fields)) {
     const trips = merged.transactions as CommissionTransaction[]
@@ -387,9 +387,17 @@ function migrate(stored: Record<string, unknown>): Database {
     merged.expenses = [...biaya, ...contoh.expenses]
     merged.internalCosts = [...internal, ...contoh.internalCosts]
     const kasbon = merged.kasbonEntries as KasbonEntry[]
-    const idKasbon = new Set(kasbon.map((k) => k.id))
-    const piutang = kasbonBelumLunasContoh(trips, todayISO(), stamp).filter((k) => !idKasbon.has(k.id))
-    merged.kasbonEntries = [...kasbon, ...kasbonTerminContoh(contoh.ujPayments, stamp), ...piutang]
+    merged.kasbonEntries = [...kasbon, ...kasbonTerminContoh(contoh.ujPayments, stamp)]
+  }
+
+  // Status Piutang tidak dipakai lagi: kasbon contoh "belum dipotong" yang dulu dibuat
+  // untuknya dihapus, selama saldo kasbon sopir itu tidak jadi minus.
+  const semuaKasbon = (merged.kasbonEntries ?? []) as KasbonEntry[]
+  if (semuaKasbon.some((k) => k.id.startsWith('ksb-piutang-'))) {
+    const saldo = petaSaldoKasbon(semuaKasbon)
+    merged.kasbonEntries = semuaKasbon.filter(
+      (k) => !(k.id.startsWith('ksb-piutang-') && (saldo.get(k.employee_id) ?? 0) - k.amount >= 0),
+    )
   }
 
   return merged as unknown as Database

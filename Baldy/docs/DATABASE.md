@@ -437,7 +437,6 @@ DROP TABLE delivery_notes;
 
 ```sql
 -- Karyawan: dokumen (KTP, SIM, dll) lewat tabel attachments (owner_table = 'drivers').
--- Status piutang = saldo kasbon > 0 (dihitung, tidak disimpan).
 
 -- Layanan trip dipilih di awal form: callout (per order) atau dedicated (kontrak).
 -- Kontrak milik satu klien dan dikelola di halaman klien (Master -> Klien -> detail).

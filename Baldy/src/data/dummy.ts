@@ -13,7 +13,7 @@ import { EXPENSE_TYPES, VEHICLE_CONFIGS } from '../types'
 import { susunKasbonDariDataLama } from '../lib/kasbon'
 import { nomorTripBerikut } from '../lib/kode'
 import REAL from './real.json'
-import { kasbonBelumLunasContoh, kasbonTerminContoh, keuanganTripContoh, lengkapiNominalRoute } from './lengkapi'
+import { kasbonTerminContoh, keuanganTripContoh, lengkapiNominalRoute } from './lengkapi'
 import { toISO } from '../lib/format'
 
 /* PRNG deterministik (mulberry32) */
@@ -724,7 +724,6 @@ export function generateDatabase(): Database {
   const kasbonEntries = [
     ...susunKasbonDariDataLama(ujAsli, transactions, stamp),
     ...kasbonTerminContoh(contoh.ujPayments, stamp),
-    ...kasbonBelumLunasContoh(tripSuratJalan, toISO(now), stamp),
   ]
 
   return {
@@ -756,7 +755,6 @@ export function generateSampleDatabase(): Database {
   const kasbonEntries = [
     ...susunKasbonDariDataLama(ujDasar, transactions, stamp),
     ...kasbonTerminContoh(contoh.ujPayments, stamp),
-    ...kasbonBelumLunasContoh(tripSuratJalan, toISO(now), stamp),
   ]
   return {
     drivers, routes, vehicles, jobOrders, projects: [...projects, ...makeKlienKontrak()], transactions, billings,

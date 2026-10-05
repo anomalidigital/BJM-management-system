@@ -8,8 +8,6 @@
  * 2. Trip contoh (dibangkitkan dari Surat Jalan contoh) belum punya uang jalan
  *    maupun biaya. Trip yang sudah jalan diberi termin sebesar UJROUTE route-nya,
  *    biaya operasional & internal seukuran data asli, dan sebagian potong kasbon.
- * 3. Beberapa sopir trip contoh diberi kasbon yang belum dipotong, supaya status
- *    Piutang di Data Karyawan tidak "Lunas" semua.
  *
  * Dipakai saat database dibuat dan sekali saat migrasi data tersimpan.
  */
@@ -275,24 +273,4 @@ export function kasbonTerminContoh(payments: UjPayment[], stamp: string): Kasbon
         updated_at: stamp,
       },
     ])
-}
-
-/** Kasbon contoh yang belum dipotong untuk enam sopir trip contoh terbaru (status Piutang). */
-export function kasbonBelumLunasContoh(trips: CommissionTransaction[], hariIni: string, stamp: string): KasbonEntry[] {
-  const sopir = [...new Set(
-    trips.filter((t) => tripContoh(t.id) && t.status !== 'batal').map((t) => t.driver_ids?.[0] || t.driver_id).filter(Boolean),
-  )].slice(0, 6)
-  return sopir.map((id, i): KasbonEntry => ({
-    id: `ksb-piutang-${id}`,
-    employee_id: id,
-    entry_date: geserHari(hariIni, -(2 + i * 3)),
-    kind: 'admin',
-    amount: bulat(250_000 + acakDari(`piutang-${id}`)() * 1_250_000, 50_000),
-    trip_id: '',
-    uj_payment_id: '',
-    notes: 'Kasbon contoh, belum dipotong',
-    attachments: [],
-    created_at: stamp,
-    updated_at: stamp,
-  }))
 }

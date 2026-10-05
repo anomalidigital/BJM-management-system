@@ -241,9 +241,8 @@ export function KaryawanTransaksiPage() {
         }
       />
 
-      <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-4 grid gap-4 sm:grid-cols-3">
         {[
-          ['Piutang (Kasbon)', formatRupiah(saldo), saldo > 0 ? 'belum lunas' : 'lunas'],
           ['Kasbon Masuk', formatRupiah(masuk), 'diberikan admin & pengembalian'],
           ['Kasbon Terpotong', formatRupiah(keluar), 'dipotong dari trip & penyesuaian'],
           ['Jumlah Trip', String(tripSaya.length), 'trip yang pernah dibawa'],
