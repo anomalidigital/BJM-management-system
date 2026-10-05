@@ -1,0 +1,116 @@
+import { cn } from '../../lib/utils'
+import { formatNumber, formatRupiah } from '../../lib/format'
+import { Panel } from './Panel'
+
+/** Perubahan dibanding bulan lalu; naik = baik untuk pendapatan & netto. */
+function Selisih({ persen, bulanLalu }: { persen: number | null; bulanLalu: string }) {
+  if (persen === null || !Number.isFinite(persen)) return null
+  const naik = persen > 0
+  const rata = Math.abs(persen) < 0.05
+  return (
+    <span className={cn('tnum block text-[11.5px]', rata ? 'text-ink-3' : naik ? 'text-[#0a7d0a]' : 'text-[color:var(--color-critical)]')}>
+      {rata ? 'sama dengan' : `${naik ? '+' : ''}${persen.toFixed(1).replace('.', ',')}% dari`} {bulanLalu}
+    </span>
+  )
+}
+
+interface Baris {
+  label: string
+  keterangan: string
+  nilai: number
+  /** Posisi batang pada lintasan, dalam proporsi pendapatan. */
+  dari: number
+  sampai: number
+  jenis: 'masuk' | 'kurang' | 'hasil'
+  persen?: number | null
+}
+
+/**
+ * Jembatan uang: bagaimana pendapatan bulan ini menjadi netto, dan berapa
+ * uang yang benar-benar keluar ke sopir.
+ */
+export function JembatanUang({
+  bulanLalu,
+  pendapatan,
+  ujroute,
+  komisi,
+  netto,
+  deltaPendapatan,
+  deltaNetto,
+  uj,
+  kasbon,
+  tf,
+  termin,
+  biaya,
+}: {
+  bulanLalu: string
+  pendapatan: number
+  ujroute: number
+  komisi: number
+  netto: number
+  deltaPendapatan: number | null
+  deltaNetto: number | null
+  uj: number
+  kasbon: number
+  tf: number
+  termin: number
+  biaya: number
+}) {
+  const skala = Math.max(pendapatan, ujroute + komisi, 1)
+  const p = (v: number) => Math.max(0, Math.min(1, v / skala))
+  const baris: Baris[] = [
+    { label: 'Pendapatan', keterangan: 'jumlah harga trip', nilai: pendapatan, dari: 0, sampai: p(pendapatan), jenis: 'masuk', persen: deltaPendapatan },
+    { label: 'Patokan uang jalan', keterangan: 'UJROUTE tiap trip', nilai: -ujroute, dari: p(pendapatan - ujroute), sampai: p(pendapatan), jenis: 'kurang' },
+    { label: 'Komisi sopir', keterangan: 'dari master Komisi', nilai: -komisi, dari: p(pendapatan - ujroute - komisi), sampai: p(pendapatan - ujroute), jenis: 'kurang' },
+    { label: 'Netto', keterangan: 'sisa untuk perusahaan', nilai: netto, dari: 0, sampai: p(netto), jenis: 'hasil', persen: deltaNetto },
+  ]
+  const ke_sopir: Array<[string, number, string]> = [
+    ['Uang jalan dibayar', uj, `${formatNumber(termin)} termin`],
+    ['Potong kasbon', kasbon, 'dipotong dari uang jalan'],
+    ['Transfer ke sopir', tf, 'uang jalan − potong kasbon'],
+    ['Biaya operasional', biaya, 'solar, tol, SPSI, dan lainnya'],
+  ]
+
+  return (
+    <Panel title="Dari pendapatan ke netto" subtitle="Rumus netto masih sementara: biaya operasional belum dikurangkan sampai dikonfirmasi.">
+      <div className="space-y-3 px-5 pb-5">
+        {baris.map((b) => (
+          <div key={b.label} className="grid items-center gap-x-4 gap-y-1 sm:grid-cols-[10.5rem_minmax(0,1fr)_9.5rem]">
+            <div className="leading-tight">
+              <span className={cn('block text-[13.5px]', b.jenis === 'hasil' ? 'font-semibold text-ink' : 'text-ink')}>{b.label}</span>
+              <span className="block text-[11.5px] text-ink-3">{b.keterangan}</span>
+            </div>
+            <div className="relative h-6 rounded-[3px] bg-sunken" aria-hidden="true">
+              <div
+                className={cn('absolute inset-y-0 rounded-[3px]',
+                  b.jenis === 'masuk' && 'bg-brand-600',
+                  b.jenis === 'kurang' && 'bg-[#b9c6d6]',
+                  b.jenis === 'hasil' && (b.nilai >= 0 ? 'bg-[#1f9d55]' : 'bg-[color:var(--color-critical)]'))}
+                style={{ left: `${b.dari * 100}%`, width: `${Math.max(b.sampai - b.dari, b.nilai ? 0.004 : 0) * 100}%` }}
+              />
+            </div>
+            <div className="text-right sm:text-right">
+              <span className={cn('tnum block font-rail text-[19px] leading-tight font-semibold',
+                b.jenis === 'kurang' ? 'text-ink-2' : b.jenis === 'hasil' && b.nilai < 0 ? 'text-[color:var(--color-critical)]' : 'text-ink')}>
+                {b.jenis === 'kurang' ? `− ${formatRupiah(-b.nilai, { compact: true })}` : formatRupiah(b.nilai, { compact: true })}
+              </span>
+              {b.persen !== undefined && <Selisih persen={b.persen} bulanLalu={bulanLalu} />}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-auto border-t border-hairline px-5 py-4">
+        <h3 className="text-[12.5px] font-medium text-ink-2">Uang yang keluar ke sopir bulan ini</h3>
+        <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-4">
+          {ke_sopir.map(([label, nilai, ket]) => (
+            <div key={label} className="min-w-0">
+              <dt className="text-[12px] text-ink-3">{label}</dt>
+              <dd className="tnum font-rail text-[19px] leading-tight font-semibold text-ink">{formatRupiah(nilai, { compact: true })}</dd>
+              <dd className="text-[11.5px] text-ink-3">{ket}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </Panel>
+  )
+}

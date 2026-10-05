@@ -1,416 +1,249 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  FaArrowRight, FaChartLine, FaCircleExclamation, FaFileLines, FaGasPump, FaPaperPlane, FaReceipt,
-  FaSackDollar, FaScissors, FaTruck, FaUsers, FaWallet,
-} from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
-import { Card, CardHeader } from '../components/ui/Card'
-import { StatCard } from '../components/ui/StatCard'
-import { Badge, DotLabel } from '../components/ui/Badge'
-import { CardSkeleton, Skeleton } from '../components/ui/States'
-import { ColumnChart } from '../components/charts/ColumnChart'
-import { LineChart } from '../components/charts/LineChart'
-import { RankingBars } from '../components/charts/RankingBars'
-import { VIZ } from '../components/charts/chartUtils'
+import { Skeleton } from '../components/ui/States'
 import { useData } from '../store/DataProvider'
-import { deltaPersen, komisiTransaksi, pendapatanTransaksi, ringkas, tripDihitung } from '../lib/calculations'
-import { formatDate, formatDateShort, formatNumber, formatRupiah, monthLabel, todayISO } from '../lib/format'
+import { deltaPersen, komisiTransaksi, ringkas, tripDihitung } from '../lib/calculations'
+import { formatRupiah, monthLabel, todayISO } from '../lib/format'
 import { groupBy } from '../lib/utils'
 import { periodeAktif, periodeSebelumnya } from '../lib/periode'
+import { HeroDepo, URUT_TUMPUK } from './dashboard/HeroDepo'
+import type { HariPapan, StatusPapan } from './dashboard/HeroDepo'
+import { PerluDitindak } from './dashboard/PerluDitindak'
+import type { ItemTindak } from './dashboard/PerluDitindak'
+import { JembatanUang } from './dashboard/JembatanUang'
+import { LayananKlien } from './dashboard/LayananKlien'
+import type { KontrakBerjalan } from './dashboard/LayananKlien'
+import { PapanRitan } from './dashboard/PapanRitan'
+import { Terbaru } from './dashboard/Terbaru'
 
+const labelHari = (iso: string) =>
+  new Date(`${iso}T00:00:00`).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })
+
+/**
+ * Dashboard "papan depo": trip bulan ini sebagai tumpukan kontainer di pelat baja,
+ * lalu yang perlu ditindak, jalannya uang, layanan & klien, ritan, dan catatan terbaru.
+ */
 export function DashboardPage() {
   const { db, transactionRows, billingRows, loading } = useData()
 
   const model = useMemo(() => {
     const periode = periodeAktif(transactionRows.map((t) => t.transaction_date))
     const sebelum = periodeSebelumnya(periode)
-    const monthStart = periode.start
-    const monthEnd = periode.end
-    const prevStart = sebelum.start
-    const prevEnd = sebelum.end
-    // Hari terakhir yang ditampilkan pada grafik harian.
-    const today = periode.dariData
-      ? transactionRows.map((t) => t.transaction_date).filter((d) => d <= monthEnd).sort().at(-1)!
-      : todayISO()
+    const hariIni = todayISO()
+    const dalam = (t: { transaction_date: string }, p: { start: string; end: string }) =>
+      t.transaction_date >= p.start && t.transaction_date <= p.end
 
-    // Trip batal tidak dihitung di ringkasan mana pun.
-    const thisMonth = transactionRows.filter((t) => tripDihitung(t) && t.transaction_date >= monthStart && t.transaction_date <= monthEnd)
-    const lastMonth = transactionRows.filter((t) => tripDihitung(t) && t.transaction_date >= prevStart && t.transaction_date <= prevEnd)
-    const now = ringkas(thisMonth)
-    const prev = ringkas(lastMonth)
+    // Trip batal hanya arsip: tidak dihitung di ringkasan mana pun.
+    const bulanIni = transactionRows.filter((t) => tripDihitung(t) && dalam(t, periode))
+    const bulanLalu = transactionRows.filter((t) => tripDihitung(t) && dalam(t, sebelum))
+    const batal = transactionRows.filter((t) => t.status === 'batal' && dalam(t, periode)).length
+    const now = ringkas(bulanIni)
+    const prev = ringkas(bulanLalu)
 
-    // Deret harian dari tanggal 1 s/d hari ini.
-    const byDate = groupBy(thisMonth, (t) => t.transaction_date)
-    const days: string[] = []
-    for (let d = 1; d <= Number(today.slice(8, 10)); d++) {
-      days.push(`${monthStart.slice(0, 8)}${String(d).padStart(2, '0')}`)
+    const perStatus = Object.fromEntries(URUT_TUMPUK.map((s) => [s, bulanIni.filter((t) => t.status === s).length])) as Record<StatusPapan, number>
+
+    // Satu kolom per tanggal sebulan penuh; hari yang belum terjadi tampil kosong.
+    const perTanggal = groupBy(bulanIni, (t) => t.transaction_date)
+    const jumlahHari = Number(periode.end.slice(8, 10))
+    const hari: HariPapan[] = Array.from({ length: jumlahHari }, (_, i) => {
+      const iso = `${periode.start.slice(0, 8)}${String(i + 1).padStart(2, '0')}`
+      const trip = (perTanggal[iso] ?? [])
+        .map((t) => ({ id: t.id, status: t.status as StatusPapan }))
+        .sort((a, b) => URUT_TUMPUK.indexOf(a.status) - URUT_TUMPUK.indexOf(b.status))
+      return { iso, tanggal: i + 1, label: labelHari(iso), trip, mendatang: iso > hariIni, hariIni: iso === hariIni }
+    })
+
+    const sopirBertugas = new Set(bulanIni.flatMap((t) => t.driver_ids)).size
+    const sopirAktif = db.drivers.filter((d) => (d.role ?? 'sopir') === 'sopir' && d.status === 'aktif').length
+    const mobilTerpakai = new Set(bulanIni.map((t) => t.vehicle_id).filter(Boolean)).size
+    const mobilTotal = db.vehicles.filter((v) => v.status === 'aktif').length
+
+    // Yang perlu ditindak, urut dari yang paling mendesak.
+    const tindak: ItemTindak[] = ([
+      {
+        id: 'menunggu-sopir', nada: 'perhatian', to: '/transaksi/trip',
+        label: 'Trip menunggu sopir', keterangan: 'Pilih sopir supaya trip bisa jalan.',
+        jumlah: perStatus.menunggu_sopir,
+      },
+      {
+        id: 'sj-draft', nada: 'perhatian', to: '/transaksi/trip',
+        label: 'Surat Jalan belum dicetak', keterangan: 'Trip sudah bernomor Surat Jalan tapi belum dicetak.',
+        jumlah: transactionRows.filter((t) => t.sj_no && !t.printed_at && t.status !== 'batal').length,
+      },
+      {
+        id: 'ditolak', nada: 'masalah', to: '/transaksi/tagihan',
+        label: 'Tagihan ditolak', keterangan: 'Perlu diperbaiki lalu diajukan ulang.',
+        jumlah: billingRows.filter((b) => b.is_rejected).length,
+      },
+      {
+        id: 'belum-selesai', nada: 'info', to: '/transaksi/trip',
+        label: 'Trip belum ditandai Selesai', keterangan: 'Tandai setelah mobil kembali ke pool.',
+        jumlah: bulanIni.filter((t) => t.status !== 'selesai').length,
+      },
+      {
+        id: 'belum-lunas', nada: 'info', to: '/transaksi/tagihan',
+        label: 'Tagihan belum lunas', keterangan: 'Belum ada tanggal lunas.',
+        jumlah: billingRows.filter((b) => !b.paid_date && !b.is_rejected).length,
+      },
+      {
+        id: 'sijo-belum-komplit', nada: 'info', to: '/pencarian/sijo',
+        label: 'SI / Job Order belum komplit',
+        jumlah: db.jobOrders.filter((j) => !j.is_complete).length,
+      },
+      {
+        id: 'id-trip', nada: 'info', to: '/transaksi/trip',
+        label: 'Trip tanpa ID Perjalanan/Trip',
+        jumlah: bulanIni.filter((t) => (t.trip_ids ?? []).length === 0).length,
+      },
+    ] satisfies ItemTindak[]).filter((a) => a.jumlah > 0)
+
+    const uang = {
+      uj: bulanIni.reduce((a, t) => a + t.uj_total, 0),
+      kasbon: bulanIni.reduce((a, t) => a + t.kasbon_total, 0),
+      tf: bulanIni.reduce((a, t) => a + t.tf_total, 0),
+      biaya: bulanIni.reduce((a, t) => a + t.expense_total, 0),
+      termin: bulanIni.reduce((a, t) => a + t.termin_count, 0),
     }
-    const daily = days.map((iso) => ({
-      label: String(Number(iso.slice(8, 10))),
-      fullLabel: formatDate(iso),
-      value: (byDate[iso] ?? []).length,
-    }))
-    const revenue = days.map((iso) => (byDate[iso] ?? []).reduce((a, r) => a + pendapatanTransaksi(r), 0))
-    const commission = days.map((iso) => (byDate[iso] ?? []).reduce((a, r) => a + komisiTransaksi(r), 0))
 
-    // Top sopir berdasarkan jumlah ritan bulan ini.
-    const perDriver = groupBy(thisMonth, (t) => t.driver_id)
-    const topDrivers = Object.entries(perDriver)
-      .map(([id, rows]) => ({
-        id,
-        label: rows[0].driver_name || 'Tanpa nama',
-        // Nilai komisi belum tersedia; tampilkan uang jalan yang datanya pasti.
-        meta: (() => {
-          const komisi = rows.reduce((a, r) => a + komisiTransaksi(r), 0)
-          if (komisi > 0) return `${formatRupiah(komisi, { compact: true })} komisi`
-          const uj = rows.reduce((a, r) => a + r.uj_total, 0)
-          return uj > 0 ? `${formatRupiah(uj, { compact: true })} uang jalan` : ''
-        })(),
-        value: rows.length,
+    // Callout = klien tetap, Dedicated = klien kontrak.
+    const callout = bulanIni.filter((t) => (t.service_type ?? 'callout') === 'callout')
+    const layanan = {
+      callout: { trip: callout.length, pendapatan: callout.reduce((a, t) => a + t.harga, 0) },
+      dedicated: { trip: bulanIni.length - callout.length },
+    }
+    const terpakai = new Map<string, number>()
+    for (const t of transactionRows) {
+      if (!t.contract_id || t.status === 'batal') continue
+      terpakai.set(t.contract_id, (terpakai.get(t.contract_id) ?? 0) + t.uj_total + t.expense_total + t.internal_total)
+    }
+    const klien = new Map(db.projects.map((p) => [p.id, p]))
+    const kontrak: KontrakBerjalan[] = db.contracts
+      .filter((c) => c.status === 'aktif')
+      .map((c) => ({
+        id: c.id,
+        nomor: c.contract_no,
+        klienId: c.project_id,
+        klien: klien.get(c.project_id)?.project_name ?? 'Klien tidak ditemukan',
+        nilai: c.value,
+        sisa: c.value - (terpakai.get(c.id) ?? 0),
       }))
-      .sort((a, b) => b.value - a.value)
+      .sort((a, b) => a.sisa / Math.max(1, a.nilai) - b.sisa / Math.max(1, b.nilai))
+
+    // Ritan per sopir utama.
+    const ritan = Object.entries(groupBy(bulanIni, (t) => t.driver_id))
+      .filter(([id]) => id)
+      .map(([id, rows]) => {
+        const komisi = rows.reduce((a, r) => a + komisiTransaksi(r), 0)
+        const uj = rows.reduce((a, r) => a + r.uj_total, 0)
+        return {
+          id,
+          nama: rows[0].driver_name || 'Tanpa nama',
+          keterangan: komisi > 0 ? `komisi ${formatRupiah(komisi, { compact: true })}` : uj > 0 ? `UJ ${formatRupiah(uj, { compact: true })}` : '',
+          ritan: rows.length,
+        }
+      })
+      .sort((a, b) => b.ritan - a.ritan)
       .slice(0, 6)
 
-    // Data yang butuh perhatian.
-    const attention = [
-      {
-        id: 'id-trip',
-        label: 'Trip tanpa ID Perjalanan/Trip',
-        count: thisMonth.filter((t) => t.status !== 'batal' && (t.trip_ids ?? []).length === 0).length,
-        to: '/transaksi/trip',
-      },
-      {
-        id: 'menunggu-sopir',
-        label: 'Trip menunggu sopir',
-        count: thisMonth.filter((t) => t.status === 'menunggu_sopir').length,
-        to: '/transaksi/trip',
-      },
-      {
-        id: 'belum-selesai',
-        label: 'Trip belum ditandai Selesai',
-        count: thisMonth.filter((t) => t.status !== 'selesai' && t.status !== 'batal').length,
-        to: '/transaksi/trip',
-      },
-      {
-        id: 'ditolak',
-        label: 'Tagihan berstatus DITOLAK',
-        count: billingRows.filter((b) => b.is_rejected).length,
-        to: '/transaksi/tagihan',
-      },
-      {
-        id: 'belum-lunas',
-        label: 'Tagihan belum ada Tanggal Lunas',
-        count: billingRows.filter((b) => !b.paid_date && !b.is_rejected).length,
-        to: '/transaksi/tagihan',
-      },
-      {
-        id: 'sijo-belum-komplit',
-        label: 'SI / Job Order belum Komplit',
-        count: db.jobOrders.filter((j) => !j.is_complete).length,
-        to: '/pencarian/sijo',
-      },
-      {
-        id: 'sj-draft',
-        label: 'Surat Jalan trip belum dicetak',
-        count: transactionRows.filter((t) => t.sj_no && !t.printed_at && t.status !== 'batal').length,
-        to: '/transaksi/trip',
-      },
-    ].filter((a) => a.count > 0)
-
-    // Uang jalan & biaya operasional bulan berjalan (aturan terverifikasi).
-    const ujNow = {
-      uj: thisMonth.reduce((a, t) => a + t.uj_total, 0),
-      kasbon: thisMonth.reduce((a, t) => a + t.kasbon_total, 0),
-      tf: thisMonth.reduce((a, t) => a + t.tf_total, 0),
-      biaya: thisMonth.reduce((a, t) => a + t.expense_total, 0),
-      termin: thisMonth.reduce((a, t) => a + t.termin_count, 0),
+    return {
+      periode, sebelum, now, prev, batal, perStatus, hari, sopirBertugas, sopirAktif,
+      mobilTerpakai, mobilTotal, tindak, uang, layanan, kontrak, ritan,
     }
-    const ujPrev = {
-      uj: lastMonth.reduce((a, t) => a + t.uj_total, 0),
-      tf: lastMonth.reduce((a, t) => a + t.tf_total, 0),
-      biaya: lastMonth.reduce((a, t) => a + t.expense_total, 0),
-    }
-    return { now, prev, daily, days, revenue, commission, topDrivers, attention, thisMonth, ujNow, ujPrev, periode }
-  }, [transactionRows, billingRows, db.jobOrders])
+  }, [transactionRows, billingRows, db.drivers, db.vehicles, db.jobOrders, db.contracts, db.projects])
 
-  const recentTrx = useMemo(
-    () => [...transactionRows].sort((a, b) => b.transaction_date.localeCompare(a.transaction_date) || b.transaction_no.localeCompare(a.transaction_no)).slice(0, 6),
-    [transactionRows],
-  )
-  const recentBilling = useMemo(
-    () => [...billingRows].sort((a, b) => b.billing_date.localeCompare(a.billing_date)).slice(0, 6),
-    [billingRows],
-  )
-  const recentSijo = useMemo(() => [...db.jobOrders].slice(-6).reverse(), [db.jobOrders])
+  const terbaru = useMemo(() => ({
+    trip: [...transactionRows]
+      .sort((a, b) => b.transaction_date.localeCompare(a.transaction_date) || b.transaction_no.localeCompare(a.transaction_no))
+      .slice(0, 6),
+    tagihan: [...billingRows].sort((a, b) => b.billing_date.localeCompare(a.billing_date)).slice(0, 6),
+    sijo: [...db.jobOrders].slice(-6).reverse(),
+  }), [transactionRows, billingRows, db.jobOrders])
 
   if (loading) {
     return (
       <>
-        <PageHeader title="Dashboard" description="Ringkasan aktivitas SIKOTIS bulan berjalan." />
-        <div className="grid grid-cols-2 gap-4 xl:grid-cols-6">
-          {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} height="h-[104px]" />)}
-        </div>
-        <div className="mt-4 grid gap-4 xl:grid-cols-3">
-          <Skeleton className="h-72 rounded-xl xl:col-span-2" />
-          <Skeleton className="h-72 rounded-xl" />
+        <PageHeader title="Dashboard" description="Memuat ringkasan operasional..." />
+        <div className="grid gap-4 xl:grid-cols-12">
+          <Skeleton className="h-[340px] rounded-xl xl:col-span-8" />
+          <Skeleton className="h-[340px] rounded-xl xl:col-span-4" />
+          <Skeleton className="h-64 rounded-xl xl:col-span-8" />
+          <Skeleton className="h-64 rounded-xl xl:col-span-4" />
         </div>
       </>
     )
   }
 
-  const { now, prev, daily, days, revenue, commission, topDrivers, attention, ujNow, ujPrev, periode } = model
+  const { periode, sebelum, now, prev, uang } = model
+  const bulan = monthLabel(periode.start)
 
   return (
     <>
       <PageHeader
         title="Dashboard"
-        description={`Ringkasan aktivitas operasional PT Bimajaya Mustika — periode ${monthLabel(periode.start)}${periode.dariData ? " (bulan terakhir yang memiliki data)" : ""}.`}
+        description={`Ringkasan operasional ${bulan}${periode.dariData ? ', bulan terakhir yang punya data' : ''}.`}
         actions={
-          <Link to="/laporan/komisi">
-            <span className="inline-flex h-9 items-center gap-2 rounded-md border border-hairline bg-surface px-3.5 text-[13px] font-medium text-ink transition hover:bg-sunken">
-              Buka laporan bulan ini
-              <FaArrowRight size={14} />
-            </span>
+          <Link
+            to="/laporan/komisi"
+            className="inline-flex h-9 items-center rounded-md border border-hairline bg-surface px-3.5 text-[13px] font-medium text-ink transition hover:bg-sunken"
+          >
+            Buka laporan komisi
           </Link>
         }
       />
 
-      {/* Kartu ringkasan */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        <StatCard
-          label="Total Transaksi Bulan Ini"
-          value={formatNumber(now.transaksi)}
-          icon={<FaTruck size={15} />}
-          delta={deltaPersen(now.transaksi, prev.transaksi)}
-        />
-        {/* Nilainya bergantung pada tarif master Route, yang belum ada di data
-            operasional. Ditampilkan sebagai belum tersedia, bukan Rp 0, supaya
-            tidak terbaca seolah tidak ada pendapatan. */}
-        <StatCard
-          label="Total Komisi Bulan Ini"
-          value={now.komisi ? formatRupiah(now.komisi, { compact: true }) : '—'}
-          icon={<FaSackDollar size={15} />}
-          delta={now.komisi ? deltaPersen(now.komisi, prev.komisi) : null}
-        />
-        <StatCard
-          label="Total Pendapatan"
-          value={now.pendapatan ? formatRupiah(now.pendapatan, { compact: true }) : formatRupiah(now.cost, { compact: true })}
-          icon={<FaWallet size={15} />}
-          delta={now.pendapatan ? deltaPersen(now.pendapatan, prev.pendapatan) : deltaPersen(now.cost, prev.cost)}
-        />
-        <StatCard
-          label="Pendapatan Netto"
-          value={now.netto ? formatRupiah(now.netto, { compact: true }) : '—'}
-          icon={<FaChartLine size={15} />}
-          delta={now.netto ? deltaPersen(now.netto, prev.netto) : null}
-        />
-        <StatCard
-          label="Total Sopir Aktif"
-          value={formatNumber(db.drivers.filter((d) => d.status === 'aktif').length)}
-          icon={<FaUsers size={15} />}
-          hint={`dari ${db.drivers.length} sopir terdaftar`}
-        />
-        <StatCard
-          label="Total SI / Job Order"
-          value={formatNumber(db.jobOrders.length)}
-          icon={<FaFileLines size={15} />}
-          hint={`${db.jobOrders.filter((j) => j.is_complete).length} sudah Komplit`}
-        />
+      <div className="grid gap-4 xl:grid-cols-12">
+        <div className="xl:col-span-8">
+          <HeroDepo
+            bulan={bulan}
+            bulanLalu={monthLabel(sebelum.start)}
+            jumlah={now.transaksi}
+            jumlahLalu={prev.transaksi}
+            perStatus={model.perStatus}
+            batal={model.batal}
+            hari={model.hari}
+            sopirBertugas={model.sopirBertugas}
+            sopirAktif={model.sopirAktif}
+            mobilTerpakai={model.mobilTerpakai}
+            mobilTotal={model.mobilTotal}
+          />
+        </div>
+        <div className="xl:col-span-4">
+          <PerluDitindak items={model.tindak} />
+        </div>
+
+        <div className="xl:col-span-8">
+          <JembatanUang
+            bulanLalu={monthLabel(sebelum.start)}
+            pendapatan={now.pendapatan}
+            ujroute={now.ujroute}
+            komisi={now.komisi}
+            netto={now.netto}
+            deltaPendapatan={deltaPersen(now.pendapatan, prev.pendapatan)}
+            deltaNetto={deltaPersen(now.netto, prev.netto)}
+            uj={uang.uj}
+            kasbon={uang.kasbon}
+            tf={uang.tf}
+            termin={uang.termin}
+            biaya={uang.biaya}
+          />
+        </div>
+        <div className="xl:col-span-4">
+          <LayananKlien callout={model.layanan.callout} dedicated={model.layanan.dedicated} kontrak={model.kontrak} />
+        </div>
+
+        <div className="xl:col-span-4">
+          <PapanRitan rows={model.ritan} bulan={bulan} />
+        </div>
+        <div className="xl:col-span-8">
+          <Terbaru
+            trip={terbaru.trip}
+            tagihan={terbaru.tagihan}
+            sijo={terbaru.sijo}
+            jumlah={{ trip: transactionRows.length, tagihan: billingRows.length, sijo: db.jobOrders.length }}
+          />
+        </div>
       </div>
-
-      {/* Uang jalan & biaya - angka dari aturan yang sudah terverifikasi */}
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Total Uang Jalan"
-          value={formatRupiah(ujNow.uj, { compact: true })}
-          icon={<FaWallet size={15} />}
-          delta={deltaPersen(ujNow.uj, ujPrev.uj)}
-          invertDelta
-        />
-        <StatCard label="Potong Kasbon" value={formatRupiah(ujNow.kasbon, { compact: true })} icon={<FaScissors size={15} />} hint="pengurang uang jalan" />
-        <StatCard
-          label="TF ke Sopir"
-          value={formatRupiah(ujNow.tf, { compact: true })}
-          icon={<FaPaperPlane size={15} />}
-          hint={`${formatNumber(ujNow.termin)} termin pembayaran`}
-        />
-        <StatCard
-          label="Biaya Operasional"
-          value={formatRupiah(ujNow.biaya, { compact: true })}
-          icon={<FaGasPump size={15} />}
-          delta={ujNow.biaya ? deltaPersen(ujNow.biaya, ujPrev.biaya) : null}
-          hint={ujNow.biaya ? undefined : 'belum ada biaya tercatat pada periode ini'}
-          invertDelta
-        />
-      </div>
-
-      {/* Grafik */}
-      <div className="mt-4 grid gap-4 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
-          <CardHeader
-            title="Jumlah transaksi per hari"
-            subtitle={`${monthLabel(periode.start)} — tanggal 1 s/d ${formatDate(model.days.at(-1) ?? periode.start).slice(0, 5)}`}
-            actions={<Badge tone="brand">{formatNumber(now.transaksi)} transaksi</Badge>}
-          />
-          <div className="px-3 pt-3 pb-2">
-            <ColumnChart data={daily} height={208} valueSuffix=" transaksi" />
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader
-            title="Top Sopir — jumlah ritan"
-            subtitle="Bulan berjalan"
-            actions={
-              <Link to="/laporan/ritan" className="text-[12px] font-medium text-brand-600 hover:underline">
-                Cek Ritan
-              </Link>
-            }
-          />
-          <div className="p-4">
-            {topDrivers.length === 0 ? (
-              <p className="py-8 text-center text-[13px] text-ink-3">Belum ada transaksi bulan ini.</p>
-            ) : (
-              <RankingBars rows={topDrivers} unit="ritan" />
-            )}
-          </div>
-        </Card>
-      </div>
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
-          <CardHeader
-            title="Pendapatan dan komisi harian"
-            subtitle="Keduanya dalam Rupiah pada satu sumbu"
-            actions={
-              <div className="flex items-center gap-3">
-                <DotLabel color={VIZ.series1}>Pendapatan</DotLabel>
-                <DotLabel color={VIZ.series2}>Komisi</DotLabel>
-              </div>
-            }
-          />
-          <div className="px-3 pt-3 pb-2">
-            <LineChart
-              labels={days.map((d) => formatDateShort(d))}
-              series={[
-                { name: 'Pendapatan', color: VIZ.series1, values: revenue },
-                { name: 'Komisi', color: VIZ.series2, values: commission },
-              ]}
-              height={214}
-            />
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader title="Perlu perhatian" subtitle="Data yang belum lengkap atau tertahan" />
-          <div className="p-2">
-            {attention.length === 0 ? (
-              <p className="py-10 text-center text-[13px] text-ink-3">Semua data sudah lengkap.</p>
-            ) : (
-              <ul className="space-y-1">
-                {attention.map((a) => (
-                  <li key={a.id}>
-                    <Link
-                      to={a.to}
-                      className="flex items-center gap-2.5 rounded-lg px-2.5 py-2.5 transition-colors hover:bg-sunken"
-                    >
-                      <FaCircleExclamation size={15} className="shrink-0 text-[color:var(--color-warning)]" />
-                      <span className="min-w-0 flex-1 text-[13px] leading-snug text-ink-2">{a.label}</span>
-                      <span className="tnum shrink-0 rounded-full bg-[#fff8e6] px-2 py-0.5 text-[12px] font-semibold text-[#8a6100]">
-                        {a.count}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </Card>
-      </div>
-
-      {/* Daftar terbaru */}
-      <div className="mt-4 grid gap-4 xl:grid-cols-3">
-        <Card>
-          <CardHeader
-            title="Trip terbaru"
-            actions={<Link to="/transaksi/trip" className="text-[12px] font-medium text-brand-600 hover:underline">Lihat semua</Link>}
-          />
-          <ul className="divide-y divide-grid">
-            {recentTrx.map((t) => (
-              <li key={t.id} className="flex items-center gap-3 px-4 py-2.5">
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <span className="tnum text-[12.5px] font-semibold text-ink">{t.transaction_no}</span>
-                    <span className="text-[11.5px] text-ink-3">{formatDate(t.transaction_date)}</span>
-                  </span>
-                  <span className="mt-0.5 block truncate text-[12px] text-ink-3">
-                    {t.driver_name} &middot; {t.plate_number} &middot; {t.route_code}
-                  </span>
-                </span>
-                <span className="tnum shrink-0 text-[12.5px] font-semibold text-ink">{formatRupiah(t.harga, { compact: true })}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-
-        <Card>
-          <CardHeader
-            title="Tagihan terbaru"
-            actions={<Link to="/transaksi/tagihan" className="text-[12px] font-medium text-brand-600 hover:underline">Lihat semua</Link>}
-          />
-          <ul className="divide-y divide-grid">
-            {recentBilling.map((b) => (
-              <li key={b.id} className="flex items-center gap-3 px-4 py-2.5">
-                <FaReceipt size={15} className="shrink-0 text-ink-3" />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <span className="tnum text-[12.5px] font-semibold text-ink">{b.invoice_no}</span>
-                    <span className="tnum text-[11.5px] text-ink-3">Sijo {b.sijo}</span>
-                  </span>
-                  <span className="mt-0.5 block truncate text-[12px] text-ink-3">
-                    {b.cost_code} &middot; {formatDate(b.billing_date)}
-                  </span>
-                </span>
-                <span className="shrink-0 text-right">
-                  <span className="tnum block text-[12.5px] font-semibold text-ink">{formatRupiah(b.amount, { compact: true })}</span>
-                  {b.is_rejected ? (
-                    <Badge tone="critical" className="mt-0.5">DITOLAK</Badge>
-                  ) : b.paid_date ? (
-                    <Badge tone="good" className="mt-0.5">Lunas</Badge>
-                  ) : (
-                    <Badge tone="warning" className="mt-0.5">Belum lunas</Badge>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-
-        <Card>
-          <CardHeader
-            title="SI / Job Order terbaru"
-            actions={<Link to="/pencarian/sijo" className="text-[12px] font-medium text-brand-600 hover:underline">Cari SI/JO</Link>}
-          />
-          <ul className="divide-y divide-grid">
-            {recentSijo.map((j) => (
-              <li key={j.id}>
-                <Link to={`/pencarian/sijo?sijo=${j.sijo}`} className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-sunken">
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className="tnum text-[12.5px] font-semibold text-brand-700">{j.sijo}</span>
-                      <span className="text-[11.5px] text-ink-3">{j.customer_code}</span>
-                    </span>
-                    <span className="mt-0.5 block truncate text-[12px] text-ink-3">{j.customer_name}</span>
-                  </span>
-                  {j.is_complete ? <Badge tone="good">Komplit</Badge> : <Badge tone="neutral">Belum</Badge>}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </div>
-
     </>
   )
 }

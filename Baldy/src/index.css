@@ -116,6 +116,20 @@ html.ws-switching *::after {
   .animate-in-pop  { animation: inPop .18s cubic-bezier(.2,.9,.3,1) both; }
   .animate-in-drawer { animation: inDrawer .22s cubic-bezier(.2,.9,.3,1) both; }
   .animate-in-toast  { animation: inToast .22s cubic-bezier(.2,.9,.3,1) both; }
+  /* Dashboard: satu trip = satu kontainer. Rusuk tegak tipis seperti dinding kontainer,
+     dan saat halaman dibuka kontainer turun bertumpuk hari demi hari. */
+  .blok-kontainer {
+    background-image: repeating-linear-gradient(90deg, rgba(255,255,255,.22) 0 1px, transparent 1px 4px);
+    box-shadow: inset 0 -1px 0 rgba(0,0,0,.28);
+    animation: blokTurun .42s cubic-bezier(.2,.8,.2,1) both;
+    animation-delay: calc(var(--urut, 0) * 16ms);
+  }
+}
+
+@keyframes blokTurun { from { opacity: 0; transform: translateY(-14px) } to { opacity: 1; transform: none } }
+
+@media (prefers-reduced-motion: reduce) {
+  .blok-kontainer { animation: none; }
 }
 
 @keyframes inFade   { from { opacity: 0 } to { opacity: 1 } }
