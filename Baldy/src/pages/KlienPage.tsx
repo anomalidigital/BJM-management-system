@@ -80,14 +80,28 @@ export function KlienPage() {
   const table = useTable(baris, { search, extraFilter, extraFilterActive: !!jenis, initialSortKey: 'project_code', pageSize: 10 })
   const resetFilter = () => { table.reset(); setJenis('') }
 
+  // Kode klien dibuat dari singkatan nama, jadi saat form dibuka kodenya masih kosong.
   function openCreate() {
-    setEditing(null); setForm({ ...BLANK, project_code: kodeKlienBerikut('', db.projects.map((p) => p.project_code)) }); setErrors({}); setFormOpen(true)
+    setEditing(null); setForm(BLANK); setErrors({}); setFormOpen(true)
   }
 
-  /** Generate: singkatan Nama Klien bila sudah diisi, selain itu nomor urut KLN. */
+  const kodeDariNama = (nama: string) =>
+    kodeKlienBerikut(nama, db.projects.filter((p) => p.id !== editing?.id).map((p) => p.project_code))
+
+  /** Generate: singkatan Nama Klien (PT Delta Energi Riau -> DER). Butuh nama terisi. */
   function generateKode() {
-    const terpakai = db.projects.filter((p) => p.id !== editing?.id).map((p) => p.project_code)
-    setForm((f) => ({ ...f, project_code: kodeKlienBerikut(f.project_name, terpakai) }))
+    if (!form.project_name.trim()) {
+      setErrors((e) => ({ ...e, project_code: 'Isi Nama Klien dulu. Kode dibuat dari singkatan nama.' }))
+      return
+    }
+    setForm((f) => ({ ...f, project_code: kodeDariNama(f.project_name) }))
+    setErrors((e) => ({ ...e, project_code: undefined }))
+  }
+
+  /** Selesai mengisi nama: kode yang masih kosong langsung diisi dari singkatannya. */
+  function isiKodeDariNama() {
+    if (form.project_code.trim() || !form.project_name.trim()) return
+    setForm((f) => ({ ...f, project_code: kodeDariNama(f.project_name) }))
     setErrors((e) => ({ ...e, project_code: undefined }))
   }
   function openEdit(p: Project) {
@@ -245,21 +259,6 @@ export function KlienPage() {
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Kode Klien" required error={errors.project_code} hint={errors.project_code ? undefined : 'Generate setelah mengisi nama = singkatan nama (PT Sumber Pangan Dingin → SPD).'}>
-            {(id) => (
-              <KodeInput id={id} value={form.project_code} invalid={!!errors.project_code} placeholder="ARM" uppercase
-                generateTitle="Buat kode klien otomatis"
-                onChange={(v) => setForm({ ...form, project_code: v })} onGenerate={generateKode} />
-            )}
-          </Field>
-          <Field label="Status">
-            {(id) => (
-              <Select id={id} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as Project['status'] })}>
-                <option value="aktif">Aktif</option>
-                <option value="nonaktif">Nonaktif</option>
-              </Select>
-            )}
-          </Field>
           <Field label="Jenis Klien" required error={errors.client_type} className="sm:col-span-2">
             {() => (
               <div className="grid gap-3 sm:grid-cols-2">
@@ -277,7 +276,26 @@ export function KlienPage() {
             )}
           </Field>
           <Field label="Nama Klien" required error={errors.project_name} className="sm:col-span-2">
-            {(id) => <Input id={id} value={form.project_name} invalid={!!errors.project_name} placeholder="Armada Migas Riau" onChange={(e) => setForm({ ...form, project_name: e.target.value })} />}
+            {(id) => (
+              <Input id={id} value={form.project_name} invalid={!!errors.project_name} placeholder="PT Delta Energi Riau"
+                onChange={(e) => setForm({ ...form, project_name: e.target.value })} onBlur={isiKodeDariNama} />
+            )}
+          </Field>
+          <Field label="Kode Klien" required error={errors.project_code}
+            hint={errors.project_code ? undefined : 'Terisi dari singkatan Nama Klien (PT Delta Energi Riau → DER). Boleh diubah.'}>
+            {(id) => (
+              <KodeInput id={id} value={form.project_code} invalid={!!errors.project_code} placeholder="Isi Nama Klien dulu" uppercase
+                generateTitle="Buat kode dari Nama Klien"
+                onChange={(v) => setForm({ ...form, project_code: v })} onGenerate={generateKode} />
+            )}
+          </Field>
+          <Field label="Status">
+            {(id) => (
+              <Select id={id} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as Project['status'] })}>
+                <option value="aktif">Aktif</option>
+                <option value="nonaktif">Nonaktif</option>
+              </Select>
+            )}
           </Field>
           <Field label="Deskripsi" className="sm:col-span-2">
             {(id) => <Input id={id} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />}

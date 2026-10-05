@@ -9,6 +9,8 @@ interface Options<T> {
   initialSortDir?: SortDir
   /** Peta kunci kolom -> field yang dipakai untuk sorting. */
   sortAccessor?: (key: string) => keyof T
+  /** Field pengurut baris yang nilainya sama, mis. nomor trip untuk tanggal yang sama. */
+  tieBreakKey?: keyof T
   pageSize?: number
   /** Filter tambahan (tanggal, status, dsb). */
   extraFilter?: (row: T) => boolean
@@ -18,7 +20,7 @@ interface Options<T> {
 
 /** State tabel standar: pencarian + sort + pagination, tanpa reload halaman. */
 export function useTable<T>(rows: T[], opts: Options<T>) {
-  const { search, initialSortKey = null, initialSortDir = 'asc', sortAccessor, pageSize: initialPageSize = 10, extraFilter, extraFilterActive } = opts
+  const { search, initialSortKey = null, initialSortDir = 'asc', sortAccessor, tieBreakKey, pageSize: initialPageSize = 10, extraFilter, extraFilterActive } = opts
 
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<{ key: string | null; dir: SortDir }>({ key: initialSortKey, dir: initialSortDir })
@@ -35,8 +37,8 @@ export function useTable<T>(rows: T[], opts: Options<T>) {
   const sorted = useMemo(() => {
     if (!sort.key) return filtered
     const field = (sortAccessor ? sortAccessor(sort.key) : (sort.key as keyof T))
-    return sortRows(filtered, field, sort.dir)
-  }, [filtered, sort, sortAccessor])
+    return sortRows(filtered, field, sort.dir, tieBreakKey)
+  }, [filtered, sort, sortAccessor, tieBreakKey])
 
   const total = sorted.length
   const totalPages = Math.max(1, Math.ceil(total / pageSize))

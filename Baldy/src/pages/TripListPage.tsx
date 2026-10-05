@@ -80,7 +80,7 @@ export function TripListPage() {
   const filterActive = Boolean(dateFrom || dateTo || status || cetak || sopir || project || layanan)
   const table = useTable(transactionRows, {
     search, extraFilter, extraFilterActive: filterActive,
-    initialSortKey: 'transaction_date', initialSortDir: 'desc', pageSize: 10,
+    initialSortKey: 'transaction_date', initialSortDir: 'desc', tieBreakKey: 'transaction_no', pageSize: 10,
   })
 
   const selectedRows = useMemo(() => transactionRows.filter((t) => selected.has(t.id)), [transactionRows, selected])

@@ -32,10 +32,16 @@ export function compareValues(a: unknown, b: unknown): number {
   return String(a ?? '').localeCompare(String(b ?? ''), 'id', { numeric: true, sensitivity: 'base' })
 }
 
-export function sortRows<T>(rows: T[], key: keyof T | null, dir: SortDir): T[] {
+/**
+ * Urutkan tanpa membalik hasil: nilai yang sama tetap di urutan asalnya, yaitu
+ * data terbaru dulu (data baru disisipkan di depan). Kalau hasil urut naik dibalik,
+ * trip yang baru dibuat malah turun ke bawah trip lain bertanggal sama.
+ * `tieKey` (opsional) mengurutkan nilai yang sama, searah dengan urutan utama.
+ */
+export function sortRows<T>(rows: T[], key: keyof T | null, dir: SortDir, tieKey?: keyof T): T[] {
   if (!key) return rows
-  const sorted = [...rows].sort((a, b) => compareValues(a[key], b[key]))
-  return dir === 'asc' ? sorted : sorted.reverse()
+  const arah = dir === 'asc' ? 1 : -1
+  return [...rows].sort((a, b) => arah * (compareValues(a[key], b[key]) || (tieKey ? compareValues(a[tieKey], b[tieKey]) : 0)))
 }
 
 export function sum<T>(rows: T[], pick: (row: T) => number): number {

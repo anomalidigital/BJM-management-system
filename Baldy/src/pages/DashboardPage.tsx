@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Skeleton } from '../components/ui/States'
 import { useData } from '../store/DataProvider'
-import { deltaPersen, komisiTransaksi, ringkas, tripDihitung } from '../lib/calculations'
+import { deltaPersen, komisiTransaksi, pendapatanTransaksi, ringkas, tripDihitung } from '../lib/calculations'
 import { formatRupiah, monthLabel, todayISO } from '../lib/format'
 import { groupBy } from '../lib/utils'
 import { periodeAktif, periodeSebelumnya } from '../lib/periode'
@@ -16,13 +16,15 @@ import { LayananKlien } from './dashboard/LayananKlien'
 import type { KontrakBerjalan } from './dashboard/LayananKlien'
 import { PapanRitan } from './dashboard/PapanRitan'
 import { Terbaru } from './dashboard/Terbaru'
+import { TrenHarian } from './dashboard/TrenHarian'
 
 const labelHari = (iso: string) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })
 
 /**
  * Dashboard "papan depo": trip bulan ini sebagai tumpukan kontainer di pelat baja,
- * lalu yang perlu ditindak, jalannya uang, layanan & klien, ritan, dan catatan terbaru.
+ * lalu yang perlu ditindak, jalannya uang, layanan & klien, tren harian, ritan,
+ * dan catatan terbaru.
  */
 export function DashboardPage() {
   const { db, transactionRows, billingRows, loading } = useData()
@@ -54,8 +56,22 @@ export function DashboardPage() {
       return { iso, tanggal: i + 1, label: labelHari(iso), trip, mendatang: iso > hariIni, hariIni: iso === hariIni }
     })
 
+    // Pendapatan & komisi per hari, dari tanggal 1 sampai hari ini (atau trip terakhir
+    // bila tanggalnya sudah lewat hari ini).
+    const tglAkhir = [hariIni, ...bulanIni.map((t) => t.transaction_date)]
+      .filter((d) => d >= periode.start && d <= periode.end)
+      .sort()
+      .at(-1) ?? periode.end
+    const tanggalTren = hari.slice(0, Number(tglAkhir.slice(8, 10))).map((h) => h.iso)
+    const tren = {
+      hari: tanggalTren,
+      pendapatan: tanggalTren.map((iso) => (perTanggal[iso] ?? []).reduce((a, t) => a + pendapatanTransaksi(t), 0)),
+      komisi: tanggalTren.map((iso) => (perTanggal[iso] ?? []).reduce((a, t) => a + komisiTransaksi(t), 0)),
+    }
+
     const sopirBertugas = new Set(bulanIni.flatMap((t) => t.driver_ids)).size
     const sopirAktif = db.drivers.filter((d) => (d.role ?? 'sopir') === 'sopir' && d.status === 'aktif').length
+    const karyawanAktif = db.drivers.filter((d) => d.status === 'aktif').length
     const mobilTerpakai = new Set(bulanIni.map((t) => t.vehicle_id).filter(Boolean)).size
     const mobilTotal = db.vehicles.filter((v) => v.status === 'aktif').length
 
@@ -105,11 +121,15 @@ export function DashboardPage() {
       biaya: bulanIni.reduce((a, t) => a + t.expense_total, 0),
       termin: bulanIni.reduce((a, t) => a + t.termin_count, 0),
     }
+    const uangLalu = {
+      uj: bulanLalu.reduce((a, t) => a + t.uj_total, 0),
+      biaya: bulanLalu.reduce((a, t) => a + t.expense_total, 0),
+    }
 
     // Callout = klien tetap, Dedicated = klien kontrak.
     const callout = bulanIni.filter((t) => (t.service_type ?? 'callout') === 'callout')
     const layanan = {
-      callout: { trip: callout.length, pendapatan: callout.reduce((a, t) => a + t.harga, 0) },
+      callout: { trip: callout.length, pendapatan: callout.reduce((a, t) => a + pendapatanTransaksi(t), 0) },
       dedicated: { trip: bulanIni.length - callout.length },
     }
     const terpakai = new Map<string, number>()
@@ -147,8 +167,8 @@ export function DashboardPage() {
       .slice(0, 6)
 
     return {
-      periode, sebelum, now, prev, batal, perStatus, hari, sopirBertugas, sopirAktif,
-      mobilTerpakai, mobilTotal, tindak, uang, layanan, kontrak, ritan,
+      periode, sebelum, now, prev, batal, perStatus, hari, tren, sopirBertugas, sopirAktif, karyawanAktif,
+      mobilTerpakai, mobilTotal, tindak, uang, uangLalu, layanan, kontrak, ritan,
     }
   }, [transactionRows, billingRows, db.drivers, db.vehicles, db.jobOrders, db.contracts, db.projects])
 
@@ -158,6 +178,14 @@ export function DashboardPage() {
       .slice(0, 6),
     tagihan: [...billingRows].sort((a, b) => b.billing_date.localeCompare(a.billing_date)).slice(0, 6),
     sijo: [...db.jobOrders].slice(-6).reverse(),
+    jumlah: {
+      trip: transactionRows.length,
+      tagihan: billingRows.length,
+      belumLunas: billingRows.filter((b) => !b.paid_date && !b.is_rejected).length,
+      ditolak: billingRows.filter((b) => b.is_rejected).length,
+      sijo: db.jobOrders.length,
+      komplit: db.jobOrders.filter((j) => j.is_complete).length,
+    },
   }), [transactionRows, billingRows, db.jobOrders])
 
   if (loading) {
@@ -174,7 +202,7 @@ export function DashboardPage() {
     )
   }
 
-  const { periode, sebelum, now, prev, uang } = model
+  const { periode, sebelum, now, prev, uang, uangLalu } = model
   const bulan = monthLabel(periode.start)
 
   return (
@@ -199,11 +227,14 @@ export function DashboardPage() {
             bulanLalu={monthLabel(sebelum.start)}
             jumlah={now.transaksi}
             jumlahLalu={prev.transaksi}
+            deltaTrip={deltaPersen(now.transaksi, prev.transaksi)}
             perStatus={model.perStatus}
             batal={model.batal}
             hari={model.hari}
             sopirBertugas={model.sopirBertugas}
             sopirAktif={model.sopirAktif}
+            karyawanAktif={model.karyawanAktif}
+            karyawanTotal={db.drivers.length}
             mobilTerpakai={model.mobilTerpakai}
             mobilTotal={model.mobilTotal}
           />
@@ -220,7 +251,11 @@ export function DashboardPage() {
             komisi={now.komisi}
             netto={now.netto}
             deltaPendapatan={deltaPersen(now.pendapatan, prev.pendapatan)}
+            deltaUjroute={deltaPersen(now.ujroute, prev.ujroute)}
+            deltaKomisi={deltaPersen(now.komisi, prev.komisi)}
             deltaNetto={deltaPersen(now.netto, prev.netto)}
+            deltaUj={deltaPersen(uang.uj, uangLalu.uj)}
+            deltaBiaya={deltaPersen(uang.biaya, uangLalu.biaya)}
             uj={uang.uj}
             kasbon={uang.kasbon}
             tf={uang.tf}
@@ -232,16 +267,15 @@ export function DashboardPage() {
           <LayananKlien callout={model.layanan.callout} dedicated={model.layanan.dedicated} kontrak={model.kontrak} />
         </div>
 
+        <div className="xl:col-span-8">
+          <TrenHarian bulan={bulan} hari={model.tren.hari} pendapatan={model.tren.pendapatan} komisi={model.tren.komisi} />
+        </div>
         <div className="xl:col-span-4">
           <PapanRitan rows={model.ritan} bulan={bulan} />
         </div>
-        <div className="xl:col-span-8">
-          <Terbaru
-            trip={terbaru.trip}
-            tagihan={terbaru.tagihan}
-            sijo={terbaru.sijo}
-            jumlah={{ trip: transactionRows.length, tagihan: billingRows.length, sijo: db.jobOrders.length }}
-          />
+
+        <div className="xl:col-span-12">
+          <Terbaru trip={terbaru.trip} tagihan={terbaru.tagihan} sijo={terbaru.sijo} jumlah={terbaru.jumlah} />
         </div>
       </div>
     </>

@@ -25,9 +25,17 @@ export function LayananKlien({
   kontrak: KontrakBerjalan[]
 }) {
   const total = Math.max(1, callout.trip + dedicated.trip)
+  // Dedicated dibayar lewat nilai kontrak, bukan harga per trip.
+  const nilaiKontrak = kontrak.reduce((a, k) => a + k.nilai, 0)
   const layanan = [
-    { nama: 'Callout', ket: 'klien tetap, order per perjalanan', trip: callout.trip, warna: 'bg-brand-600', tambahan: callout.pendapatan ? formatRupiah(callout.pendapatan, { compact: true }) : '' },
-    { nama: 'Dedicated', ket: 'klien kontrak', trip: dedicated.trip, warna: 'bg-nav-700', tambahan: '' },
+    {
+      nama: 'Callout', ket: 'klien tetap, order per perjalanan', trip: callout.trip, warna: 'bg-brand-600',
+      catatan: callout.trip ? `pendapatan ${formatRupiah(callout.pendapatan, { compact: true })}` : '',
+    },
+    {
+      nama: 'Dedicated', ket: 'klien kontrak', trip: dedicated.trip, warna: 'bg-nav-700',
+      catatan: kontrak.length ? `pendapatan lewat kontrak, nilai kontrak aktif ${formatRupiah(nilaiKontrak, { compact: true })}` : '',
+    },
   ]
 
   return (
@@ -50,6 +58,7 @@ export function LayananKlien({
             <div className="mt-1.5 h-1.5 rounded-full bg-sunken" aria-hidden="true">
               <div className={`h-full rounded-full ${l.warna}`} style={{ width: `${(l.trip / total) * 100}%` }} />
             </div>
+            {l.catatan && <span className="tnum mt-1 block text-[11.5px] text-ink-3">{l.catatan}</span>}
           </div>
         ))}
       </div>

@@ -28,6 +28,8 @@ export interface HariPapan {
 
 const TINGGI_PAPAN = 148
 const JARAK = 2
+/** Ruang angka jumlah trip di atas tiap tumpukan. */
+const RUANG_ANGKA = 14
 
 /** Draft = kontainer kosong: hanya garis tepi, tanpa isi dan rusuk. */
 const KOSONG = { background: 'transparent', backgroundImage: 'none', boxShadow: `inset 0 0 0 1.5px ${WARNA_STATUS.draft}` }
@@ -42,11 +44,14 @@ export function HeroDepo({
   bulanLalu,
   jumlah,
   jumlahLalu,
+  deltaTrip,
   perStatus,
   batal,
   hari,
   sopirBertugas,
   sopirAktif,
+  karyawanAktif,
+  karyawanTotal,
   mobilTerpakai,
   mobilTotal,
 }: {
@@ -54,17 +59,30 @@ export function HeroDepo({
   bulanLalu: string
   jumlah: number
   jumlahLalu: number
+  /** Persen perubahan jumlah trip dari bulan lalu; null bila bulan lalu kosong. */
+  deltaTrip: number | null
   perStatus: Record<StatusPapan, number>
   batal: number
   hari: HariPapan[]
   sopirBertugas: number
   sopirAktif: number
+  /** Semua karyawan (sopir + manager), seperti kartu "Total Sopir Aktif" dulu. */
+  karyawanAktif: number
+  karyawanTotal: number
   mobilTerpakai: number
   mobilTotal: number
 }) {
   const tertinggi = Math.max(1, ...hari.map((h) => h.trip.length))
-  const tinggiKotak = Math.max(3, Math.min(18, Math.floor((TINGGI_PAPAN - (tertinggi - 1) * JARAK) / tertinggi)))
+  const tinggiKotak = Math.max(3, Math.min(18, Math.floor((TINGGI_PAPAN - RUANG_ANGKA - (tertinggi - 1) * JARAK) / tertinggi)))
   const selisih = jumlah - jumlahLalu
+  const persen = deltaTrip !== null && Number.isFinite(deltaTrip) && selisih !== 0
+    ? `, ${selisih > 0 ? 'naik' : 'turun'} ${Math.abs(deltaTrip).toFixed(1).replace('.', ',')}%`
+    : ''
+  const angka: Array<[string, number, string]> = [
+    ['Sopir bertugas', sopirBertugas, `dari ${formatNumber(sopirAktif)} sopir aktif`],
+    ['Karyawan aktif', karyawanAktif, `dari ${formatNumber(karyawanTotal)} terdaftar`],
+    ['Mobil terpakai', mobilTerpakai, `dari ${formatNumber(mobilTotal)} aktif`],
+  ]
   const ringkas = URUT_TUMPUK.filter((s) => perStatus[s] > 0)
     .map((s) => `${perStatus[s]} ${STATUS_LABEL[s].toLowerCase()}`)
     .join(', ')
@@ -72,7 +90,7 @@ export function HeroDepo({
 
   return (
     <section className="rail-steel relative flex h-full flex-col overflow-hidden rounded-xl text-white" aria-labelledby="papan-judul">
-      <div className="grid flex-1 gap-6 p-5 md:grid-cols-[13.5rem_minmax(0,1fr)] md:p-6">
+      <div className="grid flex-1 gap-6 p-5 md:grid-cols-[14.5rem_minmax(0,1fr)] md:p-6">
         <div className="flex flex-col">
           <h2 id="papan-judul" className="font-rail text-[15px] font-semibold text-nav-ink">Trip {bulan}</h2>
           <p className="mt-1 font-stencil text-[88px] leading-[.82] font-extrabold tracking-[.02em] text-white tnum">
@@ -80,23 +98,19 @@ export function HeroDepo({
           </p>
           <p className="mt-3 text-[12.5px] leading-snug text-nav-ink">
             {jumlahLalu > 0
-              ? <>{selisih === 0 ? 'Sama dengan' : selisih > 0 ? `${formatNumber(selisih)} lebih banyak dari` : `${formatNumber(-selisih)} lebih sedikit dari`} {bulanLalu} ({formatNumber(jumlahLalu)} trip).</>
+              ? <>{selisih === 0 ? 'Sama dengan' : selisih > 0 ? `${formatNumber(selisih)} lebih banyak dari` : `${formatNumber(-selisih)} lebih sedikit dari`} {bulanLalu} ({formatNumber(jumlahLalu)} trip){persen}.</>
               : `Belum ada trip di ${bulanLalu} untuk dibandingkan.`}
             {batal > 0 && <> {formatNumber(batal)} trip dibatalkan tidak dihitung.</>}
           </p>
-          <dl className="mt-auto grid grid-cols-2 gap-4 border-t border-white/10 pt-4">
-            <div>
-              <dt className="text-[12px] text-nav-ink">Sopir bertugas</dt>
-              <dd className="tnum mt-0.5 font-rail text-[22px] leading-none font-semibold">
-                {formatNumber(sopirBertugas)}<span className="ml-1 text-[13px] font-medium text-nav-ink">dari {formatNumber(sopirAktif)}</span>
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[12px] text-nav-ink">Mobil terpakai</dt>
-              <dd className="tnum mt-0.5 font-rail text-[22px] leading-none font-semibold">
-                {formatNumber(mobilTerpakai)}<span className="ml-1 text-[13px] font-medium text-nav-ink">dari {formatNumber(mobilTotal)}</span>
-              </dd>
-            </div>
+          <dl className="mt-auto space-y-2 border-t border-white/10 pt-4">
+            {angka.map(([label, nilai, dari]) => (
+              <div key={label} className="flex items-baseline justify-between gap-3">
+                <dt className="text-[12px] text-nav-ink">{label}</dt>
+                <dd className="tnum text-right text-[12px] text-nav-ink">
+                  <span className="font-rail text-[19px] leading-none font-semibold text-white">{formatNumber(nilai)}</span> {dari}
+                </dd>
+              </div>
+            ))}
           </dl>
         </div>
 
@@ -150,6 +164,15 @@ export function HeroDepo({
                     style={{ height: tinggiKotak, ...isi(t.status), ['--urut' as string]: urut++ }}
                   />
                 ))}
+                {/* Jumlah trip hari itu; di layar sempit kolomnya terlalu kecil untuk angka. */}
+                {h.trip.length > 0 && (
+                  <span
+                    className={cn('tnum hidden text-center font-rail text-[11px] leading-none font-semibold sm:block', h.hariIni ? 'text-[color:var(--color-signal)]' : 'text-nav-ink')}
+                    aria-hidden="true"
+                  >
+                    {h.trip.length}
+                  </span>
+                )}
               </div>
             ))}
           </div>
