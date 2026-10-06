@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  FaBan, FaCheckDouble, FaCircleQuestion, FaEye, FaPen, FaPlus, FaPrint, FaTrashCan, FaXmark,
+  FaBan, FaCheckDouble, FaCircleQuestion, FaPen, FaPlus, FaPrint, FaTrashCan, FaXmark,
 } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
@@ -9,7 +9,7 @@ import { DataTable } from '../components/ui/DataTable'
 import type { Column } from '../components/ui/DataTable'
 import { Pagination } from '../components/ui/Pagination'
 import { FilterField, SearchInput, Toolbar } from '../components/ui/Toolbar'
-import { Button, IconButton } from '../components/ui/Button'
+import { Button, DetailButton, IconButton } from '../components/ui/Button'
 import { OverflowMenu } from '../components/ui/Menu'
 import { DateInput, Select } from '../components/ui/Field'
 import { Badge } from '../components/ui/Badge'
@@ -185,7 +185,7 @@ export function TripListPage() {
       key: 'action', header: 'Action', align: 'right', width: '120px',
       render: (t) => (
         <div className="flex justify-end gap-1">
-          <IconButton label="Lihat" icon={<FaEye size={14} />} onClick={() => navigate(`/transaksi/trip/${t.id}`)} />
+          <DetailButton label={`Lihat detail trip ${t.transaction_no}`} onClick={() => navigate(`/transaksi/trip/${t.id}`)} />
           <IconButton label="Edit" icon={<FaPen size={14} />} disabled={!canEdit || t.status === 'batal'} onClick={() => navigate(`/transaksi/trip/${t.id}/edit`)} />
           <OverflowMenu
             actions={[

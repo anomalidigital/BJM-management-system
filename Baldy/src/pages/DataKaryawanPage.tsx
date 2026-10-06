@@ -1,13 +1,13 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FaHandHoldingDollar, FaPen, FaPlus, FaTrashCan, FaXmark } from '../components/ui/icons'
+import { FaPen, FaPlus, FaTrashCan, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
 import type { Column } from '../components/ui/DataTable'
 import { Pagination } from '../components/ui/Pagination'
 import { FilterField, SearchInput, Toolbar } from '../components/ui/Toolbar'
-import { Button, IconButton } from '../components/ui/Button'
+import { Button, DetailButton, IconButton } from '../components/ui/Button'
 import { Modal, ConfirmDialog } from '../components/ui/Modal'
 import { Field, Input, Select } from '../components/ui/Field'
 import { Badge } from '../components/ui/Badge'
@@ -157,7 +157,7 @@ export function DataKaryawanPage() {
       key: 'action', header: 'Action', align: 'right', width: '124px',
       render: (d) => (
         <div className="flex justify-end gap-1">
-          <IconButton label={`Kasbon & transaksi ${d.driver_name}`} icon={<FaHandHoldingDollar size={15} />} onClick={() => navigate(`/master/karyawan/${d.id}`)} />
+          <DetailButton label={`Lihat detail ${d.driver_name} (kasbon & trip)`} onClick={() => navigate(`/master/karyawan/${d.id}`)} />
           <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!canEdit} onClick={() => openEdit(d)} />
           <IconButton label="Hapus" tone="danger" icon={<FaTrashCan size={14} />} disabled={!canEdit} onClick={() => setDeleting(d)} />
         </div>

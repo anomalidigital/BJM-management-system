@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { FaCircleNotch } from './icons'
+import { FaCircleNotch, FaFileLines } from './icons'
 import { cn } from '../../lib/utils'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'subtle' | 'outlineDanger'
@@ -85,4 +85,12 @@ export function IconButton({
       {icon}
     </button>
   )
+}
+
+/**
+ * Tombol "Lihat detail" di kolom Action: ikon dokumen yang sama di semua daftar,
+ * supaya pengguna tahu tombol inilah yang membuka isi lengkap satu baris.
+ */
+export function DetailButton({ label = 'Lihat detail', ...rest }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & { label?: string }) {
+  return <IconButton label={label} icon={<FaFileLines size={14} />} {...rest} />
 }
