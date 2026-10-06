@@ -66,10 +66,8 @@ export function Select({ className, invalid, children, ...rest }: SelectHTMLAttr
   )
 }
 
-/** Date picker native — konsisten & tanpa dependency tambahan. */
-export function DateInput({ className, invalid, ...rest }: InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) {
-  return <Input type="date" className={cn('cursor-pointer', className)} invalid={invalid} {...rest} />
-}
+/** Kolom tanggal bergaya papan jadwal depo (lihat DateInput.tsx). */
+export { DateInput } from './DateInput'
 
 export function Checkbox({ label, className, ...rest }: InputHTMLAttributes<HTMLInputElement> & { label: ReactNode }) {
   return (

@@ -128,6 +128,16 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     return m
   }, [transactionRows, existing?.id])
 
+  /** Jumlah trip berangkat per tanggal: penanda di kalender Tanggal Berangkat. */
+  const tripPerTanggal = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const t of transactionRows) {
+      if (t.status === 'batal' || t.id === existing?.id) continue
+      m.set(t.transaction_date, (m.get(t.transaction_date) ?? 0) + 1)
+    }
+    return m
+  }, [transactionRows, existing?.id])
+
   const joOptions = useMemo(
     () => db.jobOrders.map((j) => ({ value: j.id, label: j.sijo, meta: `${j.customer_name} · ${j.party}`, keywords: `${j.customer_code} ${j.goods} ${j.ship}` })),
     [db.jobOrders],
@@ -622,7 +632,11 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                 ? 'Lebih awal dari Tanggal Order. Pastikan memang benar.'
                 : 'Hari trip jalan. Dipakai untuk Nomor Trip, Surat Jalan, dan laporan.'}
             >
-              {(fid) => <DateInput id={fid} value={form.transaction_date} invalid={!!errors.transaction_date} onChange={(e) => ubahTanggal(e.target.value)} />}
+              {(fid) => (
+                <DateInput id={fid} value={form.transaction_date} invalid={!!errors.transaction_date}
+                  penanda={(t) => tripPerTanggal.get(t) ?? 0} penandaLabel="trip berangkat"
+                  onChange={(e) => ubahTanggal(e.target.value)} />
+              )}
             </Field>
             <Field label="Nomor Trip" required error={errors.transaction_no} hint={errors.transaction_no ? undefined : 'Nomor urut otomatis per bulan.'}>
               {(fid) => (
