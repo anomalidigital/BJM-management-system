@@ -608,7 +608,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                   <p className={cn('text-[12px] text-brand-800', selectedRoute && 'mt-2 border-t border-brand-100 pt-2')}>
                     Perkiraan komisi sopir: <span className="tnum font-semibold">{formatRupiah(perkiraanKomisi.nilai)}</span>
                     <span className="block text-[11.5px] text-brand-700">
-                      {!perkiraanKomisi.aturan && !form.vehicle_id ? 'Pilih No. Kendaraan dulu; aturan komisi tergantung jenis kendaraan.' : perkiraanKomisi.keterangan}
+                      {perkiraanKomisi.keterangan}
                     </span>
                   </p>
                 </div>

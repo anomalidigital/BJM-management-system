@@ -1,9 +1,7 @@
 import type {
   CommissionTransaction, Database, InternalCost, KasbonEntry, OperationalExpense, Project, Route, UjPayment,
 } from '../types'
-import {
-  aturanKomisiMeeting, generateDatabase, generateSampleDatabase, makeKlienKontrak, projectDominanPerRoute, workspaceForSeed,
-} from '../data/dummy'
+import { aturanKomisiMeeting, generateDatabase, generateSampleDatabase, makeKlienKontrak, projectDominanPerRoute, workspaceForSeed, CATATAN_KOMISI_CALLOUT, NAMA_KOMISI_CALLOUT } from '../data/dummy'
 import { kasbonTerminContoh, keuanganTripContoh, lengkapiNominalRoute } from '../data/lengkapi'
 import { petaSaldoKasbon } from '../lib/kasbon'
 import { susunKasbonDariDataLama } from '../lib/kasbon'
@@ -352,6 +350,18 @@ function migrate(stored: Record<string, unknown>): Database {
       ...aturanKomisiMeeting('tangerang', 'cms-meeting-tng', stamp),
       ...(merged.commissionSchemes as unknown[]),
     ]
+  }
+
+  // Komisi Callout dari harga trip kini berlaku untuk semua jenis kendaraan. Hanya aturan
+  // meeting yang belum diubah pengguna (masih bernama & berbatas HB/LB/DL/TRONTON).
+  if (Array.isArray(merged.commissionSchemes)) {
+    const lama = ['HB', 'LB', 'DL', 'TRONTON']
+    merged.commissionSchemes = (merged.commissionSchemes as Array<Record<string, unknown>>).map((c) => {
+      const kendaraan = Array.isArray(c.configurations) ? (c.configurations as string[]) : []
+      const belumDiubah = c.name === 'Komisi Sopir HB / LB / DL / TRONTON' &&
+        kendaraan.length === lama.length && lama.every((k) => kendaraan.includes(k))
+      return belumDiubah ? { ...c, name: NAMA_KOMISI_CALLOUT, configurations: [], notes: CATATAN_KOMISI_CALLOUT } : c
+    })
   }
 
   // Biaya internal jenis "Uang Jalan" dihapus: UJ hanya dicatat di tab Uang Jalan.

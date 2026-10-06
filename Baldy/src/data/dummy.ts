@@ -568,10 +568,16 @@ function makeInternalCosts(trips: CommissionTransaction[]): InternalCost[] {
  */
 /**
  * Aturan komisi dari catatan meeting:
- * - HB / LB / DL / TRONTON, layanan Callout: bertingkat per nilai trip
- *   (1-10 jt = 50 rb ... di atas 41 jt = 250 rb).
+ * - Layanan Callout, semua jenis kendaraan: bertingkat per harga trip
+ *   (1-10 jt = 50 rb ... di atas 41 jt = 250 rb). Catatan aslinya menyebut
+ *   HB / LB / DL / TRONTON; sejak 6 Okt 2026 berlaku untuk semua kendaraan.
  * - CDD layanan Dedicated: (nilai kontrak - 5%) x 2,5%.
  */
+/** Komisi Callout cukup dari harga trip, apa pun jenis kendaraannya (diputuskan 6 Okt 2026). */
+export const NAMA_KOMISI_CALLOUT = 'Komisi Sopir Callout'
+export const CATATAN_KOMISI_CALLOUT =
+  'Dari catatan meeting. Dasar = harga trip; berlaku untuk semua jenis kendaraan (diputuskan 6 Okt 2026, sebelumnya hanya HB / LB / DL / TRONTON).'
+
 export function aturanKomisiMeeting(workspace: Workspace, idAwal: string, cap = stamp): CommissionScheme[] {
   const tingkat = (awal: number, akhir: number, nilai: number, unit: CommissionUnit) =>
     ({ target_awal: awal, target_akhir: akhir, commission: nilai, commission_unit: unit })
@@ -580,10 +586,10 @@ export function aturanKomisiMeeting(workspace: Workspace, idAwal: string, cap = 
     {
       id: `${idAwal}-callout`,
       workspace,
-      name: 'Komisi Sopir HB / LB / DL / TRONTON',
+      name: NAMA_KOMISI_CALLOUT,
       role: 'sopir',
       service_type: 'callout',
-      configurations: ['HB', 'LB', 'DL', 'TRONTON'],
+      configurations: [],
       basis: 'nilai',
       base_deduction_pct: 0,
       is_active: true,
@@ -594,7 +600,7 @@ export function aturanKomisiMeeting(workspace: Workspace, idAwal: string, cap = 
         tingkat(31 * jt, 40 * jt, 200_000, 'rp'),
         tingkat(41 * jt, 0, 250_000, 'rp'),
       ],
-      notes: 'Dari catatan meeting. Dasar hitung masih perlu dikonfirmasi: nilai trip atau uang jalan.',
+      notes: CATATAN_KOMISI_CALLOUT,
       created_at: cap,
       updated_at: cap,
     },

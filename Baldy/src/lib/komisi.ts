@@ -100,9 +100,11 @@ export function hitungKomisiTrip(
 ): HasilKomisi {
   const s = pilihAturan(aturan, p)
   if (!s) {
-    const keterangan = p.konfigurasi.trim()
-      ? `Belum ada aturan komisi untuk kendaraan ${p.konfigurasi.trim()}`
-      : 'Konfigurasi kendaraan belum diisi di Data Mobil, jadi aturan komisi belum bisa dipilih'
+    const keterangan = p.layanan === 'dedicated'
+      ? 'Dedicated: komisi dihitung per kontrak, lihat halaman klien'
+      : p.konfigurasi.trim()
+        ? `Belum ada aturan komisi untuk kendaraan ${p.konfigurasi.trim()}`
+        : 'Belum ada aturan komisi Callout yang aktif di Master → Komisi'
     return { nilai: 0, dasar: 0, aturan: null, tingkat: null, keterangan }
   }
   return terapkan(s, dasarTrip(s.basis, p))

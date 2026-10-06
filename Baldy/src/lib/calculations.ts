@@ -39,7 +39,7 @@ export const TBD_NOTES: TbdNote[] = [
   {
     id: 'TBD-01',
     title: 'Komisi sopir per transaksi',
-    current: 'Dasar tingkatnya harga trip (dikonfirmasi atasan, 28 Sep 2026): harga yang diisi di trip, atau Harga route bila kosong. Berlaku untuk HB / LB / DL / TRONTON; penerimanya sopir utama.',
+    current: 'Dasar tingkatnya harga trip (dikonfirmasi atasan, 28 Sep 2026): harga yang diisi di trip, atau Harga route bila kosong. Berlaku untuk semua jenis kendaraan (diputuskan 6 Okt 2026; sebelumnya hanya HB / LB / DL / TRONTON); penerimanya sopir utama.',
     question: 'Harga di bawah Rp 1 jt dapat komisi atau tidak? Harga di sela tingkat (mis. Rp 10,5 jt) sementara masuk tingkat berikutnya; benarkah?',
   },
   {
