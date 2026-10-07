@@ -15,8 +15,7 @@ import { KlienPage } from './pages/KlienPage'
 import { KlienDetailPage } from './pages/KlienDetailPage'
 import { KomisiPage } from './pages/KomisiPage'
 import { TripDetailPage } from './pages/TripDetailPage'
-import { LapUangJalanPage } from './pages/LapUangJalanPage'
-import { LapBiayaPage } from './pages/LapBiayaPage'
+import { LapPengeluaranPage } from './pages/LapPengeluaranPage'
 import { TripListPage } from './pages/TripListPage'
 import { TripFormPage } from './pages/TripFormPage'
 import { DataTagihanPage } from './pages/DataTagihanPage'
@@ -74,8 +73,10 @@ export function App() {
                   <Route path="/laporan/komisi" element={<LapKomisiPage />} />
                   <Route path="/laporan/netto" element={<LapNettoPage />} />
                   <Route path="/laporan/ritan" element={<LapRitanPage />} />
-                  <Route path="/laporan/uang-jalan" element={<LapUangJalanPage />} />
-                  <Route path="/laporan/biaya" element={<LapBiayaPage />} />
+                  <Route path="/laporan/pengeluaran" element={<LapPengeluaranPage />} />
+                  {/* Alamat lama: rekap uang jalan dan biaya kini tab di Pengeluaran */}
+                  <Route path="/laporan/uang-jalan" element={<Navigate to="/laporan/pengeluaran?tab=uj" replace />} />
+                  <Route path="/laporan/biaya" element={<Navigate to="/laporan/pengeluaran?tab=biaya" replace />} />
 
                   <Route path="/pencarian/sijo" element={<SijoSearchPage />} />
                   <Route path="/admin/peran" element={<PeranPage />} />

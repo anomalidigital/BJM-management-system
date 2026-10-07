@@ -16,7 +16,8 @@ import { usePeriodeDefault } from '../lib/periode'
 
 type Mode = 'perSopir' | 'perTermin'
 
-export function LapUangJalanPage() {
+/** `tertanam`: dirender sebagai tab di halaman Pengeluaran, tanpa kepala halaman sendiri. */
+export function LapUangJalanPage({ tertanam = false }: { tertanam?: boolean } = {}) {
   const { db, transactionRows } = useData()
   const toast = useToast()
   const { from, setFrom, to, setTo, reset: resetPeriode } = usePeriodeDefault(db.ujPayments.map((p) => p.payment_date))
@@ -165,11 +166,13 @@ export function LapUangJalanPage() {
 
   return (
     <>
+      {!tertanam && (
       <PageHeader
         title="Rekap Uang Jalan"
         crumbs={[{ label: 'Laporan' }, { label: 'Uang Jalan' }]}
         description="Rekap pembayaran uang jalan beserta potongan kasbon dan nilai transfer ke sopir."
       />
+      )}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
         <Card className="h-fit">

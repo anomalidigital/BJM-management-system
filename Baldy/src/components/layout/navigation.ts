@@ -1,6 +1,6 @@
 import {
   FaBuilding, FaChartLine, FaFileInvoiceDollar, FaGaugeHigh, FaListCheck, FaMagnifyingGlass, FaPercent,
-  FaReceipt, FaRoute, FaSackDollar, FaScrewdriverWrench, FaShieldHalved, FaTruck, FaTruckFast, FaUsers, FaWallet,
+  FaRoute, FaSackDollar, FaScrewdriverWrench, FaShieldHalved, FaTruck, FaTruckFast, FaUsers, FaWallet,
 } from '../ui/icons'
 import type { IconComponent } from '../ui/icons'
 import type { Workspace } from '../../types'
@@ -22,7 +22,7 @@ export interface NavGroup {
 /**
  * Struktur navigasi utama, mengikuti susunan menu dari atasan (6 Okt 2026):
  * Dashboard, Trip / Job Order, Laporan, Master Data, Administrasi.
- * "Pengeluaran" di susunan itu = Uang Jalan + Biaya Operasional.
+ * Pengeluaran = uang jalan, biaya operasional, dan biaya internal per trip.
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -34,8 +34,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Laporan',
     items: [
-      { label: 'Uang Jalan', to: '/laporan/uang-jalan', icon: FaWallet },
-      { label: 'Biaya Operasional', to: '/laporan/biaya', icon: FaReceipt },
+      { label: 'Pengeluaran', to: '/laporan/pengeluaran', icon: FaWallet },
       { label: 'Tagihan', to: '/transaksi/tagihan', icon: FaFileInvoiceDollar },
       { label: 'Komisi', to: '/laporan/komisi', icon: FaSackDollar },
       { label: 'Netto', to: '/laporan/netto', icon: FaChartLine },

@@ -16,7 +16,8 @@ import { groupBy } from '../lib/utils'
 import { usePeriodeDefault } from '../lib/periode'
 import { EXPENSE_TYPES } from '../types'
 
-export function LapBiayaPage() {
+/** `tertanam`: dirender sebagai tab di halaman Pengeluaran, tanpa kepala halaman sendiri. */
+export function LapBiayaPage({ tertanam = false }: { tertanam?: boolean } = {}) {
   const { db, transactionRows } = useData()
   const toast = useToast()
   const { from, setFrom, to, setTo, reset: resetPeriode } = usePeriodeDefault(db.expenses.map((e) => e.expense_date))
@@ -106,11 +107,13 @@ export function LapBiayaPage() {
 
   return (
     <>
+      {!tertanam && (
       <PageHeader
         title="Rekap Biaya Operasional"
         crumbs={[{ label: 'Laporan' }, { label: 'Biaya Operasional' }]}
         description="Rekap DEX, tol, SPSI, nginap, dan biaya lain yang tercatat pada setiap trip."
       />
+      )}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
         <Card className="h-fit">
