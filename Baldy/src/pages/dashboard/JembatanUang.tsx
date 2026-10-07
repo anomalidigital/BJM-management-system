@@ -1,6 +1,7 @@
+import { Link } from 'react-router-dom'
 import { cn } from '../../lib/utils'
 import { formatNumber, formatRupiah } from '../../lib/format'
-import { Panel } from './Panel'
+import { Panel, TautanPanel } from './Panel'
 
 /**
  * Perubahan dibanding bulan lalu. Naik = baik untuk pendapatan & netto; untuk uang
@@ -30,7 +31,8 @@ interface Baris {
 
 /**
  * Jembatan uang: bagaimana pendapatan bulan ini menjadi netto, dan berapa
- * uang yang benar-benar keluar ke sopir.
+ * uang yang benar-benar keluar ke sopir. Tautan "Laporan netto" di judulnya
+ * adalah jalan masuk ke halaman Netto, yang tidak tampil di sidebar.
  */
 export function JembatanUang({
   bulanLalu,
@@ -93,7 +95,11 @@ export function JembatanUang({
   ]
 
   return (
-    <Panel title="Dari pendapatan ke netto" subtitle="Biaya di jalan dibayar dari uang jalan, kecuali yang dibayar perusahaan langsung; yang ditagihkan ke klien menambah pendapatan.">
+    <Panel
+      title="Dari pendapatan ke netto"
+      subtitle="Biaya di jalan dibayar dari uang jalan, kecuali yang dibayar perusahaan langsung; yang ditagihkan ke klien menambah pendapatan."
+      actions={<Link to="/laporan/netto"><TautanPanel>Laporan netto</TautanPanel></Link>}
+    >
       <div className="space-y-3 px-5 pb-5">
         {baris.map((b) => (
           <div key={b.label} className="grid items-center gap-x-4 gap-y-1 sm:grid-cols-[10.5rem_minmax(0,1fr)_9.5rem]">
