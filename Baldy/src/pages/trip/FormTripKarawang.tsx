@@ -19,9 +19,10 @@ import { hitungKomisiTrip } from '../../lib/komisi'
 import { buatKodeUnik, nomorTripBerikut } from '../../lib/kode'
 import { idBackload, kunciTr, lokasiRute, lokasiTrip, rapikanTr, samaLokasi, trTrip } from '../../lib/trip'
 import { cn } from '../../lib/utils'
-import type { CommissionTransaction, ServiceType, TripStatus } from '../../types'
+import type { CommissionTransaction, Route, ServiceType, TripStatus } from '../../types'
 import { STATUS_LABEL } from './status'
 import { PakaiNilai } from './bagian'
+import { ModalRute } from '../master/FormRute'
 
 /** Satu mobil di form: tersimpan sebagai satu trip. */
 interface MobilForm {
@@ -131,6 +132,9 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
   })
   const [galat, setGalat] = useState<Galat>({})
   const [pilihAsal, setPilihAsal] = useState(false)
+  /** Modal tambah rute di tempat, supaya admin tidak bolak-balik ke menu Rute. */
+  const [tambahRute, setTambahRute] = useState(false)
+  const bolehTambahRute = bisa('master')
 
   const dedicated = bersama.service_type === 'dedicated'
   const rute = ruteMap.get(bersama.route_id)
@@ -217,19 +221,34 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
     }
     return m
   }, [transactionRows, existing?.id])
-  /** Trip yang bisa jadi asal backload: ditandai saat Tutup Trip, atau masih berjalan, dan belum punya backload. */
-  const calonAsal = useMemo(() => {
-    const punyaAnak = new Set(transactionRows.map((t) => t.backload_dari).filter(Boolean))
-    return transactionRows
-      .filter((t) => t.status !== 'batal' && !punyaAnak.has(t.id) && t.vehicle_id && (t.ada_backload || t.status === 'aktif'))
-      .sort((a, b) => Number(!!b.ada_backload) - Number(!!a.ada_backload) || b.transaction_date.localeCompare(a.transaction_date))
-      .slice(0, 60)
-      .map((t) => ({
+  /** Backload yang sudah dibuat per trip asal (yang batal tidak dihitung). */
+  const anakBackload = useMemo(() => {
+    const m = new Map<string, string[]>()
+    for (const t of transactionRows) {
+      if (t.backload_dari && t.status !== 'batal') m.set(t.backload_dari, [...(m.get(t.backload_dari) ?? []), t.transaction_no])
+    }
+    return m
+  }, [transactionRows])
+  /**
+   * Trip yang bisa jadi asal backload: ditandai saat Tutup Trip, atau masih berjalan. Satu trip boleh
+   * punya beberapa backload (muatan balik ke tujuan berbeda), dan trip backload boleh dibuatkan
+   * backload lagi; yang sudah punya backload diberi keterangan supaya tidak dobel tanpa sengaja.
+   */
+  const calonAsal = useMemo(() => transactionRows
+    .filter((t) => t.status !== 'batal' && t.vehicle_id && (t.ada_backload || t.status === 'aktif'))
+    .sort((a, b) => Number(!!b.ada_backload) - Number(!!a.ada_backload) || b.transaction_date.localeCompare(a.transaction_date))
+    .slice(0, 60)
+    .map((t) => {
+      const sudah = anakBackload.get(t.id) ?? []
+      return {
         value: t.id,
         label: `${t.transaction_no} · ${t.plate_number || 'tanpa mobil'}`,
-        meta: [t.ada_backload ? 'ditandai backload' : STATUS_LABEL[t.status], `${t.muat || '?'} → ${t.bongkar || '?'}`, t.driver_names].filter(Boolean).join(' · '),
-      }))
-  }, [transactionRows])
+        meta: [
+          t.ada_backload ? 'ditandai backload' : STATUS_LABEL[t.status], `${t.muat || '?'} → ${t.bongkar || '?'}`, t.driver_names,
+          sudah.length ? `sudah ada backload: Trip ${sudah.join(', ')}` : '',
+        ].filter(Boolean).join(' · '),
+      }
+    }), [transactionRows, anakBackload])
 
   /** Nomor trip tiap mobil: urut per bulan Tanggal Berangkat, dibagikan saat disimpan. */
   const nomorRencana = useMemo(() => {
@@ -280,9 +299,10 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
   /**
    * Pilih rute -> klien, lokasi muat & bongkar, dan harga tiap mobil ikut rute.
    * Lokasi & harga yang sudah diganti sendiri tidak ditimpa. Klien kontrak -> Dedicated.
+   * `ruteBaru`: rute yang baru saja ditambahkan dari form ini (belum ada di daftar render ini).
    */
-  function pilihRute(routeId: string | null) {
-    const baru = routeId ? ruteMap.get(routeId) : undefined
+  function pilihRute(routeId: string | null, ruteBaru?: Route) {
+    const baru = ruteBaru ?? (routeId ? ruteMap.get(routeId) : undefined)
     const lama = rute
     const klienRute = klienMap.get(baru?.project_id ?? '')
     const kontrakKlien = klienRute?.client_type === 'kontrak'
@@ -517,6 +537,11 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
           {asal.status !== 'selesai' && (
             <p className="mt-1 text-brand-700">Trip asal masih {STATUS_LABEL[asal.status]}. Tutup trip asal setelah POD-nya difoto atau diterima.</p>
           )}
+          {(anakBackload.get(asal.id) ?? []).length > 0 && (
+            <p className="mt-1 text-brand-700">
+              Trip asal sudah punya backload: Trip {anakBackload.get(asal.id)!.join(', ')}. Yang ini tersimpan sebagai backload berikutnya dengan ID sendiri.
+            </p>
+          )}
         </div>
       )}
 
@@ -582,14 +607,22 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
                 required={!dedicated && wajib(!!existing?.route_id)}
                 error={galat.route_id}
                 hint={galat.route_id ? undefined
-                  : !rute ? (backload && bersama.lokasi_muat ? `Rute dari ${bersama.lokasi_muat} tampil paling atas. Belum ada? Tambahkan di menu Rute.` : dedicated ? 'Opsional untuk Dedicated: patokan uang jalan & lokasi.' : 'Klien, harga, dan patokan uang jalan ikut rute.')
+                  : !rute ? (backload && bersama.lokasi_muat
+                    ? `Rute dari ${bersama.lokasi_muat} tampil paling atas. Belum ada? ${bolehTambahRute ? 'Pilih "Tambah rute baru" di daftar.' : 'Minta Manager atau Owner menambahkannya.'}`
+                    : dedicated ? 'Opsional untuk Dedicated: patokan uang jalan & lokasi.' : 'Klien, harga, dan patokan uang jalan ikut rute.')
                   : klien && !dedicated ? `Klien ${klien.project_name} ikut rute ini.`
                   : !rute.project_id ? <>Rute ini belum punya klien. Lengkapi di menu <Link to="/master/route" className="text-brand-700 underline">Rute</Link>.</>
                   : 'UJROUTE rute jadi patokan uang jalan.'}
               >
                 {(fid) => (
                   <SearchableSelect id={fid} options={routeOptions} value={bersama.route_id || null} invalid={!!galat.route_id}
-                    placeholder="Pilih rute..." searchPlaceholder="Ketik nama atau kode rute..." onChange={pilihRute} />
+                    placeholder="Pilih rute..." searchPlaceholder="Ketik nama atau kode rute..." onChange={(v) => pilihRute(v)}
+                    tambahan={{
+                      label: 'Tambah rute baru',
+                      disabled: !bolehTambahRute,
+                      hint: bolehTambahRute ? undefined : 'Perlu Manager atau Owner.',
+                      onClick: () => setTambahRute(true),
+                    }} />
                 )}
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -737,6 +770,19 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
           </Field>
         </div>
       </Card>
+
+      {/* Rute baru: nama diawali lokasi muat (mis. backload "DURI - "), klien ikut trip asal / kontrak / rute terpilih. */}
+      <ModalRute
+        open={tambahRute}
+        onClose={() => setTambahRute(false)}
+        awal={{
+          route_name: bersama.lokasi_muat.trim() ? `${bersama.lokasi_muat.trim()} - ` : '',
+          project_id: asal?.project_id || klienKontrak?.id || rute?.project_id || '',
+        }}
+        keterangan="Rute baru langsung dipilih untuk trip ini. Tanda * wajib diisi."
+        pesanSukses={(r) => `Rute ${r.route_name} tersimpan dan dipilih untuk trip ini.`}
+        onSaved={(r) => pilihRute(r.id, r)}
+      />
 
       {/* Bar dimulai setelah rel sidebar (68px) supaya teks kirinya tidak tertutup. */}
       <div className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-surface/95 px-4 py-3 backdrop-blur lg:left-[68px] lg:px-6">

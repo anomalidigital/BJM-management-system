@@ -1,7 +1,7 @@
 /**
  * Komisi otomatis.
  *
- * Satu-satunya sumber aturan adalah master Komisi. Tiap trip mencari aturan
+ * Satu-satunya sumber aturan adalah halaman Komisi, tab Aturan. Tiap trip mencari aturan
  * yang paling cocok (peran, layanan, konfigurasi kendaraan), mengambil nilai
  * dasarnya, lalu memilih tingkat yang sesuai.
  *
@@ -104,7 +104,7 @@ export function hitungKomisiTrip(
       ? 'Dedicated: komisi dihitung per kontrak, lihat halaman klien'
       : p.konfigurasi.trim()
         ? `Belum ada aturan komisi untuk kendaraan ${p.konfigurasi.trim()}`
-        : 'Belum ada aturan komisi Callout yang aktif di Master Data → Aturan Komisi'
+        : 'Belum ada aturan komisi Callout yang aktif di Komisi → tab Aturan'
     return { nilai: 0, dasar: 0, aturan: null, tingkat: null, keterangan }
   }
   return terapkan(s, dasarTrip(s.basis, p))

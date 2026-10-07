@@ -526,7 +526,7 @@ export interface CommissionTier {
 }
 
 /**
- * Master -> Komisi: satu-satunya sumber aturan komisi.
+ * Komisi -> tab Aturan: satu-satunya sumber aturan komisi.
  * Satu pengaturan = satu peran + layanan + jenis kendaraan, dengan beberapa
  * tingkat. Komisi tiap trip dihitung otomatis dari aturan yang paling cocok.
  */

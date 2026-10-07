@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { FaEye, FaPrint, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader } from '../components/ui/Card'
+import { Tabs } from '../components/ui/Tabs'
 import { Button } from '../components/ui/Button'
 import { Field, DateInput, Radio, FieldError } from '../components/ui/Field'
 import { SearchableSelect } from '../components/ui/SearchableSelect'
@@ -16,6 +18,7 @@ import { formatDate, formatNumber, formatRupiah } from '../lib/format'
 import { groupBy } from '../lib/utils'
 import { usePeriodeDefault } from '../lib/periode'
 import type { TransactionRow } from '../types'
+import { KomisiPage } from './KomisiPage'
 
 type Mode = 'perSopir' | 'semuaSopir' | 'global'
 
@@ -25,7 +28,51 @@ const MODE_LABEL: Record<Mode, string> = {
   global: 'Cetak Komisi Global',
 }
 
+const TAB_IDS = ['laporan', 'aturan'] as const
+type TabId = (typeof TAB_IDS)[number]
+
+/**
+ * Laporan -> Komisi: laporan komisi sopir dan aturan tarifnya di satu tempat.
+ * Tab Laporan = cetak komisi per periode; tab Aturan = aturan komisi yang dipakai
+ * menghitung komisi setiap trip (dulu menu Master Data -> Aturan Komisi).
+ */
 export function LapKomisiPage() {
+  const [params, setParams] = useSearchParams()
+  // Tab dibaca langsung dari alamat, supaya tautan ?tab=aturan (mis. dari alamat lama
+  // Master Data -> Aturan Komisi) dan klik menu Komisi selalu cocok dengan isinya.
+  const dariUrl = params.get('tab')
+  const tab: TabId = TAB_IDS.includes(dariUrl as TabId) ? (dariUrl as TabId) : 'laporan'
+
+  function gantiTab(t: string) {
+    const p = new URLSearchParams(params)
+    if (t === 'laporan') p.delete('tab')
+    else p.set('tab', t)
+    setParams(p, { replace: true })
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="Komisi"
+        crumbs={[{ label: 'Laporan' }, { label: 'Komisi' }]}
+        description="Tab Laporan untuk mencetak komisi sopir per periode; tab Aturan untuk mengatur tarif komisi yang dipakai menghitung setiap trip."
+      />
+      <Card className="mb-4">
+        <Tabs
+          value={tab}
+          onChange={gantiTab}
+          className="px-2"
+          items={[{ id: 'laporan', label: 'Laporan' }, { id: 'aturan', label: 'Aturan' }]}
+        />
+      </Card>
+      {tab === 'laporan' && <LaporanKomisi />}
+      {tab === 'aturan' && <KomisiPage tertanam />}
+    </>
+  )
+}
+
+/** Tab Laporan: cetak komisi bulan berjalan (per sopir, seluruh sopir, atau rekap global). */
+function LaporanKomisi() {
   const { db, transactionRows } = useData()
   const toast = useToast()
 
@@ -204,12 +251,6 @@ export function LapKomisiPage() {
 
   return (
     <>
-      <PageHeader
-        title="Cetak Komisi Bulan Berjalan"
-        crumbs={[{ label: 'Laporan' }, { label: 'Komisi' }]}
-        description="Pilih periode dan jenis laporan, lalu buka preview sebelum mencetak atau menyimpan sebagai PDF."
-      />
-
       <div className="grid gap-4 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
         <Card className="h-fit">
           <CardHeader title="PERIODE KOMISI" subtitle="Tentukan rentang tanggal transaksi." />

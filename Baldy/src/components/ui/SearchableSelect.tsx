@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FaCheck, FaMagnifyingGlass, FaSort, FaXmark } from './icons'
+import { FaCheck, FaMagnifyingGlass, FaPlus, FaSort, FaXmark } from './icons'
 import { cn, matchesQuery } from '../../lib/utils'
 
 export interface Option {
@@ -9,6 +9,15 @@ export interface Option {
   meta?: string
   /** Teks tambahan yang ikut dicari tapi tidak ditampilkan. */
   keywords?: string
+}
+
+/** Aksi di baris pertama daftar, mis. "Tambah rute baru" saat pilihan yang dicari belum ada. */
+export interface AksiTambahan {
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  /** Keterangan kecil di bawah label, mis. alasan aksi dinonaktifkan. */
+  hint?: string
 }
 
 interface Props {
@@ -22,6 +31,8 @@ interface Props {
   invalid?: boolean
   clearable?: boolean
   id?: string
+  /** Selalu tampil paling atas di daftar, juga saat pencarian tidak menemukan apa pun. */
+  tambahan?: AksiTambahan
 }
 
 /** Dropdown dengan autocomplete — dipakai untuk daftar Sopir / Route / SI-JO. */
@@ -36,6 +47,7 @@ export function SearchableSelect({
   invalid,
   clearable = true,
   id,
+  tambahan,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -137,6 +149,26 @@ export function SearchableSelect({
               className="w-full bg-transparent text-[13px] text-ink placeholder:text-ink-3/70 focus:outline-none"
             />
           </div>
+          {/* Di luar listbox: bukan pilihan, jadi tidak ikut navigasi panah & Enter. */}
+          {tambahan && (
+            <div className="border-b border-hairline py-1">
+              <button
+                type="button"
+                disabled={tambahan.disabled}
+                onClick={() => {
+                  setOpen(false)
+                  tambahan.onClick()
+                }}
+                className="flex w-full items-start gap-2 px-3 py-1.5 text-left text-[13px] font-medium text-brand-700 transition-colors enabled:hover:bg-brand-50 disabled:cursor-not-allowed disabled:text-ink-3"
+              >
+                <FaPlus size={13} className="mt-0.5 shrink-0" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{tambahan.label}</span>
+                  {tambahan.hint && <span className="block text-[11.5px] font-normal text-ink-3">{tambahan.hint}</span>}
+                </span>
+              </button>
+            </div>
+          )}
           <ul role="listbox" className="max-h-60 overflow-y-auto py-1">
             {filtered.length === 0 && <li className="px-3 py-6 text-center text-[12px] text-ink-3">{emptyText}</li>}
             {filtered.map((o, i) => (

@@ -7,9 +7,8 @@ import type { Column } from '../components/ui/DataTable'
 import { Pagination } from '../components/ui/Pagination'
 import { FilterField, SearchInput, Toolbar } from '../components/ui/Toolbar'
 import { Button, IconButton } from '../components/ui/Button'
-import { Modal, ConfirmDialog } from '../components/ui/Modal'
-import { Field, Input, Select } from '../components/ui/Field'
-import { CurrencyInput } from '../components/ui/CurrencyInput'
+import { ConfirmDialog } from '../components/ui/Modal'
+import { Select } from '../components/ui/Field'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState, NotFoundState } from '../components/ui/States'
 import { PrintDocument, PrintPage, chunkRows } from '../components/report/PrintDocument'
@@ -21,14 +20,8 @@ import { useWorkspace } from '../store/WorkspaceProvider'
 import { useTable } from '../lib/useTable'
 import { matchesQuery, sum } from '../lib/utils'
 import { formatNumber, formatRupiah } from '../lib/format'
-import { buatKodeUnik } from '../lib/kode'
-import { KodeInput } from '../components/ui/KodeInput'
-import type { Route, RouteNominal } from '../types'
-
-type FormState = Omit<Route, 'id' | 'created_at' | 'updated_at'>
-
-const BLANK: FormState = { route_code: '', route_name: '', project_id: '', feet: '1X40', ujroute: 0, toll: 0, commissioner: 0, price: 0, estimated_fields: [] }
-const FEET_OPTIONS = ['1X20', '1X40', '2X20', '1X20K', '1X40K']
+import type { Route } from '../types'
+import { FEET_OPTIONS, ModalRute } from './master/FormRute'
 
 /** Nominal route; yang masih perkiraan diberi keterangan kecil di bawahnya. */
 function Nominal({ nilai, kira, tebal }: { nilai: number; kira?: boolean; tebal?: boolean }) {
@@ -45,7 +38,7 @@ function Nominal({ nilai, kira, tebal }: { nilai: number; kira?: boolean; tebal?
 }
 
 export function DataRoutePage() {
-  const { db, loading, error, reload, create, update, remove } = useData()
+  const { db, loading, error, reload, remove } = useData()
   const { canEdit } = useAuth()
   const toast = useToast()
   /** Feet = ukuran container, hanya untuk rute container Priok. Rute Karawang (alat berat) tidak memakainya. */
@@ -53,8 +46,6 @@ export function DataRoutePage() {
 
   const [editing, setEditing] = useState<Route | null>(null)
   const [formOpen, setFormOpen] = useState(false)
-  const [form, setForm] = useState<FormState>(BLANK)
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
   const [deleting, setDeleting] = useState<Route | null>(null)
   const [feetFilter, setFeetFilter] = useState('')
   const [projectFilter, setProjectFilter] = useState('')
@@ -77,64 +68,11 @@ export function DataRoutePage() {
   const resetFilter = () => { table.reset(); setFeetFilter(''); setProjectFilter('') }
 
   function openCreate() {
-    setEditing(null); setForm({ ...BLANK, feet: pakaiFeet ? BLANK.feet : '', route_code: buatKodeUnik(db.routes.map((r) => r.route_code)) }); setErrors({}); setFormOpen(true)
-  }
-
-  /** Tombol Generate: kode unik (timestamp + 7 huruf acak) yang belum dipakai route lain. */
-  function generateKode() {
-    const terpakai = db.routes.filter((r) => r.id !== editing?.id).map((r) => r.route_code)
-    setForm((f) => ({ ...f, route_code: buatKodeUnik(terpakai) }))
-    setErrors((e) => ({ ...e, route_code: undefined }))
+    setEditing(null); setFormOpen(true)
   }
 
   function openEdit(r: Route) {
-    setEditing(r)
-    setForm({
-      route_code: r.route_code, route_name: r.route_name, project_id: r.project_id ?? '', feet: r.feet,
-      ujroute: r.ujroute, toll: r.toll ?? 0, commissioner: r.commissioner, price: r.price, estimated_fields: r.estimated_fields ?? [],
-    })
-    setErrors({}); setFormOpen(true)
-  }
-
-  const hargaWajib = !editing || editing.price > 0
-  // Route dari data asli belum punya ukuran container; wajib dipilih hanya untuk route baru.
-  const feetWajib = pakaiFeet && (!editing || !!editing.feet)
-  // Klien trip diambil dari rutenya, jadi rute baru wajib punya klien. Rute lama yang
-  // belum punya klien tetap bisa disimpan saat hanya mengubah nominal.
-  const klienWajib = !editing || !!editing.project_id
-
-  /** Nominal perkiraan yang belum diubah di form ini. */
-  const masihKira = (k: RouteNominal) => !!editing?.estimated_fields?.includes(k) && form[k] === (editing[k] ?? 0)
-
-  function validate(): boolean {
-    const e: Partial<Record<keyof FormState, string>> = {}
-    const code = form.route_code.trim()
-    if (!code) e.route_code = 'No. Route wajib diisi. Klik Generate untuk membuatnya otomatis.'
-    else if (db.routes.some((r) => r.route_code.toLowerCase() === code.toLowerCase() && r.id !== editing?.id))
-      e.route_code = 'No. Route sudah dipakai. Gunakan kode lain.'
-    if (!form.route_name.trim()) e.route_name = 'Nama Route wajib diisi.'
-    if (klienWajib && !form.project_id) e.project_id = 'Klien wajib dipilih: trip yang memakai rute ini otomatis milik klien ini.'
-    if (feetWajib && !form.feet) e.feet = 'Feet wajib dipilih.'
-    // Route dari data asli belum punya harga; jangan paksa diisi saat hanya mengubah UJ / tol.
-    if (hargaWajib && form.price <= 0) e.price = 'Harga harus lebih dari 0.'
-    if (form.ujroute < 0) e.ujroute = 'UJROUTE tidak boleh negatif.'
-    if (form.toll < 0) e.toll = 'Uang Tol tidak boleh negatif.'
-    setErrors(e)
-    return Object.keys(e).length === 0
-  }
-
-  function onSubmit() {
-    if (!validate()) return
-    const payload = {
-      ...form,
-      route_code: form.route_code.trim().toUpperCase(),
-      route_name: form.route_name.trim(),
-      // Nominal perkiraan yang diubah admin sudah bukan perkiraan lagi.
-      estimated_fields: (editing?.estimated_fields ?? []).filter((k) => form[k] === (editing![k] ?? 0)),
-    }
-    if (editing) { update('routes', editing.id, payload); toast.success('Data berhasil diperbarui.') }
-    else { create('routes', payload); toast.success('Data berhasil disimpan.') }
-    setFormOpen(false)
+    setEditing(r); setFormOpen(true)
   }
 
   function onDelete() {
@@ -309,66 +247,8 @@ export function DataRoutePage() {
         )}
       </Card>
 
-      <Modal
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
-        title={editing ? 'Ubah Rute' : 'Tambah Rute'}
-        subtitle={editing ? `No. Route ${editing.route_code}` : 'Tanda * wajib diisi. Nominal otomatis diformat Rupiah.'}
-        footer={
-          <>
-            <Button onClick={() => setFormOpen(false)}>Batal</Button>
-            <Button variant="primary" onClick={onSubmit}>{editing ? 'Simpan Perubahan' : 'Simpan'}</Button>
-          </>
-        }
-      >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            label="No. Route"
-            required
-            error={errors.route_code}
-            className="sm:col-span-2"
-            hint={errors.route_code ? undefined : 'Terisi otomatis dan dijamin unik. Klik Generate untuk kode baru, atau ketik sendiri.'}
-          >
-            {(id) => (
-              <KodeInput id={id} value={form.route_code} invalid={!!errors.route_code} uppercase
-                placeholder="Klik Generate atau ketik manual" generateTitle="Buat No. Route unik otomatis"
-                onChange={(v) => setForm({ ...form, route_code: v })} onGenerate={generateKode} />
-            )}
-          </Field>
-          <Field label="Klien" required={klienWajib} error={errors.project_id}
-            hint={errors.project_id ? undefined : 'Trip yang memakai rute ini otomatis tercatat ke klien ini, jadi klien tidak dipilih lagi di form trip.'}>
-            {(id) => (
-              <Select id={id} value={form.project_id} invalid={!!errors.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })}>
-                <option value="">{klienWajib ? '— pilih klien —' : '— belum ditentukan —'}</option>
-                {db.projects.map((p) => <option key={p.id} value={p.id}>{p.project_code} — {p.project_name}</option>)}
-              </Select>
-            )}
-          </Field>
-          {pakaiFeet && (
-          <Field label="Feet" required={feetWajib} error={errors.feet} hint={!form.feet && !errors.feet ? 'Data asli belum mencatat ukuran container route ini.' : undefined}>
-            {(id) => (
-              <Select id={id} value={form.feet} invalid={!!errors.feet} onChange={(e) => setForm({ ...form, feet: e.target.value })}>
-                {!feetWajib && <option value="">— belum diisi —</option>}
-                {FEET_OPTIONS.map((f) => <option key={f} value={f}>{f}</option>)}
-              </Select>
-            )}
-          </Field>
-          )}
-          <Field label="Nama Route" required error={errors.route_name} className="sm:col-span-2"
-            hint={errors.route_name ? undefined : 'Tulis ASAL - TUJUAN, mis. CIB - DURI: dipakai sebagai lokasi muat & bongkar di Berita Acara. Rute backload, mis. DURI - CIB BCKLD.'}>
-            {(id) => <Input id={id} value={form.route_name} invalid={!!errors.route_name} placeholder="CIB - DURI" onChange={(e) => setForm({ ...form, route_name: e.target.value })} />}
-          </Field>
-          <Field label="UJROUTE" required error={errors.ujroute} hint={errors.ujroute ? undefined : masihKira('ujroute') ? 'Masih perkiraan. Ganti dengan nilai sebenarnya bila sudah tahu.' : 'Patokan uang jalan. Termin dicatat di trip saat dibayar.'}>
-            {(id) => <CurrencyInput id={id} value={form.ujroute} invalid={!!errors.ujroute} onValueChange={(v) => setForm({ ...form, ujroute: v })} />}
-          </Field>
-          <Field label="Uang Tol" error={errors.toll} hint={errors.toll ? undefined : masihKira('toll') ? 'Masih perkiraan. Ganti dengan nilai sebenarnya bila sudah tahu.' : 'Patokan tol. Yang dibayar dicatat di biaya operasional trip.'}>
-            {(id) => <CurrencyInput id={id} value={form.toll} invalid={!!errors.toll} onValueChange={(v) => setForm({ ...form, toll: v })} />}
-          </Field>
-          <Field label="Harga" required={hargaWajib} error={errors.price} hint={errors.price ? undefined : masihKira('price') ? 'Masih perkiraan. Ganti dengan nilai sebenarnya bila sudah tahu.' : 'Komisi sopir kini diatur di Master Data → Aturan Komisi.'}>
-            {(id) => <CurrencyInput id={id} value={form.price} invalid={!!errors.price} onValueChange={(v) => setForm({ ...form, price: v })} />}
-          </Field>
-        </div>
-      </Modal>
+      {/* Form rute dipakai bersama form trip (tambah rute di tempat). */}
+      <ModalRute open={formOpen} rute={editing} onClose={() => setFormOpen(false)} />
 
       <ConfirmDialog
         open={!!deleting}

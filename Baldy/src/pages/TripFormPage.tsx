@@ -17,12 +17,13 @@ import { formatRupiah, todayISO } from '../lib/format'
 import { hitungKomisiTrip } from '../lib/komisi'
 import { buatKodeUnik, nomorSuratJalanBerikut, nomorTripBerikut } from '../lib/kode'
 import { cn } from '../lib/utils'
-import type { CommissionTransaction, JobOrder, ServiceType, TripStatus } from '../types'
+import type { CommissionTransaction, JobOrder, Route, ServiceType, TripStatus } from '../types'
 import { STATUS_FORM, STATUS_LABEL } from './trip/status'
 import { PakaiNilai } from './trip/bagian'
 import { KodeInput } from '../components/ui/KodeInput'
 import { LampiranInput } from '../components/ui/Lampiran'
 import { FormTripKarawang } from './trip/FormTripKarawang'
+import { ModalRute } from './master/FormRute'
 
 type FormState = Omit<CommissionTransaction, 'id' | 'created_at' | 'updated_at' | 'workspace'>
 
@@ -126,6 +127,9 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     }
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  /** Modal tambah rute di tempat, supaya tidak perlu bolak-balik ke menu Rute. */
+  const [tambahRute, setTambahRute] = useState(false)
+  const bolehTambahRute = bisa('master')
 
   const dedicated = form.service_type === 'dedicated'
 
@@ -309,8 +313,9 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
    * Klien kontrak -> Dedicated, dan kontraknya terpilih bila hanya ada satu. Tujuan &
    * Harga yang sudah diganti manual tidak ditimpa; Kepada Yth ikut nama klien bila kosong.
    */
-  function applyRoute(routeId: string | null) {
-    const route = db.routes.find((r) => r.id === routeId)
+  function applyRoute(routeId: string | null, ruteBaru?: Route) {
+    // Rute yang baru ditambahkan dari form ini belum ada di daftar render ini.
+    const route = ruteBaru ?? db.routes.find((r) => r.id === routeId)
     const klienRute = klienMap.get(route?.project_id ?? '')
     const kontrakKlien = klienRute?.client_type === 'kontrak'
       ? db.contracts.filter((c) => c.project_id === klienRute.id && c.status === 'aktif')
@@ -714,7 +719,13 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                     invalid={!!errors.route_id}
                     placeholder="Pilih rute..."
                     searchPlaceholder="Ketik nama atau kode rute..."
-                    onChange={applyRoute}
+                    onChange={(v) => applyRoute(v)}
+                    tambahan={{
+                      label: 'Tambah rute baru',
+                      disabled: !bolehTambahRute,
+                      hint: bolehTambahRute ? undefined : 'Perlu Manager atau Owner.',
+                      onClick: () => setTambahRute(true),
+                    }}
                   />
                 )}
               </Field>
@@ -961,6 +972,15 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
           </Section>
         </div>
       )}
+
+      <ModalRute
+        open={tambahRute}
+        onClose={() => setTambahRute(false)}
+        awal={{ project_id: form.project_id }}
+        keterangan="Rute baru langsung dipilih untuk trip ini. Tanda * wajib diisi."
+        pesanSukses={(r) => `Rute ${r.route_name} tersimpan dan dipilih untuk trip ini.`}
+        onSaved={(r) => applyRoute(r.id, r)}
+      />
 
       {/* Bar dimulai setelah rel sidebar (68px) supaya teks kirinya tidak tertutup. */}
       <div className={cn('no-print fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-surface/95 backdrop-blur', 'px-4 py-3 lg:left-[68px] lg:px-6')}>

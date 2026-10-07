@@ -13,7 +13,6 @@ import { DataRoutePage } from './pages/DataRoutePage'
 import { DataMobilPage } from './pages/DataMobilPage'
 import { KlienPage } from './pages/KlienPage'
 import { KlienDetailPage } from './pages/KlienDetailPage'
-import { KomisiPage } from './pages/KomisiPage'
 import { TripDetailPage } from './pages/TripDetailPage'
 import { LapPengeluaranPage } from './pages/LapPengeluaranPage'
 import { TripListPage } from './pages/TripListPage'
@@ -56,7 +55,8 @@ export function App() {
                   {/* Alamat lama: Data Project kini Klien, dan kontrak dikelola di halaman klien */}
                   <Route path="/master/project" element={<Navigate to="/master/klien" replace />} />
                   <Route path="/master/kontrak" element={<Navigate to="/master/klien" replace />} />
-                  <Route path="/master/komisi" element={<KomisiPage />} />
+                  {/* Alamat lama: Aturan Komisi kini tab Aturan di halaman Komisi */}
+                  <Route path="/master/komisi" element={<Navigate to="/laporan/komisi?tab=aturan" replace />} />
 
                   <Route path="/transaksi/trip" element={<TripListPage />} />
                   <Route path="/transaksi/trip/tambah" element={<TripFormPage mode="create" />} />

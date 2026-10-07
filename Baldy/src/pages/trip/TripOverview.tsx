@@ -184,7 +184,7 @@ export function TripOverview({ trip }: { trip: TransactionRow }) {
         )}
 
         <Card>
-          <CardHeader title="Komisi" subtitle="Dihitung otomatis dari Master → Komisi." />
+          <CardHeader title="Komisi" subtitle="Dihitung otomatis dari Komisi → tab Aturan." />
           <dl className="grid grid-cols-2 gap-4 p-4">
             <InfoItem label="Sopir utama" value={formatRupiah(trip.komisi_sopir)} mono />
             <InfoItem label="Manager" value={trip.manager_id || trip.manager_name ? formatRupiah(trip.komisi_manager) : '—'} mono />

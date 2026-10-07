@@ -122,12 +122,13 @@ function NilaiKomisi({
 }
 
 /**
- * Master -> Komisi.
- * Satu pengaturan = satu peran (sopir / manager) dengan beberapa tingkat
- * target. Halaman ini hanya untuk mengatur nilai - pencapaian dilaporkan di
- * menu laporan, bukan di sini.
+ * Aturan komisi: tab Aturan di halaman Laporan -> Komisi (dulu menu Master Data ->
+ * Aturan Komisi). Satu pengaturan = satu peran (sopir / manager) dengan beberapa
+ * tingkat target. Di sini hanya mengatur nilai; pencapaiannya dilaporkan di tab Laporan.
+ *
+ * `tertanam`: dirender sebagai tab di halaman Komisi, tanpa kepala halaman sendiri.
  */
-export function KomisiPage() {
+export function KomisiPage({ tertanam = false }: { tertanam?: boolean } = {}) {
   const { db, loading, error, reload, create, update, remove } = useData()
   const { canEdit } = useAuth()
   const toast = useToast()
@@ -281,15 +282,15 @@ export function KomisiPage() {
 
   return (
     <>
-      <PageHeader
-        title="Aturan Komisi"
-        crumbs={[{ label: 'Master Data' }, { label: 'Aturan Komisi' }]}
-        actions={
-          <Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}>
-            Tambah Komisi
-          </Button>
-        }
-      />
+      {!tertanam && (
+        <PageHeader title="Aturan Komisi" crumbs={[{ label: 'Laporan' }, { label: 'Komisi', to: '/laporan/komisi' }, { label: 'Aturan' }]} />
+      )}
+
+      <p className="mb-3 max-w-3xl px-1 text-[13px] leading-relaxed text-ink-2">
+        Aturan komisi menentukan besar komisi sopir dan manager. Komisi setiap trip dihitung otomatis: sistem memakai
+        aturan aktif yang cocok dengan peran, layanan, dan jenis kendaraan trip itu, lalu memilih tingkat sesuai nilai
+        dasarnya (biasanya harga trip). Hasilnya langsung tampil di detail trip dan laporan komisi.
+      </p>
 
       <Card>
         <Toolbar
@@ -304,7 +305,14 @@ export function KomisiPage() {
               {peran && <Button size="sm" variant="ghost" icon={<FaXmark size={14} />} onClick={() => setPeran('')}>Reset</Button>}
             </>
           }
-          right={<span className="text-[12.5px] text-ink-3">{db.commissionSchemes.length} pengaturan komisi</span>}
+          right={
+            <>
+              <span className="text-[12.5px] text-ink-3">{db.commissionSchemes.length} pengaturan komisi</span>
+              <Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}>
+                Tambah Komisi
+              </Button>
+            </>
+          }
         />
         <DataTable
           columns={columns}

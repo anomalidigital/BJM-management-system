@@ -575,7 +575,7 @@ function makeInternalCosts(trips: CommissionTransaction[]): InternalCost[] {
 }
 
 /**
- * Daftar tarif komisi (halaman Master -> Komisi).
+ * Daftar tarif komisi (halaman Komisi, tab Aturan).
  * Contoh mengikuti pola yang diberikan klien: satu aturan bernominal Rupiah
  * dan satu aturan berpersen, supaya kedua bentuk isian terlihat.
  */
