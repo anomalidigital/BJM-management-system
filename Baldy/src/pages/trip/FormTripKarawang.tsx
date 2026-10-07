@@ -22,6 +22,7 @@ import { cn } from '../../lib/utils'
 import type { CommissionTransaction, Route, ServiceType, TripStatus } from '../../types'
 import { STATUS_LABEL } from './status'
 import { PakaiNilai } from './bagian'
+import { KunciTrip, tripSudahJalan } from './KunciTrip'
 import { ModalRute } from '../master/FormRute'
 
 /** Satu mobil di form: tersimpan sebagai satu trip. */
@@ -132,6 +133,10 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
   })
   const [galat, setGalat] = useState<Galat>({})
   const [pilihAsal, setPilihAsal] = useState(false)
+  /** Trip Aktif / Selesai: rute, layanan, kendaraan, sopir, nomor trip dikunci; Manager / Owner boleh membuka. */
+  const sudahJalan = mode === 'edit' && tripSudahJalan(existing?.status)
+  const [bukaKunci, setBukaKunci] = useState(false)
+  const kunci = sudahJalan && !bukaKunci
   /** Modal tambah rute di tempat, supaya admin tidak bolak-balik ke menu Rute. */
   const [tambahRute, setTambahRute] = useState(false)
   const bolehTambahRute = bisa('master')
@@ -421,11 +426,14 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
     mobil.forEach((m, i) => {
       if (wajib(!!existing?.vehicle_id) && !m.vehicle_id) e[`m${i}.vehicle`] = 'No. Kendaraan wajib dipilih.'
       const id = m.trip_id.trim().toUpperCase()
-      if (!id) e[`m${i}.id`] = 'ID Perjalanan wajib diisi. Klik Generate untuk membuatnya.'
-      else if (idDiForm.indexOf(id) !== i) e[`m${i}.id`] = 'ID Perjalanan sama dengan mobil lain di form ini.'
-      else {
-        const lain = dbAll.transactions.find((t) => t.id !== existing?.id && (t.trip_ids ?? []).some((x) => x.toUpperCase() === id))
-        if (lain) e[`m${i}.id`] = `ID Perjalanan sudah dipakai Trip ${lain.transaction_no}.`
+      // Mode ubah: ID Perjalanan dikunci dan disimpan apa adanya, jadi tidak diperiksa ulang.
+      if (mode === 'create') {
+        if (!id) e[`m${i}.id`] = 'ID Perjalanan wajib diisi. Klik Generate untuk membuatnya.'
+        else if (idDiForm.indexOf(id) !== i) e[`m${i}.id`] = 'ID Perjalanan sama dengan mobil lain di form ini.'
+        else {
+          const lain = dbAll.transactions.find((t) => t.id !== existing?.id && (t.trip_ids ?? []).some((x) => x.toUpperCase() === id))
+          if (lain) e[`m${i}.id`] = `ID Perjalanan sudah dipakai Trip ${lain.transaction_no}.`
+        }
       }
       const adaSopir = m.driver_ids.some(Boolean)
       if (mode === 'edit' && bersama.status === 'aktif' && !adaSopir && wajib(!!(existing?.driver_ids?.length || existing?.driver_id))) {
@@ -458,8 +466,9 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
       order_date: bersama.order_date,
       service_type: bersama.service_type,
       contract_id: dedicated ? bersama.contract_id : '',
-      // ID lain dari data lama (bila ada) tetap disimpan di belakang ID utama.
-      trip_ids: [m.trip_id.trim().toUpperCase(), ...(existing?.trip_ids ?? []).slice(1)],
+      // Mode ubah: ID Perjalanan terkunci, simpan persis seperti data lama.
+      // Mode tambah: ID dari form (data baru, tidak ada ID lain di belakangnya).
+      trip_ids: existing ? [...(existing.trip_ids ?? [])] : [m.trip_id.trim().toUpperCase()],
       route_id: bersama.route_id,
       tr_numbers: m.tr,
       lokasi_muat: bersama.lokasi_muat.trim(),
@@ -527,6 +536,10 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
         </div>
       )}
 
+      {sudahJalan && existing && (
+        <KunciTrip status={existing.status} terbuka={bukaKunci} bolehBuka={bolehOverride} onBuka={() => setBukaKunci(true)} />
+      )}
+
       {asal && (
         <div className="mb-4 rounded-lg border border-brand-100 bg-brand-50/70 px-4 py-3 text-[12.5px] text-brand-800">
           <p>
@@ -555,9 +568,9 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
         />
         <div className="space-y-4 p-4">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Radio name="layanan" checked={!dedicated} onChange={() => gantiLayanan('callout')} label="Callout"
+            <Radio name="layanan" checked={!dedicated} disabled={kunci} onChange={() => gantiLayanan('callout')} label="Callout"
               description="Order per perjalanan dengan TR dari klien; harga ikut rute." />
-            <Radio name="layanan" checked={dedicated} onChange={() => gantiLayanan('dedicated')} label="Dedicated"
+            <Radio name="layanan" checked={dedicated} disabled={kunci} onChange={() => gantiLayanan('dedicated')} label="Dedicated"
               description="Kendaraan dikontrak satu klien; wajib memilih nomor kontrak." />
           </div>
 
@@ -580,7 +593,7 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
               <Field label="No. Kontrak" required error={galat.contract_id}
                 hint={galat.contract_id ? undefined : db.contracts.length === 0 ? <>Belum ada kontrak. Tambahkan di menu <Link to="/master/klien" className="text-brand-700 underline">Klien / Pelanggan</Link>.</> : 'Kontrak aktif di workspace ini.'}>
                 {(fid) => (
-                  <SearchableSelect id={fid} options={contractOptions} value={bersama.contract_id || null} invalid={!!galat.contract_id}
+                  <SearchableSelect id={fid} options={contractOptions} value={bersama.contract_id || null} invalid={!!galat.contract_id} disabled={kunci}
                     placeholder="Pilih nomor kontrak..." searchPlaceholder="Ketik nomor kontrak atau klien..." onChange={pilihKontrak} />
                 )}
               </Field>
@@ -607,6 +620,7 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
                 required={!dedicated && wajib(!!existing?.route_id)}
                 error={galat.route_id}
                 hint={galat.route_id ? undefined
+                  : kunci ? 'Dikunci karena trip sudah jalan.'
                   : !rute ? (backload && bersama.lokasi_muat
                     ? `Rute dari ${bersama.lokasi_muat} tampil paling atas. Belum ada? ${bolehTambahRute ? 'Pilih "Tambah rute baru" di daftar.' : 'Minta Manager atau Owner menambahkannya.'}`
                     : dedicated ? 'Opsional untuk Dedicated: patokan uang jalan & lokasi.' : 'Klien, harga, dan patokan uang jalan ikut rute.')
@@ -615,9 +629,9 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
                   : 'UJROUTE rute jadi patokan uang jalan.'}
               >
                 {(fid) => (
-                  <SearchableSelect id={fid} options={routeOptions} value={bersama.route_id || null} invalid={!!galat.route_id}
+                  <SearchableSelect id={fid} options={routeOptions} value={bersama.route_id || null} invalid={!!galat.route_id} disabled={kunci}
                     placeholder="Pilih rute..." searchPlaceholder="Ketik nama atau kode rute..." onChange={(v) => pilihRute(v)}
-                    tambahan={{
+                    tambahan={kunci ? undefined : {
                       label: 'Tambah rute baru',
                       disabled: !bolehTambahRute,
                       hint: bolehTambahRute ? undefined : 'Perlu Manager atau Owner.',
@@ -689,7 +703,8 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
             mode={mode}
             m={m}
             galat={galat}
-            terkunci={backload}
+            terkunci={backload || kunci}
+            alasanKunci={backload ? 'Mengikuti trip asal backload.' : 'Dikunci karena trip sudah jalan.'}
             dedicated={dedicated}
             hargaRoute={rute?.price ?? 0}
             bolehOverride={bolehOverride}
@@ -754,9 +769,9 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
             </Field>
           )}
           {mode === 'edit' && (
-            <Field label="Nomor Trip" required error={galat.transaction_no} hint={galat.transaction_no ? undefined : 'Nomor urut otomatis per bulan.'}>
+            <Field label="Nomor Trip" required error={galat.transaction_no} hint={galat.transaction_no ? undefined : kunci ? 'Dikunci karena trip sudah jalan.' : 'Nomor urut otomatis per bulan.'}>
               {(fid) => (
-                <KodeInput id={fid} value={bersama.transaction_no} invalid={!!galat.transaction_no}
+                <KodeInput id={fid} value={bersama.transaction_no} invalid={!!galat.transaction_no} readOnly={kunci}
                   generateTitle="Buat nomor trip berikutnya untuk bulan tanggal trip"
                   onChange={(v) => setB('transaction_no', v)}
                   onGenerate={() => setB('transaction_no', nomorTripBerikut(
@@ -808,7 +823,7 @@ interface Opsi { value: string; label: string; meta?: string; keywords?: string 
 
 /** Satu mobil: kendaraan, sopir, ID Perjalanan, TR, dan harga. */
 function KartuMobil({
-  urutan, jumlah, nomor, mode, m, galat, terkunci, dedicated, hargaRoute, bolehOverride, vehicleOptions, sopirOptions, trLain,
+  urutan, jumlah, nomor, mode, m, galat, terkunci, alasanKunci, dedicated, hargaRoute, bolehOverride, vehicleOptions, sopirOptions, trLain,
   onKendaraan, onSopir, onTambahSopir, onHapusSopir, onId, onGenerateId, onTr, onHarga, onHapus,
 }: {
   urutan: number
@@ -817,8 +832,9 @@ function KartuMobil({
   mode: 'create' | 'edit'
   m: MobilForm
   galat: Galat
-  /** Backload: kendaraan & sopir mengikuti trip asal. */
+  /** Kendaraan & sopir dikunci: backload (mengikuti trip asal) atau trip yang sudah jalan. */
   terkunci: boolean
+  alasanKunci: string
   dedicated: boolean
   hargaRoute: number
   bolehOverride: boolean
@@ -855,7 +871,7 @@ function KartuMobil({
       />
       <div className="grid gap-4 p-4 lg:grid-cols-2">
         <Field label="No. Kendaraan" required={mode === 'create'} error={g('vehicle')}
-          hint={g('vehicle') ? undefined : terkunci ? 'Mengikuti trip asal backload.'
+          hint={g('vehicle') ? undefined : terkunci ? alasanKunci
             : m.otomatis.kendaraan ? `Terisi dari trip terakhir ${m.otomatis.kendaraan}. Ganti bila beda.` : 'Head unit. Memilih mobil ikut mengisi sopir terakhirnya.'}>
           {(fid) => (
             <SearchableSelect id={fid} options={vehicleOptions} value={m.vehicle_id || null} invalid={!!g('vehicle')} disabled={terkunci}
@@ -863,7 +879,7 @@ function KartuMobil({
           )}
         </Field>
         <Field label="Sopir" error={g('sopir')}
-          hint={g('sopir') ? undefined : terkunci ? 'Mengikuti trip asal backload.'
+          hint={g('sopir') ? undefined : terkunci ? alasanKunci
             : m.otomatis.sopir ? `Terisi dari trip terakhir mobil ${m.otomatis.sopir}. Ganti bila beda.`
             : m.driver_ids.length > 1 ? 'Sopir pertama adalah sopir utama (penerima komisi).' : 'Boleh dikosongkan dulu: trip tersimpan sebagai Menunggu Sopir.'}>
           {(fid) => (
@@ -883,10 +899,12 @@ function KartuMobil({
             </div>
           )}
         </Field>
-        <Field label="ID Perjalanan" required error={g('id')}
-          hint={g('id') ? undefined : terkunci ? 'ID trip asal + BL, supaya backload tetap terhubung.' : 'Satu ID per trip, dibuat otomatis. Boleh diganti.'}>
+        <Field label="ID Perjalanan" required={mode === 'create'} error={g('id')}
+          hint={g('id') ? undefined : mode === 'edit' ? 'ID Perjalanan dikunci setelah trip tersimpan.'
+            : terkunci ? 'ID trip asal + BL, supaya backload tetap terhubung.' : 'Satu ID per trip, dibuat otomatis. Boleh diganti.'}>
           {(fid) => (
-            <KodeInput id={fid} value={m.trip_id} invalid={!!g('id')} uppercase placeholder="Klik Generate"
+            <KodeInput id={fid} value={m.trip_id} invalid={!!g('id')} uppercase readOnly={mode === 'edit'}
+              placeholder={mode === 'edit' ? 'Belum ada ID Perjalanan' : 'Klik Generate'}
               generateTitle="Buat ID Perjalanan unik" onChange={onId} onGenerate={onGenerateId} />
           )}
         </Field>

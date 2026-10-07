@@ -16,7 +16,7 @@ import {
   faClipboardCheck, faCompass, faDatabase, faDownload, faEllipsis, faEye, faEyeSlash, faFileArrowDown,
   faFileContract, faFileExport, faFileInvoiceDollar, faFileLines, faFlagCheckered, faFloppyDisk, faGasPump,
   faGaugeHigh, faHandHoldingDollar, faHandshake, faHashtag, faImage, faInbox, faKey, faLink, faListCheck,
-  faLocationDot, faMagnifyingGlass, faMagnifyingGlassMinus, faMinus, faMugHot, faPaperPlane, faPen, faPercent,
+  faLocationDot, faLock, faLockOpen, faMagnifyingGlass, faMagnifyingGlassMinus, faMinus, faMugHot, faPaperPlane, faPen, faPercent,
   faPlus, faPrint, faReceipt, faRightFromBracket, faRightToBracket, faRotateLeft, faRoute, faSackDollar,
   faScissors, faScrewdriverWrench, faShieldHalved, faShip, faSort, faTrashCan, faTriangleExclamation, faTruck,
   faTruckFast, faTruckRampBox, faUser, faUserPlus, faUsers, faWallet, faWandMagicSparkles, faWarehouse,
@@ -102,6 +102,8 @@ export const FaKey = ikon(faKey)
 export const FaLink = ikon(faLink)
 export const FaListCheck = ikon(faListCheck)
 export const FaLocationDot = ikon(faLocationDot)
+export const FaLock = ikon(faLock)
+export const FaLockOpen = ikon(faLockOpen)
 export const FaMagnifyingGlass = ikon(faMagnifyingGlass)
 export const FaMagnifyingGlassMinus = ikon(faMagnifyingGlassMinus)
 export const FaMinus = ikon(faMinus)

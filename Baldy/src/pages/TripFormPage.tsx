@@ -23,6 +23,7 @@ import { PakaiNilai } from './trip/bagian'
 import { KodeInput } from '../components/ui/KodeInput'
 import { LampiranInput } from '../components/ui/Lampiran'
 import { FormTripKarawang } from './trip/FormTripKarawang'
+import { KunciTrip, tripSudahJalan } from './trip/KunciTrip'
 import { ModalRute } from './master/FormRute'
 
 type FormState = Omit<CommissionTransaction, 'id' | 'created_at' | 'updated_at' | 'workspace'>
@@ -127,6 +128,10 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     }
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  /** Trip Aktif / Selesai: rute, layanan, kendaraan, sopir, nomor trip dikunci; Manager / Owner boleh membuka. */
+  const sudahJalan = mode === 'edit' && tripSudahJalan(existing?.status)
+  const [bukaKunci, setBukaKunci] = useState(false)
+  const kunci = sudahJalan && !bukaKunci
   /** Modal tambah rute di tempat, supaya tidak perlu bolak-balik ke menu Rute. */
   const [tambahRute, setTambahRute] = useState(false)
   const bolehTambahRute = bisa('master')
@@ -401,6 +406,8 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
    * lain, jadi kesamaan dengan trip lain hanya diingatkan, tidak ditolak.
    */
   const idTerisi = form.trip_ids.map(bersih).filter(Boolean)
+  /** Trip yang sudah tersimpan: ID Perjalanan/Trip dikunci, tidak bisa diganti. */
+  const idTerkunci = mode === 'edit'
   const idDipakaiLain = idTerisi
     .map((v) => ({ v, trip: dbAll.transactions.find((t) => t.id !== existing?.id && t.status !== 'batal' && (t.trip_ids ?? []).some((x) => bersih(x) === v)) }))
     .filter((x) => x.trip)
@@ -420,9 +427,12 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     if (wajibRoute && !form.route_id) e.route_id = 'Rute wajib dipilih.'
     if (wajibKendaraan && !form.vehicle_id) e.vehicle_id = 'No. Kendaraan wajib dipilih.'
     if (wajibSopir && !form.driver_ids.some(Boolean)) e.driver_ids = 'Pilih minimal satu sopir, atau ubah status ke Menunggu Sopir.'
-    if (wajibId && idTerisi.length === 0) e.trip_ids = 'Isi minimal satu ID Perjalanan/Trip.'
-    const kembar = idTerisi.find((v, i) => idTerisi.indexOf(v) !== i)
-    if (kembar) e.trip_ids = `ID ${kembar} tertulis dua kali di trip ini.`
+    // Mode ubah: ID Perjalanan/Trip dikunci dan disimpan apa adanya, jadi tidak diperiksa ulang.
+    if (!idTerkunci) {
+      if (wajibId && idTerisi.length === 0) e.trip_ids = 'Isi minimal satu ID Perjalanan/Trip.'
+      const kembar = idTerisi.find((v, i) => idTerisi.indexOf(v) !== i)
+      if (kembar) e.trip_ids = `ID ${kembar} tertulis dua kali di trip ini.`
+    }
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -452,7 +462,8 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
       project_id: (dedicated ? klienKontrak?.id : selectedRoute?.project_id) || form.project_id,
       transaction_no: form.transaction_no.trim(),
       sj_no: form.sj_no.trim(),
-      trip_ids: idTerisi,
+      // Mode ubah: ID Perjalanan/Trip terkunci, simpan persis seperti data lama.
+      trip_ids: idTerkunci ? [...(existing?.trip_ids ?? [])] : idTerisi,
       driver_ids: driverIds,
       driver_id: driverIds[0] ?? '',
       manager_name: form.manager_id ? '' : form.manager_name.trim(),
@@ -525,6 +536,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
       required={wajibSopir}
       error={errors.driver_ids}
       hint={errors.driver_ids ? undefined
+        : kunci ? 'Dikunci karena trip sudah jalan.'
         : otomatis.sopir ? `Terisi dari trip terakhir mobil ${otomatis.sopir}. Ganti bila beda.`
         : menungguSopir && !form.driver_ids.some(Boolean) ? 'Boleh dikosongkan; trip tersimpan sebagai Menunggu Sopir.'
         : form.driver_ids.length > 1 ? 'Sopir pertama adalah sopir utama (penerima komisi).' : 'Memilih sopir ikut mengisi mobil terakhirnya.'}
@@ -538,17 +550,18 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                   id={i === 0 ? fid : undefined}
                   options={sopirOptions(v)}
                   value={v || null}
+                  disabled={kunci}
                   invalid={!!errors.driver_ids && i === 0 && !v}
                   placeholder={i === 0 ? 'Cari kode / nama sopir...' : 'Sopir tambahan...'}
                   onChange={(nv) => ubahSopir(i, nv)}
                 />
               </div>
-              {form.driver_ids.length > 1 && (
+              {form.driver_ids.length > 1 && !kunci && (
                 <IconButton label="Hapus sopir ini" tone="danger" icon={<FaXmark size={14} />} onClick={() => hapusSopir(i)} />
               )}
             </div>
           ))}
-          <Button size="sm" variant="ghost" icon={<FaPlus size={14} />} onClick={tambahSopir}>Tambah sopir</Button>
+          {!kunci && <Button size="sm" variant="ghost" icon={<FaPlus size={14} />} onClick={tambahSopir}>Tambah sopir</Button>}
         </div>
       )}
     </Field>
@@ -560,11 +573,12 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
       required={wajibKendaraan}
       error={errors.vehicle_id}
       hint={errors.vehicle_id ? undefined
+        : kunci ? 'Dikunci karena trip sudah jalan.'
         : otomatis.kendaraan ? `Terisi dari trip terakhir ${otomatis.kendaraan}. Ganti bila beda.`
         : selectedVehicle?.configuration ? `Konfigurasi ${selectedVehicle.configuration}` : 'Memilih mobil ikut mengisi sopir terakhirnya.'}
     >
       {(fid) => (
-        <SearchableSelect id={fid} options={vehicleOptions} value={form.vehicle_id || null} invalid={!!errors.vehicle_id}
+        <SearchableSelect id={fid} options={vehicleOptions} value={form.vehicle_id || null} invalid={!!errors.vehicle_id} disabled={kunci}
           placeholder="Pilih nomor kendaraan..." onChange={pilihKendaraan} />
       )}
     </Field>
@@ -598,6 +612,10 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
         </div>
       )}
 
+      {sudahJalan && existing && (
+        <KunciTrip status={existing.status} terbuka={bukaKunci} bolehBuka={bolehOverride} onBuka={() => setBukaKunci(true)} />
+      )}
+
       <div className="mb-4">
         <Section
           title="Layanan"
@@ -609,6 +627,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
             <Radio
               name="layanan"
               checked={!dedicated}
+              disabled={kunci}
               onChange={() => gantiLayanan('callout')}
               label="Callout"
               description={cabangContainer ? 'Order per perjalanan: penerima, SI/BL, dan nomor container.' : 'Order per perjalanan: penerima, TR, dan No PI.'}
@@ -616,6 +635,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
             <Radio
               name="layanan"
               checked={dedicated}
+              disabled={kunci}
               onChange={() => gantiLayanan('dedicated')}
               label="Dedicated"
               description="Kendaraan dikontrak satu klien. Form ringkas, wajib memilih nomor kontrak."
@@ -631,7 +651,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                 hint={errors.contract_id ? undefined : db.contracts.length === 0 ? <>Belum ada kontrak. Tambahkan di halaman klien, menu <Link to="/master/klien" className="text-brand-700 underline">Klien / Pelanggan</Link>.</> : 'Kontrak aktif di workspace ini.'}
               >
                 {(fid) => (
-                  <SearchableSelect id={fid} options={contractOptions} value={form.contract_id || null} invalid={!!errors.contract_id}
+                  <SearchableSelect id={fid} options={contractOptions} value={form.contract_id || null} invalid={!!errors.contract_id} disabled={kunci}
                     placeholder="Pilih nomor kontrak..." searchPlaceholder="Ketik nomor kontrak atau klien..."
                     onChange={pilihKontrak} />
                 )}
@@ -660,9 +680,10 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
           <div className="grid gap-4 p-4 lg:grid-cols-2">
             <Field
               label="ID Perjalanan/Trip"
-              required={wajibId}
+              required={wajibId && !idTerkunci}
               error={errors.trip_ids}
-              hint={errors.trip_ids ? undefined : 'Terisi ID unik otomatis; ganti dengan nomor container / ID perjalanan bila ada. Nomor container boleh sama dengan trip lain karena dipakai ulang.'}
+              hint={errors.trip_ids ? undefined : idTerkunci ? 'ID Perjalanan/Trip dikunci setelah trip tersimpan.'
+                : 'Terisi ID unik otomatis; ganti dengan nomor container / ID perjalanan bila ada. Nomor container boleh sama dengan trip lain karena dipakai ulang.'}
             >
               {(fid) => (
                 <div className="space-y-2">
@@ -673,26 +694,31 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                         id={i === 0 ? fid : undefined}
                         value={v}
                         invalid={!!errors.trip_ids && !v.trim()}
-                        placeholder="TCLU1234567"
+                        placeholder={idTerkunci ? 'Belum ada ID Perjalanan/Trip' : 'TCLU1234567'}
+                        readOnly={idTerkunci}
                         className="min-w-0 flex-1"
                         aria-label={`ID Perjalanan/Trip ${i + 1}`}
                         generateTitle={`Buat ID Perjalanan/Trip ${i + 1} otomatis`}
                         onChange={(nilai) => ubahId(i, nilai)}
                         onGenerate={() => generateId(i)}
                       />
-                      <IconButton
-                        label="Hapus ID ini"
-                        tone="danger"
-                        icon={<FaXmark size={14} />}
-                        disabled={form.trip_ids.length === 1 && !v}
-                        onClick={() => hapusId(i)}
-                      />
+                      {!idTerkunci && (
+                        <IconButton
+                          label="Hapus ID ini"
+                          tone="danger"
+                          icon={<FaXmark size={14} />}
+                          disabled={form.trip_ids.length === 1 && !v}
+                          onClick={() => hapusId(i)}
+                        />
+                      )}
                     </div>
                   ))}
-                  <Button size="sm" variant="ghost" icon={<FaPlus size={14} />} className="ml-6" onClick={tambahId}>
-                    Tambah ID Perjalanan/Trip
-                  </Button>
-                  {idDipakaiLain.length > 0 && (
+                  {!idTerkunci && (
+                    <Button size="sm" variant="ghost" icon={<FaPlus size={14} />} className="ml-6" onClick={tambahId}>
+                      Tambah ID Perjalanan/Trip
+                    </Button>
+                  )}
+                  {!idTerkunci && idDipakaiLain.length > 0 && (
                     <p className="ml-6 text-[12px] text-[#8a6100]">
                       {idDipakaiLain.map((x) => `${x.v} juga ada di Trip ${x.trip!.transaction_no}`).join('; ')}. Pastikan memang benar.
                     </p>
@@ -707,6 +733,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                 required={wajibRoute}
                 error={errors.route_id}
                 hint={errors.route_id ? undefined
+                  : kunci ? 'Dikunci karena trip sudah jalan.'
                   : !selectedRoute ? (dedicated ? 'Opsional untuk Dedicated: patokan uang jalan & tujuan.' : 'Klien, Harga, dan patokan uang jalan ikut rute.')
                   : routeProject ? `Klien ${routeProject.project_name} ikut rute ini. UJROUTE jadi patokan uang jalan.`
                   : <>Rute ini belum punya klien. Lengkapi di menu <Link to="/master/route" className="text-brand-700 underline">Rute</Link> supaya trip tercatat ke klien.</>}
@@ -717,10 +744,11 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                     options={routeOptions}
                     value={form.route_id || null}
                     invalid={!!errors.route_id}
+                    disabled={kunci}
                     placeholder="Pilih rute..."
                     searchPlaceholder="Ketik nama atau kode rute..."
                     onChange={(v) => applyRoute(v)}
-                    tambahan={{
+                    tambahan={kunci ? undefined : {
                       label: 'Tambah rute baru',
                       disabled: !bolehTambahRute,
                       hint: bolehTambahRute ? undefined : 'Perlu Manager atau Owner.',
@@ -805,9 +833,9 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                   onChange={(e) => ubahTanggal(e.target.value)} />
               )}
             </Field>
-            <Field label="Nomor Trip" required error={errors.transaction_no} hint={errors.transaction_no ? undefined : 'Nomor urut otomatis per bulan.'}>
+            <Field label="Nomor Trip" required error={errors.transaction_no} hint={errors.transaction_no ? undefined : kunci ? 'Dikunci karena trip sudah jalan.' : 'Nomor urut otomatis per bulan.'}>
               {(fid) => (
-                <KodeInput id={fid} value={form.transaction_no} invalid={!!errors.transaction_no}
+                <KodeInput id={fid} value={form.transaction_no} invalid={!!errors.transaction_no} readOnly={kunci}
                   generateTitle="Buat nomor trip berikutnya untuk bulan tanggal trip"
                   onChange={(v) => set('transaction_no', v)}
                   onGenerate={() => set('transaction_no', nomorTripBerikut(
