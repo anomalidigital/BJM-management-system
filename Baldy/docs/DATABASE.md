@@ -513,3 +513,90 @@ ALTER TABLE projects ADD COLUMN client_type VARCHAR(10) NOT NULL DEFAULT 'tetap'
   pendapatan; netto sementara = harga trip - UJROUTE - komisi.
 - **Nominal route** yang belum ada di spreadsheet diturunkan dari trip asli (median);
   sisanya perkiraan dan ditandai sampai diisi admin (khusus prototype).
+
+---
+
+# Perubahan 7 Oktober 2026 — Karawang: banyak mobil, TR, perjalanan, POD, backload, PI
+
+Workspace utama kini Karawang (alat berat & DHL). Satu trip = satu mobil; order yang butuh
+beberapa mobil diisi di satu form lalu tersimpan sebagai beberapa trip.
+
+```sql
+-- TR = nomor order klien (Order Release DHL/SLB). Satu trip boleh membawa beberapa TR,
+-- dan TR yang sama boleh dipakai trip lain (satu order, banyak mobil). Tidak dibuat sistem.
+CREATE TABLE trip_tr (
+  trip_id    BIGINT      NOT NULL REFERENCES commission_transactions(id) ON DELETE CASCADE,
+  tr_number  VARCHAR(30) NOT NULL,
+  PRIMARY KEY (trip_id, tr_number)
+);
+CREATE INDEX trip_tr_number ON trip_tr (tr_number);
+
+ALTER TABLE commission_transactions
+  -- Karawang: satu ID Perjalanan per trip (trip_refs berisi satu baris); Priok tetap boleh banyak (container).
+  ADD COLUMN lokasi_muat     VARCHAR(120),  -- kosong = asal dari nama rute "ASAL - TUJUAN"
+  ADD COLUMN lokasi_bongkar  VARCHAR(120),  -- kosong = tujuan dari nama rute (tanpa penanda BCKLD)
+  ADD COLUMN backload_dari   BIGINT REFERENCES commission_transactions(id),  -- trip asal backload
+  ADD COLUMN ada_backload    BOOLEAN NOT NULL DEFAULT FALSE,  -- ditandai saat Tutup Trip
+  ADD COLUMN closed_at       DATE,                            -- Tutup Trip (Receive all POD)
+  ADD COLUMN pod_fisik       BOOLEAN,       -- TRUE fisik diterima di pool, FALSE baru foto, NULL data lama
+  ADD COLUMN cancel_fee      BIGINT NOT NULL DEFAULT 0,       -- biaya cancel tetap ditagihkan ke klien
+  -- PI (Proforma Invoice): satu per trip, seperti Summary Submission PI.
+  ADD COLUMN pi_tahap        VARCHAR(10),   -- tercetak | dikirim | revisi | disetujui | lunas
+  ADD COLUMN pi_date         DATE,
+  ADD COLUMN pi_tahap_date   DATE,
+  ADD COLUMN pi_note         TEXT;
+-- Kolom lama: pi_status = catatan "Status PI" spreadsheet; tr_reference = satu TR data lama.
+-- Foto POD & bukti override harga lewat tabel attachments (owner_table = 'commission_transactions').
+
+-- Tab Perjalanan: kejadian dari pick up sampai kembali ke pool, beserta buktinya.
+CREATE TABLE trip_events (
+  id          BIGSERIAL PRIMARY KEY,
+  trip_id     BIGINT      NOT NULL REFERENCES commission_transactions(id) ON DELETE CASCADE,
+  jenis       VARCHAR(12) NOT NULL,  -- pickup | istirahat | menginap | kendala | dialihkan | tiba | bongkar | retur | pool
+  waktu       TIMESTAMP   NOT NULL,  -- "tiba" pertama = ATA
+  lokasi      VARCHAR(120),
+  catatan     TEXT,
+  created_at  TIMESTAMP   NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMP   NOT NULL DEFAULT NOW()
+);
+-- Bukti kejadian (manifest, foto barang, BA bertanda tangan) lewat attachments (owner_table = 'trip_events').
+
+-- Biaya operasional yang ikut ditagihkan ke klien sebagai Additional Cost PI.
+ALTER TABLE operational_expenses ADD COLUMN ditagihkan BOOLEAN;  -- NULL = ikut jenisnya
+-- Jenis baru: ASDP (ferry), Uang Pulang (sopir pulang kosong tanpa backload).
+```
+
+## Aturan yang dijalankan aplikasi
+
+- **Form trip Karawang**: layanan & rute diisi sekali; tiap mobil (kendaraan, sopir, ID
+  Perjalanan, TR, harga) menjadi satu trip dengan nomor urut sendiri. Klien ikut rute
+  (Callout) atau kontrak (Dedicated). Feet, kapal, SI/BL, penerima Surat Jalan, dan bon
+  pribadi hanya untuk Priok.
+- **Cetak**: trip Karawang dicetak sebagai Berita Acara Serah Terima Barang (format Meeting
+  2), satu halaman per mobil; isian yang belum diketahui dicetak titik-titik.
+- **Tutup Trip**: status `selesai`, POD fisik atau foto (fisik menyusul), dan pertanyaan
+  backload. "Ada backload" langsung membuka form backload.
+- **Backload** = trip baru: mobil & sopir sama dengan trip asal (terkunci), ID Perjalanan
+  `ID asal-BL` (berikutnya `-BL2`), lokasi muat = lokasi bongkar trip asal; rute, TR, harga,
+  uang jalan (uang dorong), dan PI sendiri.
+- **Tagihan Karawang**: trip `selesai` (atau batal dengan `cancel_fee`) selain klien tanpa
+  dokumen (CASH) masuk Siap PI. Total PI = harga + biaya ditagihkan (DEX, Tol, ASDP, SPSI,
+  Nginap, Escort). Nomor PI `0661/SLB/BJM/VIII/2026`, urutan empat digit berlanjut.
+- **Uang pulang** dicatat di biaya operasional jenis Uang Pulang (tidak ditagihkan).
+
+## Tambahan 7 Oktober 2026 (lanjutan) — uang jalan & biaya di jalan
+
+```sql
+-- Uang jalan = seluruh uang untuk sopir selama perjalanan (mesin nyala sampai kembali ke pool).
+ALTER TABLE uj_payments ADD COLUMN jenis VARCHAR(12) NOT NULL DEFAULT 'uj';  -- uj | uang_dorong | uang_pulang | tambahan
+-- Uang dorong & uang pulang bukan biaya operasional lagi (data lama dipindahkan menjadi termin).
+
+-- Biaya di jalan: siapa yang membayar. Tidak pernah mengubah transfer ke sopir (TF = UJ - potong kasbon).
+ALTER TABLE operational_expenses ADD COLUMN dibayar VARCHAR(12) NOT NULL DEFAULT 'sopir';  -- sopir (dari uang jalan) | perusahaan (langsung)
+```
+
+- **Netto** = harga + biaya ditagihkan ke klien − uang jalan dibayar − biaya dibayar perusahaan − komisi.
+  Biaya yang dibayar sopir dari uang jalan tidak dikurangkan lagi (sudah ada di uang jalan).
+- **Uang jalan** yang dihitung: termin yang benar-benar dibayar; selama trip belum ditutup,
+  sisa patokan UJROUTE dianggap masih akan dibayar.
+- Data lama: biaya satu trip yang melebihi seluruh uang jalannya ditandai `dibayar = perusahaan`.

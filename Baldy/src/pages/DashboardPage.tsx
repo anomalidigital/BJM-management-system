@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Skeleton } from '../components/ui/States'
 import { useData } from '../store/DataProvider'
+import { useWorkspace } from '../store/WorkspaceProvider'
 import { deltaPersen, komisiTransaksi, pendapatanTransaksi, ringkas, tripDihitung } from '../lib/calculations'
 import { formatRupiah, monthLabel, todayISO } from '../lib/format'
 import { groupBy } from '../lib/utils'
@@ -22,12 +23,15 @@ const labelHari = (iso: string) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })
 
 /**
- * Dashboard "papan depo": trip bulan ini sebagai tumpukan kontainer di pelat baja,
+ * Dashboard "papan depo": trip bulan ini sebagai tumpukan kontainer di papan gelap,
  * lalu yang perlu ditindak, jalannya uang, layanan & klien, tren harian, ritan,
  * dan catatan terbaru.
  */
 export function DashboardPage() {
   const { db, transactionRows, billingRows, loading } = useData()
+  const { workspace } = useWorkspace()
+  /** SI/Job Order & nomor container hanya ada di Priok; Karawang memakai TR dan No PI. */
+  const cabangContainer = workspace === 'priok'
 
   const model = useMemo(() => {
     const periode = periodeAktif(transactionRows.map((t) => t.transaction_date))
@@ -75,6 +79,12 @@ export function DashboardPage() {
     const mobilTerpakai = new Set(bulanIni.map((t) => t.vehicle_id).filter(Boolean)).size
     const mobilTotal = db.vehicles.filter((v) => v.status === 'aktif').length
 
+    // Klien yang punya alur dokumen (TR dari DHL, lalu PI). CASH tidak.
+    const klienDokumen = new Set(db.projects.filter((p) => p.requires_document).map((p) => p.id))
+    const tripDokumen = transactionRows.filter((t) => t.status !== 'batal' && klienDokumen.has(t.project_id))
+    // Antrean PI sama dengan halaman Tagihan: semua trip selesai kecuali klien tanpa dokumen (CASH).
+    const klienTanpaPi = new Set(db.projects.filter((p) => p.requires_document === false).map((p) => p.id))
+
     // Yang perlu ditindak, urut dari yang paling mendesak.
     const tindak: ItemTindak[] = ([
       {
@@ -82,19 +92,31 @@ export function DashboardPage() {
         label: 'Trip menunggu sopir', keterangan: 'Pilih sopir supaya trip bisa jalan.',
         jumlah: perStatus.menunggu_sopir,
       },
-      {
-        id: 'sj-draft', nada: 'perhatian', to: '/transaksi/trip',
+      cabangContainer ? {
+        id: 'sj-draft', nada: 'perhatian' as const, to: '/transaksi/trip',
         label: 'Surat Jalan belum dicetak', keterangan: 'Trip sudah bernomor Surat Jalan tapi belum dicetak.',
         jumlah: transactionRows.filter((t) => t.sj_no && !t.printed_at && t.status !== 'batal').length,
+      } : {
+        id: 'ba-draft', nada: 'perhatian' as const, to: '/transaksi/trip',
+        label: 'Berita Acara belum dicetak', keterangan: 'Trip yang sedang berjalan sebaiknya membawa Berita Acara.',
+        jumlah: transactionRows.filter((t) => !t.printed_at && (t.status === 'aktif' || t.status === 'menunggu_sopir')).length,
       },
       {
         id: 'ditolak', nada: 'masalah', to: '/transaksi/tagihan',
         label: 'Tagihan ditolak', keterangan: 'Perlu diperbaiki lalu diajukan ulang.',
         jumlah: billingRows.filter((b) => b.is_rejected).length,
       },
+      // Flow Karawang: trip selesai & dokumen fisik diterima -> buat PI -> tagihan.
+      ...(cabangContainer ? [] : [{
+        id: 'belum-pi', nada: 'perhatian' as const, to: '/transaksi/tagihan',
+        label: 'Trip selesai belum ada No PI', keterangan: 'Buat PI lalu tagihkan ke klien.',
+        jumlah: transactionRows.filter((t) => !t.pi_tahap && !klienTanpaPi.has(t.project_id)
+          && (t.status === 'selesai' || (t.status === 'batal' && (t.cancel_fee ?? 0) > 0))).length,
+      }]),
       {
-        id: 'belum-selesai', nada: 'info', to: '/transaksi/trip',
-        label: 'Trip belum ditandai Selesai', keterangan: 'Tandai setelah mobil kembali ke pool.',
+        id: 'belum-selesai', nada: 'info' as const, to: '/transaksi/trip',
+        label: cabangContainer ? 'Trip belum ditandai Selesai' : 'Trip belum ditutup',
+        keterangan: cabangContainer ? 'Tandai setelah mobil kembali ke pool.' : 'Tutup setelah POD diterima, sekaligus tanyakan backload.',
         jumlah: bulanIni.filter((t) => t.status !== 'selesai').length,
       },
       {
@@ -102,16 +124,22 @@ export function DashboardPage() {
         label: 'Tagihan belum lunas', keterangan: 'Belum ada tanggal lunas.',
         jumlah: billingRows.filter((b) => !b.paid_date && !b.is_rejected).length,
       },
-      {
-        id: 'sijo-belum-komplit', nada: 'info', to: '/pencarian/sijo',
-        label: 'SI / Job Order belum komplit',
-        jumlah: db.jobOrders.filter((j) => !j.is_complete).length,
-      },
-      {
-        id: 'id-trip', nada: 'info', to: '/transaksi/trip',
-        label: 'Trip tanpa ID Perjalanan/Trip',
-        jumlah: bulanIni.filter((t) => (t.trip_ids ?? []).length === 0).length,
-      },
+      ...(cabangContainer ? [
+        {
+          id: 'sijo-belum-komplit', nada: 'info' as const, to: '/pencarian/sijo',
+          label: 'SI / Job Order belum komplit',
+          jumlah: db.jobOrders.filter((j) => !j.is_complete).length,
+        },
+        {
+          id: 'id-trip', nada: 'info' as const, to: '/transaksi/trip',
+          label: 'Trip tanpa ID Perjalanan/Trip',
+          jumlah: bulanIni.filter((t) => (t.trip_ids ?? []).length === 0).length,
+        },
+      ] : [{
+        id: 'tanpa-tr', nada: 'info' as const, to: '/transaksi/trip',
+        label: 'Trip tanpa TR', keterangan: 'Isi nomor TR dari DHL di form trip.',
+        jumlah: tripDokumen.filter((t) => t.tr_list.length === 0).length,
+      }]),
     ] satisfies ItemTindak[]).filter((a) => a.jumlah > 0)
 
     const uang = {
@@ -170,7 +198,7 @@ export function DashboardPage() {
       periode, sebelum, now, prev, batal, perStatus, hari, tren, sopirBertugas, sopirAktif, karyawanAktif,
       mobilTerpakai, mobilTotal, tindak, uang, uangLalu, layanan, kontrak, ritan,
     }
-  }, [transactionRows, billingRows, db.drivers, db.vehicles, db.jobOrders, db.contracts, db.projects])
+  }, [transactionRows, billingRows, db.drivers, db.vehicles, db.jobOrders, db.contracts, db.projects, cabangContainer])
 
   const terbaru = useMemo(() => ({
     trip: [...transactionRows]
@@ -178,6 +206,17 @@ export function DashboardPage() {
       .slice(0, 6),
     tagihan: [...billingRows].sort((a, b) => b.billing_date.localeCompare(a.billing_date)).slice(0, 6),
     sijo: [...db.jobOrders].slice(-6).reverse(),
+    // Karawang: PI terbaru menurut tanggal tahap terakhirnya.
+    pi: (() => {
+      const adaPi = transactionRows.filter((t) => t.pi_tahap)
+      return {
+        rows: [...adaPi]
+          .sort((a, b) => (b.pi_tahap_date ?? b.pi_date ?? '').localeCompare(a.pi_tahap_date ?? a.pi_date ?? '') || b.transaction_no.localeCompare(a.transaction_no))
+          .slice(0, 6),
+        total: adaPi.length,
+        belumLunas: adaPi.filter((t) => t.pi_tahap !== 'lunas').length,
+      }
+    })(),
     jumlah: {
       trip: transactionRows.length,
       tagihan: billingRows.length,
@@ -247,11 +286,13 @@ export function DashboardPage() {
           <JembatanUang
             bulanLalu={monthLabel(sebelum.start)}
             pendapatan={now.pendapatan}
-            ujroute={now.ujroute}
+            ditagihkan={now.ditagihkan}
+            uangJalan={now.uangJalan}
+            biayaPerusahaan={now.biayaPerusahaan}
             komisi={now.komisi}
             netto={now.netto}
             deltaPendapatan={deltaPersen(now.pendapatan, prev.pendapatan)}
-            deltaUjroute={deltaPersen(now.ujroute, prev.ujroute)}
+            deltaUangJalan={deltaPersen(now.uangJalan, prev.uangJalan)}
             deltaKomisi={deltaPersen(now.komisi, prev.komisi)}
             deltaNetto={deltaPersen(now.netto, prev.netto)}
             deltaUj={deltaPersen(uang.uj, uangLalu.uj)}
@@ -275,7 +316,8 @@ export function DashboardPage() {
         </div>
 
         <div className="xl:col-span-12">
-          <Terbaru trip={terbaru.trip} tagihan={terbaru.tagihan} sijo={terbaru.sijo} jumlah={terbaru.jumlah} />
+          <Terbaru trip={terbaru.trip} tagihan={terbaru.tagihan} sijo={cabangContainer ? terbaru.sijo : undefined}
+            pi={cabangContainer ? undefined : terbaru.pi} jumlah={terbaru.jumlah} />
         </div>
       </div>
     </>

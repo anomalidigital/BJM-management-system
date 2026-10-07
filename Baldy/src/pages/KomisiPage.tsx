@@ -282,8 +282,8 @@ export function KomisiPage() {
   return (
     <>
       <PageHeader
-        title="Komisi"
-        crumbs={[{ label: 'Master' }, { label: 'Komisi' }]}
+        title="Aturan Komisi"
+        crumbs={[{ label: 'Master Data' }, { label: 'Aturan Komisi' }]}
         actions={
           <Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}>
             Tambah Komisi
@@ -315,12 +315,7 @@ export function KomisiPage() {
           onRetry={reload}
           isFiltered={!!peran}
           skeletonCols={7}
-          empty={
-            <EmptyState
-              entity="komisi"
-              action={canEdit && <Button variant="primary" icon={<FaPlus size={15} />} onClick={openCreate}>Tambah Komisi</Button>}
-            />
-          }
+          empty={<EmptyState entity="aturan komisi" />}
           notFound={<NotFoundState onReset={() => setPeran('')} />}
         />
       </Card>

@@ -22,13 +22,18 @@ function periodeDari(iso: string, dariData: boolean): Periode {
   return { start: startOfMonthISO(ref), end: endOfMonthISO(ref), ref, dariData }
 }
 
-/** Bulan terakhir yang memiliki transaksi; jatuh ke bulan berjalan bila data kosong. */
+/**
+ * Bulan terakhir yang memiliki transaksi, paling jauh bulan berjalan; jatuh ke bulan
+ * berjalan bila data kosong. Trip yang dijadwalkan berangkat bulan depan tidak ikut
+ * dihitung, supaya periode bawaan tidak loncat ke bulan yang masih kosong.
+ */
 export function periodeAktif(tanggal: string[]): Periode {
-  const terakhir = tanggal.filter(Boolean).sort().at(-1)
   const kini = todayISO()
+  const bulanIni = kini.slice(0, 7)
+  const terakhir = tanggal.filter((d) => d && d.slice(0, 7) <= bulanIni).sort().at(-1)
   if (!terakhir) return periodeDari(kini, false)
   // Bila data memang sampai bulan ini, pakai bulan ini seperti biasa.
-  if (terakhir.slice(0, 7) === kini.slice(0, 7)) return periodeDari(kini, false)
+  if (terakhir.slice(0, 7) === bulanIni) return periodeDari(kini, false)
   return periodeDari(terakhir, true)
 }
 

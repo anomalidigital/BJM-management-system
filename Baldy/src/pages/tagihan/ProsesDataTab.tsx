@@ -213,8 +213,7 @@ export function ProsesDataTab() {
         {!active && mode === 'view' ? (
           <div className="px-6 py-16 text-center">
             <p className="text-[14px] font-semibold text-ink">Belum ada data.</p>
-            <p className="mt-1 text-[13px] text-ink-3">Tambahkan tagihan pertama untuk memulai.</p>
-            {canEdit && <Button className="mt-4" variant="primary" icon={<FaPlus size={15} />} onClick={startCreate}>Tambah</Button>}
+            <p className="mt-1 text-[13px] text-ink-3">Tambahkan tagihan pertama lewat tombol Tambah di atas.</p>
           </div>
         ) : (
           <div className="p-4">

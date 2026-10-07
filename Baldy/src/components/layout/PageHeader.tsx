@@ -53,7 +53,8 @@ export function PageHeader({
           <h1 className="text-[19px] leading-tight font-semibold tracking-tight text-ink">{title}</h1>
           {description && <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-ink-3">{description}</p>}
         </div>
-        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+        {/* Tanpa shrink-0: di layar sempit tombol turun baris, tidak meluber ke kanan. */}
+        {actions && <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div>}
       </div>
     </header>
   )

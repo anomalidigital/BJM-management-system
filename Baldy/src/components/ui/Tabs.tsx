@@ -19,7 +19,8 @@ export function Tabs({
   className?: string
 }) {
   return (
-    <div role="tablist" className={cn('flex items-end gap-1 border-b border-hairline', className)}>
+    // Garis bawah memakai bayangan dalam supaya tab bisa digeser di layar sempit tanpa garis aktifnya terpotong.
+    <div role="tablist" className={cn('gulir-tanpa-bilah flex items-end gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-hairline)]', className)}>
       {items.map((t) => {
         const active = t.id === value
         return (
@@ -30,7 +31,7 @@ export function Tabs({
             aria-selected={active}
             onClick={() => onChange(t.id)}
             className={cn(
-              '-mb-px inline-flex items-center gap-2 border-b-2 px-3.5 py-2.5 text-[13px] font-medium transition-colors',
+              'inline-flex shrink-0 items-center gap-2 border-b-2 px-3.5 py-2.5 text-[13px] font-medium whitespace-nowrap transition-colors',
               active
                 ? 'border-brand-500 text-brand-700'
                 : 'border-transparent text-ink-3 hover:border-hairline hover:text-ink',

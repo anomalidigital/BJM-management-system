@@ -11,6 +11,7 @@ import type {
 } from '../types'
 import { EXPENSE_TYPES, VEHICLE_CONFIGS } from '../types'
 import { susunKasbonDariDataLama } from '../lib/kasbon'
+import { pindahkanUangKeTermin, tandaiPembayarLama } from '../lib/trip'
 import { nomorTripBerikut } from '../lib/kode'
 import REAL from './real.json'
 import { kasbonTerminContoh, keuanganTripContoh, lengkapiNominalRoute } from './lengkapi'
@@ -45,7 +46,18 @@ const stamp = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 export function workspaceForSeed(seed: string): Workspace {
   let h = 0
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0
-  return h % 100 < 34 ? 'tangerang' : 'jakarta'
+  return h % 100 < 34 ? 'karawang' : 'priok'
+}
+
+/**
+ * Cabang untuk data bawaan (Meeting 17 Sep 2026): trip asli DHL/SLB (`trx-...`) dan
+ * kontrak Dedicated contoh (`ktr-...`) milik Karawang; trip & tagihan contoh container
+ * (`sj-...`, `bil-...`) milik Priok. Selain itu null = ikut aturan pemanggil.
+ */
+export function cabangBawaan(id: string): Workspace | null {
+  if (/^trx-\d+$/.test(id) || /^ktr-\d+$/.test(id)) return 'karawang'
+  if (/^(trp-)?sj-/.test(id) || /^bil-\d+$/.test(id)) return 'priok'
+  return null
 }
 
 /* Referensi teks Indonesia */
@@ -313,8 +325,8 @@ function makeBillings(db: Pick<Database, 'jobOrders' | 'transactions'>, count: n
     const paid = !rejected && rand() > 0.45
     out.push({
       id: `bil-${i + 1}`,
-      // Tagihan mengikuti workspace trip pertama pada SI/JO yang sama.
-      workspace: trxForJo[0]?.workspace ?? workspaceForSeed(joId),
+      // Tagihan SI/JO adalah bisnis container: cabang Priok.
+      workspace: 'priok' as const,
       invoice_no: `INV-${String(invoiceSeq++).padStart(3, '0')}`,
       job_order_id: joId,
       cost_code: jo.customer_code, // Data Cost default mengikuti Kode Cust SI/JO (lihat TBD-04)
@@ -375,7 +387,8 @@ function makeTripSuratJalan(
     nomorAda.push(no)
     out.push({
       id: `sj-${i + 1}`,
-      workspace: t.workspace ?? workspaceForSeed(veh.id),
+      // Trip bersurat jalan contoh adalah angkutan container: cabang Priok.
+      workspace: 'priok' as const,
       transaction_no: no,
       transaction_date: t.transaction_date,
       trip_ids: [`${pick(CONT_PREFIX)}${int(1000000, 9999999)}`],
@@ -623,7 +636,7 @@ export function aturanKomisiMeeting(workspace: Workspace, idAwal: string, cap = 
 }
 
 function makeCommissionSchemes(): CommissionScheme[] {
-  return [...aturanKomisiMeeting('jakarta', 'cms-jkt'), ...aturanKomisiMeeting('tangerang', 'cms-tng')]
+  return [...aturanKomisiMeeting('priok', 'cms-prk'), ...aturanKomisiMeeting('karawang', 'cms-krw')]
 }
 
 /**
@@ -631,8 +644,8 @@ function makeCommissionSchemes(): CommissionScheme[] {
  * kontrak, jadi klien dan kontraknya sama-sama contoh.
  */
 const KLIEN_KONTRAK: ReadonlyArray<readonly [Workspace, string, string, number]> = [
-  ['jakarta', 'SPD', 'PT Sumber Pangan Dingin', 100_000_000],
-  ['tangerang', 'ADN', 'PT Aneka Distribusi Nusantara', 60_000_000],
+  ['karawang', 'SPD', 'PT Sumber Pangan Dingin', 100_000_000],
+  ['karawang', 'ADN', 'PT Aneka Distribusi Nusantara', 60_000_000],
 ]
 
 export function makeKlienKontrak(cap = stamp): Project[] {
@@ -696,11 +709,16 @@ export function generateDatabase(): Database {
     return {
       ...tanpaDokumen(),
       ...t,
+      tr_numbers: t.tr_reference?.trim() ? [t.tr_reference.trim()] : [],
+      // Kolom "Status PI" spreadsheet berisi posisi dokumen; "di pool" = hardcopy sudah di pool.
+      ...(/di pool/i.test(t.pi_status ?? '') ? { pod_fisik: true } : {}),
+      // PI yang sudah bernomor di rekap dianggap sudah dikirim ke klien (TBD-23).
+      ...(t.pi_number?.trim() ? { pi_tahap: 'dikirim' as const } : {}),
       trip_ids: kont ? [kont] : [],
       driver_ids: t.driver_id ? [t.driver_id] : [],
       container_no: '',
-      // Trip tanpa kendaraan memakai id-nya sendiri sebagai seed.
-      workspace: t.workspace ?? workspaceForSeed(t.vehicle_id || t.id),
+      // Data operasional asli adalah DHL/SLB (alat berat): cabang Karawang.
+      workspace: 'karawang' as const,
     }
   })
   const tripSuratJalan = makeTripSuratJalan(
@@ -716,6 +734,8 @@ export function generateDatabase(): Database {
   const sopirTrip = new Map(transactions.map((t) => [t.id, t.driver_id]))
   const ujAsli = real.ujPayments.map((p) => ({ ...p, driver_id: sopirTrip.get(p.trip_id) ?? '', attachments: [] }))
   const biayaAsli = real.expenses.map((e) => ({ ...e, attachments: [] }))
+  // Uang dorong adalah uang untuk sopir, bukan nota: dicatat sebagai termin uang jalan.
+  const dipindah = pindahkanUangKeTermin(biayaAsli, ujAsli, tripAsli, stamp)
   // Spreadsheet tidak memuat nominal route: diturunkan dari trip asli (lihat lengkapi.ts).
   const routes = lengkapiNominalRoute(
     real.routes.map((r) => ({ ...r, toll: r.toll ?? 0, project_id: projectRoute.get(r.id) ?? '' })),
@@ -723,8 +743,9 @@ export function generateDatabase(): Database {
   )
   // Trip contoh yang sudah jalan diberi uang jalan & biaya, supaya laporan bulan berjalan terisi.
   const contoh = keuanganTripContoh(tripSuratJalan, routes, { payments: [], expenses: [], internal: [] }, toISO(now), stamp)
-  const ujPayments = [...ujAsli, ...contoh.ujPayments]
-  const expenses = [...biayaAsli, ...contoh.expenses]
+  const ujPayments = [...dipindah.ujPayments, ...contoh.ujPayments]
+  // Biaya yang melebihi uang jalan tripnya mustahil dari uang jalan: dibayar perusahaan.
+  const expenses = [...tandaiPembayarLama(dipindah.expenses, dipindah.ujPayments), ...contoh.expenses]
   const internalCosts = [...makeInternalCosts(tripAsli), ...contoh.internalCosts]
   const commissionSchemes = makeCommissionSchemes()
   const kasbonEntries = [
@@ -734,7 +755,7 @@ export function generateDatabase(): Database {
 
   return {
     ...real, projects: [...real.projects.map((p) => ({ ...p, client_type: 'tetap' as const })), ...makeKlienKontrak()], drivers, vehicles, routes, transactions, jobOrders, billings,
-    ujPayments, expenses, internalCosts, tripNotes: [], kasbonEntries, commissionSchemes, contracts: makeContracts(),
+    ujPayments, expenses, internalCosts, tripNotes: [], tripEvents: [], kasbonEntries, commissionSchemes, contracts: makeContracts(),
   }
 }
 
@@ -764,7 +785,7 @@ export function generateSampleDatabase(): Database {
   ]
   return {
     drivers, routes, vehicles, jobOrders, projects: [...projects, ...makeKlienKontrak()], transactions, billings,
-    ujPayments, expenses, internalCosts, tripNotes: [], kasbonEntries, commissionSchemes, contracts: makeContracts(),
+    ujPayments, expenses, internalCosts, tripNotes: [], tripEvents: [], kasbonEntries, commissionSchemes, contracts: makeContracts(),
   }
 }
 

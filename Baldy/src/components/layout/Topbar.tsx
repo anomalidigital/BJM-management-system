@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ROLE_PENGGUNA } from '../../types'
 import { useNavigate } from 'react-router-dom'
 import { FaBars, FaCalendarDays, FaCheck, FaChevronDown, FaMagnifyingGlass, FaRightFromBracket } from '../ui/icons'
 import { useAuth } from '../../store/AuthProvider'
@@ -41,11 +42,14 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
     }
   }, [menuOpen])
 
+  /** Priok mencari SI / Job Order (container); Karawang langsung mencari trip. */
+  const cariSijo = workspace === 'priok'
+
   function submitQuick(e: React.FormEvent) {
     e.preventDefault()
     const q = quick.trim()
     if (!q) return
-    navigate(`/pencarian/sijo?sijo=${encodeURIComponent(q)}`)
+    navigate(cariSijo ? `/pencarian/sijo?sijo=${encodeURIComponent(q)}` : `/transaksi/trip?q=${encodeURIComponent(q)}`)
     setQuick('')
   }
 
@@ -68,14 +72,14 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
         <FaBars size={19} />
       </button>
 
-      {/* Lompat langsung ke pencarian SI/JO tanpa copy-paste antar halaman */}
+      {/* Lompat langsung ke pencarian tanpa copy-paste antar halaman */}
       <form onSubmit={submitQuick} className="relative hidden w-72 sm:block">
         <FaMagnifyingGlass size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-3" />
         <input
           value={quick}
           onChange={(e) => setQuick(e.target.value)}
-          placeholder="Lompat ke No. SI / Job Order..."
-          aria-label="Cari nomor SI atau Job Order"
+          placeholder={cariSijo ? 'Lompat ke No. SI / Job Order...' : 'Cari trip: No. Trip, TR, sopir, plat...'}
+          aria-label={cariSijo ? 'Cari nomor SI atau Job Order' : 'Cari trip'}
           className="h-9 w-full rounded-md border border-hairline bg-sunken pr-3 pl-8 text-[13px] text-ink transition-colors placeholder:text-ink-3/80 focus:border-brand-400 focus:bg-surface focus:ring-2 focus:ring-brand-500/15 focus:outline-none"
         />
       </form>
@@ -119,8 +123,8 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
                 <p className="text-[13px] font-semibold text-ink">{user?.name}</p>
                 <p className="text-[11.5px] text-ink-3">{user?.username}</p>
                 <div className="mt-1.5">
-                  <Badge tone={user?.role === 'admin' ? 'brand' : 'neutral'}>
-                    {user?.role === 'admin' ? 'Admin — akses penuh' : 'Viewer — hanya lihat & export'}
+                  <Badge tone={user?.role === 'viewer' ? 'neutral' : 'brand'}>
+                    {user ? `${ROLE_PENGGUNA[user.role].label} — ${ROLE_PENGGUNA[user.role].ringkas}` : ''}
                   </Badge>
                 </div>
               </div>

@@ -1,13 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
-  Billing, BillingRow, CommissionTransaction, Database, EntityKey, KasbonEntry, PenyelesaianUj, TransactionRow, UjPayment, Workspace,
+  Billing, BillingRow, CommissionTransaction, Database, EntityKey, KasbonEntry, PenyelesaianUj, TransactionRow, TripEvent, UjPayment, Workspace,
 } from '../types'
 import { loadDatabase, resetDatabase, resetToSampleDatabase, saveDatabase } from './persistence'
 import { nowISO, uid } from '../lib/utils'
 import { todayISO } from '../lib/format'
 import { petaSaldoKasbon } from '../lib/kasbon'
 import { hargaTrip, hitungKomisiTrip } from '../lib/komisi'
+import { ataDari, biayaDitagihkan, dibayarPerusahaan, lokasiTrip, trTrip } from '../lib/trip'
 import { bersihkanLampiran, hapusLampiran } from '../lib/lampiran'
 import { useWorkspace } from './WorkspaceProvider'
 
@@ -21,11 +22,11 @@ type NewRow<K extends EntityKey> = Omit<Row<K>, 'id' | 'created_at' | 'updated_a
  */
 const SCOPED_KEYS = ['transactions', 'billings', 'commissionSchemes', 'contracts'] as const
 
-/** Data lama tanpa penanda cabang diperlakukan sebagai Jakarta. */
-const wsOf = (row: { workspace?: Workspace }): Workspace => row.workspace ?? 'jakarta'
+/** Data lama tanpa penanda cabang diperlakukan sebagai Priok. */
+const wsOf = (row: { workspace?: Workspace }): Workspace => row.workspace ?? 'priok'
 
 /** Isian termin uang jalan dari form. */
-export type TerminForm = Pick<UjPayment, 'payment_date' | 'driver_id' | 'uj_amount' | 'kasbon_deduction' | 'notes' | 'attachments'>
+export type TerminForm = Pick<UjPayment, 'payment_date' | 'driver_id' | 'jenis' | 'uj_amount' | 'kasbon_deduction' | 'notes' | 'attachments'>
 
 /** Seluruh id lampiran yang masih dirujuk record, lintas workspace. */
 function lampiranDipakai(d: Database): Set<string> {
@@ -33,6 +34,13 @@ function lampiranDipakai(d: Database): Set<string> {
   const ambil = (rows: Array<{ attachments?: string[] }>) => rows.forEach((r) => r.attachments?.forEach((a) => ids.add(a)))
   ambil(d.vehicles); ambil(d.drivers); ambil(d.contracts ?? [])
   ambil(d.ujPayments); ambil(d.expenses); ambil(d.internalCosts); ambil(d.tripNotes); ambil(d.kasbonEntries)
+  ambil(d.tripEvents ?? [])
+  // Lampiran yang menempel langsung di trip: bukti override harga dan foto POD.
+  for (const t of d.transactions) {
+    t.override_attachments?.forEach((a) => ids.add(a))
+    t.pod_attachments?.forEach((a) => ids.add(a))
+    t.pi_attachments?.forEach((a) => ids.add(a))
+  }
   return ids
 }
 
@@ -64,6 +72,8 @@ export interface IsiTrip {
   internal: number
   internalTotal: number
   lainnya: number
+  /** Kejadian di tab Perjalanan. */
+  perjalanan: number
 }
 
 /** Pilihan saat membatalkan trip. */
@@ -71,6 +81,17 @@ export interface OpsiBatal {
   alasan: string
   /** Per termin: TF yang sudah diterima sopir dikembalikan tunai, atau jadi kasbon. */
   penyelesaian: Record<string, 'kembali' | 'kasbon'>
+  /** Biaya cancel yang tetap ditagihkan ke klien (0 = tidak ada). */
+  biayaCancel?: number
+}
+
+/** Isian saat menutup trip (Receive all POD / bukti dokumen fisik). */
+export interface OpsiTutup {
+  /** Dokumen fisik sudah diterima di pool; false = baru foto, fisik menyusul. */
+  podFisik: boolean
+  podFoto: string[]
+  /** Ada muatan balik dari lokasi bongkar: dicatat, lalu form backload dibuka. */
+  adaBackload: boolean
 }
 
 interface DataContextValue {
@@ -114,6 +135,8 @@ interface DataContextValue {
    * dicatat dikembalikan tunai atau dijadikan kasbon.
    */
   batalkanTrip: (tripId: string, opsi: OpsiBatal) => void
+  /** Tutup trip: status Selesai, POD dicatat, dan backload ditandai bila ada. */
+  tutupTrip: (tripId: string, opsi: OpsiTutup) => void
   /** Hapus trip beserta seluruh catatannya, seolah tidak pernah ada. */
   hapusTrip: (tripId: string) => void
 }
@@ -123,7 +146,7 @@ const DataContext = createContext<DataContextValue | null>(null)
 const EMPTY_DB: Database = {
   drivers: [], routes: [], vehicles: [], jobOrders: [], transactions: [],
   billings: [], projects: [], ujPayments: [], expenses: [],
-  internalCosts: [], tripNotes: [], kasbonEntries: [], commissionSchemes: [], contracts: [],
+  internalCosts: [], tripNotes: [], tripEvents: [], kasbonEntries: [], commissionSchemes: [], contracts: [],
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -265,6 +288,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       internal: internal.length,
       internalTotal: internal.reduce((a, c) => a + c.amount, 0),
       lainnya: d.tripNotes.filter((n) => n.trip_id === tripId).length,
+      perjalanan: (d.tripEvents ?? []).filter((e) => e.trip_id === tripId).length,
     }
   }, [])
 
@@ -275,11 +299,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const biaya = d.expenses.filter((e) => e.trip_id === tripId)
     const internal = d.internalCosts.filter((c) => c.trip_id === tripId)
     const lain = d.tripNotes.filter((n) => n.trip_id === tripId)
+    const jalan = (d.tripEvents ?? []).filter((e) => e.trip_id === tripId)
     remove('ujPayments', termin.map((x) => x.id))
     remove('expenses', biaya.map((x) => x.id))
     remove('internalCosts', internal.map((x) => x.id))
     remove('tripNotes', lain.map((x) => x.id))
-    void hapusLampiran([...termin, ...biaya, ...internal, ...lain].flatMap((x) => x.attachments ?? []))
+    remove('tripEvents', jalan.map((x) => x.id))
+    const trip = d.transactions.find((t) => t.id === tripId)
+    void hapusLampiran([
+      ...[...termin, ...biaya, ...internal, ...lain, ...jalan].flatMap((x) => x.attachments ?? []),
+      ...(trip?.override_attachments ?? []), ...(trip?.pod_attachments ?? []), ...(trip?.pi_attachments ?? []),
+    ])
   }, [remove])
 
   const batalkanTrip = useCallback((tripId: string, opsi: OpsiBatal) => {
@@ -312,8 +342,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
     update('transactions', tripId, {
       status: 'batal', cancelled_at: hariIni, cancel_reason: opsi.alasan.trim(), cancel_settlement: penyelesaian,
+      cancel_fee: Math.max(0, opsi.biayaCancel ?? 0),
     })
   }, [create, update])
+
+  const tutupTrip = useCallback((tripId: string, opsi: OpsiTutup) => {
+    update('transactions', tripId, {
+      status: 'selesai', closed_at: todayISO(), pod_fisik: opsi.podFisik, pod_fisik_at: opsi.podFisik ? todayISO() : null,
+      pod_attachments: opsi.podFoto, ada_backload: opsi.adaBackload,
+    })
+  }, [update])
 
   const hapusTrip = useCallback((tripId: string) => {
     const d = dbRef.current
@@ -341,6 +379,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       expenses: db.expenses.filter((e) => tripAktif.has(e.trip_id)),
       internalCosts: db.internalCosts.filter((c) => tripAktif.has(c.trip_id)),
       tripNotes: db.tripNotes.filter((n) => tripIds.has(n.trip_id)),
+      tripEvents: (db.tripEvents ?? []).filter((e) => tripIds.has(e.trip_id)),
       billings: db.billings.filter((b) => wsOf(b) === workspace),
       commissionSchemes: db.commissionSchemes.filter((s) => wsOf(s) === workspace),
       contracts: (db.contracts ?? []).filter((c) => wsOf(c) === workspace),
@@ -362,9 +401,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
     const exp = new Map<string, number>()
     const tol = new Map<string, number>()
+    const tagih = new Map<string, number>()
+    const prsh = new Map<string, number>()
     for (const e of scopedDb.expenses) {
       exp.set(e.trip_id, (exp.get(e.trip_id) ?? 0) + e.amount)
       if (e.expense_type === 'Tol') tol.set(e.trip_id, (tol.get(e.trip_id) ?? 0) + e.amount)
+      if (biayaDitagihkan(e)) tagih.set(e.trip_id, (tagih.get(e.trip_id) ?? 0) + e.amount)
+      if (dibayarPerusahaan(e)) prsh.set(e.trip_id, (prsh.get(e.trip_id) ?? 0) + e.amount)
+    }
+    // Kejadian perjalanan per trip, urut waktu: ATA dan posisi terakhir.
+    const jalan = new Map<string, TripEvent[]>()
+    const urutJalan = [...scopedDb.tripEvents].sort((a, b) => a.waktu.localeCompare(b.waktu) || a.created_at.localeCompare(b.created_at))
+    for (const e of urutJalan) {
+      const list = jalan.get(e.trip_id) ?? []
+      list.push(e)
+      jalan.set(e.trip_id, list)
     }
     const contracts = new Map(scopedDb.contracts.map((c) => [c.id, c]))
     const aturan = scopedDb.commissionSchemes
@@ -391,6 +442,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         uj_total: u.uj,
       }
       const batal = t.status === 'batal'
+      const kejadian = jalan.get(t.id) ?? []
+      const lokasi = lokasiTrip(t, r?.route_name ?? '')
       const kSopir = batal ? null : hitungKomisiTrip(aturan, { ...dasar, role: 'sopir' })
       const kManager = batal || !(t.manager_id || t.manager_name) ? null : hitungKomisiTrip(aturan, { ...dasar, role: 'manager' })
       return {
@@ -422,6 +475,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         vehicle_config: v?.configuration ?? '',
         contract_no: k?.contract_no ?? '',
         client_name: k ? projects.get(k.project_id)?.project_name ?? '' : '',
+        tr_list: trTrip(t),
+        muat: lokasi.muat,
+        bongkar: lokasi.bongkar,
+        ata: ataDari(kejadian),
+        posisi: kejadian.at(-1) ?? null,
+        biaya_ditagihkan: tagih.get(t.id) ?? 0,
+        biaya_perusahaan: prsh.get(t.id) ?? 0,
         komisi_sopir: kSopir?.nilai ?? 0,
         komisi_manager: kManager?.nilai ?? 0,
         komisi_keterangan: batal ? 'Trip dibatalkan'
@@ -451,10 +511,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     () => ({
       db: scopedDb, dbAll: db, loading, error, reload: runLoad, simulateError, muatUlangData, resetToSample,
       create, update, remove, transactionRows, billingRows, saldoKasbon,
-      buatTrip, ubahTrip, simpanTermin, hapusTermin, isiTrip, batalkanTrip, hapusTrip,
+      buatTrip, ubahTrip, simpanTermin, hapusTermin, isiTrip, batalkanTrip, tutupTrip, hapusTrip,
     }),
     [scopedDb, db, loading, error, runLoad, simulateError, muatUlangData, resetToSample, create, update, remove,
-      transactionRows, billingRows, saldoKasbon, buatTrip, ubahTrip, simpanTermin, hapusTermin, isiTrip, batalkanTrip, hapusTrip],
+      transactionRows, billingRows, saldoKasbon, buatTrip, ubahTrip, simpanTermin, hapusTermin, isiTrip, batalkanTrip, tutupTrip, hapusTrip],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

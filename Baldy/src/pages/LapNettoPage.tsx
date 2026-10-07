@@ -10,12 +10,15 @@ import { PrintTable, PRow, PCell } from '../components/report/PrintTable'
 import { ReportPreview, barisPerLembar } from '../components/report/ReportPreview'
 import { useData } from '../store/DataProvider'
 import { useToast } from '../store/ToastProvider'
-import { komisiTransaksi, nettoTransaksi, pendapatanTransaksi, ringkas, tripDihitung } from '../lib/calculations'
+import { biayaPerusahaanTransaksi, ditagihkanTransaksi, komisiTransaksi, nettoTransaksi, pendapatanTransaksi, ringkas, tripDihitung, uangJalanTransaksi } from '../lib/calculations'
 import { formatDate, formatNumber, formatRupiah } from '../lib/format'
 import { groupBy } from '../lib/utils'
 import { usePeriodeDefault } from '../lib/periode'
 
 type Mode = 'perMobil' | 'global'
+
+/** Baris untuk trip yang belum punya nomor kendaraan. */
+const TANPA_MOBIL = '(tanpa No. Kendaraan)'
 
 export function LapNettoPage() {
   const { transactionRows } = useData()
@@ -32,19 +35,25 @@ export function LapNettoPage() {
   )
   const totals = useMemo(() => ringkas(rows), [rows])
 
-  /** Rekap per nomor polisi. */
+  /**
+   * Rekap per nomor polisi, seperti Laporan Pendapatan Netto sistem lama. Trip tanpa
+   * kendaraan tetap dihitung di baris tersendiri (di laporan lama: baris tanpa No Mobil).
+   * Kernet belum dicatat di data mana pun, jadi selalu 0 sampai aturannya ada (TBD-11).
+   */
   const perMobil = useMemo(() => {
-    const grouped = groupBy(rows.filter((t) => t.plate_number), (t) => t.plate_number)
+    const grouped = groupBy(rows, (t) => t.plate_number || TANPA_MOBIL)
     return Object.entries(grouped)
       .map(([plate, group]) => ({
         plate,
         ritan: group.length,
         pendapatan: group.reduce((a, r) => a + pendapatanTransaksi(r), 0),
-        ujroute: group.reduce((a, r) => a + r.ujroute, 0),
+        ditagihkan: group.reduce((a, r) => a + ditagihkanTransaksi(r), 0),
+        ujroute: group.reduce((a, r) => a + uangJalanTransaksi(r) + biayaPerusahaanTransaksi(r), 0),
         komisi: group.reduce((a, r) => a + komisiTransaksi(r), 0),
+        kernet: 0,
         netto: group.reduce((a, r) => a + nettoTransaksi(r), 0),
       }))
-      .sort((a, b) => b.netto - a.netto)
+      .sort((a, b) => (a.plate === TANPA_MOBIL ? 1 : b.plate === TANPA_MOBIL ? -1 : b.netto - a.netto))
   }, [rows])
 
   function openPreview() {
@@ -61,6 +70,8 @@ export function LapNettoPage() {
   const metaTotals = [
     { label: 'Jumlah transaksi', value: formatNumber(totals.transaksi) },
     { label: 'Total pendapatan', value: formatRupiah(totals.pendapatan) },
+    { label: 'Biaya ditagihkan', value: formatRupiah(totals.ditagihkan) },
+    { label: 'Biaya perjalanan', value: formatRupiah(totals.uangJalan + totals.biayaPerusahaan) },
     { label: 'Total netto', value: formatRupiah(totals.netto) },
   ]
 
@@ -74,17 +85,19 @@ export function LapNettoPage() {
           {pages.map((pageRows, i) => (
             <PrintPage
               key={i} page={i + 1} totalPages={pages.length}
-              title="Pendapatan Netto per Mobil" subtitle="Rekap per nomor polisi" periode={periodeText} meta={metaTotals}
+              title="Laporan Pendapatan Netto" subtitle="Per mobil" periode={periodeText} meta={metaTotals}
             >
               <PrintTable
                 cols={[
-                  { label: 'No.', align: 'right', width: '6%' },
-                  { label: 'No. Kendaraan', width: '16%' },
-                  { label: 'Ritan', align: 'right', width: '10%' },
-                  { label: 'Pendapatan', align: 'right' },
-                  { label: 'UJROUTE', align: 'right' },
-                  { label: 'Komisioner', align: 'right' },
-                  { label: 'Netto (Rp)', align: 'right' },
+                  { label: 'No.', align: 'right', width: '5%' },
+                  { label: 'No. Mobil', width: '13%' },
+                  { label: 'Ritan', align: 'right', width: '6%' },
+                  { label: 'Pendapatan Bruto', align: 'right' },
+                  { label: 'Ditagihkan', align: 'right' },
+                  { label: 'Biaya Perjalanan', align: 'right' },
+                  { label: 'Komisi', align: 'right' },
+                  { label: 'Kernet', align: 'right', width: '9%' },
+                  { label: 'Pendapatan Netto', align: 'right' },
                 ]}
               >
                 {pageRows.map((r, ri) => (
@@ -93,8 +106,10 @@ export function LapNettoPage() {
                     <PCell bold>{r.plate}</PCell>
                     <PCell align="right">{formatNumber(r.ritan)}</PCell>
                     <PCell align="right">{formatNumber(r.pendapatan)}</PCell>
+                    <PCell align="right">{formatNumber(r.ditagihkan)}</PCell>
                     <PCell align="right">{formatNumber(r.ujroute)}</PCell>
                     <PCell align="right">{formatNumber(r.komisi)}</PCell>
+                    <PCell align="right">{formatNumber(r.kernet)}</PCell>
                     <PCell align="right" bold>{formatNumber(r.netto)}</PCell>
                   </PRow>
                 ))}
@@ -103,8 +118,10 @@ export function LapNettoPage() {
                     <PCell align="right" colSpan={2}>TOTAL</PCell>
                     <PCell align="right">{formatNumber(totals.ritan)}</PCell>
                     <PCell align="right">{formatNumber(totals.pendapatan)}</PCell>
-                    <PCell align="right">{formatNumber(totals.ujroute)}</PCell>
+                    <PCell align="right">{formatNumber(totals.ditagihkan)}</PCell>
+                    <PCell align="right">{formatNumber(totals.uangJalan + totals.biayaPerusahaan)}</PCell>
                     <PCell align="right">{formatNumber(totals.komisi)}</PCell>
+                    <PCell align="right">0</PCell>
                     <PCell align="right">{formatNumber(totals.netto)}</PCell>
                   </PRow>
                 )}
@@ -124,6 +141,9 @@ export function LapNettoPage() {
         date,
         ritan: group.length,
         pendapatan: group.reduce((a, r) => a + pendapatanTransaksi(r), 0),
+        ditagihkan: group.reduce((a, r) => a + ditagihkanTransaksi(r), 0),
+        ujroute: group.reduce((a, r) => a + uangJalanTransaksi(r) + biayaPerusahaanTransaksi(r), 0),
+        komisi: group.reduce((a, r) => a + komisiTransaksi(r), 0),
         netto: group.reduce((a, r) => a + nettoTransaksi(r), 0),
       }))
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -136,15 +156,19 @@ export function LapNettoPage() {
           {pages.map((pageRows, i) => (
             <PrintPage
               key={i} page={i + 1} totalPages={pages.length}
-              title="Pendapatan Netto GLOBAL" subtitle="Rekap harian seluruh armada" periode={periodeText} meta={metaTotals}
+              title="Laporan Pendapatan Netto" subtitle="GLOBAL, rekap harian seluruh armada" periode={periodeText} meta={metaTotals}
             >
               <PrintTable
                 cols={[
-                  { label: 'No.', align: 'right', width: '8%' },
-                  { label: 'Tanggal', width: '22%' },
-                  { label: 'Jumlah Ritan', align: 'right' },
-                  { label: 'Pendapatan (Rp)', align: 'right' },
-                  { label: 'Netto (Rp)', align: 'right' },
+                  { label: 'No.', align: 'right', width: '5%' },
+                  { label: 'Tanggal', width: '12%' },
+                  { label: 'Ritan', align: 'right', width: '6%' },
+                  { label: 'Pendapatan Bruto', align: 'right' },
+                  { label: 'Ditagihkan', align: 'right' },
+                  { label: 'Biaya Perjalanan', align: 'right' },
+                  { label: 'Komisi', align: 'right' },
+                  { label: 'Kernet', align: 'right', width: '9%' },
+                  { label: 'Pendapatan Netto', align: 'right' },
                 ]}
               >
                 {pageRows.map((r, ri) => (
@@ -153,6 +177,10 @@ export function LapNettoPage() {
                     <PCell>{formatDate(r.date)}</PCell>
                     <PCell align="right">{formatNumber(r.ritan)}</PCell>
                     <PCell align="right">{formatNumber(r.pendapatan)}</PCell>
+                    <PCell align="right">{formatNumber(r.ditagihkan)}</PCell>
+                    <PCell align="right">{formatNumber(r.ujroute)}</PCell>
+                    <PCell align="right">{formatNumber(r.komisi)}</PCell>
+                    <PCell align="right">0</PCell>
                     <PCell align="right" bold>{formatNumber(r.netto)}</PCell>
                   </PRow>
                 ))}
@@ -161,6 +189,10 @@ export function LapNettoPage() {
                     <PCell align="right" colSpan={2}>TOTAL</PCell>
                     <PCell align="right">{formatNumber(totals.ritan)}</PCell>
                     <PCell align="right">{formatNumber(totals.pendapatan)}</PCell>
+                    <PCell align="right">{formatNumber(totals.ditagihkan)}</PCell>
+                    <PCell align="right">{formatNumber(totals.uangJalan + totals.biayaPerusahaan)}</PCell>
+                    <PCell align="right">{formatNumber(totals.komisi)}</PCell>
+                    <PCell align="right">0</PCell>
                     <PCell align="right">{formatNumber(totals.netto)}</PCell>
                   </PRow>
                 )}
@@ -178,7 +210,7 @@ export function LapNettoPage() {
     <>
       <PageHeader
         title="Pendapatan Netto Bulan Berjalan"
-        crumbs={[{ label: 'Invoice' }, { label: 'Netto Bulan Berjalan' }]}
+        crumbs={[{ label: 'Laporan' }, { label: 'Netto' }]}
         description="Pilih periode dan tipe laporan, buka preview, lalu cetak atau simpan sebagai PDF."
       />
 
@@ -217,9 +249,9 @@ export function LapNettoPage() {
 
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Total Pendapatan" value={formatRupiah(totals.pendapatan, { compact: true })} hint="periode terpilih" />
-            <StatCard label="Total UJROUTE" value={formatRupiah(totals.ujroute, { compact: true })} hint="periode terpilih" />
-            <StatCard label="Total Komisioner" value={formatRupiah(totals.komisi, { compact: true })} hint="periode terpilih" />
+            <StatCard label="Pendapatan Bruto" value={formatRupiah(totals.pendapatan, { compact: true })} hint={`harga trip · + ${formatRupiah(totals.ditagihkan, { compact: true })} ditagihkan ke klien`} />
+            <StatCard label="Biaya Perjalanan" value={formatRupiah(totals.uangJalan + totals.biayaPerusahaan, { compact: true })} hint={`uang jalan ${formatRupiah(totals.uangJalan, { compact: true })} + dibayar perusahaan ${formatRupiah(totals.biayaPerusahaan, { compact: true })}`} />
+            <StatCard label="Komisi" value={formatRupiah(totals.komisi, { compact: true })} hint="kernet belum dicatat (0)" />
             <StatCard label="Pendapatan Netto" value={formatRupiah(totals.netto, { compact: true })} hint="periode terpilih" />
           </div>
 
@@ -234,7 +266,11 @@ export function LapNettoPage() {
                     <tr className="border-b border-hairline">
                       <th className="px-4 py-2 text-left text-[11.5px] font-semibold tracking-wide text-ink-2 uppercase">No. Kendaraan</th>
                       <th className="px-4 py-2 text-right text-[11.5px] font-semibold tracking-wide text-ink-2 uppercase">Ritan</th>
-                      <th className="px-4 py-2 text-right text-[11.5px] font-semibold tracking-wide text-ink-2 uppercase">Pendapatan</th>
+                      <th className="px-4 py-2 text-right text-[11.5px] font-semibold tracking-wide text-ink-2 uppercase">Bruto</th>
+                      <th className="px-4 py-2 text-right text-[11.5px] font-semibold tracking-wide text-ink-2 uppercase">Ditagihkan</th>
+                      <th className="px-4 py-2 text-right text-[11.5px] font-semibold tracking-wide text-ink-2 uppercase">Biaya Perjalanan</th>
+                      <th className="px-4 py-2 text-right text-[11.5px] font-semibold tracking-wide text-ink-2 uppercase">Komisi</th>
+                      <th className="px-4 py-2 text-right text-[11.5px] font-semibold tracking-wide text-ink-2 uppercase">Kernet</th>
                       <th className="px-4 py-2 text-right text-[11.5px] font-semibold tracking-wide text-ink-2 uppercase">Netto</th>
                     </tr>
                   </thead>
@@ -244,6 +280,10 @@ export function LapNettoPage() {
                         <td className="tnum px-4 py-2 font-medium text-ink">{r.plate}</td>
                         <td className="tnum px-4 py-2 text-right text-ink-2">{r.ritan}</td>
                         <td className="tnum px-4 py-2 text-right text-ink-2">{formatRupiah(r.pendapatan)}</td>
+                        <td className="tnum px-4 py-2 text-right text-ink-2">{formatRupiah(r.ditagihkan)}</td>
+                        <td className="tnum px-4 py-2 text-right text-ink-2">{formatRupiah(r.ujroute)}</td>
+                        <td className="tnum px-4 py-2 text-right text-ink-2">{formatRupiah(r.komisi)}</td>
+                        <td className="tnum px-4 py-2 text-right text-ink-3">{formatRupiah(r.kernet)}</td>
                         <td className="tnum px-4 py-2 text-right font-semibold text-ink">{formatRupiah(r.netto)}</td>
                       </tr>
                     ))}

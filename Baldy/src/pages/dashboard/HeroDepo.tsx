@@ -7,7 +7,7 @@ import { STATUS_LABEL } from '../trip/status'
 export const URUT_TUMPUK = ['selesai', 'aktif', 'menunggu_sopir', 'draft'] as const
 export type StatusPapan = (typeof URUT_TUMPUK)[number]
 
-/** Warna status di atas pelat baja: hijau beres, biru di jalan, kuning perlu sopir, abu belum mulai. */
+/** Warna status di atas papan gelap: hijau beres, biru di jalan, kuning perlu sopir, abu belum mulai. */
 export const WARNA_STATUS: Record<StatusPapan, string> = {
   selesai: '#46c58a',
   aktif: '#6fb5ff',
@@ -89,7 +89,7 @@ export function HeroDepo({
   let urut = 0
 
   return (
-    <section className="rail-steel relative flex h-full flex-col overflow-hidden rounded-xl text-white" aria-labelledby="papan-judul">
+    <section className="relative flex h-full flex-col overflow-hidden rounded-xl bg-nav-900 text-white" aria-labelledby="papan-judul">
       <div className="grid flex-1 gap-6 p-5 md:grid-cols-[14.5rem_minmax(0,1fr)] md:p-6">
         <div className="flex flex-col">
           <h2 id="papan-judul" className="font-rail text-[15px] font-semibold text-nav-ink">Trip {bulan}</h2>

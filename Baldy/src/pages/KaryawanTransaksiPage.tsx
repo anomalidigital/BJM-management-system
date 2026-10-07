@@ -102,7 +102,7 @@ export function KaryawanTransaksiPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Memuat karyawan..." crumbs={[{ label: 'Master' }, { label: 'Data Karyawan', to: '/master/karyawan' }]} />
+        <PageHeader title="Memuat karyawan..." crumbs={[{ label: 'Master Data' }, { label: 'Supir / Karyawan', to: '/master/karyawan' }]} />
         <div className="skeleton h-64 rounded-xl" />
       </>
     )
@@ -111,7 +111,7 @@ export function KaryawanTransaksiPage() {
   if (!orang) {
     return (
       <>
-        <PageHeader title="Karyawan tidak ditemukan" crumbs={[{ label: 'Master' }, { label: 'Data Karyawan', to: '/master/karyawan' }]} />
+        <PageHeader title="Karyawan tidak ditemukan" crumbs={[{ label: 'Master Data' }, { label: 'Supir / Karyawan', to: '/master/karyawan' }]} />
         <Card>
           <div className="px-6 py-14 text-center">
             <p className="text-[14px] font-semibold text-ink">Data tidak ditemukan.</p>
@@ -232,7 +232,7 @@ export function KaryawanTransaksiPage() {
       <PageHeader
         title={`Transaksi ${orang.driver_name}`}
         description={`${orang.driver_code} · ${ROLE_LABEL[orang.role ?? 'sopir']} · ${orang.city || 'kota belum diisi'}`}
-        crumbs={[{ label: 'Master' }, { label: 'Data Karyawan', to: '/master/karyawan' }, { label: orang.driver_name }]}
+        crumbs={[{ label: 'Master Data' }, { label: 'Supir / Karyawan', to: '/master/karyawan' }, { label: orang.driver_name }]}
         actions={
           <>
             <Button icon={<FaArrowLeft size={15} />} onClick={() => navigate('/master/karyawan')}>Kembali</Button>
@@ -241,8 +241,9 @@ export function KaryawanTransaksiPage() {
         }
       />
 
-      <div className="mb-4 grid gap-4 sm:grid-cols-3">
+      <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
+          ['Piutang (Kasbon)', formatRupiah(saldo), saldo > 0 ? 'belum lunas' : 'lunas'],
           ['Kasbon Masuk', formatRupiah(masuk), 'diberikan admin & pengembalian'],
           ['Kasbon Terpotong', formatRupiah(keluar), 'dipotong dari trip & penyesuaian'],
           ['Jumlah Trip', String(tripSaya.length), 'trip yang pernah dibawa'],
@@ -274,7 +275,7 @@ export function KaryawanTransaksiPage() {
                 <p className="mb-2 text-[11.5px] font-semibold tracking-wide text-ink-3 uppercase">Dokumen (KTP, SIM, dll.)</p>
                 {(orang.attachments ?? []).length > 0
                   ? <LampiranThumbs ids={orang.attachments} ukuran={56} />
-                  : <p className="text-[12.5px] text-ink-3">Belum ada dokumen. Tambahkan lewat Ubah di Data Karyawan.</p>}
+                  : <p className="text-[12.5px] text-ink-3">Belum ada dokumen. Tambahkan lewat Ubah di Supir / Karyawan.</p>}
               </div>
             </div>
             <div className="rounded-lg border border-hairline">
@@ -306,18 +307,15 @@ export function KaryawanTransaksiPage() {
 
         {tab === 'kasbon' && (
           <div>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-4 py-3">
-              <p className="text-[12.5px] text-ink-3">
-                Kasbon bertambah saat diberikan admin, dan berkurang saat dipotong dari uang jalan trip. Potongan dan
-                pembatalan trip tercatat otomatis dari halaman trip.
-              </p>
-              <Button size="sm" variant="primary" icon={<FaPlus size={14} />} disabled={!canEdit} onClick={bukaTambah}>Tambah Transaksi</Button>
-            </div>
+            {/* Tombol tambah cukup satu: Tambah Transaksi di kanan atas halaman. */}
+            <p className="border-b border-hairline px-4 py-3 text-[12.5px] text-ink-3">
+              Kasbon bertambah saat diberikan admin, dan berkurang saat dipotong dari uang jalan trip. Potongan dan
+              pembatalan trip tercatat otomatis dari halaman trip.
+            </p>
             {mutasi.length === 0 ? (
               <div className="px-6 py-14 text-center">
                 <p className="text-[14px] font-semibold text-ink">Belum ada transaksi kasbon.</p>
-                <p className="mt-1 text-[13px] text-ink-3">Catat kasbon pertama yang diberikan ke {orang.driver_name}.</p>
-                {canEdit && <Button className="mt-4" variant="primary" icon={<FaPlus size={15} />} onClick={bukaTambah}>Tambah Transaksi</Button>}
+                <p className="mt-1 text-[13px] text-ink-3">Catat kasbon pertama untuk {orang.driver_name} lewat Tambah Transaksi di kanan atas.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">

@@ -16,14 +16,16 @@ function Shell({ icon, title, description, action }: { icon: ReactNode; title: s
   )
 }
 
-/** Belum ada data sama sekali. */
-export function EmptyState({ entity, action }: { entity: string; action?: ReactNode }) {
+/**
+ * Belum ada data sama sekali. Sengaja tanpa tombol: tombol tambah cukup satu,
+ * di kanan atas halaman.
+ */
+export function EmptyState({ entity }: { entity: string }) {
   return (
     <Shell
       icon={<FaInbox size={20} />}
       title="Belum ada data."
       description={`Tambahkan ${entity} pertama untuk memulai.`}
-      action={action}
     />
   )
 }

@@ -17,8 +17,8 @@ const TEMA_BIRU: Tema = {
   '--color-brand-300': '#6da7ec', '--color-brand-400': '#3987e5', '--color-brand-500': '#2a78d6',
   '--color-brand-600': '#256abf', '--color-brand-700': '#1c5cab', '--color-brand-800': '#184f95',
   '--color-brand-900': '#0d366b',
-  '--color-nav-900': '#0f3561', '--color-nav-800': '#164277', '--color-nav-700': '#2a5a93',
-  '--color-nav-ink': '#a9bedb', '--color-series-1': '#2a78d6',
+  '--color-nav-900': '#0d1523', '--color-nav-800': '#131d2f', '--color-nav-700': '#1c2942',
+  '--color-nav-ink': '#93a1b8', '--color-series-1': '#2a78d6',
 }
 
 const TEMA_UNGU: Tema = {
@@ -26,8 +26,8 @@ const TEMA_UNGU: Tema = {
   '--color-brand-300': '#a48eed', '--color-brand-400': '#8465e6', '--color-brand-500': '#7050d6',
   '--color-brand-600': '#6344bf', '--color-brand-700': '#563aab', '--color-brand-800': '#4a3196',
   '--color-brand-900': '#33206b',
-  '--color-nav-900': '#2a1c5e', '--color-nav-800': '#36266f', '--color-nav-700': '#4b3a8a',
-  '--color-nav-ink': '#bdb2e0', '--color-series-1': '#7050d6',
+  '--color-nav-900': '#16102a', '--color-nav-800': '#1d1636', '--color-nav-700': '#2a1f4c',
+  '--color-nav-ink': '#a296c4', '--color-series-1': '#7050d6',
 }
 
 const TEMA_TOSCA: Tema = {
@@ -35,8 +35,8 @@ const TEMA_TOSCA: Tema = {
   '--color-brand-300': '#5cc7ac', '--color-brand-400': '#2cae90', '--color-brand-500': '#179a7c',
   '--color-brand-600': '#12866b', '--color-brand-700': '#0e6f59', '--color-brand-800': '#0b5b49',
   '--color-brand-900': '#073f33',
-  '--color-nav-900': '#0e3b36', '--color-nav-800': '#144a44', '--color-nav-700': '#22625a',
-  '--color-nav-ink': '#9cc5bd', '--color-series-1': '#179a7c',
+  '--color-nav-900': '#0b1c1a', '--color-nav-800': '#102523', '--color-nav-700': '#183533',
+  '--color-nav-ink': '#8ba8a2', '--color-series-1': '#179a7c',
 }
 
 const TEMA_AMBAR: Tema = {
@@ -44,8 +44,8 @@ const TEMA_AMBAR: Tema = {
   '--color-brand-300': '#eca858', '--color-brand-400': '#df8b29', '--color-brand-500': '#c77716',
   '--color-brand-600': '#ae6712', '--color-brand-700': '#93560f', '--color-brand-800': '#79460c',
   '--color-brand-900': '#533009',
-  '--color-nav-900': '#3d2710', '--color-nav-800': '#4b3115', '--color-nav-700': '#654520',
-  '--color-nav-ink': '#d2bb95', '--color-series-1': '#c77716',
+  '--color-nav-900': '#1d1409', '--color-nav-800': '#271c0e', '--color-nav-700': '#392a15',
+  '--color-nav-ink': '#b0a084', '--color-series-1': '#c77716',
 }
 
 /** Tema dibagikan berurutan; workspace ke-5 memakai tema pertama lagi. */
@@ -56,33 +56,34 @@ export interface WorkspaceMeta {
   label: string
   /** Inisial untuk avatar kecil. */
   initial: string
-  /** Kode depo, dicat seperti kode di badan kontainer: JKT, TNG. */
-  code: string
+  /** Kota di tanggal Surat Jalan ("Karawang, 6 Oktober 2026"). */
+  kota: string
   tema: Tema
   /** Warna utama & warna muda, dipakai untuk avatar dan aksen. */
   color: string
   colorSoft: string
-  /** Warna baja rel navigasi workspace ini. */
-  steel: string
 }
 
-/** Daftar workspace. Menambah cabang = menambah satu baris di sini. */
-const WORKSPACE_SEED: Array<Pick<WorkspaceMeta, 'id' | 'label' | 'initial' | 'code'>> = [
-  { id: 'jakarta', label: 'Jakarta', initial: 'JK', code: 'JKT' },
-  { id: 'tangerang', label: 'Tangerang', initial: 'TG', code: 'TNG' },
+/**
+ * Daftar workspace. Menambah cabang = menambah satu baris di sini.
+ * Karawang di urutan pertama: workspace utama (6 Okt 2026), jadi memakai tema biru.
+ */
+const WORKSPACE_SEED: Array<Pick<WorkspaceMeta, 'id' | 'label' | 'initial' | 'kota'>> = [
+  { id: 'karawang', label: 'Karawang', initial: 'KR', kota: 'Karawang' },
+  { id: 'priok', label: 'Priok', initial: 'PR', kota: 'Jakarta' },
 ]
 
 export const WORKSPACE_LIST: WorkspaceMeta[] = WORKSPACE_SEED.map((w, i) => {
   const tema = TEMA_LIST[i % TEMA_LIST.length]
-  return { ...w, tema, color: tema['--color-brand-500'], colorSoft: tema['--color-brand-300'], steel: tema['--color-nav-900'] }
+  return { ...w, tema, color: tema['--color-brand-500'], colorSoft: tema['--color-brand-300'] }
 })
 
 export function workspaceMeta(id: Workspace): WorkspaceMeta {
   return WORKSPACE_LIST.find((w) => w.id === id) ?? WORKSPACE_LIST[0]
 }
 
-/** Workspace bawaan setiap kali login. */
-export const DEFAULT_WORKSPACE: Workspace = 'jakarta'
+/** Workspace bawaan setiap kali login: Karawang, fokus pengembangan saat ini. */
+export const DEFAULT_WORKSPACE: Workspace = 'karawang'
 
 interface WorkspaceContextValue {
   workspace: Workspace
@@ -101,7 +102,7 @@ function isWorkspace(v: unknown): v is Workspace {
 /**
  * Menyimpan workspace aktif dan menerapkan tema warnanya ke <html>, sehingga
  * seluruh komponen ikut berganti tanpa class tambahan di tiap halaman.
- * Harus berada di dalam <AuthProvider> karena login selalu kembali ke Jakarta.
+ * Harus berada di dalam <AuthProvider> karena login selalu kembali ke Karawang.
  */
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
@@ -112,7 +113,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [switching, setSwitching] = useState(false)
   const lastUser = useRef<string | null>(user?.username ?? null)
 
-  // Setiap login baru selalu masuk ke workspace Jakarta.
+  // Setiap login baru selalu masuk ke workspace bawaan (Karawang).
   useEffect(() => {
     const now = user?.username ?? null
     if (now && now !== lastUser.current) {

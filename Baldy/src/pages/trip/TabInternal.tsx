@@ -239,7 +239,7 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
                   </Select>
                 )}
               </Field>
-              <Field label="Atas nama" required hint={form.recipient_role ? 'Terdaftar di Data Karyawan, atau isi nama sendiri.' : 'Pilih peran lebih dulu.'}>
+              <Field label="Atas nama" required hint={form.recipient_role ? 'Terdaftar di Supir / Karyawan, atau isi nama sendiri.' : 'Pilih peran lebih dulu.'}>
                 {(fid) => form.recipient_role ? (
                   <PilihKaryawan
                     key={form.recipient_role}

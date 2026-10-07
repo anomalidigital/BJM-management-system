@@ -90,7 +90,7 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'onC
 
 /**
  * Kolom tanggal SIKOTIS: bisa diketik bebas, atau dipilih di papan kalender bergaya
- * jadwal depo (kepala pelat baja, marka kuning untuk hari ini, Minggu merah).
+ * jadwal depo (kepala gelap polos, marka kuning untuk hari ini, Minggu merah).
  */
 export function DateInput({
   value, onChange, invalid, penanda, penandaLabel = 'data', className, disabled, readOnly,
@@ -295,8 +295,8 @@ export function DateInput({
             if (!panelRef.current?.contains(ke) && ke !== inputRef.current) setBuka(false)
           }}
         >
-          {/* Kepala: pelat baja seperti rel navigasi, bulan berhuruf stensil. */}
-          <div className="rail-steel flex items-center gap-1 px-2 py-2 text-white">
+          {/* Kepala: latar polos senada sidebar, bulan berhuruf stensil. */}
+          <div className="flex items-center gap-1 bg-nav-900 px-2 py-2 text-white">
             <button
               type="button"
               onClick={() => { setMode(mode === 'hari' ? 'bulan' : 'hari') }}

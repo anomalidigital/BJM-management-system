@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Badge } from '../../components/ui/Badge'
 import { formatDate, formatNumber, formatRupiah } from '../../lib/format'
 import type { BillingRow, JobOrder, TransactionRow } from '../../types'
+import { PI_TAHAP_LABEL } from '../../types'
 import { STATUS_LABEL, STATUS_TONE } from '../trip/status'
 import { Panel, TautanPanel } from './Panel'
 
@@ -20,20 +21,24 @@ function Kosong({ children }: { children: string }) {
   return <p className="border-t border-hairline px-5 py-6 text-[13px] text-ink-3">{children}</p>
 }
 
-/** Catatan terakhir yang masuk: trip, tagihan, dan SI/Job Order berdampingan. */
+/** Catatan terakhir yang masuk: trip, tagihan, dan (khusus Priok) SI/Job Order berdampingan. */
 export function Terbaru({
   trip,
   tagihan,
   sijo,
+  pi,
   jumlah,
 }: {
   trip: TransactionRow[]
   tagihan: BillingRow[]
-  sijo: JobOrder[]
+  /** Kosongkan untuk cabang tanpa SI/Job Order (Karawang). */
+  sijo?: JobOrder[]
+  /** Karawang menagih lewat PI per trip: panel tagihan menampilkan PI terbaru. */
+  pi?: { rows: TransactionRow[]; total: number; belumLunas: number }
   jumlah: JumlahTerbaru
 }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className={sijo ? 'grid gap-4 lg:grid-cols-3' : 'grid gap-4 lg:grid-cols-2'}>
       <Panel
         title="Trip terbaru"
         subtitle={`${formatNumber(jumlah.trip)} trip tercatat.`}
@@ -69,6 +74,35 @@ export function Terbaru({
         )}
       </Panel>
 
+      {pi ? (
+        <Panel
+          title="PI terbaru"
+          subtitle={`${formatNumber(pi.total)} PI, ${formatNumber(pi.belumLunas)} belum lunas.`}
+          actions={<Link to="/transaksi/tagihan"><TautanPanel>Semua tagihan</TautanPanel></Link>}
+        >
+          {pi.rows.length === 0 ? <Kosong>Belum ada PI.</Kosong> : (
+            <ul className="divide-y divide-grid border-t border-hairline">
+              {pi.rows.map((t) => (
+                <li key={t.id}>
+                  <Link to={`/transaksi/trip/${t.id}`} className={baris}>
+                    <span className="min-w-0 flex-1">
+                      <span className="tnum block truncate text-[13px] font-semibold text-ink">{t.pi_number || '—'}</span>
+                      <span className="mt-0.5 flex min-w-0 gap-3 text-[12px] text-ink-3">
+                        <span className="tnum shrink-0">Trip {t.transaction_no}</span>
+                        <span className="truncate">{t.tr_list.join(', ')}</span>
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="tnum block text-[13px] font-semibold text-ink">{formatRupiah(t.harga + t.biaya_ditagihkan, { compact: true })}</span>
+                      {t.pi_tahap && <Badge tone={t.pi_tahap === 'lunas' || t.pi_tahap === 'disetujui' ? 'good' : t.pi_tahap === 'revisi' ? 'warning' : 'brand'} className="mt-0.5">{PI_TAHAP_LABEL[t.pi_tahap]}</Badge>}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      ) : (
       <Panel
         title="Tagihan terbaru"
         subtitle={`${formatNumber(jumlah.tagihan)} tagihan, ${formatNumber(jumlah.belumLunas)} belum lunas${jumlah.ditolak ? `, ${formatNumber(jumlah.ditolak)} ditolak` : ''}.`}
@@ -102,7 +136,9 @@ export function Terbaru({
         )}
       </Panel>
 
-      <Panel
+      )}
+
+      {sijo && <Panel
         title="SI / Job Order terbaru"
         subtitle={`${formatNumber(jumlah.sijo)} SI/Job Order, ${formatNumber(jumlah.komplit)} sudah komplit.`}
         actions={<Link to="/pencarian/sijo"><TautanPanel>Cari SI/JO</TautanPanel></Link>}
@@ -125,7 +161,7 @@ export function Terbaru({
             ))}
           </ul>
         )}
-      </Panel>
+      </Panel>}
     </div>
   )
 }

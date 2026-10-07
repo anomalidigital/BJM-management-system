@@ -129,10 +129,10 @@ export function DataMobilPage() {
   return (
     <>
       <PageHeader
-        title="Data Mobil"
-        crumbs={[{ label: 'Master' }, { label: 'Data Mobil' }]}
+        title="Kendaraan"
+        crumbs={[{ label: 'Master Data' }, { label: 'Kendaraan' }]}
         description="Master kendaraan beserta konfigurasinya, terpisah dari data sopir."
-        actions={<Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah Mobil</Button>}
+        actions={<Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah Kendaraan</Button>}
       />
 
       <Card>
@@ -170,7 +170,7 @@ export function DataMobilPage() {
           isFiltered={table.isFiltered || filterAktif}
           sort={table.sort}
           onSortChange={table.toggleSort}
-          empty={<EmptyState entity="data mobil" action={canEdit && <Button variant="primary" icon={<FaPlus size={15} />} onClick={openCreate}>Tambah Mobil</Button>} />}
+          empty={<EmptyState entity="kendaraan" />}
           notFound={<NotFoundState onReset={resetFilter} />}
         />
 
@@ -183,7 +183,7 @@ export function DataMobilPage() {
       <Modal
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        title={editing ? 'Ubah Data Mobil' : 'Tambah Data Mobil'}
+        title={editing ? 'Ubah Kendaraan' : 'Tambah Kendaraan'}
         subtitle={editing ? editing.plate_number : 'Tanda * wajib diisi.'}
         footer={
           <>

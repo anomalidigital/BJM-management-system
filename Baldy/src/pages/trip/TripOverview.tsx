@@ -76,7 +76,11 @@ export function TripOverview({ trip }: { trip: TransactionRow }) {
               <InfoItem
                 label="Harga"
                 mono
-                value={<>{formatRupiah(trip.harga)}{!trip.harga_khusus && trip.harga > 0 && <span className="ml-1.5 font-sans text-[11.5px] font-normal text-ink-3">ikut Harga route</span>}</>}
+                value={<>
+                  {formatRupiah(trip.harga)}
+                  {!trip.harga_khusus && trip.harga > 0 && <span className="ml-1.5 font-sans text-[11.5px] font-normal text-ink-3">ikut Harga route</span>}
+                  {trip.override_note && <span className="mt-0.5 block font-sans text-[11.5px] font-normal text-ink-3">Alasan: {trip.override_note}</span>}
+                </>}
               />
             )}
             {kontrak && <InfoItem label="Kontrak" value={`${kontrak.contract_no} — ${trip.client_name || 'klien tidak ditemukan'}`} />}

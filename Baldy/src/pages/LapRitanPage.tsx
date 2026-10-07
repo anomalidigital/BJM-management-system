@@ -18,6 +18,7 @@ import { ReportPreview, barisPerLembar } from '../components/report/ReportPrevie
 import { useData } from '../store/DataProvider'
 import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
+import { useWorkspace } from '../store/WorkspaceProvider'
 import { useTable } from '../lib/useTable'
 import { matchesQuery, sum } from '../lib/utils'
 import { periodeAktif } from '../lib/periode'
@@ -30,8 +31,10 @@ interface Draft {
 }
 
 export function LapRitanPage() {
-  const { db, transactionRows, loading, error, reload, update, remove } = useData()
-  const { canEdit } = useAuth()
+  const { db, transactionRows, loading, error, reload, update, hapusTrip } = useData()
+  const { bisa } = useAuth()
+  /** Tgl Bon, Bon Pribadi, dan SI/JO adalah kolom Ritan sistem lama Priok; Karawang memakai rute & TR. */
+  const karawang = useWorkspace().workspace === 'karawang'
   const toast = useToast()
   const navigate = useNavigate()
 
@@ -57,7 +60,7 @@ export function LapRitanPage() {
   )
 
   const search = useCallback(
-    (t: TransactionRow, q: string) => matchesQuery(q, t.transaction_no, t.plate_number, t.route_code, t.sijo, t.driver_name, t.driver_code),
+    (t: TransactionRow, q: string) => matchesQuery(q, t.transaction_no, t.plate_number, t.route_code, t.route_name, t.sijo, t.tr_list.join(' '), t.driver_name, t.driver_code),
     [],
   )
   const extraFilter = useCallback(
@@ -94,9 +97,11 @@ export function LapRitanPage() {
   }
 
   function onDelete() {
-    const n = remove('transactions', [...selected])
+    // Hapus lewat hapusTrip supaya uang jalan, biaya, kasbon, dan catatan trip ikut terhapus.
+    const ids = [...selected]
+    ids.forEach((id) => hapusTrip(id))
     setSelected(new Set()); setConfirmDelete(false)
-    toast.success(`${n} data ritan berhasil dihapus.`)
+    toast.success(`${ids.length} data ritan berhasil dihapus.`)
   }
 
   function toggleRow(id: string) {
@@ -130,10 +135,35 @@ export function LapRitanPage() {
               periode={`${formatDate(monthStart)} s/d ${formatDate(monthEnd)}`}
               meta={[
                 { label: 'Jumlah ritan', value: formatNumber(table.total) },
-                { label: 'Total Bon Pribadi', value: formatRupiah(totalBon) },
+                ...(karawang ? [] : [{ label: 'Total Bon Pribadi', value: formatRupiah(totalBon) }]),
                 { label: 'Bulan', value: monthLabel(monthStart) },
               ]}
             >
+              {karawang ? (
+                <PrintTable
+                  cols={[
+                    { label: 'No.', align: 'right', width: '5%' },
+                    { label: 'NoTrans', width: '12%' },
+                    { label: 'Tanggal', width: '10%' },
+                    { label: 'Mobil', width: '12%' },
+                    { label: 'Rute' },
+                    { label: 'TR', width: '16%' },
+                    { label: 'Sopir', width: '16%' },
+                  ]}
+                >
+                  {rows.map((t, ri) => (
+                    <PRow key={t.id}>
+                      <PCell align="right">{i * 24 + ri + 1}</PCell>
+                      <PCell>{t.transaction_no}</PCell>
+                      <PCell>{formatDate(t.transaction_date)}</PCell>
+                      <PCell>{t.plate_number}</PCell>
+                      <PCell>{t.route_name || '-'}</PCell>
+                      <PCell>{t.tr_list.join(', ') || '-'}</PCell>
+                      <PCell>{t.driver_names}</PCell>
+                    </PRow>
+                  ))}
+                </PrintTable>
+              ) : (
               <PrintTable
                 cols={[
                   { label: 'No.', align: 'right', width: '5%' },
@@ -166,6 +196,7 @@ export function LapRitanPage() {
                   </PRow>
                 )}
               </PrintTable>
+              )}
             </PrintPage>
           ))}
         </PrintDocument>
@@ -174,6 +205,18 @@ export function LapRitanPage() {
       </ReportPreview>
     )
   }
+
+  const kolomKarawang: Column<TransactionRow>[] = [
+    {
+      key: 'transaction_no', header: 'NoTrans', sortable: true, width: '116px',
+      render: (t) => <Link to={`/transaksi/trip/${t.id}`} className="tnum font-semibold text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>{t.transaction_no}</Link>,
+    },
+    { key: 'transaction_date', header: 'Tanggal', sortable: true, width: '104px', render: (t) => <span className="tnum text-ink-2">{formatDate(t.transaction_date)}</span> },
+    { key: 'plate_number', header: 'Mobil', sortable: true, width: '128px', render: (t) => <span className="tnum text-ink-2">{t.plate_number || '—'}</span> },
+    { key: 'route_name', header: 'Rute', sortable: true, render: (t) => <span className="text-ink-2">{t.route_name || '—'}</span> },
+    { key: 'tr_list', header: 'TR', sortable: true, width: '150px', render: (t) => <span className="tnum text-ink-2">{t.tr_list.join(', ') || '—'}</span> },
+    { key: 'driver_names', header: 'Sopir', sortable: true, render: (t) => <span className="font-medium">{t.driver_names || '—'}</span> },
+  ]
 
   const columns: Column<TransactionRow>[] = [
     { key: 'transaction_no', header: 'NoTrans', sortable: true, width: '116px', render: (t) => <span className="tnum font-semibold text-ink">{t.transaction_no}</span> },
@@ -226,18 +269,20 @@ export function LapRitanPage() {
     <>
       <PageHeader
         title="Cek Ritan Bulan Ini"
-        crumbs={[{ label: 'Invoice' }, { label: 'Cek Ritan Bulan Ini' }]}
-        description={`Ritan Sopir — bulan berjalan (${monthLabel(monthStart)}). Gunakan Sunting untuk mengubah Tgl Bon dan Bon Pribadi langsung di tabel.`}
+        crumbs={[{ label: 'Laporan' }, { label: 'Ritan' }]}
+        description={karawang
+          ? `Ritan sopir bulan berjalan (${monthLabel(monthStart)}): satu baris satu trip. Trip batal tidak dihitung.`
+          : `Ritan Sopir — bulan berjalan (${monthLabel(monthStart)}). Gunakan Sunting untuk mengubah Tgl Bon dan Bon Pribadi langsung di tabel.`}
         actions={
           <>
             <Button icon={<FaPrint size={15} />} onClick={() => setPreview(true)}>Cetak</Button>
-            {editMode ? (
+            {karawang ? null : editMode ? (
               <>
                 <Button icon={<FaXmark size={14} />} onClick={cancelEdit}>Batal</Button>
                 <Button variant="primary" icon={<FaFloppyDisk size={15} />} onClick={saveDrafts}>Simpan</Button>
               </>
             ) : (
-              <Button variant="primary" icon={<FaPen size={15} />} disabled={!canEdit} onClick={() => setEditMode(true)}>Sunting</Button>
+              <Button variant="primary" icon={<FaPen size={15} />} disabled={!bisa('trip')} onClick={() => setEditMode(true)}>Sunting</Button>
             )}
             <Button variant="ghost" onClick={() => navigate('/dashboard')}>Tutup</Button>
           </>
@@ -270,7 +315,9 @@ export function LapRitanPage() {
           }
           right={
             <span className="tnum text-[12.5px] text-ink-2">
-              Total Bon Pribadi: <span className="font-semibold text-ink">{formatRupiah(totalBon)}</span>
+              {karawang
+                ? <>Jumlah ritan: <span className="font-semibold text-ink">{formatNumber(table.total)}</span></>
+                : <>Total Bon Pribadi: <span className="font-semibold text-ink">{formatRupiah(totalBon)}</span></>}
             </span>
           }
         />
@@ -286,14 +333,14 @@ export function LapRitanPage() {
           <div className="animate-in-fade flex flex-wrap items-center justify-between gap-3 border-b border-brand-100 bg-brand-50 px-4 py-2.5">
             <p className="text-[13px] font-semibold text-brand-800">{selected.size} baris dipilih</p>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="danger" icon={<FaTrashCan size={14} />} disabled={!canEdit} onClick={() => setConfirmDelete(true)}>Hapus</Button>
+              <Button size="sm" variant="danger" icon={<FaTrashCan size={14} />} disabled={!bisa('hapus')} onClick={() => setConfirmDelete(true)}>Hapus</Button>
               <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Batalkan</Button>
             </div>
           </div>
         )}
 
         <DataTable
-          columns={columns}
+          columns={karawang ? kolomKarawang : columns}
           rows={table.pageRows}
           rowKey={(t) => t.id}
           loading={loading}

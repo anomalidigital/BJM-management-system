@@ -6,6 +6,7 @@ import { Radio } from '../ui/Field'
 import { ReportPreview } from './ReportPreview'
 import { PrintDocument } from './PrintDocument'
 import { SuratJalanDocument } from './SuratJalanDocument'
+import { BeritaAcaraDocument } from './BeritaAcaraDocument'
 import type { TransactionRow } from '../../types'
 
 type Template = 'logo' | 'nologo'
@@ -15,6 +16,8 @@ type Stage = 'settings' | 'preview'
 /**
  * Alur cetak Surat Jalan: Print Settings -> Preview -> Print / PDF.
  * Klik "Cetak" tidak pernah langsung memanggil printer (addendum bagian 21).
+ * Trip Karawang dicetak sebagai Berita Acara Serah Terima Barang (format Meeting 2),
+ * trip Priok sebagai Surat Jalan.
  */
 export function SuratJalanPrintFlow({
   notes,
@@ -36,6 +39,9 @@ export function SuratJalanPrintFlow({
   }, [open])
 
   if (!open || notes.length === 0) return null
+  /** Seluruh dokumen dari Karawang: istilahnya Berita Acara. */
+  const ba = notes.every((n) => n.workspace === 'karawang')
+  const nama = ba ? 'Berita Acara' : 'Surat Jalan'
 
   function doPrint() {
     onPrinted?.(notes.map((n) => n.id))
@@ -72,19 +78,20 @@ export function SuratJalanPrintFlow({
               <p className="text-[12px] font-semibold text-ink-2">{notes.length} dokumen</p>
               <ul className="tnum mt-1.5 max-h-56 space-y-0.5 overflow-y-auto text-[11.5px] text-ink-3">
                 {notes.map((n) => (
-                  <li key={n.id}>{n.sj_no || n.transaction_no}</li>
+                  <li key={n.id}>{n.workspace === 'karawang' ? [n.transaction_no, n.plate_number].filter(Boolean).join(' · ') : n.sj_no || n.transaction_no}</li>
                 ))}
               </ul>
             </div>
             <p className="text-[11.5px] leading-relaxed text-ink-3">
-              Setiap Surat Jalan dicetak pada halaman A4 tersendiri.
+              Setiap {nama} dicetak pada halaman A4 tersendiri.{ba && ' Isian yang belum ada di sistem dicetak titik-titik untuk diisi tangan.'}
             </p>
           </div>
         }
       >
         <PrintDocument>
-          {notes.map((n) => (
-            <SuratJalanDocument key={n.id} note={n} withLogo={template === 'logo'} />
+          {notes.map((n) => (n.workspace === 'karawang'
+            ? <BeritaAcaraDocument key={n.id} note={n} withLogo={template === 'logo'} />
+            : <SuratJalanDocument key={n.id} note={n} withLogo={template === 'logo'} />
           ))}
         </PrintDocument>
       </ReportPreview>
@@ -95,7 +102,7 @@ export function SuratJalanPrintFlow({
     <Modal
       open
       onClose={onClose}
-      title="Cetak Surat Jalan"
+      title={`Cetak ${nama}`}
       subtitle={`${notes.length} dokumen dipilih`}
       size="sm"
       footer={
@@ -150,7 +157,7 @@ export function SuratJalanPrintFlow({
 
         {notes.length > 1 && (
           <p className="rounded-md border border-hairline bg-sunken px-3 py-2.5 text-[12px] leading-relaxed text-ink-3">
-            {notes.length} Surat Jalan akan dicetak berurutan, satu dokumen per halaman.
+            {notes.length} {nama} akan dicetak berurutan, satu dokumen per halaman{ba ? ', satu untuk tiap mobil' : ''}.
           </p>
         )}
       </div>

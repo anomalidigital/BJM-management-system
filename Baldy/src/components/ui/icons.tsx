@@ -10,16 +10,17 @@ import type { CSSProperties, ReactElement } from 'react'
 import { config, type IconDefinition } from '@fortawesome/fontawesome-svg-core'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
-  faArrowDown, faArrowLeft, faArrowRight, faArrowTrendDown, faArrowTrendUp, faArrowUp, faArrowsRotate,
-  faBan, faBars, faBuilding, faCalendarDays, faChartLine, faCheck, faCheckDouble, faChevronDown,
-  faChevronLeft, faChevronRight, faCircleCheck, faCircleExclamation, faCircleInfo, faCircleNotch,
-  faCircleQuestion, faCompass, faDatabase, faDownload, faEllipsis, faEye, faEyeSlash, faFileArrowDown,
-  faFileContract, faFileInvoiceDollar, faFileLines, faFloppyDisk, faGasPump, faGaugeHigh, faHandHoldingDollar,
-  faHandshake, faHashtag, faImage, faInbox, faKey, faLink, faListCheck, faMagnifyingGlass,
-  faMagnifyingGlassMinus, faMinus, faPaperPlane, faPen, faPercent, faPlus, faPrint, faReceipt,
-  faRightFromBracket, faRightToBracket, faRotateLeft, faRoute, faSackDollar, faScissors,
-  faScrewdriverWrench, faShieldHalved, faShip, faSort, faTrashCan, faTriangleExclamation, faTruck,
-  faTruckFast, faUser, faUserPlus, faUsers, faWallet, faWandMagicSparkles, faXmark,
+  faArrowDown, faArrowLeft, faArrowRight, faArrowsRotate, faArrowTrendDown, faArrowTrendUp, faArrowUp, faBan,
+  faBars, faBed, faBuilding, faCalendarDays, faChartLine, faCheck, faCheckDouble, faChevronDown, faChevronLeft,
+  faChevronRight, faCircleCheck, faCircleExclamation, faCircleInfo, faCircleNotch, faCircleQuestion,
+  faClipboardCheck, faCompass, faDatabase, faDownload, faEllipsis, faEye, faEyeSlash, faFileArrowDown,
+  faFileContract, faFileExport, faFileInvoiceDollar, faFileLines, faFlagCheckered, faFloppyDisk, faGasPump,
+  faGaugeHigh, faHandHoldingDollar, faHandshake, faHashtag, faImage, faInbox, faKey, faLink, faListCheck,
+  faLocationDot, faMagnifyingGlass, faMagnifyingGlassMinus, faMinus, faMugHot, faPaperPlane, faPen, faPercent,
+  faPlus, faPrint, faReceipt, faRightFromBracket, faRightToBracket, faRotateLeft, faRoute, faSackDollar,
+  faScissors, faScrewdriverWrench, faShieldHalved, faShip, faSort, faTrashCan, faTriangleExclamation, faTruck,
+  faTruckFast, faTruckRampBox, faUser, faUserPlus, faUsers, faWallet, faWandMagicSparkles, faWarehouse,
+  faXmark,
 } from '@fortawesome/free-solid-svg-icons'
 
 // CSS Font Awesome dimuat index.css di layer base, jadi kelas Tailwind tetap bisa menimpanya.
@@ -56,12 +57,13 @@ function ikon(def: IconDefinition): IconComponent {
 export const FaArrowDown = ikon(faArrowDown)
 export const FaArrowLeft = ikon(faArrowLeft)
 export const FaArrowRight = ikon(faArrowRight)
+export const FaArrowsRotate = ikon(faArrowsRotate)
 export const FaArrowTrendDown = ikon(faArrowTrendDown)
 export const FaArrowTrendUp = ikon(faArrowTrendUp)
 export const FaArrowUp = ikon(faArrowUp)
-export const FaArrowsRotate = ikon(faArrowsRotate)
 export const FaBan = ikon(faBan)
 export const FaBars = ikon(faBars)
+export const FaBed = ikon(faBed)
 export const FaBuilding = ikon(faBuilding)
 export const FaCalendarDays = ikon(faCalendarDays)
 export const FaChartLine = ikon(faChartLine)
@@ -75,6 +77,7 @@ export const FaCircleExclamation = ikon(faCircleExclamation)
 export const FaCircleInfo = ikon(faCircleInfo)
 export const FaCircleNotch = ikon(faCircleNotch)
 export const FaCircleQuestion = ikon(faCircleQuestion)
+export const FaClipboardCheck = ikon(faClipboardCheck)
 export const FaCompass = ikon(faCompass)
 export const FaDatabase = ikon(faDatabase)
 export const FaDownload = ikon(faDownload)
@@ -83,8 +86,10 @@ export const FaEye = ikon(faEye)
 export const FaEyeSlash = ikon(faEyeSlash)
 export const FaFileArrowDown = ikon(faFileArrowDown)
 export const FaFileContract = ikon(faFileContract)
+export const FaFileExport = ikon(faFileExport)
 export const FaFileInvoiceDollar = ikon(faFileInvoiceDollar)
 export const FaFileLines = ikon(faFileLines)
+export const FaFlagCheckered = ikon(faFlagCheckered)
 export const FaFloppyDisk = ikon(faFloppyDisk)
 export const FaGasPump = ikon(faGasPump)
 export const FaGaugeHigh = ikon(faGaugeHigh)
@@ -96,9 +101,11 @@ export const FaInbox = ikon(faInbox)
 export const FaKey = ikon(faKey)
 export const FaLink = ikon(faLink)
 export const FaListCheck = ikon(faListCheck)
+export const FaLocationDot = ikon(faLocationDot)
 export const FaMagnifyingGlass = ikon(faMagnifyingGlass)
 export const FaMagnifyingGlassMinus = ikon(faMagnifyingGlassMinus)
 export const FaMinus = ikon(faMinus)
+export const FaMugHot = ikon(faMugHot)
 export const FaPaperPlane = ikon(faPaperPlane)
 export const FaPen = ikon(faPen)
 export const FaPercent = ikon(faPercent)
@@ -119,9 +126,11 @@ export const FaTrashCan = ikon(faTrashCan)
 export const FaTriangleExclamation = ikon(faTriangleExclamation)
 export const FaTruck = ikon(faTruck)
 export const FaTruckFast = ikon(faTruckFast)
+export const FaTruckRampBox = ikon(faTruckRampBox)
 export const FaUser = ikon(faUser)
 export const FaUserPlus = ikon(faUserPlus)
 export const FaUsers = ikon(faUsers)
 export const FaWallet = ikon(faWallet)
 export const FaWandMagicSparkles = ikon(faWandMagicSparkles)
+export const FaWarehouse = ikon(faWarehouse)
 export const FaXmark = ikon(faXmark)

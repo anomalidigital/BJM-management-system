@@ -3,6 +3,7 @@ import { FaTriangleExclamation } from '../../components/ui/icons'
 import { Modal } from '../../components/ui/Modal'
 import { Button } from '../../components/ui/Button'
 import { Checkbox, Textarea } from '../../components/ui/Field'
+import { CurrencyInput } from '../../components/ui/CurrencyInput'
 import { useData } from '../../store/DataProvider'
 import type { IsiTrip } from '../../store/DataProvider'
 import { useToast } from '../../store/ToastProvider'
@@ -10,7 +11,7 @@ import { formatRupiah } from '../../lib/format'
 import { cn } from '../../lib/utils'
 import type { CommissionTransaction } from '../../types'
 
-type TripRingkas = Pick<CommissionTransaction, 'id' | 'transaction_no'>
+type TripRingkas = Pick<CommissionTransaction, 'id' | 'transaction_no' | 'workspace'>
 type Cara = 'kembali' | 'kasbon'
 
 /** Daftar catatan trip, untuk isi peringatan. */
@@ -22,6 +23,7 @@ function DaftarIsi({ isi, warna }: { isi: IsiTrip; warna: string }) {
   if (isi.biaya) baris.push(`${isi.biaya} biaya operasional · ${formatRupiah(isi.biayaTotal)}`)
   if (isi.internal) baris.push(`${isi.internal} biaya internal · ${formatRupiah(isi.internalTotal)}`)
   if (isi.lainnya) baris.push(`${isi.lainnya} catatan di tab Lainnya`)
+  if (isi.perjalanan) baris.push(`${isi.perjalanan} catatan di tab Perjalanan`)
   return (
     <ul className={cn('mt-2 list-disc space-y-1 pl-5 text-[12.5px]', warna)}>
       {baris.map((b) => <li key={b}>{b}</li>)}
@@ -29,7 +31,7 @@ function DaftarIsi({ isi, warna }: { isi: IsiTrip; warna: string }) {
   )
 }
 
-const adaIsi = (isi: IsiTrip) => isi.termin + isi.biaya + isi.internal + isi.lainnya > 0
+const adaIsi = (isi: IsiTrip) => isi.termin + isi.biaya + isi.internal + isi.lainnya + isi.perjalanan > 0
 
 /**
  * Konfirmasi Batalkan Trip. Trip ditandai Dibatalkan dan seluruh catatannya
@@ -48,9 +50,11 @@ export function KonfirmasiBatalTrip({ trip, onClose, onDone }: {
   const [alasan, setAlasan] = useState('')
   const [cara, setCara] = useState<Record<string, Cara>>({})
   const [paham, setPaham] = useState(false)
+  /** Karawang: biaya cancel yang tetap ditagihkan ke klien (alur atasan: disetujui Manager / Owner). */
+  const [biayaCancel, setBiayaCancel] = useState(0)
 
   useEffect(() => {
-    setAlasan(''); setCara({}); setPaham(false)
+    setAlasan(''); setCara({}); setPaham(false); setBiayaCancel(0)
     setIsi(trip ? isiTrip(trip.id) : null)
   }, [trip, isiTrip])
 
@@ -65,10 +69,11 @@ export function KonfirmasiBatalTrip({ trip, onClose, onDone }: {
     if (!trip) return
     const penyelesaian: Record<string, Cara> = {}
     for (const t of perluSelesai) penyelesaian[t.id] = caraTermin(t.id, !!t.driver_id)
-    batalkanTrip(trip.id, { alasan, penyelesaian })
+    batalkanTrip(trip.id, { alasan, penyelesaian, biayaCancel })
     const bagian = [
       isi?.kasbonKembali ? `potongan kasbon ${formatRupiah(isi.kasbonKembali)} dikembalikan` : '',
       jadiKasbon ? `UJ ${formatRupiah(jadiKasbon)} jadi kasbon sopir` : '',
+      biayaCancel > 0 ? `biaya cancel ${formatRupiah(biayaCancel)} masuk Tagihan` : '',
     ].filter(Boolean)
     toast.success(`Trip ${trip.transaction_no} dibatalkan${bagian.length ? `; ${bagian.join(', ')}` : ''}.`)
     onClose()
@@ -160,6 +165,14 @@ export function KonfirmasiBatalTrip({ trip, onClose, onDone }: {
         <label className="mb-1.5 block text-[12px] font-semibold tracking-wide text-ink-2" htmlFor="alasan-batal">Alasan pembatalan</label>
         <Textarea id="alasan-batal" rows={2} value={alasan} placeholder="mis. order dibatalkan customer" onChange={(e) => setAlasan(e.target.value)} />
       </div>
+
+      {trip.workspace === 'karawang' && (
+        <div className="mt-3">
+          <label className="mb-1.5 block text-[12px] font-semibold tracking-wide text-ink-2" htmlFor="biaya-cancel">Biaya cancel ditagihkan ke klien</label>
+          <CurrencyInput id="biaya-cancel" value={biayaCancel} onValueChange={setBiayaCancel} />
+          <p className="mt-1 text-[12px] text-ink-3">Isi bila klien tetap membayar cancel fee. Trip batal dengan biaya cancel masuk Tagihan untuk dibuatkan PI.</p>
+        </div>
+      )}
     </Modal>
   )
 }

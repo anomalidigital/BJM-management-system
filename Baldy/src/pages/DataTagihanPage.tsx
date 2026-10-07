@@ -6,17 +6,24 @@ import { useData } from '../store/DataProvider'
 import { ProsesDataTab } from './tagihan/ProsesDataTab'
 import { BrowsingDataTab } from './tagihan/BrowsingDataTab'
 import { PencarianDataTab } from './tagihan/PencarianDataTab'
+import { TagihanPiPage } from './tagihan/TagihanPiPage'
+import { useWorkspace } from '../store/WorkspaceProvider'
 
-/** Transaksi -> Data Tagihan. */
+/** Laporan -> Tagihan. Karawang menagih per trip lewat PI; Priok per SI/JO seperti sistem lama. */
 export function DataTagihanPage() {
+  const { workspace } = useWorkspace()
+  return workspace === 'karawang' ? <TagihanPiPage /> : <TagihanSijo />
+}
+
+function TagihanSijo() {
   const { db } = useData()
   const [tab, setTab] = useState('proses')
 
   return (
     <>
       <PageHeader
-        title="Data Tagihan"
-        crumbs={[{ label: 'Transaksi' }, { label: 'Data Tagihan' }]}
+        title="Tagihan"
+        crumbs={[{ label: 'Laporan' }, { label: 'Tagihan' }]}
       />
 
       <Card>

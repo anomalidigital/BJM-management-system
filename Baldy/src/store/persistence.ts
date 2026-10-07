@@ -1,17 +1,19 @@
 import type {
-  CommissionTransaction, Database, InternalCost, KasbonEntry, OperationalExpense, Project, Route, UjPayment,
+  CommissionTransaction, Database, InternalCost, KasbonEntry, OperationalExpense, Project, Route, UjPayment, Workspace,
 } from '../types'
-import { aturanKomisiMeeting, generateDatabase, generateSampleDatabase, makeKlienKontrak, projectDominanPerRoute, workspaceForSeed, CATATAN_KOMISI_CALLOUT, NAMA_KOMISI_CALLOUT } from '../data/dummy'
+import { aturanKomisiMeeting, generateDatabase, generateSampleDatabase, makeKlienKontrak, projectDominanPerRoute, workspaceForSeed, CATATAN_KOMISI_CALLOUT, NAMA_KOMISI_CALLOUT, cabangBawaan } from '../data/dummy'
 import { kasbonTerminContoh, keuanganTripContoh, lengkapiNominalRoute } from '../data/lengkapi'
 import { petaSaldoKasbon } from '../lib/kasbon'
 import { susunKasbonDariDataLama } from '../lib/kasbon'
 import { todayISO } from '../lib/format'
 import { kodeKlienBerikut, nomorTripBerikut } from '../lib/kode'
 import { uid } from '../lib/utils'
+import { pindahkanUangKeTermin, tandaiPembayarLama } from '../lib/trip'
 
 const DB_KEY = 'sikotis.db.v2'
 const AUTH_KEY = 'sikotis.auth.v1'
-const WORKSPACE_KEY = 'sikotis.workspace.v1'
+// v2: workspace utama pindah ke Karawang (6 Okt 2026); pilihan lama tidak dibawa.
+const WORKSPACE_KEY = 'sikotis.workspace.v2'
 
 /** Koleksi inti yang sudah ada sejak versi pertama. */
 const CORE_KEYS: Array<keyof Database> = ['drivers', 'routes', 'vehicles', 'jobOrders', 'transactions', 'billings']
@@ -78,6 +80,11 @@ function migrate(stored: Record<string, unknown>): Database {
         container_no: '',
         // Field lama is_done dipetakan ke status baru, bukan dibuang.
         status: t.status ?? (t.is_done ? 'selesai' : 'aktif'),
+        // TR kini daftar (7 Okt 2026): satu trip boleh membawa beberapa TR.
+        ...(Array.isArray(t.tr_numbers) ? {} : { tr_numbers: String(t.tr_reference ?? '').trim() ? [String(t.tr_reference).trim()] : [] }),
+        // Tahap PI baru; PI bernomor dari data lama dianggap sudah dikirim (TBD-23).
+        ...(t.pi_tahap || !String(t.pi_number ?? '').trim() ? {} : { pi_tahap: 'dikirim' }),
+        ...(t.pod_fisik === undefined && /di pool/i.test(String(t.pi_status ?? '')) ? { pod_fisik: true } : {}),
       }
     })
   }
@@ -105,7 +112,7 @@ function migrate(stored: Record<string, unknown>): Database {
     }))
   }
 
-  /* Workspace (Jakarta / Tangerang).
+  /* Workspace (cabang).
    *
    * Data lama belum mengenal workspace. Pembagiannya mengikuti armada:
    * satu kendaraan dianggap berpangkalan di satu cabang, sehingga trip dan
@@ -126,12 +133,27 @@ function migrate(stored: Record<string, unknown>): Database {
       // Baris tanpa kendaraan jatuh ke id-nya sendiri, supaya tidak menumpuk
       // di satu cabang hanya karena seed-nya sama-sama kosong.
       const seed = String(row[seedField] ?? '') || String(row.id ?? '')
-      return { ...row, workspace: workspaceForSeed(seed) }
+      return { ...row, workspace: cabangBawaan(String(row.id ?? '')) ?? workspaceForSeed(seed) }
     })
   }
   beriWorkspace('transactions', 'vehicle_id')
   beriWorkspace('deliveryNotes', 'vehicle_id')
   beriWorkspace('billings', 'job_order_id')
+
+  // Cabang berganti nama (6 Okt 2026): Jakarta -> Priok (container), Tangerang ->
+  // Karawang (alat berat & DHL). Data bawaan dipindah ke cabang bisnisnya (lihat
+  // cabangBawaan); data buatan pengguna cukup ikut nama barunya.
+  const namaBaru: Record<string, Workspace> = { jakarta: 'priok', tangerang: 'karawang' }
+  for (const key of ['transactions', 'deliveryNotes', 'billings', 'contracts', 'commissionSchemes']) {
+    const list = merged[key] as Array<Record<string, unknown>> | undefined
+    if (!Array.isArray(list) || !list.some((r) => String(r.workspace) in namaBaru)) continue
+    merged[key] = list.map((r) => {
+      const lama = String(r.workspace ?? '')
+      if (!(lama in namaBaru)) return r
+      const bawaan = key === 'commissionSchemes' ? null : cabangBawaan(String(r.id ?? ''))
+      return { ...r, workspace: bawaan ?? namaBaru[lama] }
+    })
+  }
 
   // Pengaturan Komisi kini bertingkat (target awal - akhir) untuk satu peran.
   // Bentuk lama "komisi dasar sampai target, komisi target setelahnya" diubah
@@ -303,11 +325,24 @@ function migrate(stored: Record<string, unknown>): Database {
   }
   const exp = merged.expenses as Array<Record<string, unknown>> | undefined
   if (Array.isArray(exp)) merged.expenses = exp.map((e) => ({ attachments: [], ...e }))
+  // Uang dorong & uang pulang pindah dari biaya operasional ke termin uang jalan (7 Okt 2026).
+  if ((merged.expenses as OperationalExpense[] | undefined)?.some((e) => e.expense_type === 'Uang Dorong' || e.expense_type === 'Uang Pulang')) {
+    const hasil = pindahkanUangKeTermin(
+      merged.expenses as OperationalExpense[], (merged.ujPayments ?? []) as UjPayment[], trips as unknown as CommissionTransaction[], stamp,
+    )
+    merged.expenses = hasil.expenses
+    merged.ujPayments = hasil.ujPayments
+  }
+  // Pembayar biaya baru dicatat sejak 7 Okt 2026: data lama yang melebihi uang jalannya ditandai dibayar perusahaan.
+  if (Array.isArray(merged.expenses) && (merged.expenses as OperationalExpense[]).every((e) => !e.dibayar)) {
+    merged.expenses = tandaiPembayarLama(merged.expenses as OperationalExpense[], (merged.ujPayments ?? []) as UjPayment[])
+  }
   const intr = merged.internalCosts as Array<Record<string, unknown>> | undefined
   if (Array.isArray(intr)) {
     merged.internalCosts = intr.map((c) => ({ attachments: [], recipient_role: '', recipient_id: '', recipient_name: '', ...c }))
   }
   if (!Array.isArray(merged.tripNotes)) merged.tripNotes = []
+  if (!Array.isArray(merged.tripEvents)) merged.tripEvents = []
   if (!Array.isArray(merged.contracts)) merged.contracts = []
 
   // Kontrak kini milik Klien (Master -> Klien). Kontrak lama menyimpan nama client
@@ -346,8 +381,8 @@ function migrate(stored: Record<string, unknown>): Database {
   // Aturan komisi dari catatan meeting, ditambahkan sekali per workspace.
   if (perluAturanMeeting) {
     merged.commissionSchemes = [
-      ...aturanKomisiMeeting('jakarta', 'cms-meeting-jkt', stamp),
-      ...aturanKomisiMeeting('tangerang', 'cms-meeting-tng', stamp),
+      ...aturanKomisiMeeting('priok', 'cms-meeting-jkt', stamp),
+      ...aturanKomisiMeeting('karawang', 'cms-meeting-tng', stamp),
       ...(merged.commissionSchemes as unknown[]),
     ]
   }
@@ -474,7 +509,7 @@ export function resetToSampleDatabase(): Database {
   return fresh
 }
 
-/** Workspace aktif (Jakarta / Tangerang) - disimpan terpisah dari data. */
+/** Workspace aktif (Priok / Karawang) - disimpan terpisah dari data. */
 export const workspaceStorage = {
   read(): string | null {
     try {

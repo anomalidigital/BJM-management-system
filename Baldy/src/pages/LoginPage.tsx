@@ -126,6 +126,11 @@ export function LoginPage() {
             <Button type="submit" variant="primary" loading={loading} icon={<FaRightToBracket size={15} />} className="h-10 w-full">
               Masuk
             </Button>
+            <p className="text-[12px] leading-relaxed text-ink-3">
+              Akun simulasi: <span className="font-medium text-ink-2">owner</span>, <span className="font-medium text-ink-2">manager</span>,{' '}
+              <span className="font-medium text-ink-2">admin</span>, atau <span className="font-medium text-ink-2">viewer</span>.
+              Password bebas, minimal 4 karakter.
+            </p>
           </form>
 
         </div>

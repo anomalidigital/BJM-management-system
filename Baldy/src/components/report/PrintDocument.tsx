@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/utils'
 import { formatPrintedAt } from '../../lib/format'
+import { useWorkspace } from '../../store/WorkspaceProvider'
 
 /** Bagi baris menjadi beberapa halaman A4. */
 export function chunkRows<T>(rows: T[], perPage: number): T[][] {
@@ -36,6 +37,8 @@ interface PrintPageProps {
  * mengisi penuh halaman dan memaksa page-break ke lembar berikutnya.
  */
 export function PrintPage({ title, subtitle, periode, page, totalPages, withLogo = true, meta, children }: PrintPageProps) {
+  // Kota di kop mengikuti cabang yang sedang dibuka (Priok: Jakarta, Karawang: Karawang).
+  const { meta: cabang } = useWorkspace()
   return (
     <section
       className={cn(
@@ -52,7 +55,7 @@ export function PrintPage({ title, subtitle, periode, page, totalPages, withLogo
           )}
           <div>
             <p className="text-[15px] leading-tight font-bold tracking-tight">PT BIMAJAYA MUSTIKA</p>
-            <p className="text-[10.5px] tracking-wide">JAKARTA</p>
+            <p className="text-[10.5px] tracking-wide">{cabang.kota.toUpperCase()}</p>
             <p className="mt-0.5 text-[9.5px] text-neutral-600">
               Transportation, Driver Commission, Billing &amp; Reporting Management System
             </p>

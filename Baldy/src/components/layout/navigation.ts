@@ -1,66 +1,80 @@
 import {
   FaBuilding, FaChartLine, FaFileInvoiceDollar, FaGaugeHigh, FaListCheck, FaMagnifyingGlass, FaPercent,
-  FaReceipt, FaRoute, FaSackDollar, FaScrewdriverWrench, FaTruck, FaTruckFast, FaUsers, FaWallet,
+  FaReceipt, FaRoute, FaSackDollar, FaScrewdriverWrench, FaShieldHalved, FaTruck, FaTruckFast, FaUsers, FaWallet,
 } from '../ui/icons'
 import type { IconComponent } from '../ui/icons'
+import type { Workspace } from '../../types'
 
 export interface NavItem {
   label: string
   to: string
   icon: IconComponent
+  /** Hanya tampil di workspace ini (mis. pencarian SI/JO khusus container Priok). */
+  workspace?: Workspace
 }
 
 export interface NavGroup {
-  /** Judul grup; kosong berarti item berdiri sendiri (Dashboard). */
+  /** Judul grup; kosong berarti item berdiri sendiri (Dashboard, Trip / Job Order). */
   title?: string
   items: NavItem[]
 }
 
-/** Struktur navigasi utama aplikasi. */
+/**
+ * Struktur navigasi utama, mengikuti susunan menu dari atasan (6 Okt 2026):
+ * Dashboard, Trip / Job Order, Laporan, Master Data, Administrasi.
+ * "Pengeluaran" di susunan itu = Uang Jalan + Biaya Operasional.
+ */
 export const NAV_GROUPS: NavGroup[] = [
   {
     items: [{ label: 'Dashboard', to: '/dashboard', icon: FaGaugeHigh }],
   },
   {
-    title: 'Master',
+    items: [{ label: 'Trip / Job Order', to: '/transaksi/trip', icon: FaTruckFast }],
+  },
+  {
+    title: 'Laporan',
     items: [
-      { label: 'Data Karyawan', to: '/master/karyawan', icon: FaUsers },
-      { label: 'Data Mobil', to: '/master/mobil', icon: FaTruck },
-      { label: 'Data Route', to: '/master/route', icon: FaRoute },
-      { label: 'Klien', to: '/master/klien', icon: FaBuilding },
-      { label: 'Komisi', to: '/master/komisi', icon: FaPercent },
+      { label: 'Uang Jalan', to: '/laporan/uang-jalan', icon: FaWallet },
+      { label: 'Biaya Operasional', to: '/laporan/biaya', icon: FaReceipt },
+      { label: 'Tagihan', to: '/transaksi/tagihan', icon: FaFileInvoiceDollar },
+      { label: 'Komisi', to: '/laporan/komisi', icon: FaSackDollar },
+      { label: 'Netto', to: '/laporan/netto', icon: FaChartLine },
+      { label: 'Ritan', to: '/laporan/ritan', icon: FaListCheck },
     ],
   },
   {
-    title: 'Transaksi',
+    title: 'Master Data',
     items: [
-      { label: 'Trip', to: '/transaksi/trip', icon: FaTruckFast },
-      { label: 'Data Tagihan', to: '/transaksi/tagihan', icon: FaFileInvoiceDollar },
-    ],
-  },
-  {
-    title: 'Invoice',
-    items: [
-      { label: 'Komisi Bulan Berjalan', to: '/laporan/komisi', icon: FaSackDollar },
-      { label: 'Netto Bulan Berjalan', to: '/laporan/netto', icon: FaChartLine },
-      { label: 'Cek Ritan Bulan Ini', to: '/laporan/ritan', icon: FaListCheck },
-      { label: 'Rekap Uang Jalan', to: '/laporan/uang-jalan', icon: FaWallet },
-      { label: 'Rekap Biaya Operasional', to: '/laporan/biaya', icon: FaReceipt },
+      { label: 'Supir / Karyawan', to: '/master/karyawan', icon: FaUsers },
+      { label: 'Kendaraan', to: '/master/mobil', icon: FaTruck },
+      { label: 'Rute', to: '/master/route', icon: FaRoute },
+      { label: 'Klien / Pelanggan', to: '/master/klien', icon: FaBuilding },
+      { label: 'Aturan Komisi', to: '/master/komisi', icon: FaPercent },
     ],
   },
   {
     title: 'Pencarian',
-    items: [{ label: 'SI / Job Order', to: '/pencarian/sijo', icon: FaMagnifyingGlass }],
+    items: [{ label: 'SI / Job Order', to: '/pencarian/sijo', icon: FaMagnifyingGlass, workspace: 'priok' }],
   },
   {
-    title: 'Lainnya',
-    items: [{ label: 'Tools', to: '/tools', icon: FaScrewdriverWrench }],
+    title: 'Administrasi',
+    items: [
+      { label: 'User & Roles', to: '/admin/peran', icon: FaShieldHalved },
+      { label: 'Tools', to: '/tools', icon: FaScrewdriverWrench },
+    ],
   },
 ]
 
+/** Menu yang tampil di satu workspace; grup tanpa isi ikut disembunyikan. */
+export function navUntuk(workspace: Workspace): NavGroup[] {
+  return NAV_GROUPS
+    .map((g) => ({ ...g, items: g.items.filter((it) => !it.workspace || it.workspace === workspace) }))
+    .filter((g) => g.items.length > 0)
+}
+
 /**
  * Cari tujuan untuk satu label breadcrumb.
- * Judul grup (mis. "Master") diarahkan ke halaman pertama grup itu, label menu
+ * Judul grup (mis. "Master Data") diarahkan ke halaman pertama grup itu, label menu
  * diarahkan ke halamannya sendiri. Dipakai PageHeader supaya seluruh breadcrumb
  * bisa diklik tanpa tiap halaman perlu menuliskan path-nya satu per satu.
  */

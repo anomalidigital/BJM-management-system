@@ -205,8 +205,8 @@ export function KlienPage() {
   return (
     <>
       <PageHeader
-        title="Klien"
-        crumbs={[{ label: 'Master' }, { label: 'Klien' }]}
+        title="Klien / Pelanggan"
+        crumbs={[{ label: 'Master Data' }, { label: 'Klien / Pelanggan' }]}
         description="Klien tetap order per perjalanan (Callout). Klien kontrak memakai layanan Dedicated; kontraknya dikelola di halaman klien."
         actions={<Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah Klien</Button>}
       />
@@ -241,7 +241,7 @@ export function KlienPage() {
           isFiltered={table.isFiltered || !!jenis}
           sort={table.sort}
           onSortChange={table.toggleSort}
-          empty={<EmptyState entity="klien" action={canEdit && <Button variant="primary" icon={<FaPlus size={15} />} onClick={openCreate}>Tambah Klien</Button>} />}
+          empty={<EmptyState entity="klien" />}
           notFound={<NotFoundState onReset={resetFilter} />}
         />
       </Card>

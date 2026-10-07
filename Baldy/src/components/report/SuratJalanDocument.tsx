@@ -1,6 +1,7 @@
 import type { TransactionRow } from '../../types'
 import { formatDateLong } from '../../lib/format'
 import { cn } from '../../lib/utils'
+import { workspaceMeta } from '../../store/WorkspaceProvider'
 
 /**
  * Layout dokumen Surat Jalan ukuran A4 (bukan screenshot UI) untuk satu trip.
@@ -43,7 +44,8 @@ export function SuratJalanDocument({ note, withLogo = true }: { note: Transactio
           </div>
         </div>
         <div className="pt-1 text-right text-[10.5px]">
-          <p>Jakarta, {formatDateLong(note.transaction_date)}</p>
+          {/* Kota mengikuti cabang trip: Priok mencetak Jakarta, Karawang mencetak Karawang. */}
+          <p>{workspaceMeta(note.workspace ?? 'priok').kota}, {formatDateLong(note.transaction_date)}</p>
         </div>
       </header>
 

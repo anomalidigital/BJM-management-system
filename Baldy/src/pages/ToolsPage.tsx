@@ -16,7 +16,7 @@ import { formatNumber, todayISO } from '../lib/format'
 export function ToolsPage() {
   const { db, dbAll, muatUlangData, reload } = useData()
   const { meta } = useWorkspace()
-  const { canEdit } = useAuth()
+  const { bisa } = useAuth()
   const toast = useToast()
   const [confirmReset, setConfirmReset] = useState(false)
 
@@ -28,7 +28,7 @@ export function ToolsPage() {
     ['Kontrak', db.contracts.length],
     ['SI / Job Order', db.jobOrders.length],
     ['Trip', db.transactions.length],
-    ['Data Tagihan', db.billings.length],
+    ['Tagihan', db.billings.length],
     ['Termin Uang Jalan', db.ujPayments.length],
     ['Biaya Operasional', db.expenses.length],
     ['Biaya Internal', db.internalCosts.length],
@@ -53,7 +53,7 @@ export function ToolsPage() {
     <>
       <PageHeader
         title="Tools"
-        crumbs={[{ label: 'Lainnya' }, { label: 'Tools' }]}
+        crumbs={[{ label: 'Administrasi' }, { label: 'Tools' }]}
         description="Kelola data aplikasi, uji state halaman, dan lihat daftar business rule yang masih perlu dikonfirmasi."
       />
 
@@ -108,7 +108,7 @@ export function ToolsPage() {
               <Button className="w-full justify-start" icon={<FaArrowsRotate size={15} />} onClick={reload}>
                 Muat ulang data
               </Button>
-              <Button className="w-full justify-start" variant="danger" icon={<FaDatabase size={15} />} disabled={!canEdit} onClick={() => setConfirmReset(true)}>
+              <Button className="w-full justify-start" variant="danger" icon={<FaDatabase size={15} />} disabled={!bisa('hapus')} onClick={() => setConfirmReset(true)}>
                 Reset data ke kondisi awal
               </Button>
             </div>

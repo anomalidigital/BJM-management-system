@@ -4,24 +4,34 @@ import { FaPen, FaTrashCan } from '../../components/ui/icons'
 import { Button, IconButton } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Modal, ConfirmDialog } from '../../components/ui/Modal'
-import { Field, Input, DateInput } from '../../components/ui/Field'
+import { Field, Input, DateInput, Select } from '../../components/ui/Field'
 import { CurrencyInput } from '../../components/ui/CurrencyInput'
 import { SearchableSelect } from '../../components/ui/SearchableSelect'
 import { LampiranInput, LampiranThumbs } from '../../components/ui/Lampiran'
 import { useData } from '../../store/DataProvider'
 import type { TerminForm } from '../../store/DataProvider'
 import { useToast } from '../../store/ToastProvider'
+import { useAuth } from '../../store/AuthProvider'
 import { tfPembayaran, totalUj } from '../../lib/calculations'
 import { saldoKasbon as hitungSaldo } from '../../lib/kasbon'
 import { formatDate, formatRupiah } from '../../lib/format'
 import { cn } from '../../lib/utils'
-import type { TransactionRow, UjPayment } from '../../types'
+import { JENIS_TERMIN, JENIS_TERMIN_LABEL } from '../../types'
+import type { JenisTermin, TransactionRow, UjPayment } from '../../types'
+
+/** Petunjuk tiap jenis termin. */
+const PETUNJUK_JENIS: Record<JenisTermin, string> = {
+  uj: 'Uang perjalanan dari patokan UJROUTE: solar, tol, ASDP, SPSI, nginap dibayar sopir dari sini.',
+  uang_dorong: 'Uang untuk lanjut membawa muatan balik. Catat di trip backload-nya.',
+  uang_pulang: 'Sopir pulang kosong tanpa backload.',
+  tambahan: 'Kekurangan uang jalan di luar patokan, mis. perjalanan lebih lama.',
+}
 import { KepalaTab, KepalaTabel, KosongTab, PakaiNilai, PesanGalat } from './bagian'
 
 /**
- * Tab Uang Jalan. UJROUTE route hanya patokan: termin dicatat saat uang
- * benar-benar dibayar, dan sisanya terlihat dari patokan dikurangi yang sudah
- * dibayar. Potong kasbon mengurangi kasbon sopir penerima termin itu.
+ * Tab Uang Jalan. Uang jalan = seluruh uang untuk sopir selama perjalanan (uang jalan,
+ * uang dorong, uang pulang, tambahan). UJROUTE route hanya patokan: termin dicatat saat
+ * uang benar-benar dibayar. Potong kasbon mengurangi kasbon sopir penerima termin itu.
  */
 export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah: boolean }) {
   const { dbAll, simpanTermin, hapusTermin } = useData()
@@ -29,7 +39,7 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
 
   const [terbuka, setTerbuka] = useState(false)
   const [editing, setEditing] = useState<UjPayment | null>(null)
-  const [form, setForm] = useState<TerminForm>({ payment_date: '', driver_id: '', uj_amount: 0, kasbon_deduction: 0, notes: '', attachments: [] })
+  const [form, setForm] = useState<TerminForm>({ payment_date: '', driver_id: '', jenis: 'uj', uj_amount: 0, kasbon_deduction: 0, notes: '', attachments: [] })
   const [galat, setGalat] = useState<string | null>(null)
   const [menghapus, setMenghapus] = useState<UjPayment | null>(null)
 
@@ -41,6 +51,7 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
   const drivers = useMemo(() => new Map(dbAll.drivers.map((d) => [d.id, d])), [dbAll.drivers])
   const uj = totalUj(payments)
   const batal = trip.status === 'batal'
+  const { bisa } = useAuth()
   const patokan = trip.ujroute
   const sisa = patokan - uj.uj
   const penyelesaian = new Map((trip.cancel_settlement ?? []).map((x) => [x.uj_payment_id, x]))
@@ -72,10 +83,11 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
   function buka(p?: UjPayment) {
     setEditing(p ?? null)
     setForm(p
-      ? { payment_date: p.payment_date, driver_id: p.driver_id, uj_amount: p.uj_amount, kasbon_deduction: p.kasbon_deduction, notes: p.notes, attachments: p.attachments ?? [] }
+      ? { payment_date: p.payment_date, driver_id: p.driver_id, jenis: p.jenis ?? 'uj', uj_amount: p.uj_amount, kasbon_deduction: p.kasbon_deduction, notes: p.notes, attachments: p.attachments ?? [] }
       : {
           payment_date: trip.transaction_date,
           driver_id: trip.driver_ids[0] ?? '',
+          jenis: 'uj',
           // Termin baru langsung diisi sisa dari patokan; tetap bisa diubah.
           uj_amount: Math.max(0, sisa),
           kasbon_deduction: 0,
@@ -89,6 +101,12 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
     if (!form.payment_date) { setGalat('Tanggal wajib diisi.'); return }
     if (form.uj_amount <= 0) { setGalat('Nilai UJ harus lebih dari 0.'); return }
     if (form.kasbon_deduction > form.uj_amount) { setGalat('Potong kasbon tidak boleh melebihi UJ.'); return }
+    if (!bisa('override') && patokan > 0 && form.uj_amount > Math.max(0, sisaSebelumIni)) {
+      setGalat((form.jenis ?? 'uj') === 'uj'
+        ? `Melebihi patokan UJROUTE (sisa ${formatRupiah(Math.max(0, sisaSebelumIni))}). Uang jalan di atas patokan perlu Manager atau Owner.`
+        : `${JENIS_TERMIN_LABEL[form.jenis ?? 'uj']} di luar patokan UJROUTE perlu Manager atau Owner.`)
+      return
+    }
     if (form.kasbon_deduction > 0 && !form.driver_id) { setGalat('Pilih sopir yang kasbonnya dipotong.'); return }
     if (form.kasbon_deduction > saldo) {
       setGalat(`Kasbon ${namaSopir || 'sopir ini'} tinggal ${formatRupiah(Math.max(0, saldo))}. Potongan tidak boleh melebihinya.`)
@@ -146,7 +164,12 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
                 const selesai = penyelesaian.get(p.id)
                 return (
                   <tr key={p.id} className={cn('border-b border-grid last:border-0 hover:bg-sunken', batal && 'text-ink-3')}>
-                    <td className="px-3 py-2.5"><Badge tone="neutral">Termin {p.sequence}</Badge></td>
+                    <td className="px-3 py-2.5">
+                      <span className="flex flex-wrap items-center gap-1">
+                        <Badge tone="neutral">Termin {p.sequence}</Badge>
+                        {p.jenis && p.jenis !== 'uj' && <Badge tone="brand">{JENIS_TERMIN_LABEL[p.jenis]}</Badge>}
+                      </span>
+                    </td>
                     <td className="tnum px-3 py-2.5 text-ink-2">{formatDate(p.payment_date)}</td>
                     <td className="px-3 py-2.5">
                       {d ? <Link to={`/master/karyawan/${d.id}`} className="font-medium text-ink hover:text-brand-700 hover:underline">{d.driver_name}</Link> : <span className="text-ink-3">—</span>}
@@ -200,6 +223,13 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Jenis" required className="sm:col-span-2" hint={PETUNJUK_JENIS[form.jenis ?? 'uj']}>
+            {(fid) => (
+              <Select id={fid} value={form.jenis ?? 'uj'} onChange={(e) => setForm((f) => ({ ...f, jenis: e.target.value as JenisTermin }))}>
+                {JENIS_TERMIN.map((j) => <option key={j} value={j}>{JENIS_TERMIN_LABEL[j]}</option>)}
+              </Select>
+            )}
+          </Field>
           <Field label="Tanggal" required>
             {(fid) => <DateInput id={fid} value={form.payment_date} onChange={(e) => setForm((f) => ({ ...f, payment_date: e.target.value }))} />}
           </Field>

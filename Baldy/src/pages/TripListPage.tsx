@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  FaBan, FaCheckDouble, FaCircleQuestion, FaPen, FaPlus, FaPrint, FaTrashCan, FaXmark,
+  FaBan, FaCheckDouble, FaFlagCheckered, FaPen, FaPlus, FaPrint, FaTrashCan, FaXmark,
 } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
@@ -14,12 +14,14 @@ import { OverflowMenu } from '../components/ui/Menu'
 import { DateInput, Select } from '../components/ui/Field'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState, NotFoundState } from '../components/ui/States'
-import { ConfirmDialog, Modal } from '../components/ui/Modal'
+import { ConfirmDialog } from '../components/ui/Modal'
 import { SuratJalanPrintFlow } from '../components/report/SuratJalanPrintFlow'
 import { KonfirmasiBatalTrip, KonfirmasiHapusTrip } from './trip/KonfirmasiTrip'
+import { KonfirmasiTutupTrip } from './trip/TutupTrip'
 import { useData } from '../store/DataProvider'
 import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
+import { useWorkspace } from '../store/WorkspaceProvider'
 import { useTable } from '../lib/useTable'
 import { matchesQuery } from '../lib/utils'
 import { formatDate, formatRupiah, startOfMonthISO, todayISO } from '../lib/format'
@@ -31,10 +33,18 @@ import { STATUS_LABEL, STATUS_TONE, STATUS_URUT } from './trip/status'
  * Satu baris = satu perjalanan beserta dokumen dan catatan keuangannya.
  */
 export function TripListPage() {
-  const { db, transactionRows, loading, error, reload, update } = useData()
-  const { canEdit } = useAuth()
+  const { db, transactionRows, loading, error, reload, update, tutupTrip } = useData()
+  const { bisa } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
+  const { workspace } = useWorkspace()
+  const karawang = workspace === 'karawang'
+  /** Dokumen cetak Karawang = Berita Acara Serah Terima; Priok = Surat Jalan. */
+  const namaDokumen = karawang ? 'Berita Acara' : 'Surat Jalan'
+  /** Kata kunci dari kotak pencarian di baris atas (?q=), dan trip yang baru disimpan untuk dicetak (?cetak=). */
+  const [params, setParams] = useSearchParams()
+  const cariDariAtas = params.get('q') ?? ''
+  const [menutup, setMenutup] = useState<TransactionRow | null>(null)
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [dateFrom, setDateFrom] = useState('')
@@ -45,7 +55,6 @@ export function TripListPage() {
   const [project, setProject] = useState('')
   const [layanan, setLayanan] = useState('')
   const [tandaiSelesai, setTandaiSelesai] = useState(false)
-  const [show4B, setShow4B] = useState(false)
   const [printing, setPrinting] = useState<TransactionRow[] | null>(null)
   const [membatalkan, setMembatalkan] = useState<TransactionRow | null>(null)
   const [menghapus, setMenghapus] = useState<TransactionRow | null>(null)
@@ -63,7 +72,8 @@ export function TripListPage() {
   const search = useCallback(
     (t: TransactionRow, q: string) =>
       matchesQuery(q, t.transaction_no, t.sj_no, t.sijo, t.recipient_name, t.driver_code, t.driver_names, t.plate_number,
-        t.route_code, t.route_name, t.destination_detail, (t.trip_ids ?? []).join(' '), t.tr_reference, t.contract_no, t.client_name),
+        t.route_code, t.route_name, t.destination_detail, (t.trip_ids ?? []).join(' '), t.tr_list.join(' '), t.pi_number, t.contract_no, t.client_name,
+        t.muat, t.bongkar),
     [],
   )
   const extraFilter = useCallback(
@@ -82,6 +92,22 @@ export function TripListPage() {
     search, extraFilter, extraFilterActive: filterActive,
     initialSortKey: 'transaction_date', initialSortDir: 'desc', tieBreakKey: 'transaction_no', pageSize: 10,
   })
+  const { setQuery } = table
+  useEffect(() => {
+    if (cariDariAtas) setQuery(cariDariAtas)
+  }, [cariDariAtas, setQuery])
+
+  // Datang dari "Simpan & Cetak" order banyak mobil: buka cetak untuk seluruh trip barunya.
+  const cetakBaru = params.get('cetak')
+  useEffect(() => {
+    if (!cetakBaru || loading) return
+    const ids = new Set(cetakBaru.split(','))
+    const rows = transactionRows.filter((t) => ids.has(t.id))
+    if (rows.length) setPrinting(rows)
+    const p = new URLSearchParams(params)
+    p.delete('cetak')
+    setParams(p, { replace: true })
+  }, [cetakBaru, loading, transactionRows, params, setParams])
 
   const selectedRows = useMemo(() => transactionRows.filter((t) => selected.has(t.id)), [transactionRows, selected])
 
@@ -107,8 +133,10 @@ export function TripListPage() {
   const bisaSelesai = selectedRows.filter((t) => t.status !== 'batal' && t.status !== 'selesai')
 
   function doSelesai() {
-    bisaSelesai.forEach((t) => update('transactions', t.id, { status: 'selesai' }))
-    toast.success(`${bisaSelesai.length} trip ditandai Selesai.`)
+    // Karawang: ditutup dengan dokumen fisik diterima; trip dengan backload ditutup dari detailnya.
+    if (karawang) bisaSelesai.forEach((t) => tutupTrip(t.id, { podFisik: true, podFoto: t.pod_attachments ?? [], adaBackload: false }))
+    else bisaSelesai.forEach((t) => update('transactions', t.id, { status: 'selesai' }))
+    toast.success(`${bisaSelesai.length} trip ${karawang ? 'ditutup' : 'ditandai Selesai'}.`)
     setSelected(new Set()); setTandaiSelesai(false)
   }
 
@@ -186,12 +214,16 @@ export function TripListPage() {
       render: (t) => (
         <div className="flex justify-end gap-1">
           <DetailButton label={`Lihat detail trip ${t.transaction_no}`} onClick={() => navigate(`/transaksi/trip/${t.id}`)} />
-          <IconButton label="Edit" icon={<FaPen size={14} />} disabled={!canEdit || t.status === 'batal'} onClick={() => navigate(`/transaksi/trip/${t.id}/edit`)} />
+          <IconButton label="Edit" icon={<FaPen size={14} />} disabled={!bisa('trip') || t.status === 'batal'} onClick={() => navigate(`/transaksi/trip/${t.id}/edit`)} />
           <OverflowMenu
             actions={[
-              { label: 'Cetak Surat Jalan', icon: <FaPrint size={14} />, onSelect: () => setPrinting([t]) },
-              { label: 'Batalkan Trip', icon: <FaBan size={14} />, tone: 'danger', disabled: !canEdit || t.status === 'batal', onSelect: () => setMembatalkan(t) },
-              { label: 'Hapus Trip', icon: <FaTrashCan size={14} />, tone: 'danger', disabled: !canEdit, onSelect: () => setMenghapus(t) },
+              { label: `Cetak ${namaDokumen}`, icon: <FaPrint size={14} />, onSelect: () => setPrinting([t]) },
+              ...(karawang ? [{
+                label: 'Tutup Trip', icon: <FaFlagCheckered size={14} />,
+                disabled: !bisa('trip') || t.status !== 'aktif', onSelect: () => setMenutup(t),
+              }] : []),
+              { label: 'Batalkan Trip', icon: <FaBan size={14} />, tone: 'danger', disabled: !bisa('batal') || t.status === 'batal', onSelect: () => setMembatalkan(t) },
+              { label: 'Hapus Trip', icon: <FaTrashCan size={14} />, tone: 'danger', disabled: !bisa('hapus'), onSelect: () => setMenghapus(t) },
             ]}
           />
         </div>
@@ -199,16 +231,37 @@ export function TripListPage() {
     },
   ]
 
+  // Karawang tidak memakai nomor container & SI/JO: kolomnya diganti TR (beserta klien) dan No PI.
+  const kolomKarawang: Record<string, Column<TransactionRow>> = {
+    trip_ids: {
+      key: 'tr_list', header: 'TR', sortable: true, width: '150px',
+      render: (t) => (
+        <div className="leading-tight" title={t.tr_list.join(', ')}>
+          <div className="tnum flex items-center gap-1.5 text-ink-2">
+            {t.tr_list[0] ?? '—'}
+            {t.tr_list.length > 1 && <Badge tone="neutral">+{t.tr_list.length - 1}</Badge>}
+          </div>
+          {t.project_code && <div className="text-xs text-ink-3">{t.project_code}</div>}
+        </div>
+      ),
+    },
+    sijo: {
+      key: 'pi_number', header: 'No PI', sortable: true, width: '96px',
+      render: (t) => (t.pi_number ? <span className="tnum text-ink-2">{t.pi_number}</span> : <span className="text-ink-3">—</span>),
+    },
+  }
+  const kolom = workspace === 'priok' ? columns : columns.map((c) => kolomKarawang[c.key] ?? c)
+
   return (
     <>
       <PageHeader
-        title="Trip"
-        description="Setiap trip memuat dokumen Surat Jalan beserta catatan uang jalan, biaya, dan lampirannya."
-        crumbs={[{ label: 'Transaksi' }, { label: 'Trip' }]}
+        title="Trip / Job Order"
+        description={karawang
+          ? 'Satu trip = satu mobil, dengan Berita Acara, perjalanan, uang jalan, biaya, dan PI-nya sendiri.'
+          : 'Setiap trip memuat dokumen Surat Jalan beserta catatan uang jalan, biaya, dan lampirannya.'}
         actions={
           <>
-            <Button icon={<FaCircleQuestion size={15} />} onClick={() => setShow4B(true)} title="Tombol 4B">4B</Button>
-            <Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={() => navigate('/transaksi/trip/tambah')}>
+            <Button variant="primary" icon={<FaPlus size={15} />} disabled={!bisa('trip')} onClick={() => navigate('/transaksi/trip/tambah')}>
               Tambah Trip
             </Button>
           </>
@@ -220,7 +273,7 @@ export function TripListPage() {
           left={
             <>
               <SearchInput value={table.query} onChange={table.setQuery} width="w-80"
-                placeholder="Cari No. Trip, ID Perjalanan, sopir, route, S/JO..." />
+                placeholder={workspace === 'priok' ? 'Cari No. Trip, ID Perjalanan, sopir, route, S/JO...' : 'Cari No. Trip, TR, No PI, sopir, plat, rute...'} />
               <FilterField label="Berangkat">
                 <DateInput value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-[150px]" aria-label="Berangkat dari" />
               </FilterField>
@@ -271,15 +324,17 @@ export function TripListPage() {
           <div className="animate-in-fade flex flex-wrap items-center justify-between gap-3 border-b border-brand-100 bg-brand-50 px-4 py-2.5">
             <p className="text-[13px] font-semibold text-brand-800">{selected.size} trip dipilih</p>
             <div className="flex items-center gap-2">
-              <Button size="sm" icon={<FaPrint size={14} />} onClick={() => setPrinting(selectedRows)}>Cetak Surat Jalan</Button>
-              <Button size="sm" icon={<FaCheckDouble size={14} />} disabled={!canEdit || bisaSelesai.length === 0} onClick={() => setTandaiSelesai(true)}>Tandai Selesai</Button>
+              <Button size="sm" icon={<FaPrint size={14} />} onClick={() => setPrinting(selectedRows)}>Cetak {namaDokumen}</Button>
+              <Button size="sm" icon={<FaCheckDouble size={14} />} disabled={!bisa('trip') || bisaSelesai.length === 0} onClick={() => setTandaiSelesai(true)}>
+                {karawang ? 'Tutup Trip' : 'Tandai Selesai'}
+              </Button>
               <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Batalkan pilihan</Button>
             </div>
           </div>
         )}
 
         <DataTable
-          columns={columns}
+          columns={kolom}
           rows={table.pageRows}
           rowKey={(t) => t.id}
           loading={loading}
@@ -291,12 +346,7 @@ export function TripListPage() {
           selectedKeys={selected}
           onToggleRow={toggleRow}
           onToggleAll={toggleAll}
-          empty={
-            <EmptyState
-              entity="trip"
-              action={canEdit && <Button variant="primary" icon={<FaPlus size={15} />} onClick={() => navigate('/transaksi/trip/tambah')}>Tambah Trip</Button>}
-            />
-          }
+          empty={<EmptyState entity="trip" />}
           notFound={<NotFoundState onReset={resetFilters} />}
         />
 
@@ -309,23 +359,22 @@ export function TripListPage() {
 
       <ConfirmDialog
         open={tandaiSelesai}
-        title="Tandai Selesai?"
-        message={`${bisaSelesai.length} trip akan ditandai Selesai.${bisaSelesai.length < selectedRows.length ? ' Trip yang sudah selesai atau dibatalkan dilewati.' : ''}`}
-        confirmLabel="Tandai Selesai"
+        title={karawang ? 'Tutup trip terpilih?' : 'Tandai Selesai?'}
+        message={karawang
+          ? `${bisaSelesai.length} trip akan ditutup dengan dokumen fisik POD diterima.${bisaSelesai.length < selectedRows.length ? ' Trip yang sudah selesai atau dibatalkan dilewati.' : ''} Trip yang punya backload tutup dari halaman detailnya, supaya backload langsung dibuat.`
+          : `${bisaSelesai.length} trip akan ditandai Selesai.${bisaSelesai.length < selectedRows.length ? ' Trip yang sudah selesai atau dibatalkan dilewati.' : ''}`}
+        confirmLabel={karawang ? 'Tutup Trip' : 'Tandai Selesai'}
         tone="primary"
         onCancel={() => setTandaiSelesai(false)}
         onConfirm={doSelesai}
       />
 
-      <Modal open={show4B} onClose={() => setShow4B(false)} title="Tombol 4B" size="sm"
-        footer={<Button variant="primary" onClick={() => setShow4B(false)}>Mengerti</Button>}>
-        <p className="text-[13px] leading-relaxed text-ink-2">
-          Fungsi tombol <span className="font-semibold text-ink">4B</span> belum ditentukan (TBD-06). Beri tahu perilakunya, dan
-          akan diimplementasikan di sini.
-        </p>
-      </Modal>
-
       <KonfirmasiBatalTrip trip={membatalkan} onClose={() => setMembatalkan(null)} />
+      <KonfirmasiTutupTrip
+        trip={menutup}
+        onClose={() => setMenutup(null)}
+        onClosed={(adaBackload) => { if (adaBackload && menutup) navigate(`/transaksi/trip/tambah?backload=${menutup.id}`) }}
+      />
       <KonfirmasiHapusTrip
         trip={menghapus}
         onClose={() => setMenghapus(null)}

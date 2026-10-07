@@ -75,7 +75,7 @@ export function KlienDetailPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Memuat klien..." crumbs={[{ label: 'Master' }, { label: 'Klien', to: '/master/klien' }]} />
+        <PageHeader title="Memuat klien..." crumbs={[{ label: 'Master Data' }, { label: 'Klien / Pelanggan', to: '/master/klien' }]} />
         <div className="skeleton h-64 rounded-xl" />
       </>
     )
@@ -84,7 +84,7 @@ export function KlienDetailPage() {
   if (!klien) {
     return (
       <>
-        <PageHeader title="Klien tidak ditemukan" crumbs={[{ label: 'Master' }, { label: 'Klien', to: '/master/klien' }]} />
+        <PageHeader title="Klien tidak ditemukan" crumbs={[{ label: 'Master Data' }, { label: 'Klien / Pelanggan', to: '/master/klien' }]} />
         <Card>
           <div className="px-6 py-14 text-center">
             <p className="text-[14px] font-semibold text-ink">Data tidak ditemukan.</p>
@@ -220,7 +220,7 @@ export function KlienDetailPage() {
           klien.status === 'aktif' ? 'Aktif' : 'Nonaktif',
           klien.description,
         ].filter(Boolean).join(' · ')}
-        crumbs={[{ label: 'Master' }, { label: 'Klien', to: '/master/klien' }, { label: klien.project_code }]}
+        crumbs={[{ label: 'Master Data' }, { label: 'Klien / Pelanggan', to: '/master/klien' }, { label: klien.project_code }]}
         actions={
           <>
             <Button icon={<FaArrowLeft size={15} />} onClick={() => navigate('/master/klien')}>Kembali</Button>
@@ -252,8 +252,7 @@ export function KlienDetailPage() {
           empty={(
             <div className="px-6 py-10 text-center">
               <p className="text-[13.5px] font-semibold text-ink">Belum ada kontrak.</p>
-              <p className="mt-1 text-[12.5px] text-ink-3">Tambahkan kontrak bila klien ini memakai layanan Dedicated.</p>
-              {canEdit && <Button className="mt-3" variant="primary" icon={<FaPlus size={15} />} onClick={openCreate}>Tambah Kontrak</Button>}
+              <p className="mt-1 text-[12.5px] text-ink-3">Tambahkan lewat Tambah Kontrak di kanan atas bila klien ini memakai layanan Dedicated.</p>
             </div>
           )}
         />

@@ -43,7 +43,7 @@ export function PilihKaryawan({
 
   const options = [
     ...karyawan.map((k) => ({ value: k.id, label: k.driver_name, meta: k.driver_code, keywords: k.city })),
-    { value: MANUAL, label: 'Isi nama sendiri', meta: 'belum terdaftar di Data Karyawan' },
+    { value: MANUAL, label: 'Isi nama sendiri', meta: 'belum terdaftar di Supir / Karyawan' },
   ]
 
   function pilih(v: string | null) {

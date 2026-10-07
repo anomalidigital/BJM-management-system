@@ -25,6 +25,7 @@ import { LapKomisiPage } from './pages/LapKomisiPage'
 import { LapNettoPage } from './pages/LapNettoPage'
 import { LapRitanPage } from './pages/LapRitanPage'
 import { ToolsPage } from './pages/ToolsPage'
+import { PeranPage } from './pages/PeranPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
 /** Tautan lama Surat Jalan -> trip hasil penggabungannya (id-nya dipertahankan). */
@@ -77,6 +78,7 @@ export function App() {
                   <Route path="/laporan/biaya" element={<LapBiayaPage />} />
 
                   <Route path="/pencarian/sijo" element={<SijoSearchPage />} />
+                  <Route path="/admin/peran" element={<PeranPage />} />
                   <Route path="/tools" element={<ToolsPage />} />
                   <Route path="*" element={<NotFoundPage />} />
                 </Route>

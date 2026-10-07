@@ -35,11 +35,13 @@ interface Baris {
 export function JembatanUang({
   bulanLalu,
   pendapatan,
-  ujroute,
+  ditagihkan,
+  uangJalan,
+  biayaPerusahaan,
   komisi,
   netto,
   deltaPendapatan,
-  deltaUjroute,
+  deltaUangJalan,
   deltaKomisi,
   deltaNetto,
   deltaUj,
@@ -52,11 +54,15 @@ export function JembatanUang({
 }: {
   bulanLalu: string
   pendapatan: number
-  ujroute: number
+  /** Biaya di jalan yang ditagihkan kembali ke klien (Additional Cost PI). */
+  ditagihkan: number
+  uangJalan: number
+  /** Biaya di jalan yang dibayar perusahaan langsung, di luar uang jalan. */
+  biayaPerusahaan: number
   komisi: number
   netto: number
   deltaPendapatan: number | null
-  deltaUjroute: number | null
+  deltaUangJalan: number | null
   deltaKomisi: number | null
   deltaNetto: number | null
   deltaUj: number | null
@@ -67,23 +73,27 @@ export function JembatanUang({
   termin: number
   biaya: number
 }) {
-  const skala = Math.max(pendapatan, ujroute + komisi, 1)
+  const masuk = pendapatan + ditagihkan
+  const perjalanan = uangJalan + biayaPerusahaan
+  const skala = Math.max(masuk, perjalanan + komisi, 1)
   const p = (v: number) => Math.max(0, Math.min(1, v / skala))
   const baris: Baris[] = [
     { label: 'Pendapatan', keterangan: 'jumlah harga trip', nilai: pendapatan, dari: 0, sampai: p(pendapatan), jenis: 'masuk', persen: deltaPendapatan },
-    { label: 'Patokan uang jalan', keterangan: 'UJROUTE tiap trip', nilai: -ujroute, dari: p(pendapatan - ujroute), sampai: p(pendapatan), jenis: 'kurang', persen: deltaUjroute },
-    { label: 'Komisi sopir', keterangan: 'dari master Komisi', nilai: -komisi, dari: p(pendapatan - ujroute - komisi), sampai: p(pendapatan - ujroute), jenis: 'kurang', persen: deltaKomisi },
+    { label: 'Ditagihkan ke klien', keterangan: 'tol, solar, SPSI, nginap', nilai: ditagihkan, dari: p(pendapatan), sampai: p(masuk), jenis: 'masuk' },
+    { label: 'Uang jalan', keterangan: 'dibayar ke sopir; patokan bila masih jalan', nilai: -uangJalan, dari: p(masuk - uangJalan), sampai: p(masuk), jenis: 'kurang', persen: deltaUangJalan },
+    ...(biayaPerusahaan > 0 ? [{ label: 'Dibayar perusahaan', keterangan: 'solar / tol di luar uang jalan', nilai: -biayaPerusahaan, dari: p(masuk - perjalanan), sampai: p(masuk - uangJalan), jenis: 'kurang' as const }] : []),
+    { label: 'Komisi sopir', keterangan: 'dari master Komisi', nilai: -komisi, dari: p(masuk - perjalanan - komisi), sampai: p(masuk - perjalanan), jenis: 'kurang', persen: deltaKomisi },
     { label: 'Netto', keterangan: 'sisa untuk perusahaan', nilai: netto, dari: 0, sampai: p(netto), jenis: 'hasil', persen: deltaNetto },
   ]
   const ke_sopir: Array<[string, number, string, (number | null)?]> = [
     ['Uang jalan dibayar', uj, `${formatNumber(termin)} termin`, deltaUj],
     ['Potong kasbon', kasbon, 'dipotong dari uang jalan'],
     ['Transfer ke sopir', tf, 'uang jalan − potong kasbon'],
-    ['Biaya operasional', biaya, 'solar, tol, SPSI, dan lainnya', deltaBiaya],
+    ['Biaya operasional', biaya, 'nota solar, tol, SPSI, nginap', deltaBiaya],
   ]
 
   return (
-    <Panel title="Dari pendapatan ke netto" subtitle="Rumus netto masih sementara: biaya operasional belum dikurangkan sampai dikonfirmasi.">
+    <Panel title="Dari pendapatan ke netto" subtitle="Biaya di jalan dibayar dari uang jalan, kecuali yang dibayar perusahaan langsung; yang ditagihkan ke klien menambah pendapatan.">
       <div className="space-y-3 px-5 pb-5">
         {baris.map((b) => (
           <div key={b.label} className="grid items-center gap-x-4 gap-y-1 sm:grid-cols-[10.5rem_minmax(0,1fr)_9.5rem]">

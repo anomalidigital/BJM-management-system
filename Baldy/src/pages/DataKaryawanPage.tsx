@@ -18,6 +18,7 @@ import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
 import { useTable } from '../lib/useTable'
 import { matchesQuery } from '../lib/utils'
+import { formatRupiah } from '../lib/format'
 import { kodeKaryawanBerikut } from '../lib/kode'
 import { KodeInput } from '../components/ui/KodeInput'
 import { EMPLOYEE_ROLES, ROLE_LABEL } from '../types'
@@ -30,14 +31,14 @@ const BLANK: FormState = {
   attachments: [],
 }
 
-type Baris = Driver
+type Baris = Driver & { saldo: number }
 
 /**
  * Master -> Data Karyawan (dulu Data Sopir).
  * Setiap karyawan punya kasbon sendiri; ikon kasbon membuka halaman transaksinya.
  */
 export function DataKaryawanPage() {
-  const { db, loading, error, reload, create, update, remove } = useData()
+  const { db, saldoKasbon, loading, error, reload, create, update, remove } = useData()
   const { canEdit } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
@@ -49,10 +50,11 @@ export function DataKaryawanPage() {
   const [deleting, setDeleting] = useState<Driver | null>(null)
   const [peran, setPeran] = useState('')
   const [status, setStatus] = useState('')
+  const [piutang, setPiutang] = useState('')
 
   const baris = useMemo<Baris[]>(
-    () => db.drivers.map((d) => ({ ...d, role: d.role ?? 'sopir' })),
-    [db.drivers],
+    () => db.drivers.map((d) => ({ ...d, role: d.role ?? 'sopir', saldo: saldoKasbon.get(d.id) ?? 0 })),
+    [db.drivers, saldoKasbon],
   )
 
   const search = useCallback(
@@ -60,10 +62,11 @@ export function DataKaryawanPage() {
     [],
   )
   const extraFilter = useCallback(
-    (d: Baris) => (!peran || d.role === peran) && (!status || d.status === status),
-    [peran, status],
+    (d: Baris) => (!peran || d.role === peran) && (!status || d.status === status) &&
+      (!piutang || (piutang === 'ada' ? d.saldo > 0 : d.saldo <= 0)),
+    [peran, status, piutang],
   )
-  const filterAktif = Boolean(peran || status)
+  const filterAktif = Boolean(peran || status || piutang)
   const table = useTable(baris, { search, extraFilter, extraFilterActive: filterAktif, initialSortKey: 'driver_code', pageSize: 10 })
 
   /** Kode berikutnya untuk peran tertentu, mis. SPR040 atau MGR002. */
@@ -130,7 +133,7 @@ export function DataKaryawanPage() {
   }
 
   function resetFilter() {
-    table.reset(); setPeran(''); setStatus('')
+    table.reset(); setPeran(''); setStatus(''); setPiutang('')
   }
 
   const columns: Column<Baris>[] = [
@@ -150,6 +153,16 @@ export function DataKaryawanPage() {
     { key: 'city', header: 'Kota', sortable: true, width: '120px', render: (d) => <span className="text-ink-2">{d.city || '—'}</span> },
     { key: 'attachments', header: 'Dokumen', width: '120px', render: (d) => <LampiranThumbs ids={d.attachments ?? []} ukuran={28} /> },
     {
+      // Piutang karyawan = sisa kasbon yang belum terpotong.
+      key: 'saldo', header: 'Piutang', sortable: true, align: 'right', width: '150px',
+      render: (d) => (
+        <div className="flex flex-col items-end gap-1">
+          <span className={d.saldo > 0 ? 'tnum font-semibold text-ink' : 'tnum text-ink-3'}>{formatRupiah(d.saldo)}</span>
+          {d.saldo > 0 ? <Badge tone="warning">Belum lunas</Badge> : <Badge tone="good">Lunas</Badge>}
+        </div>
+      ),
+    },
+    {
       key: 'status', header: 'Status', sortable: true, width: '100px',
       render: (d) => (d.status === 'aktif' ? <Badge tone="good">Aktif</Badge> : <Badge tone="neutral">Nonaktif</Badge>),
     },
@@ -168,8 +181,8 @@ export function DataKaryawanPage() {
   return (
     <>
       <PageHeader
-        title="Data Karyawan"
-        crumbs={[{ label: 'Master' }, { label: 'Data Karyawan' }]}
+        title="Supir / Karyawan"
+        crumbs={[{ label: 'Master Data' }, { label: 'Supir / Karyawan' }]}
         actions={
           <Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}
             title={canEdit ? undefined : 'Peran Viewer tidak dapat mengubah master data'}>
@@ -196,6 +209,13 @@ export function DataKaryawanPage() {
                   <option value="nonaktif">Nonaktif</option>
                 </Select>
               </FilterField>
+              <FilterField label="Piutang">
+                <Select value={piutang} onChange={(e) => setPiutang(e.target.value)} className="h-9 w-36">
+                  <option value="">Semua</option>
+                  <option value="ada">Belum lunas</option>
+                  <option value="lunas">Lunas</option>
+                </Select>
+              </FilterField>
               {(table.isFiltered || filterAktif) && <Button size="sm" variant="ghost" icon={<FaXmark size={14} />} onClick={resetFilter}>Reset</Button>}
             </>
           }
@@ -212,7 +232,7 @@ export function DataKaryawanPage() {
           isFiltered={table.isFiltered || filterAktif}
           sort={table.sort}
           onSortChange={table.toggleSort}
-          empty={<EmptyState entity="karyawan" action={canEdit && <Button variant="primary" icon={<FaPlus size={15} />} onClick={openCreate}>Tambah Karyawan</Button>} />}
+          empty={<EmptyState entity="karyawan" />}
           notFound={<NotFoundState onReset={resetFilter} />}
         />
 
@@ -224,7 +244,7 @@ export function DataKaryawanPage() {
       <Modal
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        title={editing ? 'Ubah Data Karyawan' : 'Tambah Karyawan'}
+        title={editing ? 'Ubah Karyawan' : 'Tambah Karyawan'}
         subtitle={editing ? `Kode ${editing.driver_code}` : 'Lengkapi data karyawan baru. Tanda * wajib diisi.'}
         footer={
           <>

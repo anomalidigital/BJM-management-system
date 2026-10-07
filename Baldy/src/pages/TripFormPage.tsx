@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { FaFloppyDisk, FaPlus, FaPrint, FaTriangleExclamation, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader } from '../components/ui/Card'
@@ -12,6 +12,7 @@ import { PilihKaryawan } from '../components/ui/PilihKaryawan'
 import { useData } from '../store/DataProvider'
 import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
+import { useWorkspace } from '../store/WorkspaceProvider'
 import { formatRupiah, todayISO } from '../lib/format'
 import { hitungKomisiTrip } from '../lib/komisi'
 import { buatKodeUnik, nomorSuratJalanBerikut, nomorTripBerikut } from '../lib/kode'
@@ -20,6 +21,8 @@ import type { CommissionTransaction, JobOrder, ServiceType, TripStatus } from '.
 import { STATUS_FORM, STATUS_LABEL } from './trip/status'
 import { PakaiNilai } from './trip/bagian'
 import { KodeInput } from '../components/ui/KodeInput'
+import { LampiranInput } from '../components/ui/Lampiran'
+import { FormTripKarawang } from './trip/FormTripKarawang'
 
 type FormState = Omit<CommissionTransaction, 'id' | 'created_at' | 'updated_at' | 'workspace'>
 
@@ -30,7 +33,7 @@ const BLANK: FormState = {
   recipient_name: '', recipient_address_1: '', recipient_address_2: '',
   vehicle_id: '', driver_id: '', driver_ids: [''], job_order_id: '', party: '', goods_type: '', kosongan: '',
   location: '', ship: '', destination_detail: '',
-  tr_reference: '', pi_number: '', pi_status: '', cost_value: 0,
+  tr_reference: '', pi_number: '', pi_status: '', cost_value: 0, override_note: '', override_attachments: [],
   notes: '', is_marked: false, bon_date: null, personal_bon: 0, printed_at: null,
   cancelled_at: null, cancel_reason: '', cancel_settlement: [], container_no: '',
 }
@@ -53,15 +56,21 @@ function Section({ title, description, actions, children }: { title: string; des
   )
 }
 
-/** Tunggu data ter-hidrasi dulu: nomor otomatis dan pencarian record bergantung padanya. */
+/**
+ * Tunggu data ter-hidrasi dulu: nomor otomatis dan pencarian record bergantung padanya.
+ * Karawang memakai form alat berat (banyak mobil, TR, backload); Priok form container.
+ */
 export function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const { loading } = useData()
   const { id } = useParams()
+  const { workspace } = useWorkspace()
+  const [params] = useSearchParams()
+  const backload = mode === 'create' ? params.get('backload') ?? undefined : undefined
 
   if (loading) {
     return (
       <>
-        <PageHeader title={mode === 'edit' ? 'Memuat trip...' : 'Tambah Trip'} crumbs={[{ label: 'Transaksi' }, { label: 'Trip' }]} />
+        <PageHeader title={mode === 'edit' ? 'Memuat trip...' : 'Tambah Trip'} crumbs={[{ label: 'Trip / Job Order', to: '/transaksi/trip' }]} />
         <div className="skeleton h-40 rounded-xl" />
         <div className="mt-4 grid gap-4 xl:grid-cols-2">
           <div className="skeleton h-56 rounded-xl" />
@@ -70,6 +79,9 @@ export function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
       </>
     )
   }
+  if (workspace === 'karawang') {
+    return <FormTripKarawang mode={mode} tripId={id} backloadDari={backload} key={`${id ?? 'baru'}-${backload ?? ''}`} />
+  }
   return <TripForm mode={mode} key={id ?? 'baru'} />
 }
 
@@ -77,10 +89,18 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const { db, dbAll, transactionRows, buatTrip, ubahTrip } = useData()
-  const { canEdit } = useAuth()
+  const { bisa, user } = useAuth()
+  /** Admin, Manager, Owner boleh input trip; mengubah harga di luar Harga route hanya Manager & Owner. */
+  const bolehSimpan = bisa('trip')
+  const bolehOverride = bisa('override')
   const toast = useToast()
+  const { workspace } = useWorkspace()
+  /** Priok = angkutan container (SI/BL, Party, Kapal). Karawang = alat berat & DHL (TR / No PI). */
+  const cabangContainer = workspace === 'priok'
 
   const existing = mode === 'edit' ? db.transactions.find((t) => t.id === id) : undefined
+  /** Status mengikuti sopir (Menunggu Sopir <-> Aktif) sampai diubah sendiri; trip lama tidak diubah. */
+  const statusManual = useRef(mode === 'edit')
 
   const [form, setForm] = useState<FormState>(() => {
     if (existing) {
@@ -96,6 +116,8 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     const hariIni = todayISO()
     return {
       ...BLANK,
+      // Belum ada sopir = Menunggu Sopir; begitu sopir dipilih, status ikut jadi Aktif.
+      status: 'menunggu_sopir',
       order_date: hariIni,
       transaction_date: hariIni,
       transaction_no: nomorTripBerikut(dbAll.transactions.map((t) => t.transaction_no), hariIni),
@@ -138,6 +160,25 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     return m
   }, [transactionRows, existing?.id])
 
+  /**
+   * Sopir dan mobil saling mengisi dari trip terakhir: di data asli, sopir membawa mobil
+   * yang sama dengan trip terakhirnya pada 99% trip, dan mobil dibawa sopir terakhirnya 91%.
+   */
+  const pasangan = useMemo(() => {
+    const urut = dbAll.transactions
+      .filter((t) => t.status !== 'batal' && t.vehicle_id && (t.driver_ids?.[0] || t.driver_id))
+      .sort((a, b) => a.transaction_date.localeCompare(b.transaction_date) || a.transaction_no.localeCompare(b.transaction_no))
+    const mobilSopir = new Map<string, string>()
+    const sopirMobil = new Map<string, string>()
+    for (const t of urut) {
+      const sopir = t.driver_ids?.[0] || t.driver_id
+      mobilSopir.set(sopir, t.vehicle_id)
+      sopirMobil.set(t.vehicle_id, sopir)
+    }
+    return { mobilSopir, sopirMobil }
+  }, [dbAll.transactions])
+  const [otomatis, setOtomatis] = useState<{ kendaraan?: string; sopir?: string }>({})
+
   const joOptions = useMemo(
     () => db.jobOrders.map((j) => ({ value: j.id, label: j.sijo, meta: `${j.customer_name} · ${j.party}`, keywords: `${j.customer_code} ${j.goods} ${j.ship}` })),
     [db.jobOrders],
@@ -150,19 +191,27 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     })),
     [db.vehicles],
   )
-  const routeOptions = useMemo(
-    () => db.routes.map((r) => ({
-      value: r.id,
-      label: r.route_name || r.route_code,
-      meta: `${r.route_code}${r.feet ? ` · ${r.feet}` : ''} · UJ ${formatRupiah(r.ujroute)}`,
-      keywords: `${r.route_code} ${r.feet}`,
-    })),
-    [db.routes],
-  )
   const klienMap = useMemo(() => new Map(db.projects.map((p) => [p.id, p])), [db.projects])
+  /** Rute klien terpilih di urutan atas (di data asli, 99% rute hanya dipakai satu klien). */
+  const routeOptions = useMemo(() => {
+    const milikKlien = (r: { project_id?: string }) => !!form.project_id && r.project_id === form.project_id
+    return [...db.routes]
+      .sort((a, b) => Number(milikKlien(b)) - Number(milikKlien(a)))
+      .map((r) => {
+        const pemilik = klienMap.get(r.project_id ?? '')
+        return {
+          value: r.id,
+          label: r.route_name || r.route_code,
+          meta: [pemilik ? `Klien ${pemilik.project_code}` : '', r.feet, `UJ ${formatRupiah(r.ujroute)}`].filter(Boolean).join(' · '),
+          keywords: `${r.route_code} ${r.feet} ${pemilik?.project_code ?? ''} ${pemilik?.project_name ?? ''}`,
+        }
+      })
+  }, [db.routes, form.project_id, klienMap])
   const contractOptions = useMemo(
     () => db.contracts
       .filter((c) => c.status === 'aktif' || c.id === form.contract_id)
+      // Klien kontrak sudah dipilih: tampilkan kontrak miliknya saja.
+      .filter((c) => !form.project_id || klienMap.get(form.project_id)?.client_type !== 'kontrak' || c.project_id === form.project_id)
       .map((c) => {
         const klien = klienMap.get(c.project_id)
         return {
@@ -172,7 +221,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
           keywords: `${klien?.project_code ?? ''} ${klien?.project_name ?? ''}`,
         }
       }),
-    [db.contracts, form.contract_id, terpakaiKontrak, klienMap],
+    [db.contracts, form.contract_id, form.project_id, terpakaiKontrak, klienMap],
   )
   /** Sopir nonaktif tetap muncul bila sudah tercatat di trip ini. */
   const sopirOptions = (pilihanIni: string) =>
@@ -184,7 +233,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
   if (mode === 'edit' && !existing) {
     return (
       <>
-        <PageHeader title="Trip tidak ditemukan" crumbs={[{ label: 'Transaksi' }, { label: 'Trip' }]} />
+        <PageHeader title="Trip tidak ditemukan" crumbs={[{ label: 'Trip / Job Order', to: '/transaksi/trip' }]} />
         <Card>
           <div className="px-6 py-14 text-center">
             <p className="text-[14px] font-semibold text-ink">Data tidak ditemukan.</p>
@@ -199,7 +248,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
   if (existing?.status === 'batal') {
     return (
       <>
-        <PageHeader title={`Trip ${existing.transaction_no}`} crumbs={[{ label: 'Transaksi' }, { label: 'Trip' }, { label: existing.transaction_no }]} />
+        <PageHeader title={`Trip ${existing.transaction_no}`} crumbs={[{ label: 'Trip / Job Order', to: '/transaksi/trip' }, { label: existing.transaction_no }]} />
         <Card>
           <div className="px-6 py-14 text-center">
             <p className="text-[14px] font-semibold text-ink">Trip ini sudah dibatalkan.</p>
@@ -254,22 +303,45 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     else if (lama) toast.info(`Isian dari SI/JO ${lama.sijo} ikut dikosongkan.`)
   }
 
-  /** Pilih rute -> Tujuan, Klien, dan Harga ikut terisi, kecuali sudah diganti manual. */
+  /**
+   * Pilih rute -> Klien, Tujuan, dan Harga ikut terisi. Satu rute dimiliki satu klien
+   * (di data asli: 130 dari 130 rute yang dipakai), jadi klien tidak dipilih lagi di form.
+   * Klien kontrak -> Dedicated, dan kontraknya terpilih bila hanya ada satu. Tujuan &
+   * Harga yang sudah diganti manual tidak ditimpa; Kepada Yth ikut nama klien bila kosong.
+   */
   function applyRoute(routeId: string | null) {
     const route = db.routes.find((r) => r.id === routeId)
+    const klienRute = klienMap.get(route?.project_id ?? '')
+    const kontrakKlien = klienRute?.client_type === 'kontrak'
+      ? db.contracts.filter((c) => c.project_id === klienRute.id && c.status === 'aktif')
+      : []
+    if (form.service_type === 'callout' && kontrakKlien.length > 0) {
+      toast.info(`${klienRute!.project_name} klien kontrak: layanan diganti ke Dedicated.`)
+    }
     setForm((f) => {
       const sebelumnya = db.routes.find((r) => r.id === f.route_id)
       const tujuanBoleh = !f.destination_detail.trim() || f.destination_detail.trim() === (sebelumnya?.route_name ?? '').trim()
-      const projectBoleh = !f.project_id || f.project_id === (sebelumnya?.project_id ?? '')
       const hargaBoleh = !f.cost_value || f.cost_value === (sebelumnya?.price ?? 0)
+      const layanan: ServiceType = f.service_type === 'dedicated' || kontrakKlien.length > 0 ? 'dedicated' : 'callout'
+      const kontrakIni = f.service_type === 'dedicated' && f.contract_id ? f.contract_id
+        : kontrakKlien.length === 1 ? kontrakKlien[0].id : ''
+      // Dedicated: klien ikut kontrak; rute hanya patokan uang jalan & tujuan.
+      const pemilikKontrak = db.contracts.find((c) => c.id === kontrakIni)?.project_id
+      const projectId = layanan === 'dedicated' ? pemilikKontrak ?? route?.project_id ?? f.project_id : route?.project_id ?? ''
+      const klienLama = klienMap.get(f.project_id)
+      const penerimaBoleh = !f.recipient_name.trim() || f.recipient_name === (klienLama?.project_name ?? '')
       return {
         ...f,
         route_id: routeId ?? '',
+        service_type: layanan,
+        contract_id: layanan === 'dedicated' ? kontrakIni : '',
+        project_id: projectId,
         cost_value: route && hargaBoleh ? route.price : f.cost_value,
         destination_detail: route && tujuanBoleh ? route.route_name : f.destination_detail,
-        project_id: route?.project_id && projectBoleh ? route.project_id : f.project_id,
+        recipient_name: layanan === 'callout' && penerimaBoleh ? klienMap.get(projectId)?.project_name ?? '' : f.recipient_name,
       }
     })
+    setErrors((er) => { const { route_id: _r, contract_id: _c, ...sisa } = er; return sisa })
   }
 
   /* ── Daftar dinamis: ID Perjalanan/Trip dan Sopir ─────────── */
@@ -287,9 +359,37 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     setErrors((er) => { const { trip_ids: _t, ...sisa } = er; return sisa })
   }
 
-  const ubahSopir = (i: number, v: string | null) => setForm((f) => ({ ...f, driver_ids: f.driver_ids.map((x, j) => (j === i ? v ?? '' : x)) }))
+  /** Status ikut sopir: ada sopir = Aktif, belum ada = Menunggu Sopir (selama belum diubah sendiri). */
+  const statusIkutSopir = (f: FormState): FormState => {
+    if (statusManual.current) return f
+    const adaSopir = f.driver_ids.some(Boolean)
+    if (adaSopir && f.status === 'menunggu_sopir') return { ...f, status: 'aktif' }
+    if (!adaSopir && f.status === 'aktif') return { ...f, status: 'menunggu_sopir' }
+    return f
+  }
+  const ubahSopir = (i: number, v: string | null) => {
+    const mobilTerakhir = i === 0 && v ? pasangan.mobilSopir.get(v) : undefined
+    const isiMobil = !!mobilTerakhir && !form.vehicle_id && db.vehicles.some((x) => x.id === mobilTerakhir && x.status === 'aktif')
+    setForm((f) => statusIkutSopir({
+      ...f,
+      driver_ids: f.driver_ids.map((x, j) => (j === i ? v ?? '' : x)),
+      vehicle_id: isiMobil && !f.vehicle_id ? mobilTerakhir! : f.vehicle_id,
+    }))
+    if (isiMobil) setOtomatis({ kendaraan: db.drivers.find((d) => d.id === v)?.driver_name ?? '' })
+    if (i === 0) setOtomatis((o) => ({ ...o, sopir: undefined }))
+  }
+  function pilihKendaraan(v: string | null) {
+    const sopirTerakhir = v ? pasangan.sopirMobil.get(v) : undefined
+    const isiSopir = !!sopirTerakhir && !form.driver_ids[0] && sopirTerdaftar.some((d) => d.id === sopirTerakhir && d.status === 'aktif')
+    setForm((f) => statusIkutSopir({
+      ...f,
+      vehicle_id: v ?? '',
+      driver_ids: isiSopir && !f.driver_ids[0] ? [sopirTerakhir!, ...f.driver_ids.slice(1)] : f.driver_ids,
+    }))
+    setOtomatis(isiSopir ? { sopir: db.vehicles.find((x) => x.id === v)?.plate_number ?? '' } : {})
+  }
   const tambahSopir = () => setForm((f) => ({ ...f, driver_ids: [...f.driver_ids, ''] }))
-  const hapusSopir = (i: number) => setForm((f) => ({ ...f, driver_ids: f.driver_ids.length > 1 ? f.driver_ids.filter((_, j) => j !== i) : [''] }))
+  const hapusSopir = (i: number) => setForm((f) => statusIkutSopir({ ...f, driver_ids: f.driver_ids.length > 1 ? f.driver_ids.filter((_, j) => j !== i) : [''] }))
 
   /**
    * ID Perjalanan/Trip berisi nomor container yang memang dipakai ulang di trip
@@ -309,6 +409,9 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     if (sj && dbAll.transactions.some((t) => t.sj_no.toLowerCase() === sj.toLowerCase() && t.id !== existing?.id)) e.sj_no = 'Nomor Surat Jalan sudah dipakai.'
     if (!form.transaction_date) e.transaction_date = 'Tanggal Berangkat wajib diisi.'
     if (dedicated && !form.contract_id) e.contract_id = 'Layanan Dedicated wajib memilih nomor kontrak.'
+    const rute = db.routes.find((r) => r.id === form.route_id)
+    if (!dedicated && rute && form.cost_value > 0 && form.cost_value !== rute.price && !(form.override_note ?? '').trim() && form.cost_value !== existing?.cost_value)
+      e.override_note = 'Tulis alasan harga berbeda dari Harga route.'
     if (wajibRoute && !form.route_id) e.route_id = 'Rute wajib dipilih.'
     if (wajibKendaraan && !form.vehicle_id) e.vehicle_id = 'No. Kendaraan wajib dipilih.'
     if (wajibSopir && !form.driver_ids.some(Boolean)) e.driver_ids = 'Pilih minimal satu sopir, atau ubah status ke Menunggu Sopir.'
@@ -321,11 +424,17 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
 
   const kontrak = db.contracts.find((c) => c.id === form.contract_id)
   const klienKontrak = kontrak ? klienMap.get(kontrak.project_id) : undefined
+  /** Klien trip: ikut kontrak (Dedicated) atau rute (Callout); tidak dipilih di form. */
+  const klienDipilih = klienMap.get(form.project_id)
 
-  /** Pilih kontrak -> klien trip ikut klien pemilik kontrak. */
+  /** Pilih kontrak -> klien trip ikut klien pemilik kontrak (kosong: kembali ke klien rute). */
   function pilihKontrak(id: string | null) {
     const k = db.contracts.find((c) => c.id === id)
-    setForm((f) => ({ ...f, contract_id: id ?? '', project_id: k?.project_id || f.project_id }))
+    setForm((f) => ({
+      ...f,
+      contract_id: id ?? '',
+      project_id: k?.project_id ?? db.routes.find((r) => r.id === f.route_id)?.project_id ?? '',
+    }))
   }
 
   function save(thenPrint: boolean) {
@@ -334,6 +443,8 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     const payload = {
       ...form,
       contract_id: dedicated ? form.contract_id : '',
+      // Klien tidak diisi di form: Dedicated ikut kontrak, Callout ikut rute (trip lama tanpa klien rute tetap).
+      project_id: (dedicated ? klienKontrak?.id : selectedRoute?.project_id) || form.project_id,
       transaction_no: form.transaction_no.trim(),
       sj_no: form.sj_no.trim(),
       trip_ids: idTerisi,
@@ -357,6 +468,10 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
   }
 
   const selectedJo = db.jobOrders.find((j) => j.id === form.job_order_id)
+  // Bagian yang tampil mengikuti cabang & klien; isian yang sudah terisi tetap ditampilkan.
+  const tampilContainer = cabangContainer || !!(form.party || form.job_order_id || form.ship || form.kosongan || form.location || form.goods_type)
+  const tampilDokumen = (klienDipilih ? klienDipilih.requires_document : !cabangContainer) || !!(form.tr_reference || form.pi_number || form.pi_status)
+  const tampilBon = cabangContainer || !!(form.bon_date || form.personal_bon)
   const selectedRoute = db.routes.find((r) => r.id === form.route_id)
   const selectedVehicle = db.vehicles.find((v) => v.id === form.vehicle_id)
   const routeProject = db.projects.find((p) => p.id === selectedRoute?.project_id)
@@ -375,7 +490,10 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
   const sisaKontrak = kontrak ? kontrak.value - (terpakaiKontrak.get(kontrak.id) ?? 0) : 0
 
   /** Harga trip: terisi dari Harga route, boleh diubah bila harga trip ini beda. */
-  const petunjukHarga: ReactNode = !selectedRoute
+  const hargaOverride = !!selectedRoute && form.cost_value > 0 && form.cost_value !== selectedRoute.price
+  const petunjukHarga: ReactNode = !bolehOverride
+    ? 'Mengikuti Harga route. Harga berbeda perlu Manager atau Owner.'
+    : !selectedRoute
     ? 'Terisi dari Harga route setelah rute dipilih. Dasar komisi & pendapatan.'
     : !form.cost_value
       ? <>Kosong: memakai Harga route {formatRupiah(selectedRoute.price)} · <PakaiNilai label="Isi" onClick={() => set('cost_value', selectedRoute.price)} /></>
@@ -383,8 +501,16 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
         ? 'Sama dengan Harga route. Ubah bila harga trip ini beda; komisi & pendapatan ikut harga ini.'
         : <>Harga khusus trip ini (Harga route {formatRupiah(selectedRoute.price)}) · <PakaiNilai label="Pakai Harga route" onClick={() => set('cost_value', selectedRoute.price)} /></>
 
+  /** Callout: klien ikut rute. Dedicated: klien ikut kontrak, yang terpilih sendiri bila klien rute hanya punya satu. */
   function gantiLayanan(l: ServiceType) {
-    setForm((f) => ({ ...f, service_type: l }))
+    setForm((f) => {
+      const rute = db.routes.find((r) => r.id === f.route_id)
+      if (l === 'callout') return { ...f, service_type: l, contract_id: '', project_id: rute?.project_id ?? '' }
+      const kontrakRute = db.contracts.filter((c) => c.status === 'aktif' && !!rute?.project_id && c.project_id === rute.project_id)
+      const kontrakIni = f.contract_id || (kontrakRute.length === 1 ? kontrakRute[0].id : '')
+      const pemilik = db.contracts.find((c) => c.id === kontrakIni)?.project_id
+      return { ...f, service_type: l, contract_id: kontrakIni, project_id: pemilik ?? rute?.project_id ?? '' }
+    })
     setErrors({})
   }
 
@@ -394,8 +520,9 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
       required={wajibSopir}
       error={errors.driver_ids}
       hint={errors.driver_ids ? undefined
-        : menungguSopir && !form.driver_ids.some(Boolean) ? 'Boleh dikosongkan selama status Menunggu Sopir.'
-        : form.driver_ids.length > 1 ? 'Sopir pertama adalah sopir utama (penerima komisi).' : 'Bisa lebih dari satu sopir.'}
+        : otomatis.sopir ? `Terisi dari trip terakhir mobil ${otomatis.sopir}. Ganti bila beda.`
+        : menungguSopir && !form.driver_ids.some(Boolean) ? 'Boleh dikosongkan; trip tersimpan sebagai Menunggu Sopir.'
+        : form.driver_ids.length > 1 ? 'Sopir pertama adalah sopir utama (penerima komisi).' : 'Memilih sopir ikut mengisi mobil terakhirnya.'}
     >
       {(fid) => (
         <div className="space-y-2">
@@ -427,11 +554,13 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
       label="No. Kendaraan"
       required={wajibKendaraan}
       error={errors.vehicle_id}
-      hint={errors.vehicle_id ? undefined : selectedVehicle?.configuration ? `Konfigurasi ${selectedVehicle.configuration}` : undefined}
+      hint={errors.vehicle_id ? undefined
+        : otomatis.kendaraan ? `Terisi dari trip terakhir ${otomatis.kendaraan}. Ganti bila beda.`
+        : selectedVehicle?.configuration ? `Konfigurasi ${selectedVehicle.configuration}` : 'Memilih mobil ikut mengisi sopir terakhirnya.'}
     >
       {(fid) => (
         <SearchableSelect id={fid} options={vehicleOptions} value={form.vehicle_id || null} invalid={!!errors.vehicle_id}
-          placeholder="Pilih nomor kendaraan..." onChange={(v) => set('vehicle_id', v ?? '')} />
+          placeholder="Pilih nomor kendaraan..." onChange={pilihKendaraan} />
       )}
     </Field>
   )
@@ -450,30 +579,34 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
       <PageHeader
         title={judul}
         crumbs={[
-          { label: 'Transaksi' },
-          { label: 'Trip', to: '/transaksi/trip' },
+          { label: 'Trip / Job Order', to: '/transaksi/trip' },
           ...(existing ? [{ label: existing.transaction_no, to: `/transaksi/trip/${existing.id}` }] : []),
           { label: mode === 'edit' ? 'Ubah' : 'Tambah' },
         ]}
-        description="Pilih jenis layanan dulu, lalu isi data perjalanannya. Uang jalan, biaya, dan lampiran dicatat di halaman detail trip."
+        description="Klien tidak perlu dipilih: ikut rute (Callout) atau kontrak (Dedicated), begitu juga harga dan patokan uang jalan. Uang jalan, biaya, dan lampiran dicatat di halaman detail trip."
       />
 
-      {!canEdit && (
+      {!bolehSimpan && (
         <div className="mb-4 flex items-start gap-2 rounded-lg border border-[#f6e2ac] bg-[#fff8e6] px-3.5 py-2.5 text-[12.5px] text-[#8a6100]">
           <FaTriangleExclamation size={15} className="mt-px shrink-0" />
-          Peran Viewer tidak dapat menyimpan perubahan. Form ini hanya untuk melihat struktur data.
+          Peran {user?.role === 'viewer' ? 'Viewer' : 'ini'} tidak dapat menyimpan perubahan. Form ini hanya untuk melihat struktur data.
         </div>
       )}
 
       <div className="mb-4">
-        <Section title="Jenis Layanan">
+        <Section
+          title="Layanan"
+          description={klienDipilih
+            ? `Klien ${klienDipilih.project_name}, ikut ${dedicated && klienKontrak ? `kontrak ${kontrak?.contract_no}` : 'rute'}.`
+            : 'Klien ikut rute yang dipilih (Callout) atau pemilik kontrak (Dedicated).'}
+        >
           <div className="grid gap-3 sm:grid-cols-2">
             <Radio
               name="layanan"
               checked={!dedicated}
               onChange={() => gantiLayanan('callout')}
               label="Callout"
-              description="Order per perjalanan. Form lengkap dengan penerima, SI/BL, dan identifier dokumen."
+              description={cabangContainer ? 'Order per perjalanan: penerima, SI/BL, dan nomor container.' : 'Order per perjalanan: penerima, TR, dan No PI.'}
             />
             <Radio
               name="layanan"
@@ -490,7 +623,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                 label="No. Kontrak"
                 required
                 error={errors.contract_id}
-                hint={errors.contract_id ? undefined : db.contracts.length === 0 ? <>Belum ada kontrak. Tambahkan di halaman klien, menu <Link to="/master/klien" className="text-brand-700 underline">Klien</Link>.</> : 'Kontrak aktif di workspace ini.'}
+                hint={errors.contract_id ? undefined : db.contracts.length === 0 ? <>Belum ada kontrak. Tambahkan di halaman klien, menu <Link to="/master/klien" className="text-brand-700 underline">Klien / Pelanggan</Link>.</> : 'Kontrak aktif di workspace ini.'}
               >
                 {(fid) => (
                   <SearchableSelect id={fid} options={contractOptions} value={form.contract_id || null} invalid={!!errors.contract_id}
@@ -564,7 +697,15 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
             </Field>
 
             <div className="space-y-3">
-              <Field label="Rute" required={wajibRoute} error={errors.route_id} hint={errors.route_id ? undefined : 'UJROUTE rute menjadi patokan uang jalan trip.'}>
+              <Field
+                label="Rute"
+                required={wajibRoute}
+                error={errors.route_id}
+                hint={errors.route_id ? undefined
+                  : !selectedRoute ? (dedicated ? 'Opsional untuk Dedicated: patokan uang jalan & tujuan.' : 'Klien, Harga, dan patokan uang jalan ikut rute.')
+                  : routeProject ? `Klien ${routeProject.project_name} ikut rute ini. UJROUTE jadi patokan uang jalan.`
+                  : <>Rute ini belum punya klien. Lengkapi di menu <Link to="/master/route" className="text-brand-700 underline">Rute</Link> supaya trip tercatat ke klien.</>}
+              >
                 {(fid) => (
                   <SearchableSelect
                     id={fid}
@@ -579,7 +720,22 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
               </Field>
               {!dedicated && (
                 <Field label="Harga" hint={petunjukHarga}>
-                  {(fid) => <CurrencyInput id={fid} value={form.cost_value} onValueChange={(v) => set('cost_value', v)} />}
+                  {(fid) => <CurrencyInput id={fid} value={form.cost_value} disabled={!bolehOverride} onValueChange={(v) => set('cost_value', v)} />}
+                </Field>
+              )}
+              {!dedicated && hargaOverride && bolehOverride && (
+                <Field label="Alasan & bukti persetujuan" error={errors.override_note}
+                  hint={errors.override_note ? undefined : 'Harga berbeda dari Harga route: catat alasannya dan lampirkan bukti persetujuan.'}>
+                  {(fid) => (
+                    <div className="space-y-2">
+                      <Input id={fid} value={form.override_note ?? ''} placeholder="mis. nego klien, harga khusus proyek"
+                        onChange={(e) => set('override_note', e.target.value)} />
+                      {bisa('bukti') && (
+                        <LampiranInput label="Tambah bukti" value={form.override_attachments ?? []}
+                          onChange={(v) => setForm((f) => ({ ...f, override_attachments: v }))} />
+                      )}
+                    </div>
+                  )}
                 </Field>
               )}
               {(selectedRoute || perkiraanKomisi.aturan) && (
@@ -589,7 +745,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                       <p className="text-[12px] text-brand-800">
                         <span className="tnum font-semibold">{selectedRoute.route_code}</span>
                         {selectedRoute.feet && <> · {selectedRoute.feet}</>}
-                        {routeProject && <> · Klien {routeProject.project_code}</>}
+                        {routeProject && <> · Klien <span className="font-semibold">{routeProject.project_name}</span> ({routeProject.project_code})</>}
                       </p>
                       <dl className="mt-2 grid grid-cols-3 gap-x-4 gap-y-1.5">
                         {([
@@ -663,7 +819,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
               label="Status"
               hint={menungguSopir && form.driver_ids.some(Boolean)
                 ? 'Sopir sudah dipilih. Ubah ke Aktif bila trip sudah jalan.'
-                : 'Pembatalan lewat tombol Batalkan Trip.'}
+                : statusManual.current ? 'Pembatalan lewat tombol Batalkan Trip.' : 'Otomatis: Menunggu Sopir sampai sopir dipilih, lalu Aktif.'}
             >
               {(fid) => (
                 <Select
@@ -671,6 +827,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                   value={form.status}
                   onChange={(e) => {
                     const next = e.target.value as TripStatus
+                    statusManual.current = true
                     set('status', next)
                     // Menunggu Sopir membolehkan sopir kosong, jadi pesan wajib sopir ikut hilang.
                     if (next === 'menunggu_sopir') setErrors((er) => { const { driver_ids: _d, ...sisa } = er; return sisa })
@@ -680,7 +837,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                 </Select>
               )}
             </Field>
-            <Field label="Manager" hint={managerTerdaftar.length ? 'Pilih manager terdaftar, atau isi nama sendiri.' : 'Belum ada manager di Data Karyawan — isi nama sendiri.'}>
+            <Field label="Manager" hint={managerTerdaftar.length ? 'Pilih manager terdaftar, atau isi nama sendiri.' : 'Belum ada manager di Supir / Karyawan — isi nama sendiri.'}>
               {(fid) => (
                 <PilihKaryawan
                   id={fid}
@@ -691,18 +848,6 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                   placeholder="Pilih manager..."
                   onChange={(mid, nama) => setForm((f) => ({ ...f, manager_id: mid, manager_name: nama }))}
                 />
-              )}
-            </Field>
-            <Field
-              label="Klien"
-              hint={dedicated && klienKontrak ? `Mengikuti klien kontrak ${kontrak?.contract_no}.`
-                : routeProject && form.project_id === routeProject.id ? 'Mengikuti klien rute.' : 'Menentukan alur dokumen TR / No PI.'}
-            >
-              {(fid) => (
-                <Select id={fid} value={form.project_id} disabled={dedicated && !!klienKontrak} onChange={(e) => set('project_id', e.target.value)}>
-                  <option value="">— belum ditentukan —</option>
-                  {db.projects.map((p) => <option key={p.id} value={p.id}>{p.project_code} — {p.project_name}</option>)}
-                </Select>
               )}
             </Field>
           </div>
@@ -745,10 +890,16 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
             </div>
           </Section>
         ) : (
-          <Section title="Informasi Pengiriman" description="SI/BL hanya untuk order container. Memilihnya mengisi Kepada Yth, alamat, Party, Jenis Brg, dan Kapal.">
+          <Section
+            title="Informasi Pengiriman"
+            description={tampilContainer
+              ? 'SI/BL hanya untuk order container. Memilihnya mengisi Kepada Yth, alamat, Party, Jenis Brg, dan Kapal.'
+              : 'Sopir dan mobil saling mengisi dari trip terakhir.'}
+          >
             <div className="grid gap-4 sm:grid-cols-2">
               {fieldKendaraan}
               {fieldSopir}
+              {tampilContainer && (<>
               <Field label="Party">
                 {(fid) => <Input id={fid} value={form.party} placeholder="40 X 40" onChange={(e) => set('party', e.target.value)} />}
               </Field>
@@ -770,6 +921,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
               <Field label="Kapal">
                 {(fid) => <Input id={fid} value={form.ship} placeholder="MV. ORIENTAL DIAMOND" onChange={(e) => set('ship', e.target.value)} />}
               </Field>
+              </>)}
               {fieldTujuan}
             </div>
           </Section>
@@ -778,8 +930,12 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
 
       {!dedicated && (
         <div className="mt-4">
-          <Section title="Identifier & Catatan" description="TR, SI/JO, dan No PI disimpan terpisah.">
+          <Section
+            title={tampilDokumen || tampilBon ? 'Identifier & Catatan' : 'Catatan'}
+            description={tampilDokumen ? 'TR dari klien; No PI diisi saat ditagihkan.' : undefined}
+          >
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {tampilDokumen && (<>
               <Field label="TR" hint="Nomor referensi dari customer.">
                 {(fid) => <Input id={fid} value={form.tr_reference} placeholder="2600305331" onChange={(e) => set('tr_reference', e.target.value)} />}
               </Field>
@@ -789,12 +945,15 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
               <Field label="Status PI" hint="mis. di pool, masih moving.">
                 {(fid) => <Input id={fid} value={form.pi_status} onChange={(e) => set('pi_status', e.target.value)} />}
               </Field>
+              </>)}
+              {tampilBon && (<>
               <Field label="Tgl Bon">
                 {(fid) => <DateInput id={fid} value={form.bon_date ?? ''} onChange={(e) => set('bon_date', e.target.value || null)} />}
               </Field>
               <Field label="Bon Pribadi">
                 {(fid) => <CurrencyInput id={fid} value={form.personal_bon} onValueChange={(v) => set('personal_bon', v)} />}
               </Field>
+              </>)}
               <Field label="Catatan" className="sm:col-span-2">
                 {(fid) => <Textarea id={fid} rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} />}
               </Field>
@@ -814,8 +973,8 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
           </p>
           <div className="ml-auto flex items-center gap-2">
             <Button onClick={() => navigate(existing ? `/transaksi/trip/${existing.id}` : '/transaksi/trip')}>Batal</Button>
-            <Button icon={<FaPrint size={15} />} disabled={!canEdit} onClick={() => save(true)}>Simpan &amp; Cetak</Button>
-            <Button variant="primary" icon={<FaFloppyDisk size={15} />} disabled={!canEdit} onClick={() => save(false)}>Simpan</Button>
+            <Button icon={<FaPrint size={15} />} disabled={!bolehSimpan} onClick={() => save(true)}>Simpan &amp; Cetak</Button>
+            <Button variant="primary" icon={<FaFloppyDisk size={15} />} disabled={!bolehSimpan} onClick={() => save(false)}>Simpan</Button>
           </div>
         </div>
       </div>
