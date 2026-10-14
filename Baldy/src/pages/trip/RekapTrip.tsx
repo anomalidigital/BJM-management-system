@@ -350,7 +350,7 @@ export function RekapTripDokumen({ data }: { data: DataRekap }) {
 /** Preview cetak Rekap Trip (Print / Export PDF). */
 export function CetakRekapTrip({ data, onClose }: { data: DataRekap; onClose: () => void }) {
   return (
-    <ReportPreview onClose={onClose} onPrint={() => window.print()} closeLabel="Kembali" orientasiTetap="potret">
+    <ReportPreview onClose={onClose} onPrint={() => window.print()} orientasiTetap="potret">
       <PrintDocument><RekapTripDokumen data={data} /></PrintDocument>
     </ReportPreview>
   )

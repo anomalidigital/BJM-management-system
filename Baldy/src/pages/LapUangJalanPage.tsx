@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { FaEye, FaPrint, FaWallet, FaXmark } from '../components/ui/icons'
+import { FaPrint, FaWallet, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -456,8 +456,7 @@ export function LapUangJalanPage({
             </div>
             {error && <FieldError>{error}</FieldError>}
             <div className="flex flex-wrap items-center gap-2 border-t border-hairline pt-4">
-              <Button variant="primary" icon={<FaEye size={15} />} onClick={bukaPreview}>Preview</Button>
-              <Button icon={<FaPrint size={15} />} onClick={bukaPreview}>Cetak</Button>
+              <Button variant="primary" icon={<FaPrint size={15} />} onClick={bukaPreview}>Cetak</Button>
               <Button variant="ghost" icon={<FaXmark size={14} />} onClick={() => { lokal.reset(); setError(null) }}>Batal</Button>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { FaEye, FaPrint, FaReceipt, FaTruckFast, FaWallet } from '../components/ui/icons'
+import { FaPrint, FaReceipt, FaTruckFast, FaWallet } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -140,7 +140,7 @@ export function LapPengeluaranPage() {
   const tautan = (dari: TabId) => (tripId: string) =>
     `/transaksi/trip/${tripId}?${new URLSearchParams({ dari: 'pengeluaran', dari_tab: dari, awal, akhir, tab: TAB_DETAIL[dari] }).toString()}`
 
-  /** Periode terbalik langsung diberi tahu, tidak menunggu tombol Preview. */
+  /** Periode terbalik langsung diberi tahu, tidak menunggu tombol Cetak. */
   const galatPeriode = awal > akhir ? 'Tanggal Awal tidak boleh lebih besar dari Tanggal Akhir.' : null
 
   function bukaPreview() {
@@ -203,8 +203,7 @@ export function LapPengeluaranPage() {
                 )}
               </Field>
             </PanelFilter>
-            <Button icon={<FaEye size={15} />} onClick={bukaPreview} title="Preview cetak bagian yang sedang dibuka">Preview</Button>
-            <Button variant="primary" icon={<FaPrint size={15} />} onClick={bukaPreview} title="Cetak bagian yang sedang dibuka">Cetak</Button>
+            <Button variant="primary" icon={<FaPrint size={15} />} onClick={bukaPreview} title="Cetak bagian yang sedang dibuka (ditampilkan dulu sebelum dicetak)">Cetak</Button>
           </>
         }
       />

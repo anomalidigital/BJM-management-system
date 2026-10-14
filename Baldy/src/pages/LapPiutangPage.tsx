@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { FaEye, FaFileExport, FaLink, FaPen, FaPlus, FaPrint, FaTrashCan, FaTriangleExclamation } from '../components/ui/icons'
+import { FaFileExport, FaLink, FaPen, FaPlus, FaPrint, FaTrashCan, FaTriangleExclamation } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { Button, IconButton } from '../components/ui/Button'
@@ -414,7 +414,6 @@ export function LapPiutangPage() {
         description="Piutang (kasbon) karyawan ke perusahaan. Piutang tercatat minus, pelunasan plus; potongan uang jalan dari trip tercatat otomatis sebagai Lunas."
         actions={
           <>
-            <Button icon={<FaEye size={15} />} onClick={() => cekSiap() && setPreview(true)}>Preview</Button>
             <Button icon={<FaPrint size={15} />} onClick={() => cekSiap() && setPreview(true)}>Cetak</Button>
             <Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={bukaTambah}>Tambah Transaksi</Button>
           </>

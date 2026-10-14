@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { FaEye, FaPrint } from '../components/ui/icons'
+import { FaPrint } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { Tabs } from '../components/ui/Tabs'
@@ -292,12 +292,15 @@ function LaporanKomisi() {
             </>
           }
           right={
-            <>
-              <Button size="sm" icon={<FaEye size={14} />} onClick={() => bukaCetak(driverId ? 'perSopir' : 'global')}>
-                {driverId ? 'Cetak Komisi Supir' : 'Cetak Rekap'}
-              </Button>
-              <Button size="sm" icon={<FaPrint size={14} />} onClick={() => bukaCetak(driverId ? 'perSopir' : 'semuaSopir')}>Cetak Rincian</Button>
-            </>
+            // Supir dipilih: hanya satu laporan (komisi supir itu). Seluruh supir: rekap per supir atau rincian transaksi.
+            driverId ? (
+              <Button size="sm" icon={<FaPrint size={14} />} onClick={() => bukaCetak('perSopir')}>Cetak Komisi Supir</Button>
+            ) : (
+              <>
+                <Button size="sm" icon={<FaPrint size={14} />} onClick={() => bukaCetak('global')}>Cetak Rekap</Button>
+                <Button size="sm" icon={<FaPrint size={14} />} onClick={() => bukaCetak('semuaSopir')}>Cetak Rincian</Button>
+              </>
+            )
           }
         />
         {error && <div className="border-b border-hairline px-4 py-2"><FieldError>{error}</FieldError></div>}

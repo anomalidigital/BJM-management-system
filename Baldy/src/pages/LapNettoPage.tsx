@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { FaEye, FaPrint, FaXmark } from '../components/ui/icons'
+import { FaPrint, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -240,8 +240,7 @@ export function LapNettoPage() {
             {error && <FieldError>{error}</FieldError>}
 
             <div className="flex flex-wrap items-center gap-2 border-t border-hairline pt-4">
-              <Button variant="primary" icon={<FaEye size={15} />} onClick={openPreview}>Preview</Button>
-              <Button icon={<FaPrint size={15} />} onClick={openPreview}>Cetak</Button>
+              <Button variant="primary" icon={<FaPrint size={15} />} onClick={openPreview}>Cetak</Button>
               <Button variant="ghost" icon={<FaXmark size={14} />} onClick={() => { resetPeriode(); setMode('perMobil'); setError(null) }}>Batal</Button>
             </div>
           </div>

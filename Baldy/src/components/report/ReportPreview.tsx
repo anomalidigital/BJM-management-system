@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { FaFileArrowDown, FaPrint, FaXmark } from '../ui/icons'
+import { FaPrint, FaXmark } from '../ui/icons'
 import { Button } from '../ui/Button'
 import { cn } from '../../lib/utils'
 
@@ -33,17 +33,18 @@ function useUkuranHalaman(orientasi: Orientasi) {
 
 /**
  * Kerangka layar Preview Laporan: pengaturan di kiri (opsional), lembar A4 di
- * kanan, dan action bar berisi Print / Export PDF.
+ * kanan, dan satu tombol Cetak / PDF. Setiap tombol Cetak di aplikasi membuka
+ * layar ini dulu, tidak pernah langsung memanggil printer.
  *
- * Keduanya memakai pipeline cetak browser — "Export PDF" berarti memilih
- * "Save as PDF" pada tujuan printer, sehingga hasilnya sama dengan preview.
+ * Cetak dan simpan PDF sama-sama memakai dialog cetak browser — PDF berarti
+ * memilih "Save as PDF" sebagai tujuan, sehingga hasilnya sama dengan preview.
+ * Ditutup lewat tombol X atau tombol Esc.
  */
 export function ReportPreview({
   onClose,
   onPrint,
   settings,
   children,
-  closeLabel = 'Tutup Preview',
   orientasiAwal = 'potret',
   orientasiTetap,
 }: {
@@ -52,7 +53,6 @@ export function ReportPreview({
   settings?: ReactNode
   /** Boleh berupa fungsi agar isi laporan menyesuaikan orientasi kertas. */
   children: ReactNode | ((orientasi: Orientasi) => ReactNode)
-  closeLabel?: string
   orientasiAwal?: Orientasi
   /** Kunci orientasi dan sembunyikan pilihannya — untuk dokumen resmi
    *  yang tata letaknya memang hanya benar pada satu orientasi. */
@@ -62,6 +62,14 @@ export function ReportPreview({
   const orientasi = orientasiTetap ?? dipilih
   useUkuranHalaman(orientasi)
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
     <div className="print-shell fixed inset-0 z-[80] flex flex-col bg-page">
       <header className="no-print flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-hairline bg-surface px-4 py-2.5 lg:px-6">
@@ -70,6 +78,7 @@ export function ReportPreview({
             type="button"
             onClick={onClose}
             aria-label="Tutup preview"
+            title="Tutup preview (Esc)"
             className="rounded-md p-1.5 text-ink-3 transition hover:bg-sunken hover:text-ink"
           >
             <FaXmark size={18} />
@@ -99,12 +108,8 @@ export function ReportPreview({
             ))}
           </div>
           )}
-          <Button onClick={onClose}>{closeLabel}</Button>
-          <Button icon={<FaFileArrowDown size={15} />} onClick={onPrint}>
-            Export PDF
-          </Button>
           <Button variant="primary" icon={<FaPrint size={15} />} onClick={onPrint}>
-            Print
+            Cetak / PDF
           </Button>
         </div>
       </header>
@@ -120,7 +125,7 @@ export function ReportPreview({
             {typeof children === 'function' ? children(orientasi) : children}
           </div>
           <p className="no-print mx-auto mt-6 max-w-[210mm] text-center text-[11.5px] leading-relaxed text-ink-3">
-            Untuk menyimpan sebagai PDF: klik <span className="font-medium text-ink-2">Export PDF</span>, lalu pilih tujuan{' '}
+            Untuk menyimpan sebagai PDF: klik <span className="font-medium text-ink-2">Cetak / PDF</span>, lalu pilih tujuan{' '}
             <span className="font-medium text-ink-2">Save as PDF</span> pada dialog cetak browser.
           </p>
         </div>
