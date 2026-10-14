@@ -196,7 +196,7 @@ export function DashboardPage() {
         return {
           id,
           nama: rows[0].driver_name || 'Tanpa nama',
-          keterangan: komisi > 0 ? `komisi ${formatRupiah(komisi, { compact: true })}` : uj > 0 ? `UJ ${formatRupiah(uj, { compact: true })}` : '',
+          keterangan: komisi > 0 ? `komisi ${formatRupiah(komisi, { compact: true })}` : uj > 0 ? `uang jalan ${formatRupiah(uj, { compact: true })}` : '',
           ritan: rows.length,
         }
       })

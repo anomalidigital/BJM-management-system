@@ -119,7 +119,7 @@ export function TripOverview({ trip }: { trip: TransactionRow }) {
             <InfoItem label="TR" value={strip(trip.tr_reference)} mono />
             <InfoItem label="No PI" value={strip(trip.pi_number)} mono />
             <InfoItem label="Status PI" value={strip(trip.pi_status)} />
-            <InfoItem label="Tgl Bon" value={trip.bon_date ? formatDate(trip.bon_date) : '—'} mono />
+            <InfoItem label="Tanggal Bon" value={trip.bon_date ? formatDate(trip.bon_date) : '—'} mono />
             <InfoItem label="Bon Pribadi" value={trip.personal_bon ? formatRupiah(trip.personal_bon) : '—'} mono />
           </dl>
           {trip.notes && (
@@ -156,7 +156,7 @@ export function TripOverview({ trip }: { trip: TransactionRow }) {
           {trip.route_code ? (
             <dl className="grid grid-cols-2 gap-4 p-4">
               <InfoItem label="No. Rute" value={<span className="break-all whitespace-normal">{trip.route_code}</span>} mono />
-              <InfoItem label="UJ Rute" value={formatRupiah(trip.ujroute)} mono />
+              <InfoItem label="Uang Jalan Rute" value={formatRupiah(trip.ujroute)} mono />
               <InfoItem label="Uang Tol (patokan)" value={formatRupiah(trip.toll)} mono />
               <InfoItem label="Harga Rute" value={formatRupiah(trip.route_price)} mono />
             </dl>

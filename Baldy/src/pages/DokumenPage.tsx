@@ -121,7 +121,7 @@ function kumpulkanBerkas(d: Database, workspace: Workspace): BerkasSumber[] {
   for (const t of trips) {
     tambah(t.pod_attachments, {
       sumber: 'pod', rincian: t.pod_fisik ? 'fisik diterima' : t.pod_fisik === false ? 'fisik menyusul' : '',
-      judul: 'Foto POD (BA / SJ bertanda tangan penerima)', ...milikTrip(t), tautan: keTrip(t), tanggal: t.closed_at || t.transaction_date, recordId: t.id,
+      judul: 'Foto POD (Berita Acara / Surat Jalan bertanda tangan penerima)', ...milikTrip(t), tautan: keTrip(t), tanggal: t.closed_at || t.transaction_date, recordId: t.id,
     })
     tambah(t.pi_attachments, {
       sumber: 'pi', rincian: t.pi_number ? `PI ${t.pi_number}` : '', judul: t.pi_note ?? '',
@@ -676,7 +676,7 @@ function ModalUnggah({ edit, opsiTrip, tripDate, onClose, onSimpan }: {
               <Radio name="simpan-dokumen" checked={!keTrip} onChange={() => setIsi((f) => ({ ...f, simpan: 'umum' }))}
                 label="Dokumen umum" description="Tidak menempel pada satu trip: SOP, surat, dokumen perusahaan." />
               <Radio name="simpan-dokumen" checked={keTrip} onChange={() => setIsi((f) => ({ ...f, simpan: 'trip' }))}
-                label="Dokumen trip" description="Masuk ke tab Dokumen trip yang dipilih: BA, surat jalan, foto barang." />
+                label="Dokumen trip" description="Masuk ke tab Dokumen trip yang dipilih: Berita Acara, surat jalan, foto barang." />
             </div>
           </fieldset>
         )}
@@ -691,7 +691,7 @@ function ModalUnggah({ edit, opsiTrip, tripDate, onClose, onSimpan }: {
         )}
         <Field label="Judul" required className="sm:col-span-2" error={galat.judul}>
           {(fid) => (
-            <Input id={fid} value={isi.judul} invalid={!!galat.judul} placeholder={keTrip ? 'BA bertanda tangan penerima' : 'SOP pemuatan alat berat'}
+            <Input id={fid} value={isi.judul} invalid={!!galat.judul} placeholder={keTrip ? 'Berita Acara bertanda tangan penerima' : 'SOP pemuatan alat berat'}
               onChange={(e) => setIsi((f) => ({ ...f, judul: e.target.value }))} />
           )}
         </Field>

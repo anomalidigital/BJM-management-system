@@ -211,7 +211,7 @@ export function TabBiaya({ trip }: {
                   <td className="px-3 py-2.5"><Badge tone="brand">{labelBiaya(e.expense_type)}</Badge></td>
                   <td className="tnum px-3 py-2.5 text-ink-2">{formatDate(e.expense_date)}</td>
                   <td className={cn('tnum px-3 py-2.5 text-right font-semibold text-ink', batal && 'text-ink-3 line-through')}>{formatRupiah(e.amount)}</td>
-                  <td className="px-3 py-2.5 text-[12.5px] text-ink-2">{dibayarPerusahaan(e) ? <Badge tone="warning">Perusahaan</Badge> : 'Supir, dari UJ'}</td>
+                  <td className="px-3 py-2.5 text-[12.5px] text-ink-2">{dibayarPerusahaan(e) ? <Badge tone="warning">Perusahaan</Badge> : 'Supir, dari uang jalan'}</td>
                   {karawang && <td className="px-3 py-2.5">{biayaDitagihkan(e) ? <Badge tone="good">Ke klien</Badge> : <span className="text-ink-3">—</span>}</td>}
                   <td className="max-w-72 px-3 py-2.5 text-ink-3">{e.notes || '—'}</td>
                   <td className="px-3 py-2.5"><LampiranThumbs ids={e.attachments ?? []} ukuran={30} /></td>

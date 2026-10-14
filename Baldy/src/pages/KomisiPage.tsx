@@ -38,7 +38,7 @@ const LABEL_PERAN: Record<EmployeeRole, string> = { ...ROLE_LABEL, sopir: 'Supir
 /** Penjelasan dasar hitung, ditampilkan di bawah pilihan. */
 const PENJELASAN_DASAR: Record<DasarKomisi, string> = {
   nilai: 'Harga yang diisi di trip; bila kosong memakai Harga Rute.',
-  uj: 'Uang jalan rute (UJ Rute); bila kosong memakai total uang jalan yang dibayar.',
+  uj: 'Uang jalan rute (Uang Jalan Rute); bila kosong memakai total uang jalan yang dibayar.',
   kontrak: 'Nilai kontrak Dedicated, dihitung per kontrak (bukan per trip).',
 }
 

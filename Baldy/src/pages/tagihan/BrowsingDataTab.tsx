@@ -117,11 +117,11 @@ export function BrowsingDataTab() {
           <>
             <SearchInput value={table.query} onChange={table.setQuery} width="w-72" placeholder="Cari faktur, Sijo, Kodecost..." />
             <PanelFilter filter={filter} galat={galatRentang(d.dateFrom, d.dateTo)} chips={[
-              (dateFrom || dateTo) && { label: `Tgl Tagih ${rentangTanggal(dateFrom, dateTo)}`, lepas: () => filter.lepas('dateFrom', 'dateTo') },
+              (dateFrom || dateTo) && { label: `Tanggal Tagih ${rentangTanggal(dateFrom, dateTo)}`, lepas: () => filter.lepas('dateFrom', 'dateTo') },
               costCode && { label: `Kodecost: ${costCode}`, lepas: () => filter.lepas('costCode') },
             ]}>
               <div>
-                <p className="form-label">Tgl Tagih</p>
+                <p className="form-label">Tanggal Tagih</p>
                 <div className="grid grid-cols-2 gap-2">
                   <DateInput value={d.dateFrom} onChange={(e) => filter.ubah({ dateFrom: e.target.value })} aria-label="Tanggal dari" />
                   <DateInput value={d.dateTo} onChange={(e) => filter.ubah({ dateTo: e.target.value })} aria-label="Tanggal sampai" />

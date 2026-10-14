@@ -107,7 +107,7 @@ export function ProsesDataTab() {
       e.invoice_no = 'No Faktur sudah dipakai.'
     if (!form.job_order_id) e.job_order_id = 'No. SI/JO wajib dipilih.'
     if (!form.cost_code.trim()) e.cost_code = 'Data Cost wajib diisi.'
-    if (!form.billing_date) e.billing_date = 'Tgl Tagih wajib diisi.'
+    if (!form.billing_date) e.billing_date = 'Tanggal Tagih wajib diisi.'
     if (form.amount <= 0) e.amount = 'Jumlah Rp harus lebih dari 0.'
     setErrors(e)
     return Object.keys(e).length === 0
@@ -256,10 +256,10 @@ export function ProsesDataTab() {
             </div>
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <Field label="Tgl Tagih" required error={errors.billing_date}>
+              <Field label="Tanggal Tagih" required error={errors.billing_date}>
                 {(fid) => <DateInput id={fid} value={form.billing_date} readOnly={readOnly} invalid={!!errors.billing_date} onChange={(e) => setForm({ ...form, billing_date: e.target.value })} />}
               </Field>
-              <Field label="Tgl Tarik">
+              <Field label="Tanggal Tarik">
                 {(fid) => <DateInput id={fid} value={form.withdrawal_date} readOnly={readOnly} onChange={(e) => setForm({ ...form, withdrawal_date: e.target.value })} />}
               </Field>
               <Field label="Tanggal Lunas" hint="Kosongkan bila belum lunas.">

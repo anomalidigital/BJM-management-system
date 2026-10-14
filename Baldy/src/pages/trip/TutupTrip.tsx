@@ -115,7 +115,7 @@ export function KonfirmasiTutupTrip({ trip, onClose, onClosed }: {
 
         <div ref={pertanyaanRef} className="space-y-3 rounded-lg border border-brand-100 bg-brand-50/50 px-3.5 py-3">
           <div>
-            <p className="mb-2 text-[12.5px] font-semibold text-ink-2">Dokumen POD (Berita Acara / SJ / TR bertanda tangan penerima)</p>
+            <p className="mb-2 text-[12.5px] font-semibold text-ink-2">Dokumen POD (Berita Acara / Surat Jalan / TR bertanda tangan penerima)</p>
             <div className="grid gap-2 sm:grid-cols-2">
               <Radio name="pod" checked={pod === 'fisik'} onChange={() => { setPod('fisik'); setGalat(null) }} label="Dokumen fisik diterima"
                 description="Supir sudah menyerahkan hardcopy di pool." />

@@ -214,7 +214,7 @@ export function DataRoutePage() {
       ),
     },
     ...(pakaiFeet ? [{ key: 'feet', header: 'Feet', sortable: true, width: '86px', render: (r: BarisRute) => (r.feet ? <Badge tone="neutral">{r.feet}</Badge> : <span className="text-ink-3">—</span>) }] : []),
-    { key: 'ujroute', header: 'UJ Rute', sortable: true, align: 'right', width: '128px', render: (r) => <Nominal nilai={r.ujroute} kira={r.estimated_fields?.includes('ujroute')} /> },
+    { key: 'ujroute', header: 'Uang Jalan Rute', sortable: true, align: 'right', width: '128px', render: (r) => <Nominal nilai={r.ujroute} kira={r.estimated_fields?.includes('ujroute')} /> },
     { key: 'toll', header: 'Uang Tol', sortable: true, align: 'right', width: '128px', render: (r) => <Nominal nilai={r.toll ?? 0} kira={r.estimated_fields?.includes('toll')} /> },
     { key: 'price', header: 'Harga', sortable: true, align: 'right', width: '134px', render: (r) => <Nominal nilai={r.price} kira={r.estimated_fields?.includes('price')} tebal /> },
     {
@@ -227,11 +227,11 @@ export function DataRoutePage() {
       ),
     },
   ]
-  /** Baris total: label menutup semua kolom sebelum UJ Rute, supaya jumlahnya tepat di bawah kolomnya. */
+  /** Baris total: label menutup semua kolom sebelum Uang Jalan Rute, supaya jumlahnya tepat di bawah kolomnya. */
   const kolomSebelumUj = columns.findIndex((c) => c.key === 'ujroute')
 
   if (preview) {
-    const kolomCetak = ['No.', 'No. Rute', 'Nama Rute', 'Area', ...(pakaiFeet ? ['Feet'] : []), 'UJ Rute', 'Uang Tol', 'Harga']
+    const kolomCetak = ['No.', 'No. Rute', 'Nama Rute', 'Area', ...(pakaiFeet ? ['Feet'] : []), 'Uang Jalan Rute', 'Uang Tol', 'Harga']
     return (
       <ReportPreview onClose={() => setPreview(false)} onPrint={() => window.print()}>
         {(orientasi) => {
@@ -258,7 +258,7 @@ export function DataRoutePage() {
                 <thead>
                   <tr className="bg-neutral-100">
                     {kolomCetak.map((h) => (
-                      <th key={h} className={`border border-neutral-400 px-1.5 py-1 font-semibold ${['UJ Rute', 'Uang Tol', 'Harga'].includes(h) ? 'text-right' : 'text-left'}`}>
+                      <th key={h} className={`border border-neutral-400 px-1.5 py-1 font-semibold ${['Uang Jalan Rute', 'Uang Tol', 'Harga'].includes(h) ? 'text-right' : 'text-left'}`}>
                         {h}
                       </th>
                     ))}

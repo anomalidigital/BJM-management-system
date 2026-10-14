@@ -22,7 +22,7 @@ import { KepalaTab, KepalaTabel, KosongTab, KotakInfo, PakaiNilai, PesanGalat } 
 
 /** Petunjuk tiap jenis termin. */
 const PETUNJUK_JENIS: Record<JenisTermin, string> = {
-  uj: 'Uang perjalanan dari patokan UJ Rute: tol, solar, SPSI Banlok, overnight, ASDP dibayar supir dari sini. Di atas patokan perlu persetujuan Manager / Owner beserta alasannya.',
+  uj: 'Uang perjalanan dari patokan Uang Jalan Rute: tol, solar, SPSI Banlok, overnight, ASDP dibayar supir dari sini. Di atas patokan perlu persetujuan Manager / Owner beserta alasannya.',
   uang_dorong: 'Uang untuk lanjut membawa muatan balik; catat di trip backload / rute lanjutannya. Nominalnya belum diatur, jadi tidak dibatasi patokan.',
   uang_pulang: 'Supir pulang kosong tanpa backload. Nominalnya belum diatur, jadi tidak dibatasi patokan.',
   tambahan: 'Kekurangan uang jalan di luar patokan, mis. perjalanan lebih lama. Selalu perlu persetujuan Manager / Owner beserta alasannya.',
@@ -38,7 +38,7 @@ type IsiTermin = TerminForm & Pick<UjPayment, 'override_note' | 'override_by'>
  * Tab Uang Jalan. Uang jalan = seluruh uang untuk supir selama perjalanan (uang jalan,
  * uang dorong, uang pulang, tambahan); termin dicatat saat uang benar-benar dibayar.
  *
- * Patokan UJ Rute hanya membatasi termin jenis "Uang jalan": total di atas patokan perlu
+ * Patokan Uang Jalan Rute hanya membatasi termin jenis "Uang jalan": total di atas patokan perlu
  * Manager / Owner (bisa('override')) dan alasan, yang disimpan di termin (override_note,
  * override_by = username). Termin "Tambahan" selalu perlu persetujuan + alasan. Uang dorong
  * & uang pulang belum punya patokan (TBD-24), jadi cukup bisa('trip').
@@ -166,8 +166,8 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
 
   function simpan() {
     if (!form.payment_date) { setGalat('Tanggal wajib diisi.'); return }
-    if (form.uj_amount <= 0) { setGalat('Nilai UJ harus lebih dari 0.'); return }
-    if (form.kasbon_deduction > form.uj_amount) { setGalat('Potong kasbon tidak boleh melebihi UJ.'); return }
+    if (form.uj_amount <= 0) { setGalat('Uang jalan harus lebih dari 0.'); return }
+    if (form.kasbon_deduction > form.uj_amount) { setGalat('Potong kasbon tidak boleh melebihi uang jalan.'); return }
     if (butuhSetuju && !bisaSetujui) {
       setGalat(`Belum bisa disimpan: ${jenis === 'tambahan' ? 'uang tambahan' : 'uang jalan di atas patokan'} perlu persetujuan Manager atau Owner.`)
       return
@@ -211,7 +211,7 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
     'Trip dibatalkan: termin di bawah hanya arsip dan tidak dihitung di laporan.'
   ) : patokan > 0 ? (
     <>
-      Patokan UJ Rute <span className="font-semibold text-ink-2">{trip.route_name || trip.route_code}</span>: {formatRupiah(patokan)} ·
+      Patokan Uang Jalan Rute <span className="font-semibold text-ink-2">{trip.route_name || trip.route_code}</span>: {formatRupiah(patokan)} ·
       uang jalan dibayar {formatRupiah(ujDibayar)} ·{' '}
       {sisa >= 0
         ? <>sisa <span className="tnum font-semibold text-ink-2">{formatRupiah(sisa)}</span></>
@@ -220,7 +220,7 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
       . Catat termin saat uang benar-benar dibayar; di atas patokan perlu persetujuan Manager / Owner.
     </>
   ) : (
-    'Rute trip ini belum punya patokan UJ Rute. Catat termin saat uang dibayar; potong kasbon mengurangi kasbon supir penerima.'
+    'Rute trip ini belum punya patokan Uang Jalan Rute. Catat termin saat uang dibayar; potong kasbon mengurangi kasbon supir penerima.'
   )
 
   return (
@@ -229,14 +229,14 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
       {payments.length === 0 ? (
         <KosongTab
           judul="Belum ada uang jalan yang dibayar."
-          keterangan={patokan > 0 ? `Patokan UJ Rute: ${formatRupiah(patokan)}. Termin pertama akan terisi nilai itu.` : 'Tambahkan termin saat uang jalan dibayar.'}
+          keterangan={patokan > 0 ? `Patokan Uang Jalan Rute: ${formatRupiah(patokan)}. Termin pertama akan terisi nilai itu.` : 'Tambahkan termin saat uang jalan dibayar.'}
         />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-max text-[13px]">
             <KepalaTabel kolom={[
-              { label: 'Termin' }, { label: 'Tanggal' }, { label: 'Supir' }, { label: 'UJ', kanan: true },
-              { label: 'Potong Kasbon', kanan: true }, { label: 'TF', kanan: true },
+              { label: 'Termin' }, { label: 'Tanggal' }, { label: 'Supir' }, { label: 'Uang Jalan', kanan: true },
+              { label: 'Potong Kasbon', kanan: true }, { label: 'Transfer', kanan: true },
               ...(batal ? [{ label: 'Setelah batal' }] : []),
               { label: 'Catatan' },
               ...(adaAlasan ? [{ label: 'Alasan & persetujuan' }] : []),
@@ -344,13 +344,13 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
             )}
           </Field>
           <Field
-            label="UJ"
+            label="Uang Jalan"
             required
             hint={jenis !== 'uj'
-              ? (jenis === 'tambahan' ? 'Di luar patokan UJ Rute.' : 'Belum ada patokan untuk jenis ini; isi sesuai uang yang dibayar.')
+              ? (jenis === 'tambahan' ? 'Di luar patokan Uang Jalan Rute.' : 'Belum ada patokan untuk jenis ini; isi sesuai uang yang dibayar.')
               : patokan > 0 && sisaSebelumIni > 0 && form.uj_amount !== sisaSebelumIni
-                ? <>Sisa patokan UJ Rute {formatRupiah(sisaSebelumIni)} · <PakaiNilai label="Pakai" onClick={() => setForm((f) => ({ ...f, uj_amount: sisaSebelumIni }))} /></>
-                : patokan > 0 ? `Patokan UJ Rute ${formatRupiah(patokan)}.` : 'Rute ini belum punya patokan UJ Rute.'}
+                ? <>Sisa patokan Uang Jalan Rute {formatRupiah(sisaSebelumIni)} · <PakaiNilai label="Pakai" onClick={() => setForm((f) => ({ ...f, uj_amount: sisaSebelumIni }))} /></>
+                : patokan > 0 ? `Patokan Uang Jalan Rute ${formatRupiah(patokan)}.` : 'Rute ini belum punya patokan Uang Jalan Rute.'}
           >
             {(fid) => <CurrencyInput id={fid} value={form.uj_amount} onValueChange={(v) => setForm((f) => ({ ...f, uj_amount: v }))} />}
           </Field>
@@ -381,16 +381,16 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
           </Field>
           <div className="rounded-lg border border-brand-100 bg-brand-50 px-3.5 py-3 sm:col-span-2">
             <p className="flex items-center justify-between gap-3">
-              <span className="text-[12.5px] font-medium text-brand-800">TF ke supir</span>
+              <span className="text-[12.5px] font-medium text-brand-800">Transfer ke supir</span>
               <span className="tnum text-[16px] font-semibold text-brand-800">{formatRupiah(form.uj_amount - form.kasbon_deduction)}</span>
             </p>
             <p className="mt-1 text-[11.5px] text-brand-700">
-              Dihitung otomatis: UJ − Potong Kasbon
+              Dihitung otomatis: Uang Jalan − Potong Kasbon
               {form.kasbon_deduction > 0 && form.driver_id && !potongLebih && <> · sisa kasbon {namaSopir} menjadi {formatRupiah(saldo - form.kasbon_deduction)}</>}
             </p>
             {lewatPatokan && bisaSetujui && (
               <p className="mt-1 text-[11.5px] font-medium text-[#8a6100]">
-                Total uang jalan trip menjadi {formatRupiah(totalSetelah)}, melebihi patokan UJ Rute {formatRupiah(patokan)}.
+                Total uang jalan trip menjadi {formatRupiah(totalSetelah)}, melebihi patokan Uang Jalan Rute {formatRupiah(patokan)}.
               </p>
             )}
           </div>
@@ -414,7 +414,7 @@ export function TabUangJalan({ trip, bisaUbah }: { trip: TransactionRow; bisaUba
               {jenis === 'tambahan'
                 ? 'Uang tambahan di luar patokan perlu persetujuan Manager atau Owner beserta alasannya. Minta Manager / Owner mencatat termin ini.'
                 : <>
-                    Total uang jalan menjadi {formatRupiah(totalSetelah)}, melebihi patokan UJ Rute {formatRupiah(patokan)}. Uang jalan di atas
+                    Total uang jalan menjadi {formatRupiah(totalSetelah)}, melebihi patokan Uang Jalan Rute {formatRupiah(patokan)}. Uang jalan di atas
                     patokan perlu persetujuan Manager atau Owner:{' '}
                     {sisaSebelumIni > 0 ? `isi paling banyak sisa patokan ${formatRupiah(sisaSebelumIni)}, atau minta` : 'minta'} Manager / Owner
                     mencatat termin ini beserta alasannya.

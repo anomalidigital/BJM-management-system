@@ -431,7 +431,7 @@ function migrate(stored: Record<string, unknown>): Database {
     })
   }
 
-  // Biaya internal jenis "Uang Jalan" dihapus: UJ hanya dicatat di tab Uang Jalan.
+  // Biaya internal jenis "Uang Jalan" dihapus: uang jalan hanya dicatat di tab Uang Jalan.
   const intr2 = merged.internalCosts as Array<Record<string, unknown>> | undefined
   if (Array.isArray(intr2)) {
     merged.internalCosts = intr2.map((c) => (c.cost_type === 'Uang Jalan'

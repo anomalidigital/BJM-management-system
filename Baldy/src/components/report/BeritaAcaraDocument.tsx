@@ -169,7 +169,7 @@ export function BeritaAcaraDocument({ note, withLogo = true }: { note: Transacti
       <div className="mt-2 grid grid-cols-3 gap-5">
         <TandaTangan peran="Yang Menyerahkan" baris={[['Nama', ''], ['Tanggal', '']]} />
         <TandaTangan peran="Transporter" baris={[['Nama', ''], ['Tanggal', '']]} />
-        <TandaTangan peran="Penerima" baris={[['Nama', ''], ['Tgl & jam', ''], ['Perusahaan', ''], ['HP', '']]} />
+        <TandaTangan peran="Penerima" baris={[['Nama', ''], ['Tanggal & jam', ''], ['Perusahaan', ''], ['HP', '']]} />
       </div>
 
       <div className="mt-2 space-y-1.5 border-t border-black pt-2">

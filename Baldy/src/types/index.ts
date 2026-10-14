@@ -414,7 +414,7 @@ export interface CommissionTransaction extends WorkspaceScoped {
 
   notes: string
   is_marked: boolean
-  bon_date: string | null        // Tgl Bon     (dipakai di Cek Ritan)
+  bon_date: string | null        // Tanggal Bon     (dipakai di Cek Ritan)
   personal_bon: number           // Bon Pribadi (dipakai di Cek Ritan)
   printed_at: string | null      // null = belum dicetak
   /* Pembatalan: catatan keuangan tetap disimpan sebagai arsip. */
@@ -451,7 +451,7 @@ export interface UjPayment {
   jenis?: JenisTermin            // Kosong = uang jalan biasa
   uj_amount: number              // UJ
   kasbon_deduction: number       // Potong Kasbon
-  /** Alasan uang jalan di atas patokan UJ Rute (wajib, disetujui Manager / Owner). */
+  /** Alasan uang jalan di atas patokan Uang Jalan Rute (wajib, disetujui Manager / Owner). */
   override_note?: string
   /** Username yang menyetujui uang jalan di atas patokan. */
   override_by?: string
@@ -486,7 +486,7 @@ export const BIAYA_DITAGIHKAN: readonly string[] = ['DEX', 'Tol', 'ASDP', 'SPSI'
  * Siapa yang membayar biaya di jalan.
  * - sopir      : dari uang jalan yang sudah diterima -> bukan biaya tambahan perusahaan
  * - perusahaan : dibayar langsung (voucher solar, kartu e-toll, transfer) -> biaya di luar uang jalan
- * Keduanya tidak mengubah transfer ke sopir (rekap BJM: TF = UJ - potong kasbon, 314/314 baris).
+ * Keduanya tidak mengubah transfer ke sopir (rekap BJM: Transfer = Uang Jalan − potong kasbon, 314/314 baris).
  */
 export const PEMBAYAR_BIAYA = ['sopir', 'perusahaan'] as const
 export type PembayarBiaya = (typeof PEMBAYAR_BIAYA)[number]
@@ -511,7 +511,7 @@ export interface OperationalExpense {
 /**
  * Jenis biaya internal - pengeluaran perusahaan sendiri atas satu trip.
  * "Komisi" meminta penerimanya: peran dan nama (terdaftar atau manual).
- * Uang jalan tidak ada di sini: UJ hanya dicatat di tab Uang Jalan.
+ * Uang jalan tidak ada di sini: uang jalan hanya dicatat di tab Uang Jalan.
  */
 export const INTERNAL_COST_TYPES = ['Uang Makan', 'Kernet', 'Komisi', 'Servis & Sparepart', 'Gaji Sopir', 'Administrasi', 'Lainnya'] as const
 /** Nama tampilan jenis biaya internal; kode tersimpan tetap ('Gaji Sopir'). */
@@ -641,8 +641,8 @@ export interface Billing extends WorkspaceScoped {
   invoice_no: string             // No Faktur / Nofaktur
   job_order_id: string           // No. SI/JO
   cost_code: string              // Data Cost / Kodecost - BUKAN "Data Cust"
-  billing_date: string           // Tgl Tagih
-  withdrawal_date: string        // Tgl Tarik
+  billing_date: string           // Tanggal Tagih
+  withdrawal_date: string        // Tanggal Tarik
   amount: number                 // Jumlah Rp
   guarantee_amount: number       // Jaminan Rp
   is_sunting: boolean            // SUNTING

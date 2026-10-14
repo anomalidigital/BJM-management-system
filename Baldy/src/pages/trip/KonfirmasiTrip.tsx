@@ -73,7 +73,7 @@ export function KonfirmasiBatalTrip({ trip, onClose, onDone }: {
     batalkanTrip(trip.id, { alasan, penyelesaian, biayaCancel })
     const bagian = [
       isi?.kasbonKembali ? `potongan kasbon ${formatRupiah(isi.kasbonKembali)} dikembalikan` : '',
-      jadiKasbon ? `UJ ${formatRupiah(jadiKasbon)} jadi kasbon sopir` : '',
+      jadiKasbon ? `uang jalan ${formatRupiah(jadiKasbon)} jadi kasbon supir` : '',
       biayaCancel > 0 ? `biaya cancel ${formatRupiah(biayaCancel)} masuk Tagihan` : '',
     ].filter(Boolean)
     toast.success(`Trip ${idTampil(trip)} dibatalkan${bagian.length ? `; ${bagian.join(', ')}` : ''}.`)
@@ -129,7 +129,7 @@ export function KonfirmasiBatalTrip({ trip, onClose, onDone }: {
               return (
                 <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5">
                   <span className="text-[12.5px] text-ink-2">
-                    Termin {t.sequence} · {nama || 'tanpa sopir'} · TF <span className="tnum font-semibold text-ink">{formatRupiah(t.tf)}</span>
+                    Termin {t.sequence} · {nama || 'tanpa supir'} · Transfer <span className="tnum font-semibold text-ink">{formatRupiah(t.tf)}</span>
                   </span>
                   {t.driver_id ? (
                     <span className="inline-flex overflow-hidden rounded-md border border-hairline text-[12px] font-medium">

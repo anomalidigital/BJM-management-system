@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { KeyboardEvent } from 'react'
-import { FaPlus, FaRotateLeft, FaXmark } from '../../../components/ui/icons'
+import { FaPlus, FaXmark } from '../../../components/ui/icons'
 import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Field'
 import { kunciTr, rapikanTr } from '../../../lib/trip'
@@ -41,13 +41,7 @@ export function NoReferensiInput({ id, value, onChange }: { id?: string; value: 
               </button>
             </li>
           ))}
-          {value.length > 1 && (
-            <li>
-              <button type="button" onClick={() => onChange([])} className="inline-flex items-center gap-1 px-1 py-0.5 text-[12px] text-ink-3 hover:text-ink">
-                <FaRotateLeft size={11} /> Kosongkan
-              </button>
-            </li>
-          )}
+          {/* Tanpa tombol "Kosongkan" (Baldy 14 Okt 2026): nomor dihapus satu per satu lewat ×. */}
         </ul>
       )}
     </div>

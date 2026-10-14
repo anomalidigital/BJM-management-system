@@ -13,14 +13,14 @@ import type { TransactionRow, UjPayment } from '../types'
 /* ===========================================================================
  *  ATURAN TERVERIFIKASI (bukan TBD)
  *  Berasal dari formula asli pada spreadsheet operasional:
- *      TF = UJ - POTONG KASBON
+ *      Transfer = Uang Jalan − Potong Kasbon
  *  Konsisten pada seluruh 343 baris pembayaran.
  * ======================================================================== */
 export function tfPembayaran(p: Pick<UjPayment, 'uj_amount' | 'kasbon_deduction'>): number {
   return p.uj_amount - p.kasbon_deduction
 }
 
-/** Total UJ / potong kasbon / TF untuk sekumpulan termin. */
+/** Total Uang Jalan / potong kasbon / TF untuk sekumpulan termin. */
 export function totalUj(payments: Array<Pick<UjPayment, 'uj_amount' | 'kasbon_deduction'>>) {
   const uj = payments.reduce((a, p) => a + p.uj_amount, 0)
   const kasbon = payments.reduce((a, p) => a + p.kasbon_deduction, 0)
@@ -51,7 +51,7 @@ export const TBD_NOTES: TbdNote[] = [
   {
     id: 'TBD-03',
     title: 'Pendapatan netto',
-    current: 'Uang jalan = seluruh biaya perjalanan dari mesin nyala sampai kembali ke pool (7 Okt 2026). Netto = harga + biaya yang ditagihkan ke klien - uang jalan dibayar - biaya yang dibayar perusahaan langsung - komisi. Biaya yang dibayar supir dari uang jalan tidak dikurangkan lagi; yang dibayar perusahaan langsung (voucher solar, e-toll) dikurangkan karena di luar uang jalan (di data lama ada 3 trip yang solarnya melebihi uang jalannya). Selama trip belum ditutup, sisa patokan UJ Rute dianggap masih akan dibayar. Kernet 0. Trip batal tidak dihitung.',
+    current: 'Uang jalan = seluruh biaya perjalanan dari mesin nyala sampai kembali ke pool (7 Okt 2026). Netto = harga + biaya yang ditagihkan ke klien - uang jalan dibayar - biaya yang dibayar perusahaan langsung - komisi. Biaya yang dibayar supir dari uang jalan tidak dikurangkan lagi; yang dibayar perusahaan langsung (voucher solar, e-toll) dikurangkan karena di luar uang jalan (di data lama ada 3 trip yang solarnya melebihi uang jalannya). Selama trip belum ditutup, sisa patokan Uang Jalan Rute dianggap masih akan dibayar. Kernet 0. Trip batal tidak dihitung.',
     question: 'Sisa uang jalan yang tidak terpakai menjadi hak supir, atau dikembalikan? Reimbus (supir menalangi) dan Double Driver dibayar di luar uang jalan - ikut mengurangi netto?',
   },
   {
@@ -105,8 +105,8 @@ export const TBD_NOTES: TbdNote[] = [
   {
     id: 'TBD-14',
     title: 'Tiga kolom pada Cek Ritan',
-    current: 'Memakai Tgl Bon, Bon Pribadi, dan SI - JOB ORDER.',
-    question: 'Bacaan awal dari layar lama adalah Tujuan, Jam.Brkt, dan St.Job — ketiganya lazim di trucking. Mana yang benar: Tujuan atau Tgl Bon? Jam Berangkat atau Bon Pribadi? Status Job atau SI - Job Order?',
+    current: 'Memakai Tanggal Bon, Bon Pribadi, dan SI - JOB ORDER.',
+    question: 'Bacaan awal dari layar lama adalah Tujuan, Jam.Brkt, dan St.Job — ketiganya lazim di trucking. Mana yang benar: Tujuan atau Tanggal Bon? Jam Berangkat atau Bon Pribadi? Status Job atau SI - Job Order?',
   },
   {
     id: 'TBD-15',
@@ -130,18 +130,18 @@ export const TBD_NOTES: TbdNote[] = [
     id: 'TBD-17',
     title: 'Cakupan pemisahan data antar workspace',
     current: 'Dua cabang, dua bisnis (Meeting 17 Sep 2026): Priok = container, Karawang = alat berat & DHL. Trip, Tagihan, Kontrak, Aturan Komisi, dan Dokumen umum terpisah per cabang. Master (karyawan, kendaraan, rute, klien, alamat, SI/JO) dan kasbon dipakai bersama.',
-    question: 'Apakah master juga dipisah per cabang (di sistem lama, supir dan rute Priok berbeda dari supir SLB)? Perhitungan apa saja yang berbeda antara Priok dan Karawang: UJ Rute, komisi, tol, atau semuanya sama?',
+    question: 'Apakah master juga dipisah per cabang (di sistem lama, supir dan rute Priok berbeda dari supir SLB)? Perhitungan apa saja yang berbeda antara Priok dan Karawang: Uang Jalan Rute, komisi, tol, atau semuanya sama?',
   },
   {
     id: 'TBD-18',
     title: 'Uang Tol pada master Rute',
-    current: 'Tol dibayar supir dari uang jalan (aturan 7 Okt 2026), lalu notanya dicatat di Biaya Operasional jenis Tol supaya ditagihkan ke klien sebagai Additional Cost PI. Tidak memotong transfer ke supir (rekap BJM: TF = UJ - potong kasbon di 314 dari 314 baris). Bila dibayar kartu e-toll perusahaan, pilih "dibayar perusahaan": dihitung sebagai biaya di luar uang jalan. Uang Tol di rute hanya patokan.',
+    current: 'Tol dibayar supir dari uang jalan (aturan 7 Okt 2026), lalu notanya dicatat di Biaya Operasional jenis Tol supaya ditagihkan ke klien sebagai Additional Cost PI. Tidak memotong transfer ke supir (rekap BJM: Transfer = Uang Jalan − potong kasbon di 314 dari 314 baris). Bila dibayar kartu e-toll perusahaan, pilih "dibayar perusahaan": dihitung sebagai biaya di luar uang jalan. Uang Tol di rute hanya patokan.',
     question: 'Tol dan solar biasanya dibayar supir dari uang jalan, atau perusahaan langsung (e-toll, voucher solar)? Ini menentukan pilihan bawaan saat admin mencatat biaya. Solar (DEX) sekarang bawaannya ditagihkan ke klien untuk semua trip: benar untuk semua klien dan layanan, atau hanya trip tertentu?',
   },
   {
     id: 'TBD-19',
     title: 'Biaya Internal pada detail trip',
-    current: 'Dicatat terpisah dari biaya operasional, belum mengurangi netto. Jenis "Uang Jalan" dihapus: UJ hanya dicatat di tab Uang Jalan.',
+    current: 'Dicatat terpisah dari biaya operasional, belum mengurangi netto. Jenis "Uang Jalan" dihapus: uang jalan hanya dicatat di tab Uang Jalan.',
     question: 'Apakah biaya internal ikut mengurangi pendapatan netto?',
   },
   {
@@ -164,9 +164,9 @@ export const TBD_NOTES: TbdNote[] = [
   },
   {
     id: 'TBD-22',
-    title: 'Nominal rute (UJ Rute, Harga, Uang Tol)',
+    title: 'Nominal rute (Uang Jalan Rute, Harga, Uang Tol)',
     current: 'Spreadsheet belum memuat nominal rute. Sementara diisi dari trip asli (median uang jalan, COST, dan biaya Tol per rute); rute tanpa data diberi perkiraan dan bertanda "perkiraan" di menu Rute.',
-    question: 'Mohon daftar resmi UJ Rute (UJROUTE), Harga, dan Uang Tol per rute, supaya nilai perkiraan bisa diganti.',
+    question: 'Mohon daftar resmi Uang Jalan Rute (UJROUTE), Harga, dan Uang Tol per rute, supaya nilai perkiraan bisa diganti.',
   },
   {
     id: 'TBD-23',
@@ -177,8 +177,8 @@ export const TBD_NOTES: TbdNote[] = [
   {
     id: 'TBD-24',
     title: 'Uang Dorong dan Uang Pulang',
-    current: 'Keduanya uang untuk supir, jadi dicatat sebagai termin uang jalan berjenis Uang Dorong / Uang Pulang, bukan biaya operasional (aturan 7 Okt 2026: semua uang perjalanan adalah uang jalan). Uang dorong dicatat di trip backload / rute lanjutannya; di tab Biaya Operasional hanya tampil baca-saja bertanda "dari Uang Jalan", tidak ikut dijumlah dan tidak ditagihkan (12 Okt 2026). Nominalnya belum diatur, jadi tidak dibatasi patokan UJ Rute dan Admin boleh mencatatnya. Empat catatan Uang Dorong di data lama dipindahkan otomatis menjadi termin.',
-    question: 'Apakah uang dorong selalu sebesar UJ Rute rute backload, atau nominal tersendiri? Uang pulang punya patokan per rute atau dinilai per kejadian? Perlu persetujuan Manager / Owner seperti uang tambahan?',
+    current: 'Keduanya uang untuk supir, jadi dicatat sebagai termin uang jalan berjenis Uang Dorong / Uang Pulang, bukan biaya operasional (aturan 7 Okt 2026: semua uang perjalanan adalah uang jalan). Uang dorong dicatat di trip backload / rute lanjutannya; di tab Biaya Operasional hanya tampil baca-saja bertanda "dari Uang Jalan", tidak ikut dijumlah dan tidak ditagihkan (12 Okt 2026). Nominalnya belum diatur, jadi tidak dibatasi patokan Uang Jalan Rute dan Admin boleh mencatatnya. Empat catatan Uang Dorong di data lama dipindahkan otomatis menjadi termin.',
+    question: 'Apakah uang dorong selalu sebesar Uang Jalan Rute rute backload, atau nominal tersendiri? Uang pulang punya patokan per rute atau dinilai per kejadian? Perlu persetujuan Manager / Owner seperti uang tambahan?',
   },
   {
     id: 'TBD-25',

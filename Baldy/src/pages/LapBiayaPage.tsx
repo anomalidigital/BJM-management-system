@@ -268,7 +268,7 @@ export function LapBiayaPage({
               </ul>
               <div className="mt-4 border-t border-hairline pt-4">
                 <RumusAngka suku={[
-                  { label: 'Dibayar supir (dari UJ)', nilai: total.nominal - total.perusahaan },
+                  { label: 'Dibayar supir (dari uang jalan)', nilai: total.nominal - total.perusahaan },
                   { label: 'Dibayar perusahaan', nilai: total.perusahaan, operator: '+' },
                   { label: 'Total biaya', nilai: total.nominal, operator: '=', tebal: true },
                 ]} />
@@ -304,7 +304,7 @@ export function LapBiayaPage({
                     <span className="block text-xs text-ink-3">{e.trip.driver_names || '—'}</span>
                   </td>
                   <td className="px-4 py-2 whitespace-nowrap text-ink">{labelBiaya(e.expense_type)}</td>
-                  <td className="px-4 py-2 whitespace-nowrap text-ink-2">{e.olehPerusahaan ? 'Perusahaan' : 'Supir (dari UJ)'}</td>
+                  <td className="px-4 py-2 whitespace-nowrap text-ink-2">{e.olehPerusahaan ? 'Perusahaan' : 'Supir (dari uang jalan)'}</td>
                   <td className="px-4 py-2">{e.ditagih ? <Badge tone="good">Ke klien</Badge> : <span className="text-ink-3">—</span>}</td>
                   <td className="tnum px-4 py-2 text-right font-semibold whitespace-nowrap text-ink">{formatRupiah(e.amount)}</td>
                 </tr>

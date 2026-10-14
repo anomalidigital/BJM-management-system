@@ -136,7 +136,7 @@ function IsiModalRute({ onClose, rute: editing = null, awal, keterangan, pesanSu
     if (feetWajib && !form.feet) e.feet = 'Feet wajib dipilih.'
     // Rute dari data asli belum punya harga; jangan paksa diisi saat hanya mengubah UJ / tol.
     if (hargaWajib && form.price <= 0) e.price = 'Harga harus lebih dari 0.'
-    if (form.ujroute < 0) e.ujroute = 'UJ Rute tidak boleh negatif.'
+    if (form.ujroute < 0) e.ujroute = 'Uang Jalan Rute tidak boleh negatif.'
     if (form.toll < 0) e.toll = 'Uang Tol tidak boleh negatif.'
     setErrors(e)
     return Object.keys(e).length === 0
@@ -242,7 +242,7 @@ function IsiModalRute({ onClose, rute: editing = null, awal, keterangan, pesanSu
               )}
             </Field>
           )}
-          <Field label="UJ Rute" required error={errors.ujroute} className="sm:col-span-2"
+          <Field label="Uang Jalan Rute" required error={errors.ujroute} className="sm:col-span-2"
             hint={errors.ujroute ? undefined : masihKira('ujroute') ? 'Masih perkiraan.' : 'Patokan uang jalan.'}>
             {(id) => <CurrencyInput id={id} value={form.ujroute} invalid={!!errors.ujroute} onValueChange={(v) => setForm({ ...form, ujroute: v })} />}
           </Field>

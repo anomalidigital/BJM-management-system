@@ -34,7 +34,7 @@ interface Draft {
 export function LapRitanPage() {
   const { db, transactionRows, loading, error, reload, update, hapusTrip } = useData()
   const { bisa } = useAuth()
-  /** Tgl Bon, Bon Pribadi, dan SI/JO adalah kolom Ritan sistem lama Priok; Karawang memakai rute & TR. */
+  /** Tanggal Bon, Bon Pribadi, dan SI/JO adalah kolom Ritan sistem lama Priok; Karawang memakai rute & TR. */
   const karawang = useWorkspace().workspace === 'karawang'
   const toast = useToast()
   const navigate = useNavigate()
@@ -171,7 +171,7 @@ export function LapRitanPage() {
                   { label: 'NoTrans', width: '12%' },
                   { label: 'Mobil', width: '13%' },
                   { label: 'No. Rute', width: '11%' },
-                  { label: 'Tgl Bon', width: '10%' },
+                  { label: 'Tanggal Bon', width: '10%' },
                   { label: 'Bon Pribadi', align: 'right', width: '13%' },
                   { label: 'SI - JOB ORDER', width: '12%' },
                   { label: 'Sopir' },
@@ -224,7 +224,7 @@ export function LapRitanPage() {
     { key: 'plate_number', header: 'Mobil', sortable: true, width: '128px', render: (t) => <span className="tnum text-ink-2">{t.plate_number || '—'}</span> },
     { key: 'route_code', header: 'No. Rute', sortable: true, width: '112px', render: (t) => <span className="tnum text-ink-2">{t.route_code || '—'}</span> },
     {
-      key: 'bon_date', header: 'Tgl Bon', sortable: true, width: '150px',
+      key: 'bon_date', header: 'Tanggal Bon', sortable: true, width: '150px',
       render: (t) => {
         const d = draftOf(t)
         return editMode ? (
@@ -232,7 +232,7 @@ export function LapRitanPage() {
             value={d.bon_date ?? ''}
             className="h-8"
             onChange={(e) => setDraft(t.id, { bon_date: e.target.value || null }, d)}
-            aria-label={`Tgl Bon ${t.transaction_no}`}
+            aria-label={`Tanggal Bon ${t.transaction_no}`}
           />
         ) : (
           <span className="tnum text-ink-2">{d.bon_date ? formatDate(d.bon_date) : '—'}</span>
@@ -273,7 +273,7 @@ export function LapRitanPage() {
         crumbs={[{ label: 'Laporan' }, { label: 'Ritan' }]}
         description={karawang
           ? `Ritan sopir bulan berjalan (${monthLabel(monthStart)}): satu baris satu trip. Trip batal tidak dihitung.`
-          : `Ritan Sopir — bulan berjalan (${monthLabel(monthStart)}). Gunakan Sunting untuk mengubah Tgl Bon dan Bon Pribadi langsung di tabel.`}
+          : `Ritan Sopir — bulan berjalan (${monthLabel(monthStart)}). Gunakan Sunting untuk mengubah Tanggal Bon dan Bon Pribadi langsung di tabel.`}
         actions={
           <>
             <Button icon={<FaPrint size={15} />} onClick={() => setPreview(true)}>Cetak</Button>
@@ -329,7 +329,7 @@ export function LapRitanPage() {
 
         {editMode && (
           <p className="border-b border-brand-100 bg-brand-50 px-4 py-2.5 text-[12.5px] font-medium text-brand-800">
-            Mode sunting aktif — ubah Tgl Bon dan Bon Pribadi, lalu klik Simpan.
+            Mode sunting aktif — ubah Tanggal Bon dan Bon Pribadi, lalu klik Simpan.
             {Object.keys(drafts).length > 0 && <span className="ml-1">({Object.keys(drafts).length} baris diubah)</span>}
           </p>
         )}

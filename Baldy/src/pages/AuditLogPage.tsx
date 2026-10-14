@@ -49,7 +49,7 @@ const LABEL_FIELD: Record<string, string> = {
   // Kendaraan, karyawan, rute, klien, kontrak
   plate_number: 'No. Kendaraan', vehicle_type: 'Jenis kendaraan', configuration: 'Konfigurasi', attachments: 'Lampiran',
   driver_code: 'Kode karyawan', driver_name: 'Nama', role: 'Peran', address_1: 'Alamat', address_2: 'Alamat 2', city: 'Kota', phone: 'Telepon',
-  route_code: 'No. Rute', route_name: 'Nama Rute', ujroute: 'UJ Rute', toll: 'Uang tol', price: 'Harga', feet: 'Feet',
+  route_code: 'No. Rute', route_name: 'Nama Rute', ujroute: 'Uang Jalan Rute', toll: 'Uang tol', price: 'Harga', feet: 'Feet',
   kode_area_asal: 'Kode area pick up', kode_area_tujuan: 'Kode area destinasi', estimated_fields: 'Nominal perkiraan', commissioner: 'Komisioner (lama)',
   project_code: 'Kode klien', project_name: 'Nama klien', client_type: 'Jenis klien', description: 'Keterangan', requires_document: 'Perlu dokumen',
   contract_no: 'No. kontrak', value: 'Nilai kontrak', start_date: 'Tanggal mulai', end_date: 'Tanggal selesai',

@@ -141,7 +141,7 @@ export function RekapTripIsi({ data }: { data: DataRekap }) {
           <dl className="grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
             <Isi label="Rute">{trip.route_name || '—'}{trip.route_code && <span className="tnum text-ink-3"> · {trip.route_code}</span>}</Isi>
             <Isi label="Muat → Bongkar">{trip.muat || '—'} → {trip.bongkar || '—'}</Isi>
-            <Isi label="Patokan UJ">{formatRupiah(trip.ujroute)}</Isi>
+            <Isi label="Patokan Uang Jalan">{formatRupiah(trip.ujroute)}</Isi>
             {!dedicated && <Isi label="Harga">{formatRupiah(trip.harga)}{trip.harga_khusus && <span className="text-ink-3"> (khusus)</span>}</Isi>}
           </dl>
         </section>
@@ -177,7 +177,7 @@ export function RekapTripIsi({ data }: { data: DataRekap }) {
       <section>
         <JudulBagian>Uang jalan</JudulBagian>
         <TabelKecil
-          kolom={[{ label: 'Termin' }, { label: 'Tanggal' }, { label: 'Jenis' }, { label: 'Supir' }, { label: 'UJ', kanan: true }, { label: 'Potong Kasbon', kanan: true }, { label: 'TF ke Supir', kanan: true }]}
+          kolom={[{ label: 'Termin' }, { label: 'Tanggal' }, { label: 'Jenis' }, { label: 'Supir' }, { label: 'Uang Jalan', kanan: true }, { label: 'Potong Kasbon', kanan: true }, { label: 'Transfer ke Supir', kanan: true }]}
           baris={data.termin.map((p) => [p.sequence, formatDate(p.payment_date), labelTermin(p), data.namaKaryawan(p.driver_id), formatRupiah(p.uj_amount), p.kasbon_deduction ? formatRupiah(p.kasbon_deduction) : '—', formatRupiah(p.uj_amount - p.kasbon_deduction)])}
           kosong="Uang jalan belum dicatat."
           kaki={['Total', '', '', '', formatRupiah(angka.uj), formatRupiah(angka.kasbon), formatRupiah(angka.tf)]}
@@ -214,7 +214,7 @@ export function RekapTripIsi({ data }: { data: DataRekap }) {
             <Isi label="Perkiraan netto"><span className={cn('font-semibold', angka.netto < 0 && 'text-[color:var(--color-critical)]')}>{formatRupiah(angka.netto)}</span></Isi>
           </dl>
           {trip.status !== 'selesai' && trip.ujroute > angka.uj && (
-            <p className="mt-1.5 text-[11.5px] text-ink-3">Selama trip belum ditutup, sisa patokan UJ dianggap masih akan dibayar.</p>
+            <p className="mt-1.5 text-[11.5px] text-ink-3">Selama trip belum ditutup, sisa patokan uang jalan dianggap masih akan dibayar.</p>
           )}
         </section>
       </div>
@@ -292,7 +292,7 @@ export function RekapTripDokumen({ data }: { data: DataRekap }) {
     <>
       <JudulCetak>Uang jalan</JudulCetak>
       <TabelCetak
-        kolom={[{ label: 'Termin', lebar: '8%' }, { label: 'Tanggal', lebar: '13%' }, { label: 'Jenis', lebar: '15%' }, { label: 'Supir' }, { label: 'UJ', kanan: true, lebar: '14%' }, { label: 'Potong Kasbon', kanan: true, lebar: '14%' }, { label: 'TF', kanan: true, lebar: '14%' }]}
+        kolom={[{ label: 'Termin', lebar: '8%' }, { label: 'Tanggal', lebar: '13%' }, { label: 'Jenis', lebar: '15%' }, { label: 'Supir' }, { label: 'Uang Jalan', kanan: true, lebar: '14%' }, { label: 'Potong Kasbon', kanan: true, lebar: '14%' }, { label: 'Transfer', kanan: true, lebar: '14%' }]}
         baris={data.termin.map((p) => [p.sequence, formatDate(p.payment_date), labelTermin(p), data.namaKaryawan(p.driver_id), formatRupiah(p.uj_amount), formatRupiah(p.kasbon_deduction), formatRupiah(p.uj_amount - p.kasbon_deduction)])}
         kosong="Uang jalan belum dicatat."
         kaki={['Total', '', '', '', formatRupiah(angka.uj), formatRupiah(angka.kasbon), formatRupiah(angka.tf)]} />

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FaPen, FaPercent, FaTrashCan } from '../../components/ui/icons'
+import { FaPen, FaTrashCan } from '../../components/ui/icons'
 import { Button, IconButton } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import { Modal, ConfirmDialog } from '../../components/ui/Modal'
@@ -12,7 +12,6 @@ import { useData } from '../../store/DataProvider'
 import { useAuth } from '../../store/AuthProvider'
 import { useToast } from '../../store/ToastProvider'
 import { hapusLampiran } from '../../lib/lampiran'
-import { hitungKomisiTrip } from '../../lib/komisi'
 import { formatDate, formatRupiah } from '../../lib/format'
 import { cn } from '../../lib/utils'
 import { EMPLOYEE_ROLES, INTERNAL_COST_TYPES, ROLE_LABEL } from '../../types'
@@ -23,36 +22,13 @@ type Form = Pick<InternalCost, 'cost_type' | 'amount' | 'cost_date' | 'notes' | 
 
 const KOSONG_PENERIMA = { recipient_role: '' as const, recipient_id: '', recipient_name: '' }
 
-/** Komisi satu peran pada trip ini: hasil hitung Aturan Komisi dibanding yang sudah dicatat dibayar. */
-interface KomisiPeran {
-  peran: EmployeeRole
-  judul: string
-  /** Penerima: supir utama / manager trip. Kosong = belum ada. */
-  penerimaId: string
-  penerimaNama: string
-  /** Hasil hitung otomatis dari Aturan Komisi. */
-  nilai: number
-  keterangan: string
-  /** Biaya internal jenis Komisi yang sudah dicatat untuk peran ini. */
-  dicatat: number
-  tanpaPenerima?: string
-}
-
-/** Status pembayaran komisi untuk satu peran. */
-function statusKomisi(k: Pick<KomisiPeran, 'nilai' | 'dicatat'>): { teks: string; nada: 'good' | 'warning' | 'neutral' } {
-  if (k.dicatat > 0 && k.dicatat >= k.nilai) return { teks: 'Sudah dicatat dibayar', nada: 'good' }
-  if (k.nilai > 0) return { teks: 'Belum dibayar', nada: 'warning' }
-  return { teks: 'Tidak ada komisi', nada: 'neutral' }
-}
-
 /**
- * Tab Komisi (dulu Biaya Internal, diganti atasan 13 Okt 2026): komisi supir utama dan manager
- * dihitung otomatis dari Aturan Komisi (hanya Owner yang mengubah aturannya); pembayarannya
- * dicatat sebagai biaya internal jenis "Komisi". Manager trip dipilih di sini (tidak lagi di
- * form trip). Uang makan, kernet, servis, dan biaya internal lain dicatat di bawahnya.
+ * Tab Komisi (dulu Biaya Internal, diganti atasan 13 Okt 2026): pembayaran komisi (biaya internal jenis
+ * "Komisi"), uang makan, kernet, servis, dan sejenisnya. Kotak hitungan komisi supir & manager dari Aturan
+ * Komisi dihapus dulu (Baldy 14 Okt 2026); hasil hitungnya tetap dipakai sebagai acuan nominal di form.
  */
 export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah: boolean }) {
-  const { db, dbAll, create, update, remove, ubahTrip } = useData()
+  const { dbAll, create, update, remove } = useData()
   const { bisa } = useAuth()
   const toast = useToast()
 
@@ -61,8 +37,6 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
   const [form, setForm] = useState<Form>({ cost_type: 'Uang Makan', amount: 0, cost_date: '', notes: '', ...KOSONG_PENERIMA, attachments: [] })
   const [galat, setGalat] = useState<string | null>(null)
   const [menghapus, setMenghapus] = useState<InternalCost | null>(null)
-  /** Isian pilih / ganti manager trip (belum disimpan). */
-  const [aturManager, setAturManager] = useState<{ id: string; nama: string } | null>(null)
 
   const batal = trip.status === 'batal'
   /** Catat biaya internal & pembayaran komisi: Manager & Owner. */
@@ -76,50 +50,7 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
   const total = internals.reduce((a, c) => a + c.amount, 0)
   const drivers = useMemo(() => new Map(dbAll.drivers.map((d) => [d.id, d])), [dbAll.drivers])
 
-  /* ── Komisi supir utama & manager ── */
   const sopirUtama = drivers.get(trip.driver_ids[0] ?? '')
-  const adaManager = !!(trip.manager_id || trip.manager_name)
-  /**
-   * Keterangan aturan komisi manager. Nilainya tetap dari trip.komisi_manager; keterangan
-   * dihitung dengan aturan & dasar yang sama seperti di DataProvider.
-   */
-  const keteranganManager = useMemo(() => {
-    if (batal || !adaManager) return ''
-    return hitungKomisiTrip(db.commissionSchemes, {
-      role: 'manager', layanan: trip.service_type ?? 'callout', konfigurasi: trip.vehicle_config,
-      cost_value: trip.cost_value ?? 0, route_price: trip.route_price, ujroute: trip.ujroute, uj_total: trip.uj_total,
-    }).keterangan
-  }, [batal, adaManager, db.commissionSchemes, trip.service_type, trip.vehicle_config, trip.cost_value, trip.route_price, trip.ujroute, trip.uj_total])
-
-  const dicatatUntuk = (peran: EmployeeRole) =>
-    internals.filter((c) => c.cost_type === 'Komisi' && c.recipient_role === peran).reduce((a, c) => a + c.amount, 0)
-  const komisi: KomisiPeran[] = [
-    {
-      peran: 'sopir', judul: 'Komisi supir', penerimaId: sopirUtama?.id ?? '', penerimaNama: sopirUtama?.driver_name ?? '',
-      nilai: trip.komisi_sopir, keterangan: trip.komisi_keterangan || 'Belum ada aturan komisi yang cocok.', dicatat: dicatatUntuk('sopir'),
-      tanpaPenerima: sopirUtama ? undefined : 'Supir utama belum diisi.',
-    },
-    {
-      peran: 'manager', judul: 'Komisi manager', penerimaId: trip.manager_id, penerimaNama: trip.manager_label,
-      nilai: trip.komisi_manager, keterangan: adaManager ? keteranganManager || 'Belum ada aturan komisi yang cocok.' : '', dicatat: dicatatUntuk('manager'),
-      tanpaPenerima: adaManager ? undefined : 'Trip ini tanpa manager.',
-    },
-  ]
-
-  const managerTerdaftar = useMemo(
-    () => dbAll.drivers.filter((d) => d.role === 'manager' && (d.status === 'aktif' || d.id === trip.manager_id)),
-    [dbAll.drivers, trip.manager_id],
-  )
-  /** Ganti manager trip: Admin ke atas (izin trip), selama trip belum batal. */
-  const bisaAturManager = bisa('trip') && !batal
-
-  function simpanManager() {
-    if (!aturManager) return
-    const nama = aturManager.nama.trim()
-    ubahTrip(trip.id, { manager_id: aturManager.id, manager_name: aturManager.id ? '' : nama })
-    toast.success(aturManager.id || nama ? `Manager trip: ${nama || 'terpilih'}.` : 'Manager trip dikosongkan.')
-    setAturManager(null)
-  }
 
   /** Karyawan sesuai peran; orang di trip ini ditaruh paling atas. */
   const karyawanPeran = useMemo(() => {
@@ -150,16 +81,6 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
           attachments: c.attachments ?? [],
         }
       : { cost_type: 'Uang Makan', amount: 0, cost_date: trip.transaction_date, notes: '', ...KOSONG_PENERIMA, attachments: [] })
-    setGalat(null); setTerbuka(true)
-  }
-
-  /** Form biaya internal terisi: jenis Komisi, peran, penerima dari trip, nominal hasil hitung (dikurangi yang sudah dicatat). */
-  function catatKomisi(k: KomisiPeran) {
-    setEditing(null)
-    setForm({
-      cost_type: 'Komisi', amount: Math.max(0, k.nilai - k.dicatat), cost_date: trip.transaction_date, notes: k.keterangan,
-      recipient_role: k.peran, recipient_id: k.penerimaId, recipient_name: k.penerimaNama, attachments: [],
-    })
     setGalat(null); setTerbuka(true)
   }
 
@@ -217,93 +138,15 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
 
   return (
     <div>
+      {/*
+        Kotak hitungan komisi supir & manager dihapus dulu (Baldy 14 Okt 2026: "ga pasti juga kalau yang dapet
+        komisi mereka doang"). Pembayaran komisi tetap dicatat di tabel ini dengan jenis Komisi.
+      */}
       <KepalaTab
-        judul="Komisi"
+        judul="Biaya internal"
         keterangan={batal
-          ? 'Trip dibatalkan: tidak ada komisi, dan biaya di bawah hanya arsip yang tidak dihitung di laporan.'
-          : 'Komisi supir dan manager dihitung otomatis dari Aturan Komisi; pembayarannya dicatat di sini. Uang makan, kernet, dan biaya internal lain dicatat di bawahnya.'}
-      />
-
-      {!batal && (
-        <section aria-label="Komisi" className="border-b border-hairline px-4 py-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h4 className="flex items-center gap-2 text-[12px] font-semibold tracking-wide text-ink-2 uppercase">
-              <FaPercent size={13} className="text-brand-600" /> Komisi
-            </h4>
-            <Link to="/laporan/komisi?tab=aturan" className="text-[12.5px] font-medium text-brand-700 hover:underline">
-              {bisa('komisi') ? 'Ubah Aturan Komisi' : 'Lihat Aturan Komisi'}
-            </Link>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {komisi.map((k) => {
-              const status = statusKomisi(k)
-              const kurang = Math.max(0, k.nilai - k.dicatat)
-              const terdaftar = k.penerimaId ? drivers.get(k.penerimaId) : undefined
-              return (
-                <div key={k.peran} className="flex flex-col rounded-lg border border-hairline bg-surface p-3.5">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-[12.5px] font-medium text-ink-3">{k.judul}</p>
-                      <p className="tnum mt-1 text-[18px] leading-none font-semibold text-ink">{formatRupiah(k.nilai)}</p>
-                    </div>
-                    <Badge tone={status.nada}>{status.teks}</Badge>
-                  </div>
-                  {k.peran === 'manager' && aturManager ? (
-                    <div className="mt-2 space-y-2">
-                      <PilihKaryawan id="manager-trip" karyawan={managerTerdaftar} valueId={aturManager.id} valueNama={aturManager.nama} peran="manager"
-                        placeholder="Pilih manager trip..." onChange={(mid, nama) => setAturManager({ id: mid, nama })} />
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="primary" onClick={simpanManager}>Simpan manager</Button>
-                        <Button size="sm" variant="ghost" onClick={() => setAturManager(null)}>Batal</Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-[12.5px] text-ink-2">
-                      {k.tanpaPenerima ?? (
-                        <>
-                          untuk{' '}
-                          {terdaftar
-                            ? <Link to={`/master/karyawan/${terdaftar.id}`} className="font-medium text-ink hover:text-brand-700 hover:underline">{terdaftar.driver_name}</Link>
-                            : <span className="font-medium text-ink">{k.penerimaNama}</span>}
-                        </>
-                      )}
-                      {k.peran === 'manager' && bisaAturManager && (
-                        <>
-                          {' · '}
-                          <button type="button" className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800"
-                            onClick={() => setAturManager({ id: trip.manager_id, nama: trip.manager_id ? '' : trip.manager_name })}>
-                            {adaManager ? 'Ganti manager' : 'Pilih manager'}
-                          </button>
-                        </>
-                      )}
-                    </p>
-                  )}
-                  {k.keterangan && <p className="mt-1 text-[11.5px] text-ink-3">{k.keterangan}</p>}
-                  {k.dicatat > 0 && (
-                    <p className={cn('mt-1 text-[11.5px]', k.nilai > 0 && k.dicatat > k.nilai ? 'font-medium text-[#8a6100]' : 'text-ink-3')}>
-                      Sudah dicatat dibayar {formatRupiah(k.dicatat)}
-                      {kurang > 0 ? `, kurang ${formatRupiah(kurang)}` : k.nilai > 0 && k.dicatat > k.nilai ? `, lebih ${formatRupiah(k.dicatat - k.nilai)} dari hasil hitung` : ''}.
-                    </p>
-                  )}
-                  {kurang > 0 && (
-                    <div className="mt-auto">
-                      <Button size="sm" className="mt-3" disabled={!bisaCatat} onClick={() => catatKomisi(k)}>Catat pembayaran komisi</Button>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-          {trip.driver_ids.length > 1 && (
-            <p className="mt-2.5 text-[12px] text-ink-3">Supir pendamping tidak otomatis dapat komisi; bayarkan lewat biaya operasional &ldquo;Double Driver&rdquo; bila ada.</p>
-          )}
-          {!bisa('biaya') && <p className="mt-2.5 text-[12px] text-ink-3">Pembayaran komisi dicatat oleh Manager / Owner.</p>}
-        </section>
-      )}
-
-      <KepalaTab
-        judul="Biaya internal lain"
-        keterangan="Uang makan, kernet, servis, dan sejenisnya. Pembayaran komisi yang sudah dicatat ikut tampil di tabel ini."
+          ? 'Trip dibatalkan: biaya di bawah hanya arsip yang tidak dihitung di laporan.'
+          : 'Pembayaran komisi, uang makan, kernet, servis, dan sejenisnya.'}
         tombol="Tambah Biaya Internal"
         bisaUbah={bisaCatat}
         onTambah={() => buka()}

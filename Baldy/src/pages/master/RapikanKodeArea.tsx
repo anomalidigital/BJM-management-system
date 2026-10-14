@@ -42,7 +42,7 @@ export function ModalRapikanKode({ kelompok, pakai, onClose, onBuka }: {
     onClose()
   }
 
-  const ringkas = (r: Route) => `${tripPerRute.get(r.id) ?? 0} trip · UJ ${formatRupiah(r.ujroute)} · Harga ${formatRupiah(r.price)}`
+  const ringkas = (r: Route) => `${tripPerRute.get(r.id) ?? 0} trip · Uang jalan ${formatRupiah(r.ujroute)} · Harga ${formatRupiah(r.price)}`
 
   return (
     <Modal

@@ -102,10 +102,10 @@ export function PencarianDataTab() {
           <Field label="Customer">
             {(id) => <Input id={id} value={draft.customer} placeholder="PT ..." onChange={(e) => setDraft({ ...draft, customer: e.target.value })} />}
           </Field>
-          <Field label="Tgl Tagih dari">
+          <Field label="Tanggal Tagih dari">
             {(id) => <DateInput id={id} value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} />}
           </Field>
-          <Field label="Tgl Tagih sampai">
+          <Field label="Tanggal Tagih sampai">
             {(id) => <DateInput id={id} value={draft.to} onChange={(e) => setDraft({ ...draft, to: e.target.value })} />}
           </Field>
           <Field label="Jumlah minimal">

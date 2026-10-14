@@ -191,7 +191,7 @@ export function TripListPage() {
   const chips = [
     (f.dari || f.sampai) && { label: `Berangkat ${rentangTanggal(f.dari, f.sampai)}`, lepas: () => filter.lepas('dari', 'sampai') },
     f.status && { label: `Status: ${STATUS_LABEL[f.status as keyof typeof STATUS_LABEL] ?? f.status}`, lepas: () => filter.lepas('status') },
-    f.cetak && { label: f.cetak === 'tercetak' ? `${karawang ? 'BA' : 'SJ'} sudah dicetak` : `${karawang ? 'BA' : 'SJ'} belum dicetak`, lepas: () => filter.lepas('cetak') },
+    f.cetak && { label: f.cetak === 'tercetak' ? `${karawang ? 'Berita Acara' : 'Surat Jalan'} sudah dicetak` : `${karawang ? 'Berita Acara' : 'Surat Jalan'} belum dicetak`, lepas: () => filter.lepas('cetak') },
     f.supir && { label: `Supir: ${namaSupir.get(f.supir) ?? '—'}`, lepas: () => filter.lepas('supir') },
     f.klien && { label: `Klien: ${db.projects.find((p) => p.id === f.klien)?.project_code ?? '—'}`, lepas: () => filter.lepas('klien') },
     f.layanan && { label: `Layanan: ${CLIENT_TYPE_LABEL[f.layanan as keyof typeof CLIENT_TYPE_LABEL] ?? f.layanan}`, lepas: () => filter.lepas('layanan') },
@@ -389,7 +389,7 @@ export function TripListPage() {
                       </Select>
                     )}
                   </Field>
-                  <Field label={`Cetak ${karawang ? 'BA' : 'SJ'}`}>
+                  <Field label={`Cetak ${karawang ? 'Berita Acara' : 'Surat Jalan'}`}>
                     {(id) => (
                       <Select id={id} value={d.cetak} onChange={(e) => filter.ubah({ cetak: e.target.value })}>
                         <option value="">Semua</option>

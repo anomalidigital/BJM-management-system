@@ -71,7 +71,7 @@ export function TabLainnya({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah:
       {dokumen.length === 0 ? (
         <KosongTab
           judul="Belum ada dokumen trip."
-          keterangan="Unggah BA bertanda tangan, surat jalan, atau foto untuk trip ini."
+          keterangan="Unggah Berita Acara bertanda tangan, surat jalan, atau foto untuk trip ini."
         />
       ) : (
         <div className="overflow-x-auto">
@@ -114,7 +114,7 @@ export function TabLainnya({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah:
       >
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Judul" required className="sm:col-span-2">
-            {(fid) => <Input id={fid} value={form.title} placeholder="BA bertanda tangan penerima" onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />}
+            {(fid) => <Input id={fid} value={form.title} placeholder="Berita Acara bertanda tangan penerima" onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />}
           </Field>
           <Field label="Tanggal" required>
             {(fid) => <DateInput id={fid} value={form.note_date} onChange={(e) => setForm((f) => ({ ...f, note_date: e.target.value }))} />}

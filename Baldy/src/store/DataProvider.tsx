@@ -456,7 +456,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (cara === 'kasbon') {
         create('kasbonEntries', {
           employee_id: p.driver_id, entry_date: hariIni, kind: 'pembatalan', amount: tf,
-          trip_id: tripId, uj_payment_id: p.id, notes: `UJ termin ${p.sequence} trip ${no} tidak dikembalikan, jadi kasbon`, attachments: [],
+          trip_id: tripId, uj_payment_id: p.id, notes: `Uang jalan termin ${p.sequence} trip ${no} tidak dikembalikan, jadi kasbon`, attachments: [],
         })
       }
     }

@@ -95,7 +95,7 @@ export const KELAS_TH = 'px-4 py-2 text-[11.5px] font-semibold tracking-wide whi
 /** Garis atas baris total di kaki tabel (ikut menempel di bawah saat digulir). */
 export const GARIS_TOTAL = { boxShadow: 'inset 0 1px 0 var(--color-hairline)' } as const
 
-/** Deretan angka berhubungan, mis. Uang jalan - Potong kasbon = TF ke supir. */
+/** Deretan angka berhubungan, mis. Uang jalan - Potong kasbon = Transfer ke supir. */
 export function RumusAngka({ suku }: { suku: Array<{ label: string; nilai: number; operator?: '+' | '−' | '='; tebal?: boolean }> }) {
   return (
     <div className="flex flex-wrap items-end gap-x-3 gap-y-1.5">
@@ -208,8 +208,8 @@ export function LapUangJalanPage({
 
   const meta = [
     { label: 'Jumlah termin', value: formatNumber(total.n) },
-    { label: 'Total UJ', value: formatRupiah(total.uj) },
-    { label: 'Total TF ke supir', value: formatRupiah(total.tf) },
+    { label: 'Total Uang Jalan', value: formatRupiah(total.uj) },
+    { label: 'Total transfer ke supir', value: formatRupiah(total.tf) },
   ]
 
   if (preview && tampil === 'supir') {
@@ -226,7 +226,7 @@ export function LapUangJalanPage({
                   <PrintTable cols={[
                     { label: 'No.', align: 'right', width: '6%' }, { label: 'Supir' },
                     { label: 'Trip', align: 'right', width: '9%' }, { label: 'Termin', align: 'right', width: '9%' },
-                    { label: 'UJ (Rp)', align: 'right' }, { label: 'Potong Kasbon (Rp)', align: 'right' }, { label: 'TF (Rp)', align: 'right' },
+                    { label: 'Uang Jalan (Rp)', align: 'right' }, { label: 'Potong Kasbon (Rp)', align: 'right' }, { label: 'Transfer (Rp)', align: 'right' },
                   ]}>
                     {rows.map((r, ri) => (
                       <PRow key={r.id}>
@@ -274,7 +274,7 @@ export function LapUangJalanPage({
                     { label: 'No.', align: 'right', width: '5%' }, { label: 'Tanggal', width: '9%' },
                     { label: labelId, width: karawang ? '17%' : '11%' }, { label: 'Supir' }, { label: 'Mobil', width: '10%' },
                     { label: 'Ke-', align: 'right', width: '5%' }, { label: 'Jenis', width: '10%' },
-                    { label: 'UJ (Rp)', align: 'right' }, { label: 'Kasbon (Rp)', align: 'right' }, { label: 'TF (Rp)', align: 'right' },
+                    { label: 'Uang Jalan (Rp)', align: 'right' }, { label: 'Kasbon (Rp)', align: 'right' }, { label: 'Transfer (Rp)', align: 'right' },
                   ]}>
                     {rows.map((p, ri) => (
                       <PRow key={p.id}>
@@ -330,7 +330,7 @@ export function LapUangJalanPage({
         <RumusAngka suku={[
           { label: 'Uang jalan dibayar', nilai: total.uj },
           { label: 'Potong kasbon', nilai: total.kasbon, operator: '−' },
-          { label: 'TF ke supir', nilai: total.tf, operator: '=', tebal: true },
+          { label: 'Transfer ke supir', nilai: total.tf, operator: '=', tebal: true },
         ]} />
       </div>
 
@@ -357,7 +357,7 @@ export function LapUangJalanPage({
           <table className="w-full text-[13px]">
             <thead className="sticky top-0 z-10 bg-sunken">
               <tr>
-                {['Supir', 'Trip', 'Termin', 'Uang Jalan', 'Potong Kasbon', 'TF ke Supir'].map((h, i) => (
+                {['Supir', 'Trip', 'Termin', 'Uang Jalan', 'Potong Kasbon', 'Transfer ke Supir'].map((h, i) => (
                   <th key={h} className={cn(KELAS_TH, i === 0 ? 'text-left' : 'text-right')}>{h}</th>
                 ))}
               </tr>
@@ -391,7 +391,7 @@ export function LapUangJalanPage({
           <table className="w-full text-[13px]">
             <thead className="sticky top-0 z-10 bg-sunken">
               <tr>
-                {['Tanggal', 'Trip', 'Supir', 'Mobil', 'Ke-', 'Jenis', 'Uang Jalan', 'Potong Kasbon', 'TF ke Supir'].map((h, i) => (
+                {['Tanggal', 'Trip', 'Supir', 'Mobil', 'Ke-', 'Jenis', 'Uang Jalan', 'Potong Kasbon', 'Transfer ke Supir'].map((h, i) => (
                   <th key={h} className={cn(KELAS_TH, i === 4 || i >= 6 ? 'text-right' : 'text-left')}>{h}</th>
                 ))}
               </tr>

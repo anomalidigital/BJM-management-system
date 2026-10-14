@@ -176,7 +176,7 @@ export function TripDetailPage() {
     internal: internal.length,
     lainnya: dbAll.tripNotes.filter((n) => n.trip_id === trip.id).length,
   }
-  // Patokan UJ Rute hanya dibandingkan dengan termin jenis uang jalan biasa; uang dorong,
+  // Patokan Uang Jalan Rute hanya dibandingkan dengan termin jenis uang jalan biasa; uang dorong,
   // uang pulang, dan tambahan memang di luar patokan (sama dengan aturan tab Uang Jalan).
   const ujBiasa = termin.filter((p) => (p.jenis ?? 'uj') === 'uj').reduce((a, p) => a + p.uj_amount, 0)
   const sisaUj = trip.ujroute - ujBiasa
@@ -212,7 +212,7 @@ export function TripDetailPage() {
   const arsip = batal ? ' · arsip' : ''
   const kartu: Array<{ label: string; nilai: string; ket: string; tab?: TabId; acuan?: boolean }> = [
     {
-      label: 'Total UJ', nilai: formatRupiah(angka.uj), tab: 'uj',
+      label: 'Total Uang Jalan', nilai: formatRupiah(angka.uj), tab: 'uj',
       ket: trip.ujroute > 0 && !batal
         ? (sisaUj >= 0 ? `patokan ${formatRupiah(trip.ujroute)} · sisa ${formatRupiah(sisaUj)}` : `lebih ${formatRupiah(-sisaUj)} dari patokan`)
         : `${hitung.uj} termin${arsip}`,
@@ -230,7 +230,7 @@ export function TripDetailPage() {
         ket: trip.toll > 0 ? `patokan rute ${formatRupiah(trip.toll)}` : 'dari biaya operasional jenis Tol',
       },
     { label: 'Potong Kasbon', nilai: formatRupiah(angka.kasbon), ket: `dari kasbon supir${arsip}`, tab: 'uj' },
-    { label: 'TF ke Supir', nilai: formatRupiah(angka.uj - angka.kasbon), ket: `UJ − Potong Kasbon${arsip}`, tab: 'uj' },
+    { label: 'Transfer ke Supir', nilai: formatRupiah(angka.uj - angka.kasbon), ket: `Uang Jalan − Potong Kasbon${arsip}`, tab: 'uj' },
     {
       label: 'Biaya Operasional', nilai: formatRupiah(angka.biaya), tab: 'biaya',
       ket: karawang
@@ -298,7 +298,7 @@ export function TripDetailPage() {
               <ul className="mt-1 list-disc pl-5 text-[12.5px]">
                 {trip.cancel_settlement.map((x) => (
                   <li key={x.uj_payment_id}>
-                    TF {formatRupiah(x.tf)} {namaSupir(x.driver_id)}: {x.cara === 'kasbon' ? 'dijadikan kasbon' : 'dikembalikan tunai'}
+                    Transfer {formatRupiah(x.tf)} {namaSupir(x.driver_id)}: {x.cara === 'kasbon' ? 'dijadikan kasbon' : 'dikembalikan tunai'}
                   </li>
                 ))}
               </ul>

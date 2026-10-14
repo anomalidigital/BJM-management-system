@@ -200,7 +200,7 @@ export function KlienDetailPage() {
     ['Kontrak Aktif', String(aktif.length), `dari ${kontrak.length} kontrak di ${meta.label}`],
     ['Nilai Kontrak Aktif', formatRupiah(aktif.reduce((a, c) => a + c.value, 0)), 'total nilai kontrak berjalan'],
     ['Sisa Kontrak Aktif', formatRupiah(aktif.reduce((a, c) => a + c.sisa, 0)), 'nilai dikurangi biaya trip kontrak'],
-    ['Jumlah Trip', String(tripDihitung.length), `total UJ ${formatRupiah(tripDihitung.reduce((a, t) => a + t.uj_total, 0))}`],
+    ['Jumlah Trip', String(tripDihitung.length), `total uang jalan ${formatRupiah(tripDihitung.reduce((a, t) => a + t.uj_total, 0))}`],
   ] : [
     ['Jumlah Trip', String(tripDihitung.length), `di ${meta.label}, tanpa trip batal`],
     ['Pendapatan', formatRupiah(tripDihitung.reduce((a, t) => a + t.harga, 0)), 'jumlah harga trip'],

@@ -211,7 +211,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
         return {
           value: r.id,
           label: r.route_name || r.route_code,
-          meta: [pemilik ? `Klien ${pemilik.project_code}` : '', r.feet, `UJ ${formatRupiah(r.ujroute)}`].filter(Boolean).join(' · '),
+          meta: [pemilik ? `Klien ${pemilik.project_code}` : '', r.feet, `Uang jalan ${formatRupiah(r.ujroute)}`].filter(Boolean).join(' · '),
           keywords: `${r.route_code} ${r.feet} ${pemilik?.project_code ?? ''} ${pemilik?.project_name ?? ''}`,
         }
       })
@@ -789,7 +789,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                       </p>
                       <dl className="mt-2 grid grid-cols-3 gap-x-4 gap-y-1.5">
                         {([
-                          ['UJ Rute (patokan)', selectedRoute.ujroute],
+                          ['Uang Jalan Rute (patokan)', selectedRoute.ujroute],
                           ['Uang Tol (patokan)', selectedRoute.toll ?? 0],
                           ['Harga Rute', selectedRoute.price],
                         ] as const).map(([k, v]) => (
@@ -987,7 +987,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
               </Field>
               </>)}
               {tampilBon && (<>
-              <Field label="Tgl Bon">
+              <Field label="Tanggal Bon">
                 {(fid) => <DateInput id={fid} value={form.bon_date ?? ''} onChange={(e) => set('bon_date', e.target.value || null)} />}
               </Field>
               <Field label="Bon Pribadi">
@@ -1018,7 +1018,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
             {form.transaction_no || 'nomor belum diisi'}
             {' · '}
             {dedicated ? `Dedicated ${kontrak?.contract_no ?? '(kontrak belum dipilih)'}` : `${idTerisi.length} ID Perjalanan/Trip`}
-            {selectedRoute && <> · patokan UJ {formatRupiah(selectedRoute.ujroute)}</>}
+            {selectedRoute && <> · patokan uang jalan {formatRupiah(selectedRoute.ujroute)}</>}
           </p>
           <div className="ml-auto flex items-center gap-2">
             <Button onClick={() => navigate(existing ? `/transaksi/trip/${existing.id}` : '/transaksi/trip')}>Batal</Button>

@@ -193,7 +193,7 @@ export function KlienPage() {
       )),
     },
     { key: 'trip', header: 'Trip', sortable: true, align: 'right', width: '80px', render: (p) => <span className="tnum text-ink-2">{formatNumber(p.trip)}</span> },
-    { key: 'uj', header: 'Total UJ', sortable: true, align: 'right', width: '140px', render: (p) => <span className="tnum text-ink-2">{formatRupiah(p.uj)}</span> },
+    { key: 'uj', header: 'Total Uang Jalan', sortable: true, align: 'right', width: '140px', render: (p) => <span className="tnum text-ink-2">{formatRupiah(p.uj)}</span> },
     {
       key: 'status', header: 'Status', sortable: true, width: '104px',
       render: (p) => (p.status === 'aktif' ? <Badge tone="good">Aktif</Badge> : <Badge tone="neutral">Nonaktif</Badge>),

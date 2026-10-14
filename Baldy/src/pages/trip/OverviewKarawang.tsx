@@ -106,7 +106,7 @@ export function OverviewKarawang({ trip }: { trip: TransactionRow }) {
         <Card>
           <CardHeader
             title="Trip"
-            actions={trip.printed_at ? <Badge tone="good">BA tercetak {formatDate(trip.printed_at)}</Badge> : <Badge tone="warning">Berita Acara belum dicetak</Badge>}
+            actions={trip.printed_at ? <Badge tone="good">Berita Acara tercetak {formatDate(trip.printed_at)}</Badge> : <Badge tone="warning">Berita Acara belum dicetak</Badge>}
           />
           {/* ID Trip = Kode Trip (atasan 13 Okt 2026); ID Perjalanan ada di Add Items Details. */}
           <div className="border-b border-hairline px-4 py-3">
@@ -239,7 +239,7 @@ export function OverviewKarawang({ trip }: { trip: TransactionRow }) {
           {trip.route_code ? (
             <dl className="grid grid-cols-2 gap-4 p-4">
               <InfoItem label="No. Rute" value={<span className="break-all whitespace-normal">{trip.route_code}</span>} mono />
-              <InfoItem label="UJ Rute" value={formatRupiah(trip.ujroute)} mono />
+              <InfoItem label="Uang Jalan Rute" value={formatRupiah(trip.ujroute)} mono />
               <InfoItem label="Uang Tol (patokan)" value={formatRupiah(trip.toll)} mono />
               <InfoItem label="Harga Rute" value={formatRupiah(trip.route_price)} mono />
             </dl>

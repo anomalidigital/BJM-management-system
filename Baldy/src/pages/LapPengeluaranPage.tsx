@@ -309,8 +309,8 @@ function PengeluaranPerTrip({
                     { label: 'No.', align: 'right', width: '4%' }, { label: 'Tanggal', width: '8%' },
                     { label: karawang ? 'ID Trip' : 'No. Trip', width: karawang ? '11%' : '9%' },
                     { label: 'Mobil / Supir', width: '12%' }, { label: 'Rute' },
-                    { label: 'Uang Jalan', align: 'right' }, { label: 'Potong Kasbon', align: 'right' }, { label: 'Biaya dari UJ', align: 'right' },
-                    { label: 'Dibayar Prsh.', align: 'right' }, { label: 'Internal', align: 'right' }, { label: 'Total Keluar', align: 'right' },
+                    { label: 'Uang Jalan', align: 'right' }, { label: 'Potong Kasbon', align: 'right' }, { label: 'Biaya dari Uang Jalan', align: 'right' },
+                    { label: 'Dibayar Perusahaan', align: 'right' }, { label: 'Internal', align: 'right' }, { label: 'Total Keluar', align: 'right' },
                     { label: 'Ditagihkan', align: 'right' },
                   ]}>
                     {isi.map((r, ri) => (
@@ -352,7 +352,7 @@ function PengeluaranPerTrip({
   }
 
   const adaHarian = harian.values.some((v) => v > 0)
-  const kolom = ['Trip', 'Mobil · Supir', 'Uang Jalan', 'Potong Kasbon', 'Biaya dari UJ', 'Dibayar Prsh.', 'Biaya Internal', 'Total Keluar', 'Ditagihkan ke Klien']
+  const kolom = ['Trip', 'Mobil · Supir', 'Uang Jalan', 'Potong Kasbon', 'Biaya dari Uang Jalan', 'Dibayar Perusahaan', 'Biaya Internal', 'Total Keluar', 'Ditagihkan ke Klien']
 
   return (
     <Card>
@@ -425,7 +425,7 @@ function PengeluaranPerTrip({
             </table>
           </div>
           <p className="border-t border-hairline px-4 py-2.5 text-[12px] leading-relaxed text-ink-3">
-            Total Keluar = Uang Jalan + Dibayar Prsh. + Biaya Internal. Potong Kasbon dan Biaya dari UJ hanya keterangan (sudah termasuk
+            Total Keluar = Uang Jalan + Dibayar Perusahaan + Biaya Internal. Potong Kasbon dan Biaya dari Uang Jalan hanya keterangan (sudah termasuk
             di Uang Jalan); angka “×” = jumlah termin. Ditagihkan ke Klien = biaya di jalan yang ditagih kembali lewat PI.
           </p>
         </>
