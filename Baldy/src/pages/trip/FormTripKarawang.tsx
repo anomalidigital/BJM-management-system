@@ -1,15 +1,13 @@
 import { useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FaFloppyDisk, FaPen, FaPlus, FaPrint, FaXmark } from '../../components/ui/icons'
+import { FaFloppyDisk, FaPlus, FaPrint, FaXmark } from '../../components/ui/icons'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { Card } from '../../components/ui/Card'
 import { Button, IconButton } from '../../components/ui/Button'
 import { DateInput, Field, Input } from '../../components/ui/Field'
-import { CurrencyInput } from '../../components/ui/CurrencyInput'
 import { SearchableSelect } from '../../components/ui/SearchableSelect'
 import type { Option } from '../../components/ui/SearchableSelect'
-import { LampiranInput } from '../../components/ui/Lampiran'
 import { useData } from '../../store/DataProvider'
 import { useAuth } from '../../store/AuthProvider'
 import { useToast } from '../../store/ToastProvider'
@@ -53,7 +51,7 @@ interface Isian {
   kosongan: string
 }
 
-type Galat = Partial<Record<'klien' | 'contract_id' | 'transaction_date' | 'vehicle_id' | 'route_id' | 'override_note', string>>
+type Galat = Partial<Record<'klien' | 'contract_id' | 'transaction_date' | 'vehicle_id' | 'route_id', string>>
 
 /** Field trip yang tidak diisi di form ini (milik Priok / dokumen / penutupan), untuk trip baru. */
 const FIELD_LAIN = {
@@ -147,7 +145,6 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
   const sudahJalan = mode === 'edit' && tripSudahJalan(existing?.status)
   const [bukaKunci, setBukaKunci] = useState(false)
   const kunci = sudahJalan && !bukaKunci
-  const [ubahHarga, setUbahHarga] = useState(false)
   const [tambahRute, setTambahRute] = useState(false)
   /** Form Tambah Alamat dari dropdown Pick Up / Destination, dengan ketikan pencarian sebagai nama. */
   const [tambahAlamat, setTambahAlamat] = useState<{ sisi: 'pengirim' | 'penerima'; nama: string; kode?: string } | null>(null)
@@ -314,7 +311,6 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
    */
   function pilihRute(routeId: string | null, ruteBaru?: Route) {
     const baru = ruteBaru ?? (routeId ? ruteMap.get(routeId) : undefined)
-    const lama = ruteMap.get(f.route_id)
     const a = baru ? kodeAreaRute(baru) : { asal: '', tujuan: '' }
     const ikutRute = (sisi: 'pengirim' | 'penerima') => !f[sisi] || !!otomatis[sisi]
     const isi = (sisi: 'pengirim' | 'penerima', kode: string) =>
@@ -324,12 +320,13 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
     setF({
       ...f,
       route_id: baru?.id ?? '',
-      harga: !f.harga || f.harga === (lama?.price ?? 0) ? baru?.price ?? 0 : f.harga,
+      // Harga selalu ikut rute (Baldy 14 Okt 2026: harga diubah di Master Rute, bukan di trip).
+      harga: baru?.price ?? 0,
       pengirim,
       penerima,
     })
     setOtomatis((o) => ({ ...o, pengirim: ikutRute('pengirim') && !!pengirim, penerima: ikutRute('penerima') && !!penerima }))
-    hapusGalat('route_id', 'override_note')
+    hapusGalat('route_id')
   }
 
   /** Kode area rute yang belum punya alamat: dipakai sebagai kode area alamat baru. */
@@ -375,8 +372,8 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
   const hapusItem = (i: number) => ubah({ muatan: f.muatan.length > 1 ? f.muatan.filter((_, n) => n !== i) : [itemKosong()] })
 
   /* ── Harga ────────────────────────────────────────────── */
+  /** Trip lama yang tersimpan dengan harga khusus: tetap ditampilkan apa adanya, tidak bisa diubah di sini. */
   const hargaBeda = !dedicated && !!rute && f.harga > 0 && f.harga !== rute.price
-  const tampilHarga = !dedicated && !!rute && bolehOverride && (ubahHarga || hargaBeda)
 
   /* ── Validasi & simpan ────────────────────────────────── */
   function validasi(): boolean {
@@ -390,7 +387,6 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
     const tahan = tahanKendaraan(f.vehicle_id)
     if (tahan) e.vehicle_id = `Kendaraan ini masih di trip ${tahan.id_tampil} dan belum kembali ke pool. Pilih kendaraan lain, atau catat dulu kendaraannya kembali di pool pada trip itu.`
     if (!dedicated && wajib(!!existing?.route_id) && !f.route_id) e.route_id = 'Rute wajib dipilih.'
-    if (hargaBeda && !f.override_note.trim() && (mode === 'create' || f.harga !== existing?.cost_value)) e.override_note = 'Tulis alasan harga berbeda dari Harga Rute.'
     setGalat(e)
     return Object.keys(e).length === 0
   }
@@ -701,34 +697,17 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
                       </NilaiInfo>
                     )}
                   </dl>
-                  {!dedicated && bolehOverride && !tampilHarga && !kunci && (
+                  {!dedicated && (
                     <p className="mt-2 text-[11.5px] text-brand-700">
-                      Harga beda dari rute? <TombolTeks onClick={() => setUbahHarga(true)}><FaPen size={10} className="mr-1 inline" />Ubah harga trip ini</TombolTeks>
+                      {hargaBeda
+                        ? `Harga khusus tersimpan di trip ini (Harga Rute ${formatRupiah(rute.price)}). Memilih rute lagi memakai Harga Rute.`
+                        : 'Harga mengikuti rute. Perubahan harga dilakukan di Master Rute.'}
                     </p>
                   )}
                 </KotakInfo>
               )}
             </div>
 
-            {tampilHarga && rute && (
-              <div className="grid gap-4 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
-                <Field label="Harga Trip" hint={f.harga === rute.price ? 'Sama dengan Harga Rute.' : <>Harga Rute {formatRupiah(rute.price)} · <TombolTeks onClick={() => { ubah({ harga: rute.price, override_note: '' }); setUbahHarga(false); hapusGalat('override_note') }}>Pakai Harga Rute</TombolTeks></>}>
-                  {(fid) => <CurrencyInput id={fid} value={f.harga} disabled={kunci} onValueChange={(v) => ubah({ harga: v })} />}
-                </Field>
-                <Field label="Alasan & bukti persetujuan harga" error={galat.override_note}
-                  hint={galat.override_note ? undefined : hargaBeda ? 'Wajib diisi karena harga berbeda dari Harga Rute.' : 'Diisi bila harga diganti.'}>
-                  {(fid) => (
-                    <div className="space-y-2">
-                      <Input id={fid} value={f.override_note} invalid={!!galat.override_note} placeholder="mis. trailer lowbed, harga nego klien"
-                        onChange={(e) => { ubah({ override_note: e.target.value }); hapusGalat('override_note') }} />
-                      {bisa('bukti') && hargaBeda && (
-                        <LampiranInput label="Tambah bukti" value={f.override_attachments} onChange={(v) => ubah({ override_attachments: v })} />
-                      )}
-                    </div>
-                  )}
-                </Field>
-              </div>
-            )}
             <div className="grid gap-x-4 gap-y-5 md:grid-cols-2">
               <PilihAlamatTrip
                 label="Pick Up Details"

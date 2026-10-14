@@ -251,7 +251,7 @@ function IsiModalRute({ onClose, rute: editing = null, awal, keterangan, pesanSu
             {(id) => <CurrencyInput id={id} value={form.toll} invalid={!!errors.toll} onValueChange={(v) => setForm({ ...form, toll: v })} />}
           </Field>
           <Field label="Harga" required={hargaWajib} error={errors.price} className="sm:col-span-2"
-            hint={errors.price ? undefined : masihKira('price') ? 'Masih perkiraan.' : 'Harga ke klien per trip.'}>
+            hint={errors.price ? undefined : masihKira('price') ? 'Masih perkiraan.' : editing ? 'Harga baru berlaku untuk trip berikutnya; trip yang sudah ada tetap.' : 'Harga ke klien per trip.'}>
             {(id) => <CurrencyInput id={id} value={form.price} invalid={!!errors.price} onValueChange={(v) => setForm({ ...form, price: v })} />}
           </Field>
         </div>
