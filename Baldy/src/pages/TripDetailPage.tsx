@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { FaArrowLeft, FaBan, FaClipboardCheck, FaFlagCheckered, FaPen, FaPrint, FaRoute, FaTrashCan, FaWarehouse } from '../components/ui/icons'
+import { FaArrowLeft, FaBan, FaClipboardCheck, FaFlagCheckered, FaPen, FaPrint, FaTrashCan, FaWarehouse } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import type { Crumb } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
@@ -249,11 +249,8 @@ export function TripDetailPage() {
 
   const menuLain: MenuAction[] = [
     ...(karawang ? [
+      // Backload / lanjutan hanya dari menu ⋯ daftar trip (Baldy 14 Okt 2026), tidak dari detail.
       { label: 'Rekap Trip', icon: <FaClipboardCheck size={14} />, onSelect: () => setRekap(true) },
-      {
-        label: 'Ada Backload / Lanjutan', icon: <FaRoute size={14} />,
-        disabled: !bisaUbah || !trip.vehicle_id, onSelect: () => navigate(`/transaksi/trip/tambah?backload=${trip.id}`),
-      },
     ] : []),
     ...(belumDiPool ? [{ label: 'Tandai mobil di pool', icon: <FaWarehouse size={14} />, disabled: !bisa('trip'), onSelect: tandaiPool }] : []),
     { label: 'Hapus Trip', icon: <FaTrashCan size={14} />, tone: 'danger', disabled: !bisa('hapus'), onSelect: () => setMenghapus(true) },
@@ -316,18 +313,13 @@ export function TripDetailPage() {
             <span>
               <span className="font-semibold">Mobil belum tercatat kembali di pool, jadi belum bisa dipakai trip lain.</span>
               {trip.ada_backload
-                ? <span className="block text-[12.5px]">Trip ini ditandai ada backload / lanjutan: buat tripnya dengan mobil yang sama, atau tandai sudah di pool bila tidak jadi.</span>
+                ? <span className="block text-[12.5px]">Trip ini ditandai ada backload / lanjutan: buat tripnya lewat menu ⋯ di daftar trip, atau tandai sudah di pool bila tidak jadi.</span>
                 : trip.plate_number && <span className="block text-[12.5px]">{trip.plate_number} masih tertahan di trip ini sejak ditutup{trip.closed_at ? ` ${formatDate(trip.closed_at)}` : ''}.</span>}
             </span>
           </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" icon={<FaRoute size={14} />} disabled={!bisaUbah || !trip.vehicle_id} onClick={() => navigate(`/transaksi/trip/tambah?backload=${trip.id}`)}>
-              Ada Backload / Lanjutan
-            </Button>
-            <Button size="sm" variant="primary" icon={<FaWarehouse size={14} />} disabled={!bisa('trip')} onClick={tandaiPool}>
-              Tandai sudah di pool
-            </Button>
-          </div>
+          <Button size="sm" variant="primary" icon={<FaWarehouse size={14} />} disabled={!bisa('trip')} onClick={tandaiPool}>
+            Tandai sudah di pool
+          </Button>
         </div>
       )}
 
