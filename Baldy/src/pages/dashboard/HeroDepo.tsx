@@ -7,7 +7,7 @@ import { STATUS_LABEL } from '../trip/status'
 export const URUT_TUMPUK = ['selesai', 'aktif', 'menunggu_sopir', 'draft'] as const
 export type StatusPapan = (typeof URUT_TUMPUK)[number]
 
-/** Warna status di atas papan gelap: hijau beres, biru di jalan, kuning perlu sopir, abu belum mulai. */
+/** Warna status di atas papan gelap: hijau beres, biru di jalan, kuning perlu supir, abu belum mulai. */
 export const WARNA_STATUS: Record<StatusPapan, string> = {
   selesai: '#46c58a',
   aktif: '#6fb5ff',
@@ -46,6 +46,7 @@ export function HeroDepo({
   jumlahLalu,
   deltaTrip,
   perStatus,
+  tanpaDraft = false,
   batal,
   hari,
   sopirBertugas,
@@ -62,11 +63,13 @@ export function HeroDepo({
   /** Persen perubahan jumlah trip dari bulan lalu; null bila bulan lalu kosong. */
   deltaTrip: number | null
   perStatus: Record<StatusPapan, number>
+  /** Karawang tidak memakai Draft: sembunyikan dari keterangan bila jumlahnya 0. */
+  tanpaDraft?: boolean
   batal: number
   hari: HariPapan[]
   sopirBertugas: number
   sopirAktif: number
-  /** Semua karyawan (sopir + manager), seperti kartu "Total Sopir Aktif" dulu. */
+  /** Semua karyawan (supir + manager), seperti kartu "Total Sopir Aktif" dulu. */
   karyawanAktif: number
   karyawanTotal: number
   mobilTerpakai: number
@@ -79,10 +82,12 @@ export function HeroDepo({
     ? `, ${selisih > 0 ? 'naik' : 'turun'} ${Math.abs(deltaTrip).toFixed(1).replace('.', ',')}%`
     : ''
   const angka: Array<[string, number, string]> = [
-    ['Sopir bertugas', sopirBertugas, `dari ${formatNumber(sopirAktif)} sopir aktif`],
+    ['Supir bertugas', sopirBertugas, `dari ${formatNumber(sopirAktif)} supir aktif`],
     ['Karyawan aktif', karyawanAktif, `dari ${formatNumber(karyawanTotal)} terdaftar`],
     ['Mobil terpakai', mobilTerpakai, `dari ${formatNumber(mobilTotal)} aktif`],
   ]
+  /** Status yang dijelaskan di keterangan papan. */
+  const tampil = URUT_TUMPUK.filter((s) => !(tanpaDraft && s === 'draft'))
   const ringkas = URUT_TUMPUK.filter((s) => perStatus[s] > 0)
     .map((s) => `${perStatus[s]} ${STATUS_LABEL[s].toLowerCase()}`)
     .join(', ')
@@ -131,7 +136,7 @@ export function HeroDepo({
             ))}
           </div>
           <ul className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-[12.5px] text-nav-ink">
-            {URUT_TUMPUK.map((s) => (
+            {tampil.map((s) => (
               <li key={s} className="flex items-center gap-1.5">
                 <span className="size-2.5 rounded-[2px]" style={isi(s)} aria-hidden="true" />
                 {STATUS_LABEL[s]}
@@ -184,7 +189,7 @@ export function HeroDepo({
             ))}
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[12px] text-nav-ink">
-            <span>Satu kotak = satu trip, ditumpuk per tanggal. Kotak kosong = draft.</span>
+            <span>Satu kotak = satu trip, ditumpuk per tanggal.{!tanpaDraft && ' Kotak kosong = draft.'}</span>
             <Link to="/transaksi/trip" className="font-medium text-white underline decoration-white/30 underline-offset-4 hover:decoration-white">
               Buka daftar trip
             </Link>

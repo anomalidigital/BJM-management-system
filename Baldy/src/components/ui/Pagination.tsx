@@ -1,5 +1,6 @@
 import { FaChevronLeft, FaChevronRight } from './icons'
 import { cn } from '../../lib/utils'
+import { Select } from './Field'
 
 interface Props {
   page: number
@@ -10,6 +11,7 @@ interface Props {
   pageSizeOptions?: number[]
 }
 
+/** Navigasi halaman tabel (Bootstrap .pagination). */
 export function Pagination({ page, pageSize, total, onPageChange, onPageSizeChange, pageSizeOptions = [10, 25, 50, 100] }: Props) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1
@@ -27,54 +29,42 @@ export function Pagination({ page, pageSize, total, onPageChange, onPageSizeChan
           <span className="font-semibold text-ink-2">{total}</span> data
         </p>
         {onPageSizeChange && (
-          <select
+          <Select
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
             aria-label="Jumlah baris per halaman"
-            className="h-7 cursor-pointer rounded-md border border-hairline bg-surface px-1.5 text-[12px] text-ink-2 focus:outline-none"
+            ukuran="sm"
+            className="w-36"
           >
             {pageSizeOptions.map((n) => (
               <option key={n} value={n}>
                 {n} / halaman
               </option>
             ))}
-          </select>
+          </Select>
         )}
       </div>
 
-      <nav className="flex items-center gap-1" aria-label="Navigasi halaman">
-        <button
-          type="button"
-          onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1}
-          aria-label="Halaman sebelumnya"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-hairline text-ink-2 transition hover:bg-sunken disabled:pointer-events-none disabled:opacity-40"
-        >
-          <FaChevronLeft size={15} />
-        </button>
-        {numbers.map((n) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => onPageChange(n)}
-            aria-current={n === page ? 'page' : undefined}
-            className={cn(
-              'tnum inline-flex h-7 min-w-7 items-center justify-center rounded-md border px-1.5 text-[12.5px] font-medium transition',
-              n === page ? 'border-brand-500 bg-brand-500 text-white' : 'border-hairline text-ink-2 hover:bg-sunken',
-            )}
-          >
-            {n}
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => onPageChange(page + 1)}
-          disabled={page >= totalPages}
-          aria-label="Halaman berikutnya"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-hairline text-ink-2 transition hover:bg-sunken disabled:pointer-events-none disabled:opacity-40"
-        >
-          <FaChevronRight size={15} />
-        </button>
+      <nav aria-label="Navigasi halaman">
+        <ul className="pagination pagination-sm">
+          <li className={cn('page-item', page <= 1 && 'disabled')}>
+            <button type="button" className="page-link" onClick={() => onPageChange(page - 1)} disabled={page <= 1} aria-label="Halaman sebelumnya">
+              <FaChevronLeft size={13} />
+            </button>
+          </li>
+          {numbers.map((n) => (
+            <li key={n} className={cn('page-item', n === page && 'active')}>
+              <button type="button" className="page-link" onClick={() => onPageChange(n)} aria-current={n === page ? 'page' : undefined}>
+                {n}
+              </button>
+            </li>
+          ))}
+          <li className={cn('page-item', page >= totalPages && 'disabled')}>
+            <button type="button" className="page-link" onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} aria-label="Halaman berikutnya">
+              <FaChevronRight size={13} />
+            </button>
+          </li>
+        </ul>
       </nav>
     </div>
   )

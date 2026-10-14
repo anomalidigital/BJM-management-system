@@ -30,9 +30,8 @@ const KONTRAK_KOSONG: FormKontrak = { contract_no: '', value: 0, start_date: '',
 type BarisKontrak = Contract & { trip: number; terpakai: number; sisa: number; komisi: number }
 
 /**
- * Master -> Klien -> satu klien. Klien kontrak: kontrak Dedicated dan sisanya
- * (nilai kontrak dikurangi uang jalan & biaya trip kontrak itu). Klien tetap:
- * ringkasan trip dan pendapatannya.
+ * Master -> Klien -> satu klien. Klien Dedicated: kontraknya dan sisanya (nilai kontrak
+ * dikurangi uang jalan & biaya trip kontrak itu). Klien Callout: ringkasan trip dan pendapatannya.
  */
 export function KlienDetailPage() {
   const { id } = useParams()
@@ -98,7 +97,7 @@ export function KlienDetailPage() {
 
   const aktif = kontrak.filter((c) => c.status === 'aktif')
   const tripDihitung = tripKlien.filter((t) => t.status !== 'batal')
-  const klienKontrak = klien.client_type === 'kontrak'
+  const klienKontrak = klien.client_type === 'dedicated'
 
   function openCreate() {
     setEditing(null)
@@ -215,7 +214,7 @@ export function KlienDetailPage() {
         title={klien.project_name}
         description={[
           klien.project_code,
-          CLIENT_TYPE_LABEL[klien.client_type ?? 'tetap'],
+          CLIENT_TYPE_LABEL[klien.client_type ?? 'callout'],
           klien.requires_document ? 'Pakai TR / No PI' : 'Tanpa dokumen',
           klien.status === 'aktif' ? 'Aktif' : 'Nonaktif',
           klien.description,
@@ -259,10 +258,10 @@ export function KlienDetailPage() {
       </Card>
       ) : (
         <Card className="mb-4 px-4 py-3.5">
-          <p className="text-[13px] font-semibold text-ink">Klien tetap, tanpa kontrak</p>
+          <p className="text-[13px] font-semibold text-ink">Klien Callout, tanpa kontrak</p>
           <p className="mt-1 text-[12.5px] leading-relaxed text-ink-3">
-            Trip klien ini order per perjalanan (layanan Callout). Bila perusahaan ini memakai jasa lewat kontrak,
-            ubah jenisnya menjadi Klien kontrak di <Link to="/master/klien" className="text-brand-700 hover:underline">daftar Klien</Link>.
+            Trip klien ini order per perjalanan. Bila perusahaan ini memakai jasa lewat kontrak,
+            ubah tipe layanannya menjadi Dedicated di <Link to="/master/klien" className="text-brand-700 hover:underline">daftar Klien</Link>.
           </p>
         </Card>
       )}

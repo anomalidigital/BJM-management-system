@@ -24,6 +24,10 @@ import { LapNettoPage } from './pages/LapNettoPage'
 import { LapRitanPage } from './pages/LapRitanPage'
 import { ToolsPage } from './pages/ToolsPage'
 import { PeranPage } from './pages/PeranPage'
+import { DataAlamatPage } from './pages/master/DataAlamatPage'
+import { LapPiutangPage } from './pages/LapPiutangPage'
+import { DokumenPage } from './pages/DokumenPage'
+import { AuditLogPage } from './pages/AuditLogPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
 /** Tautan lama Surat Jalan -> trip hasil penggabungannya (id-nya dipertahankan). */
@@ -49,9 +53,11 @@ export function App() {
                   <Route path="/master/karyawan/:id" element={<KaryawanTransaksiPage />} />
                   <Route path="/master/sopir" element={<Navigate to="/master/karyawan" replace />} />
                   <Route path="/master/mobil" element={<DataMobilPage />} />
-                  <Route path="/master/route" element={<DataRoutePage />} />
+                  <Route path="/master/rute" element={<DataRoutePage />} />
+                  <Route path="/master/route" element={<Navigate to="/master/rute" replace />} />
                   <Route path="/master/klien" element={<KlienPage />} />
                   <Route path="/master/klien/:id" element={<KlienDetailPage />} />
+                  <Route path="/master/alamat" element={<DataAlamatPage />} />
                   {/* Alamat lama: Data Project kini Klien, dan kontrak dikelola di halaman klien */}
                   <Route path="/master/project" element={<Navigate to="/master/klien" replace />} />
                   <Route path="/master/kontrak" element={<Navigate to="/master/klien" replace />} />
@@ -74,12 +80,18 @@ export function App() {
                   <Route path="/laporan/netto" element={<LapNettoPage />} />
                   <Route path="/laporan/ritan" element={<LapRitanPage />} />
                   <Route path="/laporan/pengeluaran" element={<LapPengeluaranPage />} />
+                  <Route path="/laporan/piutang-karyawan" element={<LapPiutangPage />} />
                   {/* Alamat lama: rekap uang jalan dan biaya kini tab di Pengeluaran */}
                   <Route path="/laporan/uang-jalan" element={<Navigate to="/laporan/pengeluaran?tab=uj" replace />} />
                   <Route path="/laporan/biaya" element={<Navigate to="/laporan/pengeluaran?tab=biaya" replace />} />
 
                   <Route path="/pencarian/sijo" element={<SijoSearchPage />} />
-                  <Route path="/admin/peran" element={<PeranPage />} />
+                  <Route path="/dokumen" element={<DokumenPage />} />
+                  <Route path="/pengaturan/pengguna" element={<PeranPage />} />
+                  <Route path="/pengaturan/audit-log" element={<AuditLogPage />} />
+                  {/* Alamat lama: User & Roles kini Pengaturan -> Pengguna & Peran */}
+                  <Route path="/admin/peran" element={<Navigate to="/pengaturan/pengguna" replace />} />
+                  {/* Tools tidak ada di menu atasan; dibuka dari menu akun di kanan atas */}
                   <Route path="/tools" element={<ToolsPage />} />
                   <Route path="*" element={<NotFoundPage />} />
                 </Route>

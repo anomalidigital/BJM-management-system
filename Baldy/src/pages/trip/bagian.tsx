@@ -1,19 +1,30 @@
 import type { ReactNode } from 'react'
-import { FaPlus } from '../../components/ui/icons'
+import { FaCircleInfo, FaPlus, FaTriangleExclamation } from '../../components/ui/icons'
 import { Button } from '../../components/ui/Button'
 import { cn } from '../../lib/utils'
 
-/** Baris keterangan + tombol tambah di atas tabel tiap tab. */
-export function KepalaTab({ keterangan, tombol, bisaUbah, onTambah }: {
+/**
+ * Baris judul / keterangan + tombol tambah di atas tabel tiap tab.
+ * Judul dan tombol boleh kosong: tanpa `tombol` / `onTambah` tidak ada tombol tambah.
+ */
+export function KepalaTab({ judul, keterangan, tombol, bisaUbah = false, onTambah, className }: {
+  /** Judul bagian, mis. "Komisi & biaya internal lain". */
+  judul?: ReactNode
   keterangan: ReactNode
-  tombol: string
-  bisaUbah: boolean
-  onTambah: () => void
+  tombol?: string
+  bisaUbah?: boolean
+  onTambah?: () => void
+  className?: string
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-4 py-3">
-      <p className="max-w-3xl text-[12.5px] text-ink-3">{keterangan}</p>
-      <Button size="sm" variant="primary" icon={<FaPlus size={14} />} disabled={!bisaUbah} onClick={onTambah}>{tombol}</Button>
+    <div className={cn('flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-4 py-3', className)}>
+      <div className="max-w-3xl min-w-0">
+        {judul && <h3 className="text-[13.5px] font-semibold text-ink">{judul}</h3>}
+        <div className={cn('text-[12.5px] text-ink-3', judul ? 'mt-0.5' : undefined)}>{keterangan}</div>
+      </div>
+      {tombol && onTambah && (
+        <Button size="sm" variant="primary" icon={<FaPlus size={14} />} disabled={!bisaUbah} onClick={onTambah}>{tombol}</Button>
+      )}
     </div>
   )
 }
@@ -48,7 +59,7 @@ export function KepalaTabel({ kolom }: { kolom: Kolom[] }) {
   )
 }
 
-/** Tombol kecil "Pakai ..." untuk mengisi nilai acuan dari route. */
+/** Tombol kecil "Pakai ..." untuk mengisi nilai acuan dari rute. */
 export function PakaiNilai({ label, onClick }: { label: ReactNode; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className="font-semibold text-brand-700 underline decoration-brand-200 underline-offset-2 hover:decoration-brand-500">
@@ -60,4 +71,28 @@ export function PakaiNilai({ label, onClick }: { label: ReactNode; onClick: () =
 export function PesanGalat({ children }: { children?: ReactNode }) {
   if (!children) return null
   return <p className="text-[12px] font-medium text-[color:var(--color-critical)]">{children}</p>
+}
+
+/**
+ * Kotak penjelasan kecil di dalam tab atau form. Nada "peringatan" untuk hal yang
+ * belum bisa disimpan tanpa persetujuan Manager / Owner.
+ */
+export function KotakInfo({ nada = 'info', children, className }: {
+  nada?: 'info' | 'peringatan'
+  children: ReactNode
+  className?: string
+}) {
+  const Ikon = nada === 'peringatan' ? FaTriangleExclamation : FaCircleInfo
+  return (
+    <div
+      className={cn(
+        'flex items-start gap-2 rounded-lg border px-3.5 py-3 text-[12.5px] leading-relaxed',
+        nada === 'peringatan' ? 'border-[#f6e2ac] bg-[#fff8e6] text-[#8a6100]' : 'border-brand-100 bg-brand-50 text-brand-800',
+        className,
+      )}
+    >
+      <Ikon size={14} className="mt-[3px] shrink-0" />
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  )
 }

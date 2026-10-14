@@ -1,3 +1,11 @@
+> **Arsip, tidak diperbarui lagi (12 Oktober 2026).** Dokumen ini catatan riwayat skema prototipe
+> dari Agustus sampai 7 Oktober 2026. Acuan terbaru untuk tim backend adalah
+> [KONTRAK-DATA.md](KONTRAK-DATA.md) (entitas, field, enum, penomoran, endpoint) dan
+> [ATURAN-BISNIS.md](ATURAN-BISNIS.md) (rumus dan aturan, dengan contoh angka). Sebagian isi di bawah
+> sudah tidak berlaku, misalnya workspace `jakarta` / `tangerang` (kini `priok` / `karawang`), jenis biaya
+> "Uang Dorong" / "Uang Pulang" (kini termin uang jalan), dan Batalkan Trip yang menghapus catatan
+> (kini catatan tetap disimpan sebagai arsip). Isi lama sengaja tidak dihapus.
+
 # Database Schema — SIKOTIS
 
 Relational schema untuk Phase 2. Prototype saat ini memakai bentuk yang sama di

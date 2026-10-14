@@ -5,7 +5,7 @@
  * Mutasi "trip" tertaut ke termin uang jalan yang memotong kasbon, sehingga
  * mengubah atau menghapus termin ikut memperbarui kasbon.
  */
-import type { CommissionTransaction, KasbonEntry, KasbonKind, UjPayment } from '../types'
+import type { CommissionTransaction, JenisPiutang, KasbonEntry, KasbonKind, UjPayment } from '../types'
 
 export function saldoKasbon(entries: KasbonEntry[], employeeId: string, kecualiUjId = ''): number {
   return entries.reduce(
@@ -21,8 +21,18 @@ export function petaSaldoKasbon(entries: KasbonEntry[]): Map<string, number> {
   return m
 }
 
-/** Arah bawaan tiap jenis mutasi; manual dipilih pengguna. */
-export const ARAH_KASBON: Record<KasbonKind, 1 | -1 | 0> = { admin: 1, trip: -1, pembatalan: 1, manual: 0 }
+/** Arah bawaan tiap jenis mutasi; manual ikut tanda nominalnya. */
+export const ARAH_KASBON: Record<KasbonKind, 1 | -1 | 0> = { admin: 1, trip: -1, pembatalan: 1, lunas: -1, manual: 0 }
+
+/** Jenis di layar: Piutang (utang bertambah) atau Lunas (pelunasan). */
+export const jenisPiutang = (e: Pick<KasbonEntry, 'amount'>): JenisPiutang => (e.amount > 0 ? 'piutang' : 'lunas')
+
+/**
+ * Nilai dari sisi karyawan (permintaan atasan 13 Okt 2026): piutang tampil minus, pelunasan
+ * plus, dan saldo minus berarti karyawan masih punya piutang. Data tetap disimpan dari sisi
+ * perusahaan (positif = utang karyawan), jadi tanda dibalik hanya saat ditampilkan.
+ */
+export const sisiKaryawan = (amount: number) => (amount === 0 ? 0 : -amount)
 
 /**
  * Susun mutasi kasbon dari data lama.

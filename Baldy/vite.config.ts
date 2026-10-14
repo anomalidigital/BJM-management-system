@@ -25,6 +25,12 @@ export default defineConfig(({ command }) => ({
       },
     },
   ],
+  css: {
+    preprocessorOptions: {
+      // Bootstrap 5.3 masih memakai @import Sass; peringatan penghentiannya tidak relevan untuk kita.
+      scss: { quietDeps: true, silenceDeprecations: ['import', 'global-builtin', 'color-functions', 'if-function'] },
+    },
+  },
   server: {
     port: 5180,
     open: false,

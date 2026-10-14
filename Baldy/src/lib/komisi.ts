@@ -68,7 +68,7 @@ export interface DataTripKomisi {
 }
 
 /** Nilai dasar sebelum potongan, sesuai dasar hitung aturan. */
-/** Harga trip: harga yang diisi di trip, atau Harga route bila kosong. Dasar komisi & pendapatan. */
+/** Harga trip: harga yang diisi di trip, atau Harga Rute bila kosong. Dasar komisi & pendapatan. */
 export const hargaTrip = (t: { cost_value: number; route_price: number }): number => (t.cost_value > 0 ? t.cost_value : t.route_price)
 
 export function dasarTrip(basis: CommissionScheme['basis'], t: DataTripKomisi): number {

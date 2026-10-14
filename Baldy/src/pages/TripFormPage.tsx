@@ -92,7 +92,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
   const navigate = useNavigate()
   const { db, dbAll, transactionRows, buatTrip, ubahTrip } = useData()
   const { bisa, user } = useAuth()
-  /** Admin, Manager, Owner boleh input trip; mengubah harga di luar Harga route hanya Manager & Owner. */
+  /** Admin, Manager, Owner boleh input trip; mengubah harga di luar Harga Rute hanya Manager & Owner. */
   const bolehSimpan = bisa('trip')
   const bolehOverride = bisa('override')
   const toast = useToast()
@@ -220,7 +220,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     () => db.contracts
       .filter((c) => c.status === 'aktif' || c.id === form.contract_id)
       // Klien kontrak sudah dipilih: tampilkan kontrak miliknya saja.
-      .filter((c) => !form.project_id || klienMap.get(form.project_id)?.client_type !== 'kontrak' || c.project_id === form.project_id)
+      .filter((c) => !form.project_id || klienMap.get(form.project_id)?.client_type !== 'dedicated' || c.project_id === form.project_id)
       .map((c) => {
         const klien = klienMap.get(c.project_id)
         return {
@@ -322,7 +322,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     // Rute yang baru ditambahkan dari form ini belum ada di daftar render ini.
     const route = ruteBaru ?? db.routes.find((r) => r.id === routeId)
     const klienRute = klienMap.get(route?.project_id ?? '')
-    const kontrakKlien = klienRute?.client_type === 'kontrak'
+    const kontrakKlien = klienRute?.client_type === 'dedicated'
       ? db.contracts.filter((c) => c.project_id === klienRute.id && c.status === 'aktif')
       : []
     if (form.service_type === 'callout' && kontrakKlien.length > 0) {
@@ -423,7 +423,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
     if (dedicated && !form.contract_id) e.contract_id = 'Layanan Dedicated wajib memilih nomor kontrak.'
     const rute = db.routes.find((r) => r.id === form.route_id)
     if (!dedicated && rute && form.cost_value > 0 && form.cost_value !== rute.price && !(form.override_note ?? '').trim() && form.cost_value !== existing?.cost_value)
-      e.override_note = 'Tulis alasan harga berbeda dari Harga route.'
+      e.override_note = 'Tulis alasan harga berbeda dari Harga Rute.'
     if (wajibRoute && !form.route_id) e.route_id = 'Rute wajib dipilih.'
     if (wajibKendaraan && !form.vehicle_id) e.vehicle_id = 'No. Kendaraan wajib dipilih.'
     if (wajibSopir && !form.driver_ids.some(Boolean)) e.driver_ids = 'Pilih minimal satu sopir, atau ubah status ke Menunggu Sopir.'
@@ -505,17 +505,17 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
   })
   const sisaKontrak = kontrak ? kontrak.value - (terpakaiKontrak.get(kontrak.id) ?? 0) : 0
 
-  /** Harga trip: terisi dari Harga route, boleh diubah bila harga trip ini beda. */
+  /** Harga trip: terisi dari Harga Rute, boleh diubah bila harga trip ini beda. */
   const hargaOverride = !!selectedRoute && form.cost_value > 0 && form.cost_value !== selectedRoute.price
   const petunjukHarga: ReactNode = !bolehOverride
-    ? 'Mengikuti Harga route. Harga berbeda perlu Manager atau Owner.'
+    ? 'Mengikuti Harga Rute. Harga berbeda perlu Manager atau Owner.'
     : !selectedRoute
-    ? 'Terisi dari Harga route setelah rute dipilih. Dasar komisi & pendapatan.'
+    ? 'Terisi dari Harga Rute setelah rute dipilih. Dasar komisi & pendapatan.'
     : !form.cost_value
-      ? <>Kosong: memakai Harga route {formatRupiah(selectedRoute.price)} · <PakaiNilai label="Isi" onClick={() => set('cost_value', selectedRoute.price)} /></>
+      ? <>Kosong: memakai Harga Rute {formatRupiah(selectedRoute.price)} · <PakaiNilai label="Isi" onClick={() => set('cost_value', selectedRoute.price)} /></>
       : form.cost_value === selectedRoute.price
-        ? 'Sama dengan Harga route. Ubah bila harga trip ini beda; komisi & pendapatan ikut harga ini.'
-        : <>Harga khusus trip ini (Harga route {formatRupiah(selectedRoute.price)}) · <PakaiNilai label="Pakai Harga route" onClick={() => set('cost_value', selectedRoute.price)} /></>
+        ? 'Sama dengan Harga Rute. Ubah bila harga trip ini beda; komisi & pendapatan ikut harga ini.'
+        : <>Harga khusus trip ini (Harga Rute {formatRupiah(selectedRoute.price)}) · <PakaiNilai label="Pakai Harga Rute" onClick={() => set('cost_value', selectedRoute.price)} /></>
 
   /** Callout: klien ikut rute. Dedicated: klien ikut kontrak, yang terpilih sendiri bila klien rute hanya punya satu. */
   function gantiLayanan(l: ServiceType) {
@@ -613,7 +613,8 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
       )}
 
       {sudahJalan && existing && (
-        <KunciTrip status={existing.status} terbuka={bukaKunci} bolehBuka={bolehOverride} onBuka={() => setBukaKunci(true)} />
+        <KunciTrip status={existing.status} terbuka={bukaKunci} bolehBuka={bolehOverride} onBuka={() => setBukaKunci(true)}
+          isian="rute, layanan & kontrak, kendaraan, supir, dan nomor trip" />
       )}
 
       <div className="mb-4">
@@ -736,7 +737,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                   : kunci ? 'Dikunci karena trip sudah jalan.'
                   : !selectedRoute ? (dedicated ? 'Opsional untuk Dedicated: patokan uang jalan & tujuan.' : 'Klien, Harga, dan patokan uang jalan ikut rute.')
                   : routeProject ? `Klien ${routeProject.project_name} ikut rute ini. UJROUTE jadi patokan uang jalan.`
-                  : <>Rute ini belum punya klien. Lengkapi di menu <Link to="/master/route" className="text-brand-700 underline">Rute</Link> supaya trip tercatat ke klien.</>}
+                  : <>Rute ini belum punya klien. Lengkapi di menu <Link to="/master/rute" className="text-brand-700 underline">Rute</Link> supaya trip tercatat ke klien.</>}
               >
                 {(fid) => (
                   <SearchableSelect
@@ -764,7 +765,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
               )}
               {!dedicated && hargaOverride && bolehOverride && (
                 <Field label="Alasan & bukti persetujuan" error={errors.override_note}
-                  hint={errors.override_note ? undefined : 'Harga berbeda dari Harga route: catat alasannya dan lampirkan bukti persetujuan.'}>
+                  hint={errors.override_note ? undefined : 'Harga berbeda dari Harga Rute: catat alasannya dan lampirkan bukti persetujuan.'}>
                   {(fid) => (
                     <div className="space-y-2">
                       <Input id={fid} value={form.override_note ?? ''} placeholder="mis. nego klien, harga khusus proyek"
@@ -788,9 +789,9 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
                       </p>
                       <dl className="mt-2 grid grid-cols-3 gap-x-4 gap-y-1.5">
                         {([
-                          ['UJROUTE (patokan)', selectedRoute.ujroute],
+                          ['UJ Rute (patokan)', selectedRoute.ujroute],
                           ['Uang Tol (patokan)', selectedRoute.toll ?? 0],
-                          ['Harga route', selectedRoute.price],
+                          ['Harga Rute', selectedRoute.price],
                         ] as const).map(([k, v]) => (
                           <div key={k}>
                             <dt className="text-[11px] font-semibold tracking-wide text-brand-700/80 uppercase">{k}</dt>
@@ -1004,7 +1005,7 @@ function TripForm({ mode }: { mode: 'create' | 'edit' }) {
       <ModalRute
         open={tambahRute}
         onClose={() => setTambahRute(false)}
-        awal={{ project_id: form.project_id }}
+        awal={{}}
         keterangan="Rute baru langsung dipilih untuk trip ini. Tanda * wajib diisi."
         pesanSukses={(r) => `Rute ${r.route_name} tersimpan dan dipilih untuk trip ini.`}
         onSaved={(r) => applyRoute(r.id, r)}

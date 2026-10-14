@@ -1,3 +1,5 @@
+/* Urutan layer: Bootstrap (src/styles/bootstrap.scss) di atas preflight Tailwind, di bawah utilitas. */
+@layer theme, base, bootstrap, components, utilities;
 @import "tailwindcss";
 /* Ikon Font Awesome Free: CSS dasarnya masuk layer base agar kelas Tailwind tetap bisa menimpa. */
 @import "@fortawesome/fontawesome-svg-core/styles.css" layer(base);

@@ -74,7 +74,9 @@ export function LineChart({ labels, series, height = 210 }: { labels: string[]; 
 
         {labels.map((l, i) => {
           const every = Math.ceil(labels.length / Math.max(3, Math.floor(innerW / 62)))
-          if (i % every !== 0 && i !== labels.length - 1) return null
+          const akhir = labels.length - 1
+          // Label terakhir selalu tampil; label reguler yang terlalu dekat dengannya dilewati supaya tidak bertumpuk.
+          if (i !== akhir && (i % every !== 0 || akhir - i < every)) return null
           return (
             <text key={`${l}-${i}`} x={x(i)} y={height - 6} textAnchor="middle" fontSize={10.5} fill={VIZ.muted}>
               {l}

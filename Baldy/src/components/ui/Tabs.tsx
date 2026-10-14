@@ -7,6 +7,7 @@ export interface TabItem {
   badge?: ReactNode
 }
 
+/** Tab bergaris bawah (Bootstrap .nav-underline); bisa digeser di layar sempit. */
 export function Tabs({
   items,
   value,
@@ -19,8 +20,7 @@ export function Tabs({
   className?: string
 }) {
   return (
-    // Garis bawah memakai bayangan dalam supaya tab bisa digeser di layar sempit tanpa garis aktifnya terpotong.
-    <div role="tablist" className={cn('gulir-tanpa-bilah flex items-end gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-hairline)]', className)}>
+    <div role="tablist" className={cn('nav nav-underline', className)}>
       {items.map((t) => {
         const active = t.id === value
         return (
@@ -30,24 +30,10 @@ export function Tabs({
             type="button"
             aria-selected={active}
             onClick={() => onChange(t.id)}
-            className={cn(
-              'inline-flex shrink-0 items-center gap-2 border-b-2 px-3.5 py-2.5 text-[13px] font-medium whitespace-nowrap transition-colors',
-              active
-                ? 'border-brand-500 text-brand-700'
-                : 'border-transparent text-ink-3 hover:border-hairline hover:text-ink',
-            )}
+            className={cn('nav-link', active && 'active')}
           >
             {t.label}
-            {t.badge != null && (
-              <span
-                className={cn(
-                  'tnum rounded-full px-1.5 py-px text-[11px] font-semibold',
-                  active ? 'bg-brand-100 text-brand-700' : 'bg-sunken text-ink-3',
-                )}
-              >
-                {t.badge}
-              </span>
-            )}
+            {t.badge != null && <span className="jumlah">{t.badge}</span>}
           </button>
         )
       })}

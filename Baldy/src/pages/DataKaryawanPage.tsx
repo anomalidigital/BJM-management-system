@@ -1,41 +1,56 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FaPen, FaPlus, FaTrashCan, FaXmark } from '../components/ui/icons'
+import { FaPen, FaPlus, FaTrashCan } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
 import type { Column } from '../components/ui/DataTable'
 import { Pagination } from '../components/ui/Pagination'
-import { FilterField, SearchInput, Toolbar } from '../components/ui/Toolbar'
+import { PanelFilter, SearchInput, Toolbar } from '../components/ui/Toolbar'
 import { Button, DetailButton, IconButton } from '../components/ui/Button'
 import { Modal, ConfirmDialog } from '../components/ui/Modal'
 import { Field, Input, Select } from '../components/ui/Field'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState, NotFoundState } from '../components/ui/States'
-import { LampiranInput, LampiranThumbs } from '../components/ui/Lampiran'
+import { DokumenPentingInput, ringkasDokumen } from '../components/ui/DokumenPenting'
+import { NilaiPiutang } from '../components/ui/NilaiPiutang'
 import { useData } from '../store/DataProvider'
 import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
 import { useTable } from '../lib/useTable'
+import { useFilter } from '../lib/useFilter'
 import { matchesQuery } from '../lib/utils'
-import { formatRupiah } from '../lib/format'
 import { kodeKaryawanBerikut } from '../lib/kode'
+import { sisiKaryawan } from '../lib/kasbon'
 import { KodeInput } from '../components/ui/KodeInput'
-import { EMPLOYEE_ROLES, ROLE_LABEL } from '../types'
-import type { Driver, EmployeeRole } from '../types'
+import { DOKUMEN_KARYAWAN, EMPLOYEE_ROLES, ROLE_LABEL } from '../types'
+import type { DokumenPenting, Driver, EmployeeRole } from '../types'
 
-type FormState = Omit<Driver, 'id' | 'created_at' | 'updated_at'>
+type FormState = Omit<Driver, 'id' | 'created_at' | 'updated_at' | 'dokumen'> & { dokumen: Record<string, DokumenPenting> }
 
 const BLANK: FormState = {
   driver_code: '', driver_name: '', role: 'sopir', address_1: '', address_2: '', city: '', phone: '', status: 'aktif',
-  attachments: [],
+  dokumen: {}, attachments: [],
 }
 
-type Baris = Driver & { saldo: number }
+type Baris = Driver & {
+  /** Saldo piutang dari sisi karyawan: minus = masih punya piutang. */
+  saldo: number
+  /** Jumlah dokumen penting yang sudah diunggah (urut kolom Dokumen). */
+  jumlahDok: number
+}
+
+/** Dokumen penting tersimpan tanpa slot kosong (tidak ada berkas & tanggal). */
+function rapikanDokumen(d: Record<string, DokumenPenting>): Record<string, DokumenPenting> | undefined {
+  const isi = Object.entries(d).filter(([, v]) => v.berkas.length > 0 || v.berlaku_sampai)
+    .map(([k, v]) => [k, { berkas: v.berkas, ...(v.berlaku_sampai ? { berlaku_sampai: v.berlaku_sampai } : {}) }] as const)
+  return isi.length ? Object.fromEntries(isi) : undefined
+}
 
 /**
- * Master -> Data Karyawan (dulu Data Sopir).
- * Setiap karyawan punya kasbon sendiri; ikon kasbon membuka halaman transaksinya.
+ * Master -> Supir / Karyawan. Revisi 13 Okt 2026: tanpa status lunas / belum lunas, piutang
+ * tampil merah bertanda minus; dokumen penting (KTP, SIM, KK, NPWP) punya tempat upload sendiri
+ * di form, terpisah dari dokumen lainnya. Transaksi piutang dicatat di menu Piutang Karyawan.
  */
 export function DataKaryawanPage() {
   const { db, saldoKasbon, loading, error, reload, create, update, remove } = useData()
@@ -48,12 +63,15 @@ export function DataKaryawanPage() {
   const [form, setForm] = useState<FormState>(BLANK)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
   const [deleting, setDeleting] = useState<Driver | null>(null)
-  const [peran, setPeran] = useState('')
-  const [status, setStatus] = useState('')
-  const [piutang, setPiutang] = useState('')
+  const filter = useFilter({ peran: '', status: '', piutang: '', dokumen: '' })
+  const { peran, status, piutang, dokumen } = filter.nilai
+  const d = filter.draf
 
   const baris = useMemo<Baris[]>(
-    () => db.drivers.map((d) => ({ ...d, role: d.role ?? 'sopir', saldo: saldoKasbon.get(d.id) ?? 0 })),
+    () => db.drivers.map((d) => ({
+      ...d, role: d.role ?? 'sopir', saldo: sisiKaryawan(saldoKasbon.get(d.id) ?? 0),
+      jumlahDok: ringkasDokumen(DOKUMEN_KARYAWAN, d.dokumen).ada.length,
+    })),
     [db.drivers, saldoKasbon],
   )
 
@@ -62,11 +80,16 @@ export function DataKaryawanPage() {
     [],
   )
   const extraFilter = useCallback(
-    (d: Baris) => (!peran || d.role === peran) && (!status || d.status === status) &&
-      (!piutang || (piutang === 'ada' ? d.saldo > 0 : d.saldo <= 0)),
-    [peran, status, piutang],
+    (d: Baris) => {
+      const r = ringkasDokumen(DOKUMEN_KARYAWAN, d.dokumen)
+      return (!peran || d.role === peran) && (!status || d.status === status)
+        && (!piutang || (piutang === 'ada' ? d.saldo < 0 : d.saldo >= 0))
+        && (!dokumen || (dokumen === 'kurang' ? r.ada.length < r.total : r.habis.length + r.segera.length > 0))
+    },
+    [peran, status, piutang, dokumen],
   )
-  const filterAktif = Boolean(peran || status || piutang)
+  const jumlahFilter = [peran, status, piutang, dokumen].filter(Boolean).length
+  const filterAktif = jumlahFilter > 0
   const table = useTable(baris, { search, extraFilter, extraFilterActive: filterAktif, initialSortKey: 'driver_code', pageSize: 10 })
 
   /** Kode berikutnya untuk peran tertentu, mis. SPR040 atau MGR002. */
@@ -83,7 +106,7 @@ export function DataKaryawanPage() {
     setEditing(d)
     setForm({
       driver_code: d.driver_code, driver_name: d.driver_name, role: d.role ?? 'sopir', address_1: d.address_1,
-      address_2: d.address_2, city: d.city, phone: d.phone, status: d.status, attachments: d.attachments ?? [],
+      address_2: d.address_2, city: d.city, phone: d.phone, status: d.status, dokumen: { ...(d.dokumen ?? {}) }, attachments: d.attachments ?? [],
     })
     setErrors({})
     setFormOpen(true)
@@ -114,7 +137,8 @@ export function DataKaryawanPage() {
 
   function onSubmit() {
     if (!validate()) return
-    const payload = { ...form, driver_code: form.driver_code.trim().toUpperCase(), driver_name: form.driver_name.trim() }
+    const { dokumen: dok, ...lain } = form
+    const payload = { ...lain, dokumen: rapikanDokumen(dok), driver_code: form.driver_code.trim().toUpperCase(), driver_name: form.driver_name.trim() }
     if (editing) {
       update('drivers', editing.id, payload)
       toast.success('Data berhasil diperbarui.')
@@ -132,8 +156,14 @@ export function DataKaryawanPage() {
     setDeleting(null)
   }
 
+  const chips = [
+    peran && { label: `Peran: ${ROLE_LABEL[peran as EmployeeRole] ?? peran}`, lepas: () => filter.lepas('peran') },
+    status && { label: `Status: ${status === 'aktif' ? 'Aktif' : 'Nonaktif'}`, lepas: () => filter.lepas('status') },
+    piutang && { label: piutang === 'ada' ? 'Masih punya piutang' : 'Tidak punya piutang', lepas: () => filter.lepas('piutang') },
+    dokumen && { label: dokumen === 'kurang' ? 'Dokumen belum lengkap' : 'Dokumen habis / segera habis', lepas: () => filter.lepas('dokumen') },
+  ]
   function resetFilter() {
-    table.reset(); setPeran(''); setStatus(''); setPiutang('')
+    table.reset(); filter.lepasSemua()
   }
 
   const columns: Column<Baris>[] = [
@@ -147,20 +177,36 @@ export function DataKaryawanPage() {
       key: 'address_1', header: 'Alamat', sortable: true,
       render: (d) => {
         const alamat = [d.address_1, d.address_2].filter(Boolean).join(', ')
-        return <span className="text-ink-2">{alamat || '—'}</span>
+        return (
+          <span className="block leading-tight">
+            <span className="text-ink-2">{alamat || '—'}</span>
+            {d.city && <span className="mt-0.5 block text-[12px] text-ink-3">{d.city}</span>}
+          </span>
+        )
       },
     },
-    { key: 'city', header: 'Kota', sortable: true, width: '120px', render: (d) => <span className="text-ink-2">{d.city || '—'}</span> },
-    { key: 'attachments', header: 'Dokumen', width: '120px', render: (d) => <LampiranThumbs ids={d.attachments ?? []} ukuran={28} /> },
     {
-      // Piutang karyawan = sisa kasbon yang belum terpotong.
-      key: 'saldo', header: 'Piutang', sortable: true, align: 'right', width: '150px',
-      render: (d) => (
-        <div className="flex flex-col items-end gap-1">
-          <span className={d.saldo > 0 ? 'tnum font-semibold text-ink' : 'tnum text-ink-3'}>{formatRupiah(d.saldo)}</span>
-          {d.saldo > 0 ? <Badge tone="warning">Belum lunas</Badge> : <Badge tone="good">Lunas</Badge>}
-        </div>
-      ),
+      key: 'jumlahDok', header: 'Dokumen', sortable: true, width: '150px',
+      render: (d) => {
+        const r = ringkasDokumen(DOKUMEN_KARYAWAN, d.dokumen)
+        const lain = (d.attachments ?? []).length
+        return (
+          <span className="block leading-tight">
+            <span className={r.ada.length ? 'text-ink-2' : 'text-ink-3'}>{r.ada.length ? r.ada.join(', ') : 'Belum ada'}</span>
+            {(r.habis.length > 0 || r.segera.length > 0) && (
+              <span className="mt-0.5 block text-[11.5px] font-medium text-[color:var(--color-critical)]">
+                {[...r.habis, ...r.segera].join(', ')} {r.habis.length ? 'habis' : 'segera habis'}
+              </span>
+            )}
+            {lain > 0 && <span className="mt-0.5 block text-[11.5px] text-ink-3">+{lain} dokumen lainnya</span>}
+          </span>
+        )
+      },
+    },
+    {
+      // Piutang dari sisi karyawan (atasan 13 Okt 2026): minus merah = masih punya piutang.
+      key: 'saldo', header: 'Piutang', sortable: true, align: 'right', width: '140px',
+      render: (d) => <NilaiPiutang nilai={d.saldo} tebal={d.saldo < 0} />,
     },
     {
       key: 'status', header: 'Status', sortable: true, width: '100px',
@@ -170,7 +216,7 @@ export function DataKaryawanPage() {
       key: 'action', header: 'Action', align: 'right', width: '124px',
       render: (d) => (
         <div className="flex justify-end gap-1">
-          <DetailButton label={`Lihat detail ${d.driver_name} (kasbon & trip)`} onClick={() => navigate(`/master/karyawan/${d.id}`)} />
+          <DetailButton label={`Lihat detail ${d.driver_name} (piutang & trip)`} onClick={() => navigate(`/master/karyawan/${d.id}`)} />
           <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!canEdit} onClick={() => openEdit(d)} />
           <IconButton label="Hapus" tone="danger" icon={<FaTrashCan size={14} />} disabled={!canEdit} onClick={() => setDeleting(d)} />
         </div>
@@ -196,27 +242,45 @@ export function DataKaryawanPage() {
           left={
             <>
               <SearchInput value={table.query} onChange={table.setQuery} placeholder="Cari kode, nama, alamat, atau kota..." />
-              <FilterField label="Peran">
-                <Select value={peran} onChange={(e) => setPeran(e.target.value)} className="h-9 w-32">
-                  <option value="">Semua</option>
-                  {EMPLOYEE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
-                </Select>
-              </FilterField>
-              <FilterField label="Status">
-                <Select value={status} onChange={(e) => setStatus(e.target.value)} className="h-9 w-32">
-                  <option value="">Semua</option>
-                  <option value="aktif">Aktif</option>
-                  <option value="nonaktif">Nonaktif</option>
-                </Select>
-              </FilterField>
-              <FilterField label="Piutang">
-                <Select value={piutang} onChange={(e) => setPiutang(e.target.value)} className="h-9 w-36">
-                  <option value="">Semua</option>
-                  <option value="ada">Belum lunas</option>
-                  <option value="lunas">Lunas</option>
-                </Select>
-              </FilterField>
-              {(table.isFiltered || filterAktif) && <Button size="sm" variant="ghost" icon={<FaXmark size={14} />} onClick={resetFilter}>Reset</Button>}
+              <PanelFilter filter={filter} chips={chips}>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Peran">
+                    {(id) => (
+                      <Select id={id} value={d.peran} onChange={(e) => filter.ubah({ peran: e.target.value })}>
+                        <option value="">Semua</option>
+                        {EMPLOYEE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+                      </Select>
+                    )}
+                  </Field>
+                  <Field label="Status">
+                    {(id) => (
+                      <Select id={id} value={d.status} onChange={(e) => filter.ubah({ status: e.target.value })}>
+                        <option value="">Semua</option>
+                        <option value="aktif">Aktif</option>
+                        <option value="nonaktif">Nonaktif</option>
+                      </Select>
+                    )}
+                  </Field>
+                </div>
+                <Field label="Piutang">
+                  {(id) => (
+                    <Select id={id} value={d.piutang} onChange={(e) => filter.ubah({ piutang: e.target.value })}>
+                      <option value="">Semua</option>
+                      <option value="ada">Masih punya piutang</option>
+                      <option value="tidak">Tidak punya piutang</option>
+                    </Select>
+                  )}
+                </Field>
+                <Field label="Dokumen penting">
+                  {(id) => (
+                    <Select id={id} value={d.dokumen} onChange={(e) => filter.ubah({ dokumen: e.target.value })}>
+                      <option value="">Semua</option>
+                      <option value="kurang">Belum lengkap</option>
+                      <option value="habis">Habis / segera habis</option>
+                    </Select>
+                  )}
+                </Field>
+              </PanelFilter>
             </>
           }
           right={<span className="text-[12.5px] text-ink-3">{db.drivers.length} karyawan terdaftar</span>}
@@ -244,6 +308,7 @@ export function DataKaryawanPage() {
       <Modal
         open={formOpen}
         onClose={() => setFormOpen(false)}
+        size="lg"
         title={editing ? 'Ubah Karyawan' : 'Tambah Karyawan'}
         subtitle={editing ? `Kode ${editing.driver_code}` : 'Lengkapi data karyawan baru. Tanda * wajib diisi.'}
         footer={
@@ -253,26 +318,41 @@ export function DataKaryawanPage() {
           </>
         }
       >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Peran" required hint="Sopir membawa kendaraan; manager mengelola trip.">
+        {/* Ringkas tanpa scroll (Baldy 14 Okt 2026): tiga kolom, dokumen sebaris di bawah. */}
+        <div className="grid gap-x-4 gap-y-3 sm:grid-cols-3">
+          <Field label="Peran" required>
             {(id) => (
               <Select id={id} value={form.role} onChange={(e) => gantiPeran(e.target.value as EmployeeRole)}>
                 {EMPLOYEE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
               </Select>
             )}
           </Field>
-          <Field label="Kode" required error={errors.driver_code} hint={errors.driver_code ? undefined : 'Terisi otomatis: SPR untuk sopir, MGR untuk manager.'}>
+          <Field label="Kode" required error={errors.driver_code}>
             {(id) => (
               <KodeInput id={id} value={form.driver_code} invalid={!!errors.driver_code} placeholder="SPR027" uppercase
-                generateTitle="Buat kode karyawan berikutnya"
+                generateTitle="Buat kode berikutnya: SPR untuk supir, MGR untuk manager"
                 onChange={(v) => setForm({ ...form, driver_code: v })}
                 onGenerate={() => setForm((f) => ({ ...f, driver_code: kodeKaryawanBerikut(db.drivers.filter((d) => d.id !== editing?.id), f.role) }))} />
+            )}
+          </Field>
+          <Field label="Status">
+            {(id) => (
+              <Select id={id} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as Driver['status'] })}>
+                <option value="aktif">Aktif</option>
+                <option value="nonaktif">Nonaktif</option>
+              </Select>
             )}
           </Field>
           <Field label="Nama" required error={errors.driver_name} className="sm:col-span-2">
             {(id) => (
               <Input id={id} value={form.driver_name} invalid={!!errors.driver_name} placeholder="Budi Santoso"
                 onChange={(e) => setForm({ ...form, driver_name: e.target.value })} />
+            )}
+          </Field>
+          <Field label="Telepon" error={errors.phone}>
+            {(id) => (
+              <Input id={id} value={form.phone} invalid={!!errors.phone} placeholder="0812xxxxxxx"
+                onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             )}
           </Field>
           <Field label="Alamat" className="sm:col-span-2">
@@ -287,23 +367,12 @@ export function DataKaryawanPage() {
                 onChange={(e) => setForm({ ...form, city: e.target.value })} />
             )}
           </Field>
-          <Field label="Telepon" error={errors.phone}>
-            {(id) => (
-              <Input id={id} value={form.phone} invalid={!!errors.phone} placeholder="0812xxxxxxx"
-                onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-            )}
-          </Field>
-          <Field label="Status">
-            {(id) => (
-              <Select id={id} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as Driver['status'] })}>
-                <option value="aktif">Aktif</option>
-                <option value="nonaktif">Nonaktif</option>
-              </Select>
-            )}
-          </Field>
-          <Field label="Dokumen" className="sm:col-span-2" hint="KTP, SIM, dan surat lain karyawan. Foto diperkecil otomatis.">
-            {(id) => <LampiranInput id={id} label="Tambah dokumen" value={form.attachments} onChange={(v) => setForm((f) => ({ ...f, attachments: v }))} />}
-          </Field>
+
+          <fieldset className="min-w-0 sm:col-span-3">
+            <legend className="form-label">Dokumen <span className="font-normal text-ink-3">· klik kotak untuk upload; foto diperkecil otomatis, PDF juga bisa</span></legend>
+            <DokumenPentingInput jenis={DOKUMEN_KARYAWAN} value={form.dokumen} onChange={(v) => setForm((f) => ({ ...f, dokumen: v }))}
+              lainnya={{ label: 'Dokumen lainnya', value: form.attachments, onChange: (v) => setForm((f) => ({ ...f, attachments: v })) }} />
+          </fieldset>
         </div>
       </Modal>
 

@@ -11,7 +11,7 @@
  */
 export type Role = 'owner' | 'manager' | 'admin' | 'viewer'
 export const ROLE_PENGGUNA: Record<Role, { label: string; ringkas: string }> = {
-  owner: { label: 'Owner', ringkas: 'akses penuh' },
+  owner: { label: 'Owner', ringkas: 'super admin: akses penuh' },
   manager: { label: 'Manager', ringkas: 'semua kecuali hapus trip & atur pengguna' },
   admin: { label: 'Admin', ringkas: 'input & ubah trip harian' },
   viewer: { label: 'Viewer', ringkas: 'hanya lihat & export' },
@@ -21,6 +21,19 @@ export interface User {
   username: string
   name: string
   role: Role
+}
+
+/**
+ * Akun yang boleh masuk (Pengaturan -> Pengguna & Peran). Selama login masih simulasi,
+ * sandi tidak disimpan; di produksi akun dan sandi dikelola backend (POST /auth/public/login).
+ */
+export interface Pengguna {
+  username: string
+  name: string
+  role: Role
+  aktif: boolean
+  created_at: string
+  updated_at: string
 }
 
 /**
@@ -47,10 +60,38 @@ export interface WorkspaceScoped {
  */
 export type Lampiran = string[]
 
+/**
+ * Dokumen penting yang punya tempat upload sendiri di form karyawan & kendaraan (revisi
+ * 13 Okt 2026), terpisah dari "dokumen lainnya" (attachments).
+ */
+export interface DokumenPenting {
+  berkas: Lampiran
+  /** Berlaku sampai (yyyy-mm-dd) untuk dokumen yang punya masa berlaku; kosong = tidak dicatat. */
+  berlaku_sampai?: string
+}
+/** Jenis dokumen penting per pemilik; `berlaku` = punya masa berlaku. */
+export interface JenisDokumenPenting {
+  kode: string
+  label: string
+  berlaku?: boolean
+}
+export const DOKUMEN_KARYAWAN: readonly JenisDokumenPenting[] = [
+  { kode: 'KTP', label: 'KTP' },
+  { kode: 'SIM', label: 'SIM', berlaku: true },
+  { kode: 'KK', label: 'Kartu Keluarga' },
+  { kode: 'NPWP', label: 'NPWP' },
+]
+export const DOKUMEN_KENDARAAN: readonly JenisDokumenPenting[] = [
+  { kode: 'STNK', label: 'STNK', berlaku: true },
+  { kode: 'KIR', label: 'KIR', berlaku: true },
+  { kode: 'PAJAK', label: 'Pajak Kendaraan', berlaku: true },
+  { kode: 'ASURANSI', label: 'Asuransi', berlaku: true },
+]
+
 /** Peran karyawan. Sopir adalah karyawan yang membawa kendaraan. */
 export const EMPLOYEE_ROLES = ['sopir', 'manager'] as const
 export type EmployeeRole = (typeof EMPLOYEE_ROLES)[number]
-export const ROLE_LABEL: Record<EmployeeRole, string> = { sopir: 'Sopir', manager: 'Manager' }
+export const ROLE_LABEL: Record<EmployeeRole, string> = { sopir: 'Supir', manager: 'Manager' }
 
 /**
  * Master -> Data Karyawan (dulu Data Sopir).
@@ -67,19 +108,23 @@ export interface Driver {
   city: string                   // Kota
   phone: string
   status: 'aktif' | 'nonaktif'
-  attachments: Lampiran          // KTP, SIM, dan dokumen lain karyawan
+  /** Dokumen penting (KTP, SIM, KK, NPWP), per jenis. */
+  dokumen?: Record<string, DokumenPenting>
+  attachments: Lampiran          // Dokumen lainnya (data lama: KTP, SIM, dan dokumen lain)
   created_at: string
   updated_at: string
 }
 
-/** Master -> Data Route */
+/** Master -> Rute */
 /** Nominal pada route yang bisa berstatus perkiraan. */
 export type RouteNominal = 'ujroute' | 'toll' | 'price'
 
 export interface Route {
   id: string
-  route_code: string             // No. Route
-  route_name: string             // Nama Route
+  route_code: string             // No. Rute
+  /** No. Rute dari aplikasi lama sebelum dirapikan (14 Okt 2026); tetap bisa dicari. */
+  route_code_lama?: string
+  route_name: string             // Nama Rute
   project_id: string             // Project pemilik route - satu route, satu project
   feet: string                   // Feet - ukuran container, mis. 1X40 (1 x 40 kaki)
   ujroute: number                // UJROUTE - uang jalan baku untuk route ini
@@ -95,6 +140,12 @@ export interface Route {
    * Ditampilkan bertanda "perkiraan" sampai nilainya diubah lewat form route.
    */
   estimated_fields?: RouteNominal[]
+  /**
+   * Kode area pick up & destinasi (mis. CIB, DURI) untuk memilih rute di form trip.
+   * Kosong = diturunkan dari nama "ASAL - TUJUAN" (lib/trip.ts kodeAreaRute).
+   */
+  kode_area_asal?: string
+  kode_area_tujuan?: string
   created_at: string
   updated_at: string
 }
@@ -108,19 +159,83 @@ export interface Vehicle {
   vehicle_type: string
   configuration: string          // 6X6, DL, LB, HB, EXT, TRONTON, DOLLY - boleh kosong
   status: 'aktif' | 'servis' | 'nonaktif'
-  attachments: Lampiran          // Foto kendaraan, STNK, dsb.
+  /** Surat penting (STNK, KIR, Pajak, Asuransi), per jenis. */
+  dokumen?: Record<string, DokumenPenting>
+  attachments: Lampiran          // Dokumen lainnya: foto kendaraan, surat lain (data lama: STNK, dsb.)
   created_at: string
   updated_at: string
 }
 
+/** Nama sub kendaraan / gandengan mengikuti istilah atasan (Hi Bed, Low Bed, Dolly, ...). */
+export const GANDENGAN_LABEL: Record<string, string> = {
+  HB: 'Hi Bed', LB: 'Low Bed', DOLLY: 'Dolly', TRONTON: 'Tronton', DL: 'DL', '6X6': '6x6', '4X4': '4x4', EXT: 'Extension', CDD: 'CDD',
+}
+
+/** Jenis titik di Master Alamat. */
+export const JENIS_ALAMAT = ['pengirim', 'penerima', 'keduanya'] as const
+export type JenisAlamat = (typeof JENIS_ALAMAT)[number]
+export const JENIS_ALAMAT_LABEL: Record<JenisAlamat, string> = {
+  pengirim: 'Pick up (pengirim)', penerima: 'Destinasi (penerima)', keduanya: 'Pick up & destinasi',
+}
+
 /**
- * Jenis klien:
- * - tetap   : pelanggan rutin, order per perjalanan (layanan Callout)
- * - kontrak : perusahaan lain yang memakai jasa lewat kontrak (layanan Dedicated)
+ * Master Data -> Alamat: titik pick up (pengirim) dan destinasi (penerima) beserta
+ * kontaknya. Dipakai bersama kedua workspace; trip menyimpan salinannya (TitikAlamat).
  */
-export const CLIENT_TYPES = ['tetap', 'kontrak'] as const
+export interface Alamat {
+  id: string
+  kode_area: string              // Kode area, sama dengan kode di nama rute (CIB, DURI, ...)
+  nama: string                   // Nama lokasi / perusahaan
+  alamat: string                 // Alamat lengkap
+  kota: string
+  nama_kontak: string            // PIC di lokasi
+  telepon: string
+  project_id: string             // Klien; kosong = boleh dipakai semua klien
+  jenis: JenisAlamat
+  /** Koordinat dari Order Release klien ("-6.39, 107.16"); teks saja, tanpa peta. */
+  lat_long: string
+  /** Origin / Destination ID di Order Release klien. */
+  id_lokasi_klien: string
+  catatan: string
+  status: 'aktif' | 'nonaktif'
+  created_at: string
+  updated_at: string
+}
+
+/** Titik pick up / destinasi pada satu trip: salinan alamat saat trip diisi. */
+export interface TitikAlamat {
+  /** Master Alamat asal salinan; kosong = diketik manual (data lama). */
+  alamat_id?: string
+  nama: string
+  alamat: string
+  kontak: string
+  telepon: string
+  /** Catatan khusus trip ini, mis. info kapal, lokasi di pelabuhan, kontak pengambilan. */
+  catatan?: string
+}
+
+/**
+ * Add Items Details (form trip 13 Okt 2026): barang yang dibawa satu trip. Tiap item boleh
+ * punya ID Perjalanan sendiri (penanda pengiriman) dan keterangan barang / No Container.
+ */
+export interface ItemMuatan {
+  id_perjalanan: string
+  keterangan: string
+}
+
+/**
+ * Jenis klien = tipe layanannya (revisi 13 Okt 2026), jadi trip tidak perlu memilih layanan lagi:
+ * - callout   : order per perjalanan dengan No. Referensi; harga ikut rute
+ * - dedicated : kendaraan dikontrak klien ini; trip memakai kontraknya
+ * Data lama memakai 'tetap' / 'kontrak' (diganti saat migrasi).
+ */
+export const CLIENT_TYPES = ['callout', 'dedicated'] as const
 export type ClientType = (typeof CLIENT_TYPES)[number]
-export const CLIENT_TYPE_LABEL: Record<ClientType, string> = { tetap: 'Klien tetap', kontrak: 'Klien kontrak' }
+export const CLIENT_TYPE_LABEL: Record<ClientType, string> = { callout: 'Callout', dedicated: 'Dedicated' }
+export const CLIENT_TYPE_KET: Record<ClientType, string> = {
+  callout: 'Order per perjalanan dengan No. Referensi dari klien. Harga ikut rute.',
+  dedicated: 'Kendaraan dikontrak klien ini. Kontraknya dikelola di halaman klien.',
+}
 
 /** Master -> Klien (SLB, ATLAS, PDT, ...): pemilik trip dan kontrak Dedicated. */
 export interface Project {
@@ -202,14 +317,24 @@ export interface PenyelesaianUj {
  */
 export interface CommissionTransaction extends WorkspaceScoped {
   id: string
-  transaction_no: string         // Nomor Trip (NoTrans)
+  /**
+   * Kode Trip / ID Trip (NoTrans): YYYYMM + 4 digit urut, mis. 2026100001; dibuat saat Tambah Trip
+   * diklik dan dipakai di daftar, Berita Acara, dan tagihan. Backload: kode trip asal + "-BL".
+   */
+  transaction_no: string
   transaction_date: string       // Tanggal Berangkat: hari trip jalan (ISO yyyy-mm-dd)
   order_date?: string            // Tanggal Order: hari permintaan klien masuk; trip lama boleh kosong
   service_type: ServiceType      // Callout / Dedicated
   contract_id: string            // Kontrak, wajib untuk Dedicated
 
   /* Konfigurasi */
-  trip_ids: string[]             // ID Perjalanan / Trip. Karawang: satu ID per trip; Priok: nomor container, boleh lebih dari satu
+  /**
+   * ID Perjalanan / Trip. Karawang: ID Perjalanan tiap item muatan (salinan dari `muatan`, untuk
+   * pencarian); Priok: nomor container, boleh lebih dari satu.
+   */
+  trip_ids: string[]
+  /** Add Items Details: ID Perjalanan + keterangan barang. Kosong = data lama (trip_ids & goods_type). */
+  muatan?: ItemMuatan[]
   route_id: string               // Rute - satu per trip
   /**
    * Karawang: TR = nomor order klien (Order Release DHL/SLB). Satu trip boleh membawa
@@ -224,6 +349,16 @@ export interface CommissionTransaction extends WorkspaceScoped {
   backload_dari?: string
   /** Ditandai saat Tutup Trip: ada muatan balik dari lokasi bongkar. */
   ada_backload?: boolean
+  /** Detail alamat (Karawang): pick up (pengirim) dan destinasi (penerima) beserta kontak. */
+  pengirim?: TitikAlamat
+  penerima?: TitikAlamat
+  /** Sub kendaraan / gandengan trip ini (kode VEHICLE_CONFIGS); kosong = ikut konfigurasi kendaraan. */
+  gandengan?: string
+  /**
+   * Waktu kendaraan tercatat kembali di pool untuk trip ini (yyyy-mm-ddThh:mm). Selama
+   * belum, kendaraannya tidak bisa dipilih trip lain (aturan Baldy 12 Okt 2026).
+   */
+  pool_at?: string | null
 
   /* Informasi dokumen */
   sj_no: string                  // Nomor Surat Jalan (dokumen cetak)
@@ -262,6 +397,8 @@ export interface CommissionTransaction extends WorkspaceScoped {
   pi_note?: string               // Catatan revisi / persetujuan PI
   /** Bukti tahap PI: scan PI, tanda terima kirim, email persetujuan, bukti transfer. */
   pi_attachments?: string[]
+  /** Nilai PI yang dibekukan saat PI dibuat; perubahan trip sesudahnya ditandai, tidak menimpa. */
+  pi_nilai?: { pokok: number; tambahan: number; total: number } | null
   /* Penutupan trip (Receive all POD / bukti dokumen fisik) */
   closed_at?: string | null
   /** true = dokumen fisik bertanda tangan sudah diterima di pool; false = baru foto, fisik menyusul. */
@@ -271,8 +408,8 @@ export interface CommissionTransaction extends WorkspaceScoped {
   pod_attachments?: string[]     // Foto POD (BA / SJ / TR bertanda tangan penerima)
   /** Biaya cancel yang tetap ditagihkan ke klien saat trip dibatalkan (disetujui Manager / Owner). */
   cancel_fee?: number
-  cost_value: number             // Harga trip (kolom COST di spreadsheet); 0 = memakai Harga route
-  override_note?: string         // Alasan harga trip berbeda dari Harga route (override oleh Manager/Owner)
+  cost_value: number             // Harga trip (kolom COST di spreadsheet); 0 = memakai Harga Rute
+  override_note?: string         // Alasan harga trip berbeda dari Harga Rute (override oleh Manager/Owner)
   override_attachments?: string[] // Bukti persetujuan override (gambar/berkas)
 
   notes: string
@@ -314,6 +451,10 @@ export interface UjPayment {
   jenis?: JenisTermin            // Kosong = uang jalan biasa
   uj_amount: number              // UJ
   kasbon_deduction: number       // Potong Kasbon
+  /** Alasan uang jalan di atas patokan UJ Rute (wajib, disetujui Manager / Owner). */
+  override_note?: string
+  /** Username yang menyetujui uang jalan di atas patokan. */
+  override_by?: string
   notes: string
   attachments: Lampiran
   created_at: string
@@ -325,8 +466,14 @@ export interface UjPayment {
  * Biaya operasional = nota pemakaian uang jalan sopir (solar, tol, ASDP, SPSI, nginap, ...),
  * bukan uang tambahan untuk sopir: uang dorong & uang pulang dicatat sebagai termin uang jalan.
  */
-export const EXPENSE_TYPES = ['DEX', 'Tol', 'ASDP', 'SPSI', 'Nginap', 'Escort', 'Reimbus', 'Double Driver', 'Lainnya'] as const
+export const EXPENSE_TYPES = ['Tol', 'DEX', 'SPSI', 'Nginap', 'Escort', 'ASDP', 'Double Driver', 'Reimbus', 'Lainnya'] as const
 export type ExpenseType = (typeof EXPENSE_TYPES)[number]
+/**
+ * Nama tampilan jenis biaya mengikuti istilah atasan (12 Okt 2026). Kode yang tersimpan
+ * tetap (SPSI, Nginap) supaya data lama dan kontrak data backend tidak berubah.
+ */
+export const EXPENSE_LABEL: Record<string, string> = { SPSI: 'SPSI Banlok', Nginap: 'Overnight' }
+export const labelBiaya = (kode: string): string => EXPENSE_LABEL[kode] ?? kode
 
 /**
  * Biaya di luar tanggungan perusahaan (Meeting 17 Sep 2026): ikut ditagihkan ke klien
@@ -343,7 +490,7 @@ export const BIAYA_DITAGIHKAN: readonly string[] = ['DEX', 'Tol', 'ASDP', 'SPSI'
  */
 export const PEMBAYAR_BIAYA = ['sopir', 'perusahaan'] as const
 export type PembayarBiaya = (typeof PEMBAYAR_BIAYA)[number]
-export const PEMBAYAR_LABEL: Record<PembayarBiaya, string> = { sopir: 'Sopir, dari uang jalan', perusahaan: 'Perusahaan langsung' }
+export const PEMBAYAR_LABEL: Record<PembayarBiaya, string> = { sopir: 'Supir, dari uang jalan', perusahaan: 'Perusahaan langsung' }
 
 export interface OperationalExpense {
   id: string
@@ -367,6 +514,8 @@ export interface OperationalExpense {
  * Uang jalan tidak ada di sini: UJ hanya dicatat di tab Uang Jalan.
  */
 export const INTERNAL_COST_TYPES = ['Uang Makan', 'Kernet', 'Komisi', 'Servis & Sparepart', 'Gaji Sopir', 'Administrasi', 'Lainnya'] as const
+/** Nama tampilan jenis biaya internal; kode tersimpan tetap ('Gaji Sopir'). */
+export const labelInternal = (kode: string): string => (kode === 'Gaji Sopir' ? 'Gaji Supir' : kode)
 export type InternalCostType = (typeof INTERNAL_COST_TYPES)[number]
 
 /** Trip -> Biaya Internal. */
@@ -438,25 +587,34 @@ export interface TripNote {
 }
 
 /**
- * Jenis mutasi kasbon karyawan.
- * - admin      : kasbon diberikan perusahaan          (menambah)
- * - trip       : dipotong dari uang jalan sebuah trip (mengurangi)
- * - pembatalan : trip dibatalkan, potongannya kembali (menambah)
- * - manual     : penyesuaian, arahnya dipilih         (menambah / mengurangi)
+ * Sumber mutasi kasbon karyawan. Di layar hanya ada dua jenis (revisi 13 Okt 2026):
+ * Piutang (utang karyawan bertambah) dan Lunas (pelunasan); sumbernya jadi keterangan.
+ * - admin      : kasbon diberikan perusahaan          -> Piutang
+ * - pembatalan : trip dibatalkan, potongan / TF kembali menjadi utang -> Piutang
+ * - trip       : dipotong dari uang jalan sebuah trip -> Lunas (otomatis)
+ * - lunas      : dibayar langsung oleh karyawan (tunai / transfer) -> Lunas
+ * - manual     : penyesuaian lama, arahnya ikut tanda nominal
  */
-export const KASBON_KINDS = ['admin', 'trip', 'pembatalan', 'manual'] as const
+export const KASBON_KINDS = ['admin', 'trip', 'pembatalan', 'lunas', 'manual'] as const
 export type KasbonKind = (typeof KASBON_KINDS)[number]
 export const KASBON_LABEL: Record<KasbonKind, string> = {
-  admin: 'Kasbon dari Admin',
-  trip: 'Potong dari Trip',
-  pembatalan: 'Pembatalan Trip',
-  manual: 'Penyesuaian Manual',
+  admin: 'Kasbon',
+  trip: 'Potong uang jalan',
+  pembatalan: 'Pembatalan trip',
+  lunas: 'Pelunasan',
+  manual: 'Penyesuaian',
 }
+
+/** Dua jenis transaksi piutang karyawan yang dipakai di layar. */
+export const JENIS_PIUTANG = ['piutang', 'lunas'] as const
+export type JenisPiutang = (typeof JENIS_PIUTANG)[number]
+export const JENIS_PIUTANG_LABEL: Record<JenisPiutang, string> = { piutang: 'Piutang', lunas: 'Lunas' }
 
 /**
  * Satu mutasi kasbon. `amount` bertanda: positif menambah kasbon (utang
  * karyawan ke perusahaan), negatif menguranginya. Saldo = jumlah seluruh
- * mutasi milik karyawan itu.
+ * mutasi milik karyawan itu. Layar menampilkan dari sisi karyawan (revisi
+ * 13 Okt 2026): piutang bertanda minus, pelunasan plus (lib/kasbon.ts).
  *
  * Mutasi berjenis "trip" dibuat otomatis dari termin uang jalan yang memotong
  * kasbon, dan tertaut lewat uj_payment_id. Saat trip dibatalkan, tiap potongan
@@ -504,7 +662,7 @@ export type CommissionUnit = 'rp' | 'persen'
 
 /**
  * Nilai yang menjadi dasar tingkat komisi.
- * - nilai   : harga trip = Harga yang diisi di trip, atau Harga route bila kosong
+ * - nilai   : harga trip = Harga yang diisi di trip, atau Harga Rute bila kosong
  * - uj      : uang jalan = UJROUTE route, atau UJ yang dibayar bila UJROUTE kosong
  * - kontrak : nilai kontrak Dedicated (dihitung per kontrak, bukan per trip)
  */
@@ -545,6 +703,49 @@ export interface CommissionScheme extends WorkspaceScoped {
   updated_at: string
 }
 
+/** Pengaturan -> Audit Log: jenis aksi yang dicatat. */
+export const AKSI_AUDIT = ['buat', 'ubah', 'hapus', 'batal', 'tutup', 'pool', 'tahap_pi', 'cetak'] as const
+export type AksiAudit = (typeof AKSI_AUDIT)[number]
+export const AKSI_AUDIT_LABEL: Record<AksiAudit, string> = {
+  buat: 'Tambah', ubah: 'Ubah', hapus: 'Hapus', batal: 'Batalkan trip', tutup: 'Tutup trip',
+  pool: 'Kembali ke pool', tahap_pi: 'Tahap PI', cetak: 'Cetak',
+}
+export interface PerubahanAudit {
+  field: string
+  dari: string
+  ke: string
+}
+
+/** Satu catatan Audit Log: siapa, kapan, mengubah apa. Di produksi ditulis backend. */
+export interface AuditLog extends WorkspaceScoped {
+  id: string
+  waktu: string                  // ISO, waktu kejadian
+  username: string
+  nama: string
+  peran: Role | ''
+  aksi: AksiAudit
+  entitas: string                // koleksi data, mis. transactions
+  entity_id: string
+  label: string                  // penanda yang dibaca orang, mis. ID Perjalanan
+  ringkasan: string
+  perubahan: PerubahanAudit[]
+  created_at: string
+  updated_at: string
+}
+
+/** Dokumen -> unggahan umum yang tidak menempel pada satu trip (SOP, surat, dokumen perusahaan). */
+export const KATEGORI_DOKUMEN = ['Umum', 'Perusahaan', 'Kendaraan', 'Karyawan', 'Klien', 'Lainnya'] as const
+export interface Dokumen extends WorkspaceScoped {
+  id: string
+  judul: string
+  kategori: string
+  tanggal: string
+  catatan: string
+  attachments: Lampiran
+  created_at: string
+  updated_at: string
+}
+
 export interface Database {
   drivers: Driver[]
   routes: Route[]
@@ -561,6 +762,12 @@ export interface Database {
   kasbonEntries: KasbonEntry[]
   commissionSchemes: CommissionScheme[]
   contracts: Contract[]
+  /** Master Data -> Alamat (dipakai bersama kedua workspace). */
+  alamat: Alamat[]
+  /** Pengaturan -> Audit Log. */
+  auditLogs: AuditLog[]
+  /** Dokumen umum (bukan lampiran trip). */
+  dokumen: Dokumen[]
 }
 
 export type EntityKey = keyof Database
@@ -576,9 +783,9 @@ export interface TransactionRow extends CommissionTransaction {
   route_code: string
   route_name: string
   route_price: number
-  /** Harga trip yang dipakai komisi & pendapatan: Harga trip, atau Harga route bila kosong. */
+  /** Harga trip yang dipakai komisi & pendapatan: Harga trip, atau Harga Rute bila kosong. */
   harga: number
-  /** true bila trip punya harga sendiri (bukan mengikuti Harga route). */
+  /** true bila harga trip berbeda dari Harga Rute (diganti Manager / Owner). */
   harga_khusus: boolean
   ujroute: number
   toll: number
@@ -619,6 +826,17 @@ export interface TransactionRow extends CommissionTransaction {
   komisi_manager: number
   /** Penjelasan singkat aturan & tingkat yang dipakai. */
   komisi_keterangan: string
+  /** Penanda trip yang dibaca orang: Kode Trip (transaction_no). */
+  id_tampil: string
+  /** ID Perjalanan item pertama; kosong bila belum ada. */
+  id_perjalanan: string
+  /** Trip ini masih menahan kendaraannya (belum kembali ke pool): kendaraan tidak bisa dipakai trip lain. */
+  menahan_kendaraan: boolean
+  /** Nilai tagihan trip sekarang: harga + biaya ditagihkan; trip batal = biaya cancel. */
+  tagihan_total: number
+  /** Kode area pick up & destinasi rute (atau lokasi muat & bongkar bila tanpa rute). */
+  area_asal: string
+  area_tujuan: string
 }
 
 export interface BillingRow extends Billing {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ROLE_PENGGUNA } from '../../types'
-import { useNavigate } from 'react-router-dom'
-import { FaBars, FaCalendarDays, FaCheck, FaChevronDown, FaMagnifyingGlass, FaRightFromBracket } from '../ui/icons'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { FaBars, FaCalendarDays, FaCheck, FaChevronDown, FaMagnifyingGlass, FaRightFromBracket, FaScrewdriverWrench } from '../ui/icons'
 import { useAuth } from '../../store/AuthProvider'
 import { useData } from '../../store/DataProvider'
 import { WORKSPACE_LIST, useWorkspace } from '../../store/WorkspaceProvider'
@@ -17,11 +17,14 @@ import type { Workspace } from '../../types'
  * identitas pengguna, pemilih workspace, dan logout.
  */
 export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => void; onLogout: () => void }) {
-  const { user } = useAuth()
+  const { user, bisa } = useAuth()
   const { transactionRows } = useData()
   const { workspace, meta, setWorkspace } = useWorkspace()
   const toast = useToast()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  /** Halaman Tambah / Ubah Trip tanpa kotak cari (mock atasan 13 Okt 2026): fokus mengisi form. */
+  const diFormTrip = /^\/transaksi\/trip\/(tambah|[^/]+\/edit)\/?$/.test(pathname)
   const [menuOpen, setMenuOpen] = useState(false)
   const [quick, setQuick] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
@@ -42,7 +45,10 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
     }
   }, [menuOpen])
 
-  /** Priok mencari SI / Job Order (container); Karawang langsung mencari trip. */
+  /**
+   * Priok mencari SI / Job Order (container); Karawang langsung mencari trip di daftar
+   * Trip (?q=): ID Trip, No. Referensi (TR/OR), ID Perjalanan, supir, plat, dan rute.
+   */
   const cariSijo = workspace === 'priok'
 
   function submitQuick(e: React.FormEvent) {
@@ -73,19 +79,20 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
       </button>
 
       {/* Lompat langsung ke pencarian tanpa copy-paste antar halaman */}
-      <form onSubmit={submitQuick} className="relative hidden w-72 sm:block">
+      <form onSubmit={submitQuick} className={cn('relative hidden w-72 xl:w-96', !diFormTrip && 'sm:block')}>
         <FaMagnifyingGlass size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-ink-3" />
         <input
           value={quick}
           onChange={(e) => setQuick(e.target.value)}
-          placeholder={cariSijo ? 'Lompat ke No. SI / Job Order...' : 'Cari trip: No. Trip, TR, sopir, plat...'}
+          placeholder={cariSijo ? 'Lompat ke No. SI / Job Order...' : 'Cari trip: ID Trip, No. Referensi, supir, plat...'}
           aria-label={cariSijo ? 'Cari nomor SI atau Job Order' : 'Cari trip'}
           className="h-9 w-full rounded-md border border-hairline bg-sunken pr-3 pl-8 text-[13px] text-ink transition-colors placeholder:text-ink-3/80 focus:border-brand-400 focus:bg-surface focus:ring-2 focus:ring-brand-500/15 focus:outline-none"
         />
       </form>
 
       <div className="ml-auto flex items-center gap-3">
-        <span className="hidden items-center gap-1.5 rounded-md border border-hairline bg-sunken px-2.5 py-1.5 text-[12px] font-medium text-ink-2 md:inline-flex">
+        <span className="hidden items-center gap-1.5 rounded-md border border-hairline bg-sunken px-2.5 py-1.5 text-[12px] font-medium text-ink-2 md:inline-flex"
+          title="Periode bawaan semua laporan: bulan terakhir yang punya trip. Ganti periodenya lewat Filter di tiap laporan.">
           <FaCalendarDays size={14} className="text-ink-3" />
           Periode: {monthLabel(periodeAktif(transactionRows.map((t) => t.transaction_date)).start)}
         </span>
@@ -151,6 +158,18 @@ export function Topbar({ onOpenMobileNav, onLogout }: { onOpenMobileNav: () => v
                   )
                 })}
               </div>
+
+              {/* Tools tidak ada di menu samping (susunan atasan); tetap terbuka untuk Owner & Manager */}
+              {bisa('master') && (
+                <button
+                  type="button"
+                  onClick={() => { setMenuOpen(false); navigate('/tools') }}
+                  className="flex w-full items-center gap-2 border-b border-hairline px-3.5 py-2.5 text-left text-[13px] font-medium text-ink-2 transition hover:bg-sunken hover:text-ink"
+                >
+                  <FaScrewdriverWrench size={15} />
+                  Tools
+                </button>
+              )}
 
               <button
                 type="button"

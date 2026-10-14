@@ -34,10 +34,8 @@ export function CurrencyInput({ value, onValueChange, invalid, className, placeh
   })
 
   return (
-    <div className="relative">
-      <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-[12px] font-semibold text-ink-3">
-        Rp
-      </span>
+    <div className="input-group">
+      <span className="input-group-text">Rp</span>
       <input
         ref={ref}
         inputMode="numeric"
@@ -48,13 +46,7 @@ export function CurrencyInput({ value, onValueChange, invalid, className, placeh
           digitKanan.current = raw.slice(e.target.selectionStart ?? raw.length).replace(/\D/g, '').length
           onValueChange(parseCurrencyInput(raw))
         }}
-        className={cn(
-          'tnum h-9 w-full rounded-md border bg-surface pr-2.5 pl-9 text-right text-[13px] text-ink transition-colors placeholder:text-ink-3/70',
-          'focus:border-brand-400 focus:ring-2 focus:ring-brand-500/15 focus:outline-none',
-          'disabled:cursor-not-allowed disabled:bg-sunken disabled:text-ink-3',
-          invalid ? 'border-[color:var(--color-critical)]' : 'border-hairline',
-          className,
-        )}
+        className={cn('form-control tnum text-right', invalid && 'is-invalid', className)}
         {...rest}
       />
     </div>

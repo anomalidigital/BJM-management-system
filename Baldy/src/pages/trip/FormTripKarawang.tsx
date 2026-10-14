@@ -1,81 +1,83 @@
-import { useMemo, useState } from 'react'
-import type { KeyboardEvent, ReactNode } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FaFloppyDisk, FaPlus, FaPrint, FaRotateLeft, FaTriangleExclamation, FaXmark } from '../../components/ui/icons'
+import { FaFloppyDisk, FaPen, FaPlus, FaPrint, FaXmark } from '../../components/ui/icons'
 import { PageHeader } from '../../components/layout/PageHeader'
-import { Card, CardHeader } from '../../components/ui/Card'
+import { Card } from '../../components/ui/Card'
 import { Button, IconButton } from '../../components/ui/Button'
-import { Checkbox, DateInput, Field, Input, Radio, Select, Textarea } from '../../components/ui/Field'
+import { DateInput, Field, Input } from '../../components/ui/Field'
 import { CurrencyInput } from '../../components/ui/CurrencyInput'
 import { SearchableSelect } from '../../components/ui/SearchableSelect'
-import { PilihKaryawan } from '../../components/ui/PilihKaryawan'
-import { KodeInput } from '../../components/ui/KodeInput'
+import type { Option } from '../../components/ui/SearchableSelect'
 import { LampiranInput } from '../../components/ui/Lampiran'
 import { useData } from '../../store/DataProvider'
 import { useAuth } from '../../store/AuthProvider'
 import { useToast } from '../../store/ToastProvider'
-import { formatDate, formatRupiah, todayISO } from '../../lib/format'
-import { hitungKomisiTrip } from '../../lib/komisi'
-import { buatKodeUnik, nomorTripBerikut } from '../../lib/kode'
-import { idBackload, kunciTr, lokasiRute, lokasiTrip, rapikanTr, samaLokasi, trTrip } from '../../lib/trip'
-import { cn } from '../../lib/utils'
-import type { CommissionTransaction, Route, ServiceType, TripStatus } from '../../types'
+import { formatRupiah, todayISO } from '../../lib/format'
+import { nomorTripBerikut } from '../../lib/kode'
+import { idBackload, kodeAreaRute, kunciTr, muatanTrip, normalKodeArea, trTrip } from '../../lib/trip'
+import { CLIENT_TYPE_LABEL } from '../../types'
+import type { Alamat, CommissionTransaction, ItemMuatan, Route, ServiceType, TitikAlamat, TripStatus } from '../../types'
 import { STATUS_LABEL } from './status'
-import { PakaiNilai } from './bagian'
 import { KunciTrip, tripSudahJalan } from './KunciTrip'
 import { ModalRute } from '../master/FormRute'
+import { ModalAlamat } from '../master/FormAlamat'
+import { Bagian, KotakInfo, NilaiInfo, Peringatan, TombolTeks } from './form/Bagian'
+import { NoReferensiInput } from './form/NoReferensiInput'
+import { PilihAlamatTrip, TITIK_LAMA, samaArea, samaTitik, titikDariAlamat, titikRapi, titikTerisi } from './form/TitikAlamatInput'
+import { alasanDitahan, labelGandengan, opsiGandengan, petaDitahan, rapikanGandengan } from './form/aturan'
 
-/** Satu mobil di form: tersimpan sebagai satu trip. */
-interface MobilForm {
-  kunci: string
-  vehicle_id: string
-  driver_ids: string[]
-  /** ID Perjalanan: satu per trip, dibuat sistem, boleh diganti. */
-  trip_id: string
-  tr: string[]
-  harga: number
-  /** Petunjuk isian otomatis dari pasangan sopir-mobil terakhir. */
-  otomatis: { kendaraan?: string; sopir?: string }
-}
-
-/** Isian yang sama untuk semua mobil satu order. */
-interface Bersama {
-  service_type: ServiceType
+/** Isian form trip Karawang (satu trip = satu mobil), urut mock atasan 13 Okt 2026 (1a + 1b). */
+interface Isian {
+  /** Klien trip; tipe layanan (Callout / Dedicated) terdeteksi dari klien ini. */
+  klien: string
   contract_id: string
-  route_id: string
-  project_id: string
-  lokasi_muat: string
-  lokasi_bongkar: string
-  order_date: string
+  /** No. Referensi (TR DHL / Order Release) dari klien. */
+  tr: string[]
   transaction_date: string
-  transaction_no: string
-  status: TripStatus
-  manager_id: string
-  manager_name: string
-  notes: string
+  vehicle_id: string
+  gandengan: string
+  /** Supir utama di urutan pertama, sisanya pendamping. */
+  driver_ids: string[]
+  route_id: string
+  harga: number
   override_note: string
   override_attachments: string[]
+  /** Id Master Alamat, TITIK_LAMA (isian lama trip ini), atau kosong. */
+  pengirim: string
+  catatan_pengirim: string
+  penerima: string
+  catatan_penerima: string
+  /** Add Items Details: ID Perjalanan + keterangan barang. */
+  muatan: ItemMuatan[]
+  kosongan: string
 }
 
-type Galat = Record<string, string>
+type Galat = Partial<Record<'klien' | 'contract_id' | 'transaction_date' | 'vehicle_id' | 'route_id' | 'override_note', string>>
 
-/** Status yang bisa dipilih saat mengubah trip. Selesai lewat Tutup Trip, Dibatalkan lewat Batalkan Trip. */
-const STATUS_UBAH: TripStatus[] = ['draft', 'menunggu_sopir', 'aktif']
+/** Field trip yang tidak diisi di form ini (milik Priok / dokumen / penutupan), untuk trip baru. */
+const FIELD_LAIN = {
+  sj_no: '', recipient_name: '', recipient_address_1: '', recipient_address_2: '',
+  job_order_id: '', party: '', goods_type: '', kosongan: '', location: '', ship: '', destination_detail: '',
+  tr_reference: '', pi_number: '', pi_status: '', is_marked: false, bon_date: null, personal_bon: 0,
+  printed_at: null, cancelled_at: null, cancel_reason: '', cancel_settlement: [], container_no: '',
+  manager_id: '', manager_name: '', notes: '', lokasi_muat: '', lokasi_bongkar: '',
+} satisfies Partial<CommissionTransaction>
 
-let urutKunci = 0
-const kunciBaru = () => `m${++urutKunci}`
+const itemKosong = (): ItemMuatan => ({ id_perjalanan: '', keterangan: '' })
 
 /**
- * Form trip workspace Karawang (alat berat & DHL), mengikuti alur atasan:
- * Layanan -> Rute -> Mobil (head unit, sopir) -> Harga. Satu order boleh
- * beberapa mobil: rute & jadwal diisi sekali, tiap mobil tersimpan sebagai trip
- * sendiri (ID Perjalanan, TR, uang jalan, POD, dan PI masing-masing), lalu
- * dicetak satu Berita Acara per mobil.
+ * Form Tambah / Ubah Trip workspace Karawang, disederhanakan mengikuti mock atasan 13 Okt 2026
+ * (1a & 1b = satu form dari atas ke bawah): Konfigurasi (Klien, No Referensi) · Informasi
+ * Kendaraan dan Supir + Rute · Informasi Pengiriman (Pick Up & Destination Details berikut
+ * catatannya, Add Items Details, Kosongan). Kode Trip langsung dibuat saat Tambah Trip diklik dan
+ * menjadi judul. Tipe layanan ikut klien. Backload tidak dipilih di sini: dibuka dari menu ⋯
+ * tabel trip ("Ada Backload / Lanjutan", ?backload=<id trip asal>). Manager trip diatur di tab Komisi.
  */
 export function FormTripKarawang({ mode, tripId, backloadDari }: {
   mode: 'create' | 'edit'
   tripId?: string
-  /** Buat backload dari trip ini: mobil & sopir ikut trip asal. */
+  /** Buat backload / lanjutan dari trip ini: kendaraan & supir ikut trip asal. */
   backloadDari?: string
 }) {
   const navigate = useNavigate()
@@ -84,118 +86,147 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
   const toast = useToast()
   const bolehSimpan = bisa('trip')
   const bolehOverride = bisa('override')
+  const bolehMaster = bisa('master')
+  const akarRef = useRef<HTMLDivElement>(null)
 
   const existing = mode === 'edit' ? db.transactions.find((t) => t.id === tripId) : undefined
-  const asal = mode === 'create' && backloadDari ? transactionRows.find((t) => t.id === backloadDari) : undefined
+  const calonAsal = mode === 'create' && backloadDari ? transactionRows.find((t) => t.id === backloadDari) : undefined
+  /** Trip asal backload; trip yang sudah dibatalkan tidak bisa dilanjutkan. */
+  const asal = calonAsal && calonAsal.status !== 'batal' ? calonAsal : undefined
   const backload = !!asal
+  const daftarAlamat = useMemo(() => db.alamat ?? [], [db.alamat])
   const ruteMap = useMemo(() => new Map(db.routes.map((r) => [r.id, r])), [db.routes])
   const klienMap = useMemo(() => new Map(db.projects.map((p) => [p.id, p])), [db.projects])
-  const semuaId = useMemo(() => dbAll.transactions.filter((t) => t.id !== existing?.id).flatMap((t) => t.trip_ids ?? []), [dbAll.transactions, existing?.id])
+  const semuaNomor = useMemo(() => dbAll.transactions.filter((t) => t.id !== existing?.id).map((t) => t.transaction_no), [dbAll.transactions, existing?.id])
+  /** Kode area pick up backload: area tujuan / lokasi bongkar trip asal. */
+  const areaBackload = asal ? asal.area_tujuan || normalKodeArea(asal.bongkar) : ''
 
-  const [bersama, setBersama] = useState<Bersama>(() => {
-    const hariIni = todayISO()
+  /** Kode Trip: dibuat sekali saat form dibuka (mock: "langsung ter-generate begitu Tambah Trip diklik"). */
+  const [kodeAwal] = useState(() => existing?.transaction_no
+    ?? (asal ? idBackload(asal.transaction_no, semuaNomor) : nomorTripBerikut(semuaNomor, todayISO())))
+
+  /** Titik trip lama yang diketik manual (tanpa Master Alamat) tetap bisa dipertahankan. */
+  const titikLama = (t: TitikAlamat | undefined) => (t && titikTerisi(t) && !(t.alamat_id && daftarAlamat.some((a) => a.id === t.alamat_id)) ? t : undefined)
+  const pengirimLama = titikLama(existing?.pengirim)
+  const penerimaLama = titikLama(existing?.penerima)
+  const nilaiTitik = (t: TitikAlamat | undefined) => (!t ? '' : t.alamat_id && daftarAlamat.some((a) => a.id === t.alamat_id) ? t.alamat_id : titikTerisi(t) ? TITIK_LAMA : '')
+
+  /** Isian awal; mode ubah: pembanding supaya nilai yang tidak disentuh disimpan apa adanya. */
+  const [awal] = useState<Isian>(() => {
     if (existing) {
       const r = ruteMap.get(existing.route_id)
-      const lokasi = lokasiTrip(existing, r?.route_name ?? '')
+      const sopir = existing.driver_ids?.length ? existing.driver_ids : existing.driver_id ? [existing.driver_id] : []
+      const konfigurasi = db.vehicles.find((v) => v.id === existing.vehicle_id)?.configuration ?? ''
+      const muatan = muatanTrip(existing)
       return {
-        service_type: existing.service_type ?? 'callout', contract_id: existing.contract_id ?? '', route_id: existing.route_id ?? '',
-        project_id: existing.project_id ?? '', lokasi_muat: lokasi.muat, lokasi_bongkar: lokasi.bongkar,
-        order_date: existing.order_date ?? '', transaction_date: existing.transaction_date, transaction_no: existing.transaction_no,
-        status: existing.status, manager_id: existing.manager_id ?? '', manager_name: existing.manager_name ?? '', notes: existing.notes ?? '',
+        klien: existing.project_id ?? '', contract_id: existing.contract_id ?? '', tr: trTrip(existing),
+        transaction_date: existing.transaction_date, vehicle_id: existing.vehicle_id ?? '',
+        gandengan: rapikanGandengan(existing.gandengan ?? konfigurasi), driver_ids: sopir.length ? [...sopir] : [''],
+        route_id: existing.route_id ?? '', harga: existing.cost_value || r?.price || 0,
         override_note: existing.override_note ?? '', override_attachments: existing.override_attachments ?? [],
+        pengirim: nilaiTitik(existing.pengirim), catatan_pengirim: existing.pengirim?.catatan ?? '',
+        penerima: nilaiTitik(existing.penerima), catatan_penerima: existing.penerima?.catatan ?? '',
+        muatan: muatan.length ? muatan.map((m) => ({ ...m })) : [itemKosong()], kosongan: existing.kosongan ?? '',
       }
     }
+    const konfigurasiAsal = asal ? db.vehicles.find((v) => v.id === asal.vehicle_id)?.configuration ?? '' : ''
+    // Backload: barang balik diambil dari tempat bongkar trip asal (penerimanya menjadi pick up).
+    const pickupAsal = asal?.penerima?.alamat_id && daftarAlamat.some((a) => a.id === asal.penerima?.alamat_id) ? asal.penerima.alamat_id : ''
     return {
-      service_type: 'callout', contract_id: '', route_id: '', project_id: '',
-      // Backload: lokasi bongkar trip asal menjadi lokasi muat.
-      lokasi_muat: asal?.bongkar ?? '', lokasi_bongkar: '',
-      order_date: hariIni, transaction_date: hariIni, transaction_no: '', status: 'menunggu_sopir',
-      manager_id: asal?.manager_id ?? '', manager_name: asal?.manager_name ?? '', notes: '', override_note: '', override_attachments: [],
+      klien: asal?.project_id ?? '', contract_id: asal?.service_type === 'dedicated' ? asal.contract_id ?? '' : '', tr: [],
+      transaction_date: todayISO(), vehicle_id: asal?.vehicle_id ?? '', gandengan: rapikanGandengan(asal?.gandengan || konfigurasiAsal),
+      driver_ids: asal?.driver_ids.length ? [...asal.driver_ids] : [''], route_id: '', harga: 0, override_note: '', override_attachments: [],
+      pengirim: pickupAsal, catatan_pengirim: '', penerima: '', catatan_penerima: '', muatan: [itemKosong()], kosongan: '',
     }
   })
-
-  const [mobil, setMobil] = useState<MobilForm[]>(() => {
-    if (existing) {
-      const sopir = existing.driver_ids?.length ? existing.driver_ids : existing.driver_id ? [existing.driver_id] : []
-      const r = ruteMap.get(existing.route_id)
-      return [{
-        kunci: kunciBaru(), vehicle_id: existing.vehicle_id, driver_ids: sopir.length ? [...sopir] : [''],
-        trip_id: existing.trip_ids?.[0] ?? '', tr: trTrip(existing), harga: existing.cost_value || r?.price || 0, otomatis: {},
-      }]
-    }
-    if (asal) {
-      return [{
-        kunci: kunciBaru(), vehicle_id: asal.vehicle_id, driver_ids: asal.driver_ids.length ? [...asal.driver_ids] : [''],
-        trip_id: idBackload(asal.trip_ids[0] || asal.transaction_no, semuaId), tr: [], harga: 0, otomatis: {},
-      }]
-    }
-    return [{ kunci: kunciBaru(), vehicle_id: '', driver_ids: [''], trip_id: buatKodeUnik(semuaId), tr: [], harga: 0, otomatis: {} }]
-  })
+  const [f, setF] = useState<Isian>(awal)
   const [galat, setGalat] = useState<Galat>({})
-  const [pilihAsal, setPilihAsal] = useState(false)
-  /** Trip Aktif / Selesai: rute, layanan, kendaraan, sopir, nomor trip dikunci; Manager / Owner boleh membuka. */
+  /** Petunjuk isian otomatis dari pasangan supir-kendaraan terakhir / area rute. */
+  const [otomatis, setOtomatis] = useState<{ kendaraan?: string; sopir?: string; pengirim?: boolean; penerima?: boolean }>({})
+  /** Trip Aktif / Selesai: klien & kontrak, kendaraan, gandengan, supir, rute dikunci; Manager / Owner boleh membuka. */
   const sudahJalan = mode === 'edit' && tripSudahJalan(existing?.status)
   const [bukaKunci, setBukaKunci] = useState(false)
   const kunci = sudahJalan && !bukaKunci
-  /** Modal tambah rute di tempat, supaya admin tidak bolak-balik ke menu Rute. */
+  const [ubahHarga, setUbahHarga] = useState(false)
   const [tambahRute, setTambahRute] = useState(false)
-  const bolehTambahRute = bisa('master')
+  /** Form Tambah Alamat dari dropdown Pick Up / Destination, dengan ketikan pencarian sebagai nama. */
+  const [tambahAlamat, setTambahAlamat] = useState<{ sisi: 'pengirim' | 'penerima'; nama: string; kode?: string } | null>(null)
 
-  const dedicated = bersama.service_type === 'dedicated'
-  const rute = ruteMap.get(bersama.route_id)
-  const klien = klienMap.get(bersama.project_id)
-  const kontrak = db.contracts.find((c) => c.id === bersama.contract_id)
-  const klienKontrak = kontrak ? klienMap.get(kontrak.project_id) : undefined
+  const klien = klienMap.get(f.klien)
+  const layanan: ServiceType = klien?.client_type ?? (existing?.service_type ?? 'callout')
+  const dedicated = layanan === 'dedicated'
+  const rute = ruteMap.get(f.route_id)
+  const area = rute ? kodeAreaRute(rute) : { asal: '', tujuan: '' }
+  const kendaraan = db.vehicles.find((v) => v.id === f.vehicle_id)
+  const kontrakKlien = useMemo(
+    () => db.contracts.filter((c) => c.project_id === f.klien && (c.status === 'aktif' || c.id === f.contract_id)),
+    [db.contracts, f.klien, f.contract_id],
+  )
+  const kontrak = db.contracts.find((c) => c.id === f.contract_id)
+  /** Backload: kendaraan & supir mengikuti trip asal dan terkunci. */
+  const kunciMobil = kunci || (backload && !!asal?.vehicle_id)
+  const kunciSupir = kunci || (backload && (asal?.driver_ids.length ?? 0) > 0)
+  /** Trip lama bisa saja belum lengkap; jangan paksa diisi hanya karena diubah. */
   const wajib = (adaSebelumnya: boolean) => mode === 'create' || adaSebelumnya
 
   /* ── Pilihan ─────────────────────────────────────────── */
-  const sopirTerdaftar = useMemo(() => db.drivers.filter((d) => d.role === 'sopir'), [db.drivers])
-  const managerTerdaftar = useMemo(() => db.drivers.filter((d) => d.role === 'manager'), [db.drivers])
-  const vehicleOptions = useMemo(
-    () => db.vehicles.map((v) => ({
-      value: v.id, label: v.plate_number,
-      meta: [v.configuration, v.vehicle_type, v.status !== 'aktif' ? v.status : ''].filter(Boolean).join(' · '),
-    })),
-    [db.vehicles],
-  )
-  /** Rute dari lokasi muat backload tampil paling atas, lalu rute klien kontrak. */
-  const routeOptions = useMemo(() => {
-    const skor = (r: { route_name: string; project_id?: string }) =>
-      (bersama.lokasi_muat && samaLokasi(lokasiRute(r.route_name).asal, bersama.lokasi_muat) ? 2 : 0) +
-      (dedicated && klienKontrak && r.project_id === klienKontrak.id ? 1 : 0)
+  const opsiKlien = useMemo<Option[]>(() => db.projects
+    .filter((p) => p.status !== 'nonaktif' || p.id === f.klien)
+    .map((p) => ({ value: p.id, label: p.project_name, keywords: p.project_code, meta: `${p.project_code} · ${CLIENT_TYPE_LABEL[p.client_type] ?? 'Callout'}` })),
+  [db.projects, f.klien])
+
+  /** Rute yang pernah dipakai klien ini paling atas; backload: rute dari lokasi bongkar trip asal. */
+  const opsiRute = useMemo<Option[]>(() => {
+    const pakai = new Map<string, number>()
+    for (const t of transactionRows) if (t.project_id && t.project_id === f.klien && t.route_id) pakai.set(t.route_id, (pakai.get(t.route_id) ?? 0) + 1)
+    const dariBongkar = (r: Route) => !!areaBackload && samaArea(kodeAreaRute(r).asal, areaBackload)
     return [...db.routes]
-      .sort((a, b) => skor(b) - skor(a))
+      .sort((a, b) => Number(dariBongkar(b)) - Number(dariBongkar(a)) || (pakai.get(b.id) ?? 0) - (pakai.get(a.id) ?? 0)
+        || (a.route_name || a.route_code).localeCompare(b.route_name || b.route_code, 'id'))
       .map((r) => {
-        const pemilik = klienMap.get(r.project_id ?? '')
-        const dariSini = !!bersama.lokasi_muat && samaLokasi(lokasiRute(r.route_name).asal, bersama.lokasi_muat)
+        const a = kodeAreaRute(r)
         return {
           value: r.id,
           label: r.route_name || r.route_code,
-          meta: [dariSini ? `dari ${bersama.lokasi_muat}` : '', pemilik ? `Klien ${pemilik.project_code}` : '', `UJ ${formatRupiah(r.ujroute)}`].filter(Boolean).join(' · '),
-          keywords: `${r.route_code} ${pemilik?.project_code ?? ''} ${pemilik?.project_name ?? ''}`,
+          meta: [dariBongkar(r) ? 'dari lokasi bongkar trip asal' : '', pakai.get(r.id) ? `${pakai.get(r.id)}× dipakai klien ini` : '', `No. ${r.route_code}`, `UJ ${formatRupiah(r.ujroute)}`]
+            .filter(Boolean).join(' · '),
+          keywords: `${r.route_code} ${r.route_code_lama ?? ''} ${a.asal} ${a.tujuan}`,
         }
       })
-  }, [db.routes, klienMap, bersama.lokasi_muat, dedicated, klienKontrak])
-  const terpakaiKontrak = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const t of transactionRows) {
-      if (!t.contract_id || t.status === 'batal' || t.id === existing?.id) continue
-      m.set(t.contract_id, (m.get(t.contract_id) ?? 0) + t.uj_total + t.expense_total + t.internal_total)
-    }
-    return m
-  }, [transactionRows, existing?.id])
-  const contractOptions = useMemo(
-    () => db.contracts.filter((c) => c.status === 'aktif' || c.id === bersama.contract_id).map((c) => {
-      const k = klienMap.get(c.project_id)
+  }, [db.routes, transactionRows, f.klien, areaBackload])
+
+  const opsiKontrak: Option[] = kontrakKlien.map((c) => ({ value: c.id, label: c.contract_no, meta: `Nilai ${formatRupiah(c.value)}${c.status !== 'aktif' ? ' · selesai' : ''}` }))
+
+  /** Kendaraan & supir yang masih di trip lain dan belum kembali ke pool. */
+  const ditahan = useMemo(() => petaDitahan(transactionRows, [existing?.id, asal?.id]), [transactionRows, existing?.id, asal?.id])
+  /** Trip lain yang menahan kendaraan ini; kendaraan lama trip yang sedang diubah tetap boleh dipakai. */
+  const tahanKendaraan = (vid: string) => (vid && vid !== existing?.vehicle_id ? ditahan.kendaraan.get(vid) : undefined)
+  const opsiKendaraan = useMemo<Option[]>(() => {
+    const daftar = db.vehicles.map((v) => {
+      const t = v.id !== existing?.vehicle_id ? ditahan.kendaraan.get(v.id) : undefined
       return {
-        value: c.id, label: c.contract_no,
-        meta: `${k?.project_name ?? 'Klien tidak ditemukan'} · sisa ${formatRupiah(c.value - (terpakaiKontrak.get(c.id) ?? 0))}`,
-        keywords: `${k?.project_code ?? ''} ${k?.project_name ?? ''}`,
+        value: v.id, label: v.plate_number, disabled: !!t,
+        meta: t ? alasanDitahan(t) : [labelGandengan(v.configuration), v.vehicle_type, v.status !== 'aktif' ? v.status : ''].filter(Boolean).join(' · '),
+        keywords: `${v.configuration} ${v.vehicle_type}`,
       }
-    }),
-    [db.contracts, bersama.contract_id, klienMap, terpakaiKontrak],
-  )
-  /** Sopir & mobil saling mengisi dari trip terakhir (data asli: 99% dan 91% cocok). */
+    })
+    // Yang bisa dipilih di atas; yang masih di trip lain di bawah, lengkap dengan alasannya.
+    return [...daftar.filter((o) => !o.disabled), ...daftar.filter((o) => o.disabled)]
+  }, [db.vehicles, ditahan, existing?.vehicle_id])
+
+  const sopirTerdaftar = useMemo(() => db.drivers.filter((d) => d.role === 'sopir'), [db.drivers])
+  /** Supir nonaktif tetap muncul bila sudah tercatat di trip ini; supir yang masih di trip lain diberi keterangan. */
+  const opsiSupir = (pilihanIni: string): Option[] => sopirTerdaftar
+    .filter((d) => d.status === 'aktif' || d.id === pilihanIni)
+    .filter((d) => d.id === pilihanIni || !f.driver_ids.includes(d.id))
+    .map((d) => {
+      const t = ditahan.supir.get(d.id)
+      return {
+        value: d.id, label: `${d.driver_code} — ${d.driver_name}`, keywords: d.driver_name,
+        meta: t ? `${alasanDitahan(t)}${t.plate_number ? ` (${t.plate_number})` : ''}` : [d.address_2, d.city].filter(Boolean).join(', '),
+      }
+    })
+  /** Supir & kendaraan saling mengisi dari trip terakhir (data asli: 99% dan 91% cocok). */
   const pasangan = useMemo(() => {
     const urut = dbAll.transactions
       .filter((t) => t.status !== 'batal' && t.vehicle_id && (t.driver_ids?.[0] || t.driver_id))
@@ -209,60 +240,16 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
     }
     return { mobilSopir, sopirMobil }
   }, [dbAll.transactions])
-  /** TR yang sudah dipakai trip lain: wajar untuk satu order banyak mobil, cukup diberi tahu. */
-  const trLain = useMemo(() => {
+
+  /** No. Referensi yang sudah dipakai trip lain: wajar untuk satu order banyak mobil, cukup diberi tahu. */
+  const refLain = useMemo(() => {
     const m = new Map<string, string[]>()
     for (const t of transactionRows) {
       if (t.id === existing?.id || t.status === 'batal') continue
-      for (const tr of t.tr_list) m.set(kunciTr(tr), [...(m.get(kunciTr(tr)) ?? []), `${t.transaction_no}${t.plate_number ? ` (${t.plate_number})` : ''}`])
+      for (const no of t.tr_list) m.set(kunciTr(no), [...(m.get(kunciTr(no)) ?? []), `${t.id_tampil}${t.plate_number ? ` (${t.plate_number})` : ''}`])
     }
     return m
   }, [transactionRows, existing?.id])
-  const tripPerTanggal = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const t of transactionRows) {
-      if (t.status === 'batal' || t.id === existing?.id) continue
-      m.set(t.transaction_date, (m.get(t.transaction_date) ?? 0) + 1)
-    }
-    return m
-  }, [transactionRows, existing?.id])
-  /** Backload yang sudah dibuat per trip asal (yang batal tidak dihitung). */
-  const anakBackload = useMemo(() => {
-    const m = new Map<string, string[]>()
-    for (const t of transactionRows) {
-      if (t.backload_dari && t.status !== 'batal') m.set(t.backload_dari, [...(m.get(t.backload_dari) ?? []), t.transaction_no])
-    }
-    return m
-  }, [transactionRows])
-  /**
-   * Trip yang bisa jadi asal backload: ditandai saat Tutup Trip, atau masih berjalan. Satu trip boleh
-   * punya beberapa backload (muatan balik ke tujuan berbeda), dan trip backload boleh dibuatkan
-   * backload lagi; yang sudah punya backload diberi keterangan supaya tidak dobel tanpa sengaja.
-   */
-  const calonAsal = useMemo(() => transactionRows
-    .filter((t) => t.status !== 'batal' && t.vehicle_id && (t.ada_backload || t.status === 'aktif'))
-    .sort((a, b) => Number(!!b.ada_backload) - Number(!!a.ada_backload) || b.transaction_date.localeCompare(a.transaction_date))
-    .slice(0, 60)
-    .map((t) => {
-      const sudah = anakBackload.get(t.id) ?? []
-      return {
-        value: t.id,
-        label: `${t.transaction_no} · ${t.plate_number || 'tanpa mobil'}`,
-        meta: [
-          t.ada_backload ? 'ditandai backload' : STATUS_LABEL[t.status], `${t.muat || '?'} → ${t.bongkar || '?'}`, t.driver_names,
-          sudah.length ? `sudah ada backload: Trip ${sudah.join(', ')}` : '',
-        ].filter(Boolean).join(' · '),
-      }
-    }), [transactionRows, anakBackload])
-
-  /** Nomor trip tiap mobil: urut per bulan Tanggal Berangkat, dibagikan saat disimpan. */
-  const nomorRencana = useMemo(() => {
-    if (mode === 'edit') return [bersama.transaction_no]
-    const ada = dbAll.transactions.map((t) => t.transaction_no)
-    const out: string[] = []
-    for (let i = 0; i < mobil.length; i++) out.push(nomorTripBerikut([...ada, ...out], bersama.transaction_date || todayISO()))
-    return out
-  }, [mode, bersama.transaction_no, bersama.transaction_date, dbAll.transactions, mobil.length])
 
   if (mode === 'edit' && !existing) {
     return (
@@ -293,525 +280,575 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
     )
   }
 
-  /* ── Ubah isian bersama ───────────────────────────────── */
-  const setB = <K extends keyof Bersama>(k: K, v: Bersama[K]) => setBersama((b) => ({ ...b, [k]: v }))
-  const hapusGalat = (...kunci: string[]) => setGalat((g) => {
+  /* ── Ubah isian ───────────────────────────────────────── */
+  const ubah = (patch: Partial<Isian>) => setF((g) => ({ ...g, ...patch }))
+  const hapusGalat = (...k: Array<keyof Galat>) => setGalat((g) => {
     const sisa = { ...g }
-    for (const k of kunci) delete sisa[k]
+    for (const x of k) delete sisa[x]
     return sisa
   })
 
+  /** Klien menentukan tipe layanan; Dedicated memakai kontrak aktif klien itu (terpilih sendiri bila hanya satu). */
+  function pilihKlien(id: string | null) {
+    const k = klienMap.get(id ?? '')
+    const aktif = k?.client_type === 'dedicated' ? db.contracts.filter((c) => c.project_id === k.id && c.status === 'aktif') : []
+    const kontrakIni = aktif.some((c) => c.id === f.contract_id) ? f.contract_id : aktif.length === 1 ? aktif[0].id : ''
+    ubah({ klien: id ?? '', contract_id: kontrakIni })
+    hapusGalat('klien', 'contract_id')
+  }
+
+  const adaAlamatDiArea = (kode: string) => daftarAlamat.some((a) => a.status === 'aktif' && samaArea(a.kode_area, kode))
+
   /**
-   * Pilih rute -> klien, lokasi muat & bongkar, dan harga tiap mobil ikut rute.
-   * Lokasi & harga yang sudah diganti sendiri tidak ditimpa. Klien kontrak -> Dedicated.
-   * `ruteBaru`: rute yang baru saja ditambahkan dari form ini (belum ada di daftar render ini).
+   * Alamat pick up / destinasi dari area rute (Baldy 14 Okt 2026: "ketika rute dipilih, pickup dan destinasinya
+   * ikut terisi"). Banyak alamat di satu area: yang terakhir dipakai trip rute ini, lalu yang paling sering
+   * dipakai, lalu urut nama. Kosong bila area itu belum punya alamat di Master Alamat.
+   */
+  function alamatUntukArea(kode: string, sisi: 'pengirim' | 'penerima', routeId: string): string {
+    const diArea = daftarAlamat.filter((a) => a.status === 'aktif' && samaArea(a.kode_area, kode))
+    const cocokSisi = diArea.filter((a) => a.jenis === 'keduanya' || a.jenis === sisi)
+    const calon = cocokSisi.length ? cocokSisi : diArea
+    if (calon.length <= 1) return calon[0]?.id ?? ''
+    const ids = new Set(calon.map((a) => a.id))
+    const terakhir = transactionRows
+      .filter((t) => t.route_id === routeId && t.status !== 'batal' && ids.has(t[sisi]?.alamat_id ?? ''))
+      .sort((a, b) => b.transaction_date.localeCompare(a.transaction_date) || b.transaction_no.localeCompare(a.transaction_no))[0]
+    if (terakhir?.[sisi]?.alamat_id) return terakhir[sisi].alamat_id
+    const pakai = new Map<string, number>()
+    for (const t of transactionRows) {
+      const id = t[sisi]?.alamat_id
+      if (id && ids.has(id)) pakai.set(id, (pakai.get(id) ?? 0) + 1)
+    }
+    return [...calon].sort((a, b) => (pakai.get(b.id) ?? 0) - (pakai.get(a.id) ?? 0) || a.nama.localeCompare(b.nama, 'id'))[0].id
+  }
+
+  /**
+   * Pilih rute: harga ikut Harga Rute (kecuali sudah diganti), pick up & destinasi diisi dari area rute.
+   * Isian yang tadinya terisi otomatis ikut berganti bersama rutenya; yang dipilih sendiri tidak disentuh.
    */
   function pilihRute(routeId: string | null, ruteBaru?: Route) {
     const baru = ruteBaru ?? (routeId ? ruteMap.get(routeId) : undefined)
-    const lama = rute
-    const klienRute = klienMap.get(baru?.project_id ?? '')
-    const kontrakKlien = klienRute?.client_type === 'kontrak'
-      ? db.contracts.filter((c) => c.project_id === klienRute.id && c.status === 'aktif')
-      : []
-    if (!dedicated && kontrakKlien.length > 0) toast.info(`${klienRute!.project_name} klien kontrak: layanan diganti ke Dedicated.`)
-    const lamaL = lokasiRute(lama?.route_name ?? '')
-    const baruL = lokasiRute(baru?.route_name ?? '')
-    setBersama((b) => {
-      const layanan: ServiceType = b.service_type === 'dedicated' || kontrakKlien.length > 0 ? 'dedicated' : 'callout'
-      const kontrakIni = b.service_type === 'dedicated' && b.contract_id ? b.contract_id : kontrakKlien.length === 1 ? kontrakKlien[0].id : ''
-      const pemilikKontrak = db.contracts.find((c) => c.id === kontrakIni)?.project_id
-      const ikut = (isi: string, dariLama: string, dariBaru: string) => (!isi.trim() || samaLokasi(isi, dariLama) ? dariBaru : isi)
-      return {
-        ...b,
-        route_id: routeId ?? '',
-        service_type: layanan,
-        contract_id: layanan === 'dedicated' ? kontrakIni : '',
-        project_id: layanan === 'dedicated' ? pemilikKontrak ?? baru?.project_id ?? '' : baru?.project_id ?? '',
-        lokasi_muat: ikut(b.lokasi_muat, lamaL.asal, baruL.asal),
-        lokasi_bongkar: ikut(b.lokasi_bongkar, lamaL.tujuan, baruL.tujuan),
-      }
+    const lama = ruteMap.get(f.route_id)
+    const a = baru ? kodeAreaRute(baru) : { asal: '', tujuan: '' }
+    const ikutRute = (sisi: 'pengirim' | 'penerima') => !f[sisi] || !!otomatis[sisi]
+    const isi = (sisi: 'pengirim' | 'penerima', kode: string) =>
+      ikutRute(sisi) ? (baru ? alamatUntukArea(kode, sisi, baru.id) : '') : f[sisi]
+    const pengirim = isi('pengirim', a.asal)
+    const penerima = isi('penerima', a.tujuan)
+    setF({
+      ...f,
+      route_id: baru?.id ?? '',
+      harga: !f.harga || f.harga === (lama?.price ?? 0) ? baru?.price ?? 0 : f.harga,
+      pengirim,
+      penerima,
     })
-    setMobil((ms) => ms.map((m) => (!m.harga || m.harga === (lama?.price ?? 0) ? { ...m, harga: baru?.price ?? 0 } : m)))
-    hapusGalat('route_id', 'contract_id')
+    setOtomatis((o) => ({ ...o, pengirim: ikutRute('pengirim') && !!pengirim, penerima: ikutRute('penerima') && !!penerima }))
+    hapusGalat('route_id', 'override_note')
   }
 
-  function gantiLayanan(l: ServiceType) {
-    setBersama((b) => {
-      if (l === 'callout') return { ...b, service_type: l, contract_id: '', project_id: rute?.project_id ?? '' }
-      const kontrakRute = db.contracts.filter((c) => c.status === 'aktif' && !!rute?.project_id && c.project_id === rute.project_id)
-      const kontrakIni = b.contract_id || (kontrakRute.length === 1 ? kontrakRute[0].id : '')
-      const pemilik = db.contracts.find((c) => c.id === kontrakIni)?.project_id
-      return { ...b, service_type: l, contract_id: kontrakIni, project_id: pemilik ?? rute?.project_id ?? '' }
-    })
-    setGalat({})
+  /** Kode area rute yang belum punya alamat: dipakai sebagai kode area alamat baru. */
+  const areaKosong = (kode: string) => (kode && !adaAlamatDiArea(kode) ? kode : undefined)
+  /** Rute sudah dipilih tapi areanya belum punya alamat: tawarkan langsung menambah alamat area itu. */
+  function petunjukTanpaAlamat(sisi: 'pengirim' | 'penerima', kode: string): ReactNode {
+    if (!rute || f[sisi] || !kode || adaAlamatDiArea(kode)) return null
+    return (
+      <>
+        Area {kode} belum punya alamat di Master Alamat.{' '}
+        {bolehMaster
+          ? <TombolTeks onClick={() => setTambahAlamat({ sisi, nama: '', kode })}><FaPlus size={10} className="mr-1 inline" />Tambah alamat {kode}</TombolTeks>
+          : 'Minta Manager / Owner menambahkannya.'}
+      </>
+    )
   }
 
-  function pilihKontrak(cid: string | null) {
-    const k = db.contracts.find((c) => c.id === cid)
-    setBersama((b) => ({ ...b, contract_id: cid ?? '', project_id: k?.project_id ?? rute?.project_id ?? '' }))
-    hapusGalat('contract_id')
-  }
-
-  /* ── Ubah isian per mobil ─────────────────────────────── */
-  const ubahMobil = (i: number, patch: Partial<MobilForm>) => setMobil((ms) => ms.map((m, j) => (j === i ? { ...m, ...patch } : m)))
+  /* ── Kendaraan & supir ────────────────────────────────── */
   const sopirAktif = (id: string) => sopirTerdaftar.some((d) => d.id === id && d.status === 'aktif')
-
-  function pilihKendaraan(i: number, v: string | null) {
-    const sopirTerakhir = v ? pasangan.sopirMobil.get(v) : undefined
-    setMobil((ms) => ms.map((m, j) => {
-      if (j !== i) return m
-      const dipakaiLain = !!sopirTerakhir && ms.some((x, k) => k !== i && x.driver_ids.includes(sopirTerakhir))
-      const isi = !!sopirTerakhir && !m.driver_ids[0] && sopirAktif(sopirTerakhir) && !dipakaiLain
-      return {
-        ...m, vehicle_id: v ?? '',
-        driver_ids: isi ? [sopirTerakhir!, ...m.driver_ids.slice(1)] : m.driver_ids,
-        otomatis: isi ? { sopir: db.vehicles.find((x) => x.id === v)?.plate_number ?? '' } : {},
-      }
-    }))
-    hapusGalat(`m${i}.vehicle`, 'mobil')
+  const kendaraanAktif = (id: string) => db.vehicles.some((v) => v.id === id && v.status === 'aktif')
+  /** Gandengan ikut konfigurasi kendaraan baru, kecuali sudah dipilih sendiri. */
+  function gandenganIkut(gandengan: string, kendaraanLama: string, kendaraanBaru: string) {
+    const lama = rapikanGandengan(db.vehicles.find((v) => v.id === kendaraanLama)?.configuration ?? '')
+    const baru = rapikanGandengan(db.vehicles.find((v) => v.id === kendaraanBaru)?.configuration ?? '')
+    return !gandengan || gandengan === lama ? baru : gandengan
   }
 
-  function ubahSopir(i: number, k: number, v: string | null) {
-    const mobilTerakhir = k === 0 && v ? pasangan.mobilSopir.get(v) : undefined
-    setMobil((ms) => ms.map((m, j) => {
-      if (j !== i) return m
-      const dipakaiLain = !!mobilTerakhir && ms.some((x, n) => n !== i && x.vehicle_id === mobilTerakhir)
-      const isi = !!mobilTerakhir && !m.vehicle_id && !dipakaiLain && db.vehicles.some((x) => x.id === mobilTerakhir && x.status === 'aktif')
-      return {
-        ...m,
-        driver_ids: m.driver_ids.map((x, n) => (n === k ? v ?? '' : x)),
-        vehicle_id: isi ? mobilTerakhir! : m.vehicle_id,
-        otomatis: isi ? { kendaraan: db.drivers.find((d) => d.id === v)?.driver_name ?? '' } : k === 0 ? { ...m.otomatis, sopir: undefined } : m.otomatis,
-      }
-    }))
-    hapusGalat(`m${i}.sopir`, 'mobil')
-  }
-
-  function tambahMobil() {
-    setMobil((ms) => {
-      const terakhir = ms.at(-1)
-      const terpakai = [...semuaId, ...ms.map((m) => m.trip_id)]
-      // Satu order biasanya satu TR untuk semua mobil: TR mobil sebelumnya ikut tersalin.
-      return [...ms, {
-        kunci: kunciBaru(), vehicle_id: '', driver_ids: [''], trip_id: buatKodeUnik(terpakai),
-        tr: [...(terakhir?.tr ?? [])], harga: rute?.price ?? 0, otomatis: {},
-      }]
+  function pilihKendaraan(v: string | null) {
+    const id = v ?? ''
+    const sopirTerakhir = id ? pasangan.sopirMobil.get(id) : undefined
+    // Supir terakhir kendaraan ini hanya diisi bila aktif dan tidak sedang di trip lain.
+    const isi = !!sopirTerakhir && !f.driver_ids[0] && sopirAktif(sopirTerakhir) && !ditahan.supir.has(sopirTerakhir) && !f.driver_ids.includes(sopirTerakhir)
+    setF({
+      ...f,
+      vehicle_id: id,
+      gandengan: gandenganIkut(f.gandengan, f.vehicle_id, id),
+      driver_ids: isi ? [sopirTerakhir!, ...f.driver_ids.slice(1)] : f.driver_ids,
     })
+    setOtomatis((o) => ({ ...o, kendaraan: undefined, sopir: isi ? db.vehicles.find((x) => x.id === id)?.plate_number ?? '' : undefined }))
+    hapusGalat('vehicle_id')
   }
 
-  /* ── Harga & komisi ───────────────────────────────────── */
-  const hargaBeda = (m: MobilForm) => !!rute && m.harga > 0 && m.harga !== rute.price
-  const adaOverride = !dedicated && mobil.some(hargaBeda)
-  const perkiraanKomisi = hitungKomisiTrip(db.commissionSchemes, {
-    role: 'sopir', layanan: bersama.service_type,
-    konfigurasi: db.vehicles.find((v) => v.id === mobil[0]?.vehicle_id)?.configuration ?? '',
-    cost_value: mobil[0]?.harga ?? 0, route_price: rute?.price ?? 0, ujroute: rute?.ujroute ?? 0, uj_total: 0,
-  })
+  function ubahSupir(k: number, v: string | null) {
+    const id = v ?? ''
+    const mobilTerakhir = k === 0 && id ? pasangan.mobilSopir.get(id) : undefined
+    // Kendaraan terakhir supir hanya diisi bila aktif dan tidak sedang ditahan trip lain.
+    const isi = !!mobilTerakhir && !f.vehicle_id && !kunciMobil && kendaraanAktif(mobilTerakhir) && !tahanKendaraan(mobilTerakhir)
+    setF({
+      ...f,
+      driver_ids: f.driver_ids.map((x, n) => (n === k ? id : x)),
+      vehicle_id: isi ? mobilTerakhir! : f.vehicle_id,
+      gandengan: isi ? gandenganIkut(f.gandengan, f.vehicle_id, mobilTerakhir!) : f.gandengan,
+    })
+    if (isi) setOtomatis((o) => ({ ...o, kendaraan: db.drivers.find((d) => d.id === id)?.driver_name ?? '' }))
+    else if (k === 0) setOtomatis((o) => ({ ...o, sopir: undefined }))
+    if (isi) hapusGalat('vehicle_id')
+  }
+
+  /* ── Add Items Details ────────────────────────────────── */
+  const ubahItem = (i: number, patch: Partial<ItemMuatan>) => ubah({ muatan: f.muatan.map((m, n) => (n === i ? { ...m, ...patch } : m)) })
+  const hapusItem = (i: number) => ubah({ muatan: f.muatan.length > 1 ? f.muatan.filter((_, n) => n !== i) : [itemKosong()] })
+
+  /* ── Harga ────────────────────────────────────────────── */
+  const hargaBeda = !dedicated && !!rute && f.harga > 0 && f.harga !== rute.price
+  const tampilHarga = !dedicated && !!rute && bolehOverride && (ubahHarga || hargaBeda)
 
   /* ── Validasi & simpan ────────────────────────────────── */
   function validasi(): boolean {
     const e: Galat = {}
-    if (!bersama.transaction_date) e.transaction_date = 'Tanggal Berangkat wajib diisi.'
-    if (dedicated && !bersama.contract_id) e.contract_id = 'Layanan Dedicated wajib memilih nomor kontrak.'
-    if (!dedicated && wajib(!!existing?.route_id) && !bersama.route_id) e.route_id = 'Rute wajib dipilih.'
-    if (mode === 'edit') {
-      const no = bersama.transaction_no.trim()
-      if (!no) e.transaction_no = 'Nomor Trip wajib diisi.'
-      else if (dbAll.transactions.some((t) => t.transaction_no === no && t.id !== existing?.id)) e.transaction_no = 'Nomor Trip sudah dipakai.'
+    if (wajib(!!existing?.project_id) && !f.klien) e.klien = 'Klien wajib dipilih: tipe layanan dan tagihan mengikuti klien.'
+    if (!f.transaction_date) e.transaction_date = 'Tanggal berangkat wajib diisi.'
+    if (dedicated && !f.contract_id) {
+      e.contract_id = kontrakKlien.length ? 'Klien Dedicated: pilih kontrak yang dipakai trip ini.' : 'Klien Dedicated ini belum punya kontrak aktif. Tambahkan dulu di halaman klien.'
     }
-    if (adaOverride && !bersama.override_note.trim() && (mode === 'create' || mobil[0].harga !== existing?.cost_value)) {
-      e.override_note = 'Tulis alasan harga berbeda dari Harga route.'
-    }
-    const idDiForm = mobil.map((m) => m.trip_id.trim().toUpperCase())
-    mobil.forEach((m, i) => {
-      if (wajib(!!existing?.vehicle_id) && !m.vehicle_id) e[`m${i}.vehicle`] = 'No. Kendaraan wajib dipilih.'
-      const id = m.trip_id.trim().toUpperCase()
-      // Mode ubah: ID Perjalanan dikunci dan disimpan apa adanya, jadi tidak diperiksa ulang.
-      if (mode === 'create') {
-        if (!id) e[`m${i}.id`] = 'ID Perjalanan wajib diisi. Klik Generate untuk membuatnya.'
-        else if (idDiForm.indexOf(id) !== i) e[`m${i}.id`] = 'ID Perjalanan sama dengan mobil lain di form ini.'
-        else {
-          const lain = dbAll.transactions.find((t) => t.id !== existing?.id && (t.trip_ids ?? []).some((x) => x.toUpperCase() === id))
-          if (lain) e[`m${i}.id`] = `ID Perjalanan sudah dipakai Trip ${lain.transaction_no}.`
-        }
-      }
-      const adaSopir = m.driver_ids.some(Boolean)
-      if (mode === 'edit' && bersama.status === 'aktif' && !adaSopir && wajib(!!(existing?.driver_ids?.length || existing?.driver_id))) {
-        e[`m${i}.sopir`] = 'Pilih sopir, atau ubah status ke Menunggu Sopir.'
-      }
-    })
-    const mobilDipilih = mobil.map((m) => m.vehicle_id).filter(Boolean)
-    const sopirDipilih = mobil.flatMap((m) => m.driver_ids.filter(Boolean))
-    if (new Set(mobilDipilih).size < mobilDipilih.length) e.mobil = 'Satu kendaraan dipilih di dua mobil. Tiap mobil harus kendaraan berbeda.'
-    else if (new Set(sopirDipilih).size < sopirDipilih.length) e.mobil = 'Satu sopir dipilih di dua mobil.'
+    if (wajib(!!existing?.vehicle_id) && !f.vehicle_id) e.vehicle_id = 'Kendaraan wajib dipilih.'
+    const tahan = tahanKendaraan(f.vehicle_id)
+    if (tahan) e.vehicle_id = `Kendaraan ini masih di trip ${tahan.id_tampil} dan belum kembali ke pool. Pilih kendaraan lain, atau catat dulu kendaraannya kembali di pool pada trip itu.`
+    if (!dedicated && wajib(!!existing?.route_id) && !f.route_id) e.route_id = 'Rute wajib dipilih.'
+    if (hargaBeda && !f.override_note.trim() && (mode === 'create' || f.harga !== existing?.cost_value)) e.override_note = 'Tulis alasan harga berbeda dari Harga Rute.'
     setGalat(e)
     return Object.keys(e).length === 0
   }
 
-  function isiTrip(m: MobilForm, nomor: string): Omit<CommissionTransaction, 'id' | 'created_at' | 'updated_at' | 'workspace'> {
-    const sopir = [...new Set(m.driver_ids.filter(Boolean))]
-    const projectId = (dedicated ? klienKontrak?.id : rute?.project_id) || bersama.project_id
-    const harga = dedicated ? 0 : m.harga
-    const beda = !dedicated && hargaBeda(m)
-    const statusOtomatis: TripStatus = sopir.length ? 'aktif' : 'menunggu_sopir'
-    return {
-      ...(existing ?? {
-        sj_no: '', recipient_name: '', recipient_address_1: '', recipient_address_2: '',
-        job_order_id: '', party: '', goods_type: '', kosongan: '', location: '', ship: '',
-        tr_reference: '', pi_number: '', pi_status: '', is_marked: false, bon_date: null, personal_bon: 0,
-        printed_at: null, cancelled_at: null, cancel_reason: '', cancel_settlement: [], container_no: '',
-      }),
+  /** Gulir ke isian merah pertama: jangan sampai pesan galat tidak terlihat. */
+  function gulirKeGalat() {
+    window.setTimeout(() => {
+      akarRef.current?.querySelector('.invalid-feedback, .is-invalid')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }, 60)
+  }
+
+  /** Salinan alamat untuk trip; isian lama yang tidak diganti disimpan apa adanya (catatannya ikut yang baru). */
+  function titikTrip(nilai: string, catatan: string, lama: TitikAlamat | undefined): TitikAlamat | undefined {
+    if (nilai === TITIK_LAMA) return titikRapi(lama ? { ...lama, catatan } : undefined)
+    const a = daftarAlamat.find((x) => x.id === nilai)
+    if (!a) return undefined
+    // Alamat sama dengan salinan lama: pertahankan salinannya (Master Alamat mungkin sudah berubah sesudahnya).
+    if (lama?.alamat_id === a.id) return titikRapi({ ...lama, catatan })
+    return titikDariAlamat(a, catatan)
+  }
+
+  function isiTrip(nomor: string): Omit<CommissionTransaction, 'id' | 'created_at' | 'updated_at' | 'workspace'> {
+    const sopir = [...new Set(f.driver_ids.filter(Boolean))]
+    const muatan = f.muatan.map((m) => ({ id_perjalanan: m.id_perjalanan.trim().toUpperCase(), keterangan: m.keterangan.trim() }))
+      .filter((m) => m.id_perjalanan || m.keterangan)
+    /**
+     * Mode ubah: isian yang tidak disentuh (masih sama dengan saat form dibuka) menyimpan nilai lama apa adanya,
+     * jadi Audit Log hanya mencatat yang benar-benar diubah.
+     */
+    const tetap = <T,>(k: keyof Isian, baru: T, lama: T | undefined): T | undefined =>
+      existing && JSON.stringify(f[k]) === JSON.stringify(awal[k]) ? lama : baru
+    const titik = (k: 'pengirim' | 'penerima', ck: 'catatan_pengirim' | 'catatan_penerima', lama: TitikAlamat | undefined) => {
+      const baru = titikTrip(f[k], f[ck], lama)
+      return existing && (samaTitik(lama, baru) || (f[k] === awal[k] && f[ck] === awal[ck])) ? lama : baru
+    }
+    const statusTrip: TripStatus = !existing || existing.status === 'menunggu_sopir' || existing.status === 'aktif' || existing.status === 'draft'
+      ? (sopir.length ? 'aktif' : 'menunggu_sopir')
+      : existing.status
+    const isi = {
+      ...(existing ?? FIELD_LAIN),
       transaction_no: nomor,
-      transaction_date: bersama.transaction_date,
-      order_date: bersama.order_date,
-      service_type: bersama.service_type,
-      contract_id: dedicated ? bersama.contract_id : '',
-      // Mode ubah: ID Perjalanan terkunci, simpan persis seperti data lama.
-      // Mode tambah: ID dari form (data baru, tidak ada ID lain di belakangnya).
-      trip_ids: existing ? [...(existing.trip_ids ?? [])] : [m.trip_id.trim().toUpperCase()],
-      route_id: bersama.route_id,
-      tr_numbers: m.tr,
-      lokasi_muat: bersama.lokasi_muat.trim(),
-      lokasi_bongkar: bersama.lokasi_bongkar.trim(),
-      destination_detail: bersama.lokasi_bongkar.trim(),
-      manager_id: bersama.manager_id,
-      manager_name: bersama.manager_id ? '' : bersama.manager_name.trim(),
-      project_id: projectId,
-      status: mode === 'edit' ? bersama.status : statusOtomatis,
-      vehicle_id: m.vehicle_id,
+      transaction_date: f.transaction_date,
+      // Tanggal order = hari trip didaftarkan (tidak lagi diisi di form).
+      order_date: existing ? existing.order_date : todayISO(),
+      service_type: layanan,
+      contract_id: dedicated ? f.contract_id : '',
+      project_id: f.klien,
+      tr_numbers: tetap('tr', f.tr, existing?.tr_numbers),
+      route_id: f.route_id,
+      vehicle_id: f.vehicle_id,
+      gandengan: tetap('gandengan', rapikanGandengan(f.gandengan), existing?.gandengan),
       driver_id: sopir[0] ?? '',
       driver_ids: sopir,
-      cost_value: harga,
-      override_note: beda ? bersama.override_note.trim() : '',
-      override_attachments: beda ? bersama.override_attachments : [],
-      notes: bersama.notes.trim(),
-      ...(asal ? { backload_dari: asal.id } : {}),
+      status: statusTrip,
+      // Harga 0 di trip lama = ikut Harga Rute; tetap 0 selama harga dan rutenya tidak diubah.
+      cost_value: dedicated ? 0 : existing && f.route_id === existing.route_id ? tetap('harga', f.harga, existing.cost_value) ?? 0 : f.harga,
+      override_note: hargaBeda ? f.override_note.trim() : '',
+      override_attachments: hargaBeda ? f.override_attachments : [],
+      pengirim: titik('pengirim', 'catatan_pengirim', existing?.pengirim),
+      penerima: titik('penerima', 'catatan_penerima', existing?.penerima),
+      muatan: tetap('muatan', muatan, existing?.muatan),
+      // ID Perjalanan tetap disalin ke trip_ids supaya bisa dicari dari mana pun.
+      trip_ids: tetap('muatan', muatan.map((m) => m.id_perjalanan).filter(Boolean), existing?.trip_ids) ?? [],
+      kosongan: f.kosongan.trim(),
+      ...(asal ? { backload_dari: asal.id, manager_id: asal.manager_id ?? '', manager_name: asal.manager_name ?? '' } : {}),
     }
+    // Kosong tetap kosong seperti tersimpan (undefined / '' / []), supaya tidak tercatat "— → —".
+    if (existing) {
+      const lama = existing as unknown as Record<string, unknown>
+      const baru = isi as unknown as Record<string, unknown>
+      const kosong = (v: unknown) => v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)
+      for (const k of Object.keys(baru)) if (kosong(baru[k]) && kosong(lama[k])) baru[k] = lama[k]
+    }
+    return isi
   }
 
   function simpan(cetak: boolean) {
-    if (!validasi()) { toast.error('Periksa kembali isian yang ditandai merah.'); return }
+    if (!validasi()) { toast.error('Periksa kembali isian yang ditandai merah.'); gulirKeGalat(); return }
     if (existing) {
-      ubahTrip(existing.id, isiTrip(mobil[0], bersama.transaction_no.trim()))
-      toast.success('Trip berhasil diperbarui.')
+      ubahTrip(existing.id, isiTrip(existing.transaction_no))
+      toast.success(`Trip ${existing.transaction_no} berhasil diperbarui.`)
       navigate(`/transaksi/trip/${existing.id}${cetak ? '?print=1' : ''}`)
       return
     }
-    const dibuat = mobil.map((m, i) => buatTrip(isiTrip(m, nomorRencana[i])))
+    // Kode Trip dicek ulang saat disimpan: bila sudah dipakai trip lain, dipakai nomor berikutnya.
+    const nomorSekarang = dbAll.transactions.map((t) => t.transaction_no)
+    const nomor = !nomorSekarang.includes(kodeAwal) ? kodeAwal
+      : asal ? idBackload(asal.transaction_no, nomorSekarang) : nomorTripBerikut(nomorSekarang, todayISO())
+    const baru = buatTrip(isiTrip(nomor))
     if (asal && !asal.ada_backload) ubahTrip(asal.id, { ada_backload: true })
-    if (dibuat.length === 1) {
-      toast.success(asal ? `Backload tersimpan sebagai Trip ${dibuat[0].transaction_no}.` : 'Trip berhasil disimpan. Catat uang jalan di tab Uang Jalan saat dibayar.')
-      navigate(`/transaksi/trip/${dibuat[0].id}${cetak ? '?print=1' : ''}`)
-      return
-    }
-    toast.success(`${dibuat.length} trip tersimpan: ${dibuat.map((t) => t.transaction_no).join(', ')}.`)
-    navigate(cetak ? `/transaksi/trip?cetak=${dibuat.map((t) => t.id).join(',')}` : '/transaksi/trip')
+    toast.success(nomor !== kodeAwal
+      ? `Kode ${kodeAwal} sudah dipakai, trip tersimpan sebagai ${nomor}.`
+      : asal ? `Backload / lanjutan ${nomor} tersimpan.` : `Trip ${nomor} tersimpan. Catat uang jalan di tab Uang Jalan saat dibayar.`)
+    navigate(`/transaksi/trip/${baru.id}${cetak ? '?print=1' : ''}`)
   }
 
   /* ── Tampilan ─────────────────────────────────────────── */
-  const judul = mode === 'edit' ? `Ubah Trip ${existing?.transaction_no}` : backload ? 'Tambah Trip Backload' : 'Tambah Trip'
-  const sisaKontrak = kontrak ? kontrak.value - (terpakaiKontrak.get(kontrak.id) ?? 0) : 0
-  const ringkas = mode === 'edit' ? `Trip ${bersama.transaction_no}`
-    : mobil.length === 1 ? `Trip ${nomorRencana[0]}`
-    : `${mobil.length} mobil · Trip ${nomorRencana[0]} – ${nomorRencana.at(-1)}`
+  const lewatKunci = 'Dikunci karena trip sudah jalan.'
+  const kendaraanDiTripLain = f.vehicle_id ? ditahan.kendaraan.get(f.vehicle_id) : undefined
+  const refDipakai = f.tr.map((no) => ({ no, trip: refLain.get(kunciTr(no)) ?? [] })).filter((x) => x.trip.length)
+  const anakBackload = asal ? transactionRows.filter((t) => t.backload_dari === asal.id && t.status !== 'batal').map((t) => t.id_tampil) : []
+
+  const hintKlien: ReactNode = galat.klien ? undefined
+    : kunci ? lewatKunci
+    : klien ? <>Tipe layanan <span className="font-semibold text-ink-2">{CLIENT_TYPE_LABEL[klien.client_type] ?? 'Callout'}</span> terdeteksi dari klien {klien.project_code}.</>
+    : 'Pilih dari Listing Master Data Klien terdaftar (Tipe Layanan Callout / Dedicated terdeteksi dari kode Klien).'
+  const hintKendaraan: ReactNode = galat.vehicle_id ? undefined
+    : kunci ? lewatKunci
+    : kunciMobil ? 'Mengikuti trip asal backload.'
+    : otomatis.kendaraan ? `Terisi dari trip terakhir ${otomatis.kendaraan}. Ganti bila beda.`
+    : kendaraan && kendaraan.status !== 'aktif' ? `Status kendaraan: ${kendaraan.status}.`
+    : undefined
+  const konfigurasi = kendaraan?.configuration ?? ''
+  const hintGandengan: ReactNode = kunci ? lewatKunci
+    : konfigurasi && rapikanGandengan(f.gandengan) !== rapikanGandengan(konfigurasi) ? `Berbeda dari konfigurasi kendaraan (${labelGandengan(konfigurasi)}).`
+    : undefined
+  const hintRute: ReactNode = galat.route_id ? undefined
+    : kunci ? lewatKunci
+    : backload && !rute ? `Pilih rute dari lokasi bongkar trip asal${asal?.bongkar ? ` (${asal.bongkar})` : ''}.`
+    : dedicated && !rute ? 'Opsional untuk Dedicated: patokan uang jalan dan lokasi muat / bongkar.'
+    : 'Pilih rute pengiriman, mis. CIB - DURI.'
+  const ringkasan = [
+    kodeAwal,
+    klien ? `${klien.project_code} (${CLIENT_TYPE_LABEL[klien.client_type] ?? 'Callout'})` : 'klien belum dipilih',
+    rute ? rute.route_name : 'rute belum dipilih',
+    kendaraan ? kendaraan.plate_number : 'kendaraan belum dipilih',
+  ].join(' · ')
 
   return (
-    <div className="pb-20">
+    <div ref={akarRef} className="pb-28 sm:pb-20">
       <PageHeader
-        title={judul}
+        title={kodeAwal}
         crumbs={[
           { label: 'Trip / Job Order', to: '/transaksi/trip' },
-          ...(existing ? [{ label: existing.transaction_no, to: `/transaksi/trip/${existing.id}` }] : []),
-          { label: mode === 'edit' ? 'Ubah' : 'Tambah' },
+          ...(existing ? [{ label: existing.transaction_no, to: `/transaksi/trip/${existing.id}` }] : asal ? [{ label: asal.id_tampil, to: `/transaksi/trip/${asal.id}` }] : []),
+          { label: mode === 'edit' ? 'Ubah Trip' : backload ? 'Backload / Lanjutan' : 'Tambah Trip' },
         ]}
-        description={mode === 'edit'
-          ? 'Klien, harga, dan patokan uang jalan ikut rute. Uang jalan, biaya, perjalanan, dan lampiran dicatat di halaman detail trip.'
-          : 'Isi layanan dan rute sekali, lalu tambahkan mobil. Tiap mobil tersimpan sebagai trip sendiri dengan Berita Acara masing-masing.'}
+        description="Tiap mobil tersimpan sebagai trip sendiri dengan Berita Acara Serah Terima masing-masing."
       />
 
       {!bolehSimpan && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-[#f6e2ac] bg-[#fff8e6] px-3.5 py-2.5 text-[12.5px] text-[#8a6100]">
-          <FaTriangleExclamation size={15} className="mt-px shrink-0" />
+        <Peringatan className="mb-4">
           Peran {user?.role === 'viewer' ? 'Viewer' : 'ini'} tidak dapat menyimpan perubahan. Form ini hanya untuk melihat struktur data.
-        </div>
+        </Peringatan>
       )}
-
       {sudahJalan && existing && (
-        <KunciTrip status={existing.status} terbuka={bukaKunci} bolehBuka={bolehOverride} onBuka={() => setBukaKunci(true)} />
+        <KunciTrip status={existing.status} terbuka={bukaKunci} bolehBuka={bolehOverride} onBuka={() => setBukaKunci(true)}
+          isian="klien & kontrak, kendaraan, gandengan, supir, dan rute" />
       )}
-
+      {mode === 'create' && backloadDari && !asal && (
+        <Peringatan className="mb-4">
+          {calonAsal ? `Trip asal ${calonAsal.id_tampil} sudah dibatalkan, jadi tidak bisa dilanjutkan.` : 'Trip asal backload tidak ditemukan (mungkin sudah dihapus).'}
+          {' '}Form ini dibuka sebagai trip baru biasa.
+        </Peringatan>
+      )}
       {asal && (
         <div className="mb-4 rounded-lg border border-brand-100 bg-brand-50/70 px-4 py-3 text-[12.5px] text-brand-800">
-          <p>
-            Backload dari <Link to={`/transaksi/trip/${asal.id}`} className="font-semibold underline">Trip {asal.transaction_no}</Link>
-            {' '}({asal.plate_number || 'tanpa mobil'}{asal.driver_names && `, ${asal.driver_names}`}). Mobil dan sopir mengikuti trip asal;
-            lokasi muat diambil dari lokasi bongkarnya{asal.bongkar && <>: <span className="font-semibold">{asal.bongkar}</span></>}.
+          <p className="font-semibold">
+            Backload / Lanjutan dari Trip <Link to={`/transaksi/trip/${asal.id}`} className="underline">{asal.id_tampil}</Link>
+          </p>
+          <p className="mt-0.5">
+            Kendaraan {asal.plate_number || '(belum ada)'}{asal.driver_names && ` dan supir ${asal.driver_names}`} mengikuti trip asal.
+            Pick up dari lokasi bongkarnya{asal.bongkar && <>: <span className="font-semibold">{asal.bongkar}</span></>}.
           </p>
           {asal.status !== 'selesai' && (
             <p className="mt-1 text-brand-700">Trip asal masih {STATUS_LABEL[asal.status]}. Tutup trip asal setelah POD-nya difoto atau diterima.</p>
           )}
-          {(anakBackload.get(asal.id) ?? []).length > 0 && (
-            <p className="mt-1 text-brand-700">
-              Trip asal sudah punya backload: Trip {anakBackload.get(asal.id)!.join(', ')}. Yang ini tersimpan sebagai backload berikutnya dengan ID sendiri.
-            </p>
+          {anakBackload.length > 0 && (
+            <p className="mt-1 text-brand-700">Trip asal sudah punya backload: {anakBackload.join(', ')}. Yang ini tersimpan sebagai backload berikutnya.</p>
           )}
         </div>
       )}
 
-      {/* Layanan & Rute */}
-      <Card className="mb-4">
-        <CardHeader
-          title="Layanan & Rute"
-          subtitle={klien
-            ? `Klien ${klien.project_name}, ikut ${dedicated && klienKontrak ? `kontrak ${kontrak?.contract_no}` : 'rute'}.`
-            : 'Klien ikut rute yang dipilih (Callout) atau pemilik kontrak (Dedicated).'}
-        />
-        <div className="space-y-4 p-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Radio name="layanan" checked={!dedicated} disabled={kunci} onChange={() => gantiLayanan('callout')} label="Callout"
-              description="Order per perjalanan dengan TR dari klien; harga ikut rute." />
-            <Radio name="layanan" checked={dedicated} disabled={kunci} onChange={() => gantiLayanan('dedicated')} label="Dedicated"
-              description="Kendaraan dikontrak satu klien; wajib memilih nomor kontrak." />
-          </div>
-
-          {mode === 'create' && !backload && (
-            <div>
-              <Checkbox label="Trip ini backload dari trip sebelumnya" checked={pilihAsal} onChange={(e) => setPilihAsal(e.target.checked)} />
-              {pilihAsal && (
-                <div className="mt-2 max-w-xl">
-                  <SearchableSelect options={calonAsal} value={null} placeholder="Pilih trip asal..." searchPlaceholder="Ketik nomor trip atau plat..."
-                    emptyText="Belum ada trip yang ditandai backload atau masih berjalan."
-                    onChange={(v) => v && navigate(`/transaksi/trip/tambah?backload=${v}`, { replace: true })} />
-                  <p className="mt-1 text-[12px] text-ink-3">Trip yang ditandai "ada backload" saat Tutup Trip tampil paling atas.</p>
-                </div>
+      <div className="space-y-4">
+        {/* Konfigurasi */}
+        <Bagian judul="Konfigurasi">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,13rem)]">
+            <Field label="Klien" required={wajib(!!existing?.project_id)} error={galat.klien} hint={hintKlien}>
+              {(fid) => (
+                <SearchableSelect id={fid} options={opsiKlien} value={f.klien || null} invalid={!!galat.klien} disabled={kunci}
+                  placeholder="Pilih klien..." searchPlaceholder="Ketik nama atau kode klien..." onChange={pilihKlien} />
               )}
-            </div>
-          )}
-
+            </Field>
+            <Field label="No Referensi"
+              hint={refDipakai.length > 0
+                ? `${refDipakai.map((x) => `${x.no} juga dipakai trip ${x.trip.join(', ')}`).join('; ')}. Wajar bila satu order dikirim beberapa mobil.`
+                : 'Isi dengan nomor referensi penugasan seperti no TR dari klien.'}>
+              {(fid) => <NoReferensiInput id={fid} value={f.tr} onChange={(tr) => ubah({ tr })} />}
+            </Field>
+            <Field label="Tanggal Berangkat" required error={galat.transaction_date} hint={galat.transaction_date ? undefined : 'Hari trip jalan.'}>
+              {(fid) => (
+                <DateInput id={fid} value={f.transaction_date} invalid={!!galat.transaction_date}
+                  onChange={(e) => { ubah({ transaction_date: e.target.value }); hapusGalat('transaction_date') }} />
+              )}
+            </Field>
+          </div>
           {dedicated && (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
               <Field label="No. Kontrak" required error={galat.contract_id}
-                hint={galat.contract_id ? undefined : db.contracts.length === 0 ? <>Belum ada kontrak. Tambahkan di menu <Link to="/master/klien" className="text-brand-700 underline">Klien / Pelanggan</Link>.</> : 'Kontrak aktif di workspace ini.'}>
+                hint={galat.contract_id ? undefined : kunci ? lewatKunci : kontrakKlien.length === 1 ? 'Satu-satunya kontrak aktif klien ini.' : 'Kontrak aktif klien ini.'}>
                 {(fid) => (
-                  <SearchableSelect id={fid} options={contractOptions} value={bersama.contract_id || null} invalid={!!galat.contract_id} disabled={kunci}
-                    placeholder="Pilih nomor kontrak..." searchPlaceholder="Ketik nomor kontrak atau klien..." onChange={pilihKontrak} />
+                  <SearchableSelect id={fid} options={opsiKontrak} value={f.contract_id || null} invalid={!!galat.contract_id} disabled={kunci}
+                    placeholder="Pilih nomor kontrak..." emptyText="Belum ada kontrak aktif."
+                    onChange={(v) => { ubah({ contract_id: v ?? '' }); hapusGalat('contract_id') }} />
                 )}
               </Field>
               {kontrak && (
-                <div className="rounded-lg border border-brand-100 bg-brand-50/60 px-3.5 py-3">
-                  <p className="text-[12px] text-brand-800">Klien <span className="font-semibold">{klienKontrak?.project_name ?? '—'}</span></p>
-                  <dl className="mt-2 grid grid-cols-3 gap-x-4">
-                    {([['Nilai kontrak', kontrak.value], ['Terpakai', kontrak.value - sisaKontrak], ['Sisa', sisaKontrak]] as const).map(([k, v]) => (
-                      <div key={k}>
-                        <dt className="text-[11px] font-semibold text-brand-700/80">{k}</dt>
-                        <dd className={cn('tnum text-[13px] font-semibold', v < 0 ? 'text-[color:var(--color-critical)]' : 'text-brand-900')}>{formatRupiah(v)}</dd>
-                      </div>
-                    ))}
+                <KotakInfo>
+                  <dl className="grid grid-cols-2 gap-x-3">
+                    <NilaiInfo label="Nilai kontrak">{formatRupiah(kontrak.value)}</NilaiInfo>
+                    <NilaiInfo label="Berlaku">{kontrak.start_date ? `${kontrak.start_date.split('-').reverse().join('/')}` : '—'}{kontrak.end_date ? ` – ${kontrak.end_date.split('-').reverse().join('/')}` : ''}</NilaiInfo>
                   </dl>
-                </div>
+                </KotakInfo>
+              )}
+              {!kontrakKlien.length && (
+                <Peringatan className="md:col-span-2">
+                  Klien Dedicated ini belum punya kontrak aktif. Tambahkan kontraknya di <Link to={`/master/klien/${f.klien}`} className="font-semibold underline">halaman klien</Link>.
+                </Peringatan>
               )}
             </div>
           )}
+        </Bagian>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="space-y-4">
-              <Field
-                label="Rute"
-                required={!dedicated && wajib(!!existing?.route_id)}
-                error={galat.route_id}
-                hint={galat.route_id ? undefined
-                  : kunci ? 'Dikunci karena trip sudah jalan.'
-                  : !rute ? (backload && bersama.lokasi_muat
-                    ? `Rute dari ${bersama.lokasi_muat} tampil paling atas. Belum ada? ${bolehTambahRute ? 'Pilih "Tambah rute baru" di daftar.' : 'Minta Manager atau Owner menambahkannya.'}`
-                    : dedicated ? 'Opsional untuk Dedicated: patokan uang jalan & lokasi.' : 'Klien, harga, dan patokan uang jalan ikut rute.')
-                  : klien && !dedicated ? `Klien ${klien.project_name} ikut rute ini.`
-                  : !rute.project_id ? <>Rute ini belum punya klien. Lengkapi di menu <Link to="/master/route" className="text-brand-700 underline">Rute</Link>.</>
-                  : 'UJROUTE rute jadi patokan uang jalan.'}
-              >
-                {(fid) => (
-                  <SearchableSelect id={fid} options={routeOptions} value={bersama.route_id || null} invalid={!!galat.route_id} disabled={kunci}
-                    placeholder="Pilih rute..." searchPlaceholder="Ketik nama atau kode rute..." onChange={(v) => pilihRute(v)}
-                    tambahan={kunci ? undefined : {
-                      label: 'Tambah rute baru',
-                      disabled: !bolehTambahRute,
-                      hint: bolehTambahRute ? undefined : 'Perlu Manager atau Owner.',
-                      onClick: () => setTambahRute(true),
-                    }} />
-                )}
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Lokasi Muat" hint={backload ? 'Lokasi bongkar trip asal.' : 'Terisi dari rute, bisa diubah.'}>
-                  {(fid) => <Input id={fid} value={bersama.lokasi_muat} placeholder="CIB" onChange={(e) => setB('lokasi_muat', e.target.value)} />}
-                </Field>
-                <Field label="Lokasi Bongkar" hint="Terisi dari rute, bisa diubah.">
-                  {(fid) => <Input id={fid} value={bersama.lokasi_bongkar} placeholder="DURI" onChange={(e) => setB('lokasi_bongkar', e.target.value)} />}
-                </Field>
-              </div>
-            </div>
-
-            {(rute || perkiraanKomisi.aturan) && (
-              <div className="self-start rounded-lg border border-brand-100 bg-brand-50/60 px-3.5 py-3">
-                {rute && (
-                  <>
-                    <p className="text-[12px] text-brand-800">
-                      <span className="tnum font-semibold">{rute.route_code}</span>
-                      {klienMap.get(rute.project_id) && <> · Klien <span className="font-semibold">{klienMap.get(rute.project_id)!.project_name}</span></>}
-                    </p>
-                    <dl className="mt-2 grid grid-cols-3 gap-x-4 gap-y-1.5">
-                      {([['UJROUTE (patokan)', rute.ujroute], ['Uang Tol (patokan)', rute.toll ?? 0], ['Harga route', rute.price]] as const).map(([k, v]) => (
-                        <div key={k}>
-                          <dt className="text-[11px] font-semibold text-brand-700/80">{k}</dt>
-                          <dd className="tnum text-[13px] font-semibold text-brand-900">{formatRupiah(v)}</dd>
+        {/* Informasi Kendaraan dan Supir + Rute */}
+        <Bagian judul="Informasi Kendaraan dan Supir">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field label="Kendaraan Utama" required={wajib(!!existing?.vehicle_id)} error={galat.vehicle_id} hint={hintKendaraan}>
+              {(fid) => (
+                <SearchableSelect id={fid} options={opsiKendaraan} value={f.vehicle_id || null} invalid={!!galat.vehicle_id} disabled={kunciMobil}
+                  placeholder="Pilih nomor polisi..." searchPlaceholder="Ketik nomor polisi atau jenis..." onChange={pilihKendaraan} />
+              )}
+            </Field>
+            <Field label="Sub Kendaraan / Gandengan" hint={hintGandengan}>
+              {(fid) => (
+                <SearchableSelect id={fid} options={opsiGandengan(f.gandengan, konfigurasi)} value={f.gandengan || null} disabled={kunci} cari={false}
+                  placeholder="Low Bed / Hi Bed / 4x4 / Dolly" onChange={(v) => ubah({ gandengan: v ?? '' })} />
+              )}
+            </Field>
+            <div className="space-y-3">
+              {f.driver_ids.map((v, k) => {
+                const diTripLain = v ? ditahan.supir.get(v) : undefined
+                const alasanKunci = kunciSupir ? (kunci ? lewatKunci : 'Mengikuti trip asal backload.') : ''
+                // Supir yang masih di trip lain hanya diberi peringatan, tidak diblokir.
+                const hint: ReactNode = diTripLain
+                  ? <span className="text-[#8a6100]">Masih di trip {diTripLain.id_tampil}{diTripLain.plate_number && ` (${diTripLain.plate_number})`} yang belum kembali ke pool. Boleh tetap disimpan bila memang benar.</span>
+                  : alasanKunci || (k > 0 ? 'Pendamping (double driver); komisi tetap untuk supir utama.'
+                    : otomatis.sopir ? `Terisi dari trip terakhir kendaraan ${otomatis.sopir}. Ganti bila beda.`
+                    : `Pilih kode supir yang membawa muatan. Boleh dikosongkan dulu (${STATUS_LABEL.menunggu_sopir}).`)
+                return (
+                  <Field key={k} label={k === 0 ? 'Supir' : 'Supir Pendamping'} hint={hint}>
+                    {(fid) => (
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                          <SearchableSelect id={fid} options={opsiSupir(v)} value={v || null} disabled={kunciSupir}
+                            placeholder="Cari kode / nama supir..." onChange={(nv) => ubahSupir(k, nv)} />
                         </div>
-                      ))}
-                    </dl>
-                  </>
+                        {k > 0 && !kunciSupir && (
+                          <IconButton label="Hapus supir pendamping" tone="danger" icon={<FaXmark size={14} />}
+                            onClick={() => ubah({ driver_ids: f.driver_ids.filter((_, n) => n !== k) })} />
+                        )}
+                      </div>
+                    )}
+                  </Field>
+                )
+              })}
+              {!kunciSupir && f.driver_ids.length < 3 && (
+                <TombolTeks onClick={() => ubah({ driver_ids: [...f.driver_ids, ''] })}>+ Tambah supir pendamping</TombolTeks>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <Field label="Rute" required={!dedicated && wajib(!!existing?.route_id)} error={galat.route_id} hint={hintRute}>
+              {(fid) => (
+                <SearchableSelect id={fid} options={opsiRute} value={f.route_id || null} invalid={!!galat.route_id} disabled={kunci}
+                  placeholder="Pilih rute..." searchPlaceholder="Ketik nama, kode area, atau No. Rute..." onChange={(v) => pilihRute(v)}
+                  tambahan={kunci ? undefined : {
+                    label: 'Tambah rute baru',
+                    disabled: !bolehMaster,
+                    hint: bolehMaster ? undefined : 'Perlu Manager atau Owner.',
+                    onClick: () => setTambahRute(true),
+                  }} />
+              )}
+            </Field>
+            {rute && (
+              <KotakInfo className="self-start md:mt-[22px]">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                  <NilaiInfo label="No. Rute">{rute.route_code}</NilaiInfo>
+                  <NilaiInfo label="Patokan UJ">{formatRupiah(rute.ujroute)}</NilaiInfo>
+                  <NilaiInfo label="Patokan Tol">{formatRupiah(rute.toll ?? 0)}</NilaiInfo>
+                  {!dedicated && (
+                    <NilaiInfo label={hargaBeda ? 'Harga trip (khusus)' : 'Harga'}>
+                      {formatRupiah(hargaBeda ? f.harga : rute.price)}
+                    </NilaiInfo>
+                  )}
+                </dl>
+                {!dedicated && bolehOverride && !tampilHarga && !kunci && (
+                  <p className="mt-2 text-[11.5px] text-brand-700">
+                    Harga beda dari rute? <TombolTeks onClick={() => setUbahHarga(true)}><FaPen size={10} className="mr-1 inline" />Ubah harga trip ini</TombolTeks>
+                  </p>
                 )}
-                <p className={cn('text-[12px] text-brand-800', rute && 'mt-2 border-t border-brand-100 pt-2')}>
-                  Perkiraan komisi sopir per mobil: <span className="tnum font-semibold">{formatRupiah(perkiraanKomisi.nilai)}</span>
-                  <span className="block text-[11.5px] text-brand-700">{perkiraanKomisi.keterangan}</span>
-                </p>
-              </div>
+              </KotakInfo>
             )}
           </div>
 
-          {adaOverride && bolehOverride && (
-            <Field label="Alasan & bukti persetujuan harga" error={galat.override_note}
-              hint={galat.override_note ? undefined : 'Ada mobil dengan harga berbeda dari Harga route: catat alasannya dan lampirkan bukti persetujuan.'}>
-              {(fid) => (
-                <div className="space-y-2">
-                  <Input id={fid} value={bersama.override_note} placeholder="mis. trailer lowbed, harga nego klien"
-                    onChange={(e) => { setB('override_note', e.target.value); hapusGalat('override_note') }} />
-                  {bisa('bukti') && (
-                    <LampiranInput label="Tambah bukti" value={bersama.override_attachments} onChange={(v) => setB('override_attachments', v)} />
-                  )}
-                </div>
-              )}
-            </Field>
+          {tampilHarga && rute && (
+            <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]">
+              <Field label="Harga Trip" hint={f.harga === rute.price ? 'Sama dengan Harga Rute.' : <>Harga Rute {formatRupiah(rute.price)} · <TombolTeks onClick={() => { ubah({ harga: rute.price, override_note: '' }); setUbahHarga(false); hapusGalat('override_note') }}>Pakai Harga Rute</TombolTeks></>}>
+                {(fid) => <CurrencyInput id={fid} value={f.harga} disabled={kunci} onValueChange={(v) => ubah({ harga: v })} />}
+              </Field>
+              <Field label="Alasan & bukti persetujuan harga" error={galat.override_note}
+                hint={galat.override_note ? undefined : hargaBeda ? 'Wajib diisi karena harga berbeda dari Harga Rute.' : 'Diisi bila harga diganti.'}>
+                {(fid) => (
+                  <div className="space-y-2">
+                    <Input id={fid} value={f.override_note} invalid={!!galat.override_note} placeholder="mis. trailer lowbed, harga nego klien"
+                      onChange={(e) => { ubah({ override_note: e.target.value }); hapusGalat('override_note') }} />
+                    {bisa('bukti') && hargaBeda && (
+                      <LampiranInput label="Tambah bukti" value={f.override_attachments} onChange={(v) => ubah({ override_attachments: v })} />
+                    )}
+                  </div>
+                )}
+              </Field>
+            </div>
           )}
-        </div>
-      </Card>
 
-      {/* Mobil */}
-      <div className="mb-4 space-y-4">
-        {mobil.map((m, i) => (
-          <KartuMobil
-            key={m.kunci}
-            urutan={i}
-            jumlah={mobil.length}
-            nomor={nomorRencana[i]}
-            mode={mode}
-            m={m}
-            galat={galat}
-            terkunci={backload || kunci}
-            alasanKunci={backload ? 'Mengikuti trip asal backload.' : 'Dikunci karena trip sudah jalan.'}
-            dedicated={dedicated}
-            hargaRoute={rute?.price ?? 0}
-            bolehOverride={bolehOverride}
-            vehicleOptions={vehicleOptions.filter((o) => o.value === m.vehicle_id || !mobil.some((x) => x.vehicle_id === o.value))}
-            sopirOptions={(pilihanIni) => sopirTerdaftar
-              .filter((d) => d.status === 'aktif' || d.id === pilihanIni)
-              .filter((d) => d.id === pilihanIni || !mobil.some((x) => x.driver_ids.includes(d.id)))
-              .map((d) => ({ value: d.id, label: `${d.driver_code} — ${d.driver_name}`, meta: [d.address_2, d.city].filter(Boolean).join(', '), keywords: d.driver_name }))}
-            trLain={trLain}
-            onKendaraan={(v) => pilihKendaraan(i, v)}
-            onSopir={(k, v) => ubahSopir(i, k, v)}
-            onTambahSopir={() => ubahMobil(i, { driver_ids: [...m.driver_ids, ''] })}
-            onHapusSopir={(k) => ubahMobil(i, { driver_ids: m.driver_ids.length > 1 ? m.driver_ids.filter((_, n) => n !== k) : [''] })}
-            onId={(v) => { ubahMobil(i, { trip_id: v.toUpperCase().replace(/\s+/g, '') }); hapusGalat(`m${i}.id`) }}
-            onGenerateId={() => { ubahMobil(i, { trip_id: buatKodeUnik([...semuaId, ...mobil.map((x) => x.trip_id)]) }); hapusGalat(`m${i}.id`) }}
-            onTr={(tr) => ubahMobil(i, { tr })}
-            onHarga={(v) => ubahMobil(i, { harga: v })}
-            onHapus={() => setMobil((ms) => ms.filter((_, j) => j !== i))}
-          />
-        ))}
-        {galat.mobil && <p className="text-[12.5px] font-medium text-[color:var(--color-critical)]">{galat.mobil}</p>}
-        {mode === 'create' && !backload && (
-          <Button variant="ghost" icon={<FaPlus size={14} />} onClick={tambahMobil}>Tambah mobil</Button>
-        )}
+          {kendaraanDiTripLain && (f.vehicle_id === existing?.vehicle_id || kunciMobil) && (
+            <Peringatan className="mt-4">
+              Kendaraan ini juga tercatat di trip{' '}
+              <Link to={`/transaksi/trip/${kendaraanDiTripLain.id}`} className="font-semibold underline">{kendaraanDiTripLain.id_tampil}</Link>
+              {' '}yang belum kembali ke pool.
+            </Peringatan>
+          )}
+        </Bagian>
+
+        {/* Informasi Pengiriman: pick up dan destinasi berdampingan supaya form lebih pendek. */}
+        <Bagian judul="Informasi Pengiriman">
+          <div className="space-y-5">
+            <div className="grid gap-x-4 gap-y-5 md:grid-cols-2">
+              <PilihAlamatTrip
+                label="Pick Up Details"
+                hint={otomatis.pengirim && f.pengirim
+                  ? `Terisi dari area pick up rute (${area.asal}). Ganti bila beda.`
+                  : backload && f.pengirim && f.pengirim === awal.pengirim ? 'Terisi dari penerima trip asal (lokasi bongkarnya).'
+                  : petunjukTanpaAlamat('pengirim', area.asal)
+                    ?? 'Bisa save alamat, catatan spt info kapal, lokasi di pelabuhan, dan kontak pengambilan'}
+                nilai={f.pengirim} onChange={(v) => { ubah({ pengirim: v }); setOtomatis((o) => ({ ...o, pengirim: false })) }}
+                catatan={f.catatan_pengirim} onCatatan={(v) => ubah({ catatan_pengirim: v })}
+                labelCatatan="Catatan Pick Up" placeholderCatatan="mis. info kapal, lokasi di pelabuhan, kontak pengambilan"
+                daftar={daftarAlamat} area={area.asal || areaBackload} titikLama={pengirimLama}
+                bolehTambah={bolehMaster} onTambah={(q) => setTambahAlamat({ sisi: 'pengirim', nama: q.trim(), kode: areaKosong(area.asal) })}
+              />
+              <PilihAlamatTrip
+                label="Destination Details"
+                hint={otomatis.penerima && f.penerima
+                  ? `Terisi dari area destinasi rute (${area.tujuan}). Ganti bila beda.`
+                  : petunjukTanpaAlamat('penerima', area.tujuan) ?? 'Bisa save alamat, catatan tambahan, dan kontak penerima'}
+                nilai={f.penerima} onChange={(v) => { ubah({ penerima: v }); setOtomatis((o) => ({ ...o, penerima: false })) }}
+                catatan={f.catatan_penerima} onCatatan={(v) => ubah({ catatan_penerima: v })}
+                labelCatatan="Catatan Destinasi" placeholderCatatan="mis. jam bongkar, gerbang masuk, kontak penerima di lokasi"
+                daftar={daftarAlamat} area={area.tujuan} titikLama={penerimaLama}
+                bolehTambah={bolehMaster} onTambah={(q) => setTambahAlamat({ sisi: 'penerima', nama: q.trim(), kode: areaKosong(area.tujuan) })}
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <fieldset className="min-w-0">
+                <legend className="form-label">Add Items Details</legend>
+                <div className="space-y-2">
+                  {f.muatan.map((m, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <Input value={m.id_perjalanan} aria-label={`ID Perjalanan item ${i + 1}`} placeholder="ID Perjalanan"
+                        className="tnum w-40 shrink-0 uppercase sm:w-44" onChange={(e) => ubahItem(i, { id_perjalanan: e.target.value.replace(/\s+/g, '') })} />
+                      <Input value={m.keterangan} aria-label={`Keterangan barang item ${i + 1}`} placeholder="Info terkait barang yang dibawa / No Container"
+                        className="min-w-0 flex-1" onChange={(e) => ubahItem(i, { keterangan: e.target.value })} />
+                      {(f.muatan.length > 1 || m.id_perjalanan || m.keterangan) && (
+                        <IconButton label={`Hapus item ${i + 1}`} tone="danger" icon={<FaXmark size={14} />} onClick={() => hapusItem(i)} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                  <p className="form-text m-0">ID Perjalanan + keterangan barang; satu baris per item. Boleh dikosongkan.</p>
+                  <TombolTeks onClick={() => ubah({ muatan: [...f.muatan, itemKosong()] })}>
+                    <FaPlus size={10} className="mr-1 inline" />Tambah item
+                  </TombolTeks>
+                </div>
+              </fieldset>
+              <Field label="Kosongan" hint="Depo container kosong (tempat ambil / kembalikan), bila trip membawa container. Kosongkan bila tidak ada.">
+                {(fid) => <Input id={fid} value={f.kosongan} placeholder="DEPO MUSTIKA CAKUNG" onChange={(e) => ubah({ kosongan: e.target.value })} />}
+              </Field>
+            </div>
+          </div>
+        </Bagian>
       </div>
 
-      {/* Jadwal & Catatan */}
-      <Card>
-        <CardHeader title="Jadwal & Catatan" subtitle={mobil.length > 1 ? 'Berlaku untuk semua mobil di order ini.' : undefined} />
-        <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Field label="Tanggal Order" hint="Hari permintaan klien masuk.">
-            {(fid) => <DateInput id={fid} value={bersama.order_date} onChange={(e) => setB('order_date', e.target.value)} />}
-          </Field>
-          <Field label="Tanggal Berangkat" required error={galat.transaction_date}
-            hint={galat.transaction_date ? undefined : bersama.order_date && bersama.transaction_date && bersama.transaction_date < bersama.order_date
-              ? 'Lebih awal dari Tanggal Order. Pastikan memang benar.' : 'Dipakai untuk Nomor Trip, Berita Acara, dan laporan.'}>
-            {(fid) => (
-              <DateInput id={fid} value={bersama.transaction_date} invalid={!!galat.transaction_date}
-                penanda={(t) => tripPerTanggal.get(t) ?? 0} penandaLabel="trip berangkat"
-                onChange={(e) => { setB('transaction_date', e.target.value); hapusGalat('transaction_date') }} />
-            )}
-          </Field>
-          <Field label="Manager" hint={managerTerdaftar.length ? 'Pilih manager terdaftar, atau isi nama sendiri.' : 'Belum ada manager di Supir / Karyawan — isi nama sendiri.'}>
-            {(fid) => (
-              <PilihKaryawan id={fid} karyawan={managerTerdaftar} valueId={bersama.manager_id} valueNama={bersama.manager_name} peran="manager"
-                placeholder="Pilih manager..." onChange={(mid, nama) => setBersama((b) => ({ ...b, manager_id: mid, manager_name: nama }))} />
-            )}
-          </Field>
-          {mode === 'edit' ? (
-            <Field label="Status" hint={bersama.status === 'selesai' ? `Ditutup ${formatDate(existing?.closed_at ?? null)}.` : 'Selesai lewat Tutup Trip; batal lewat Batalkan Trip.'}>
-              {(fid) => bersama.status === 'selesai'
-                ? <Input id={fid} value={STATUS_LABEL.selesai} readOnly />
-                : (
-                  <Select id={fid} value={bersama.status} onChange={(e) => { setB('status', e.target.value as TripStatus); hapusGalat(...mobil.map((_, i) => `m${i}.sopir`)) }}>
-                    {STATUS_UBAH.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-                  </Select>
-                )}
-            </Field>
-          ) : (
-            <Field label="Status">
-              {(fid) => <Input id={fid} readOnly value={mobil.every((m) => m.driver_ids.some(Boolean)) ? 'Aktif' : mobil.some((m) => m.driver_ids.some(Boolean)) ? 'Aktif / Menunggu Sopir' : 'Menunggu Sopir'} />}
-            </Field>
-          )}
-          {mode === 'edit' && (
-            <Field label="Nomor Trip" required error={galat.transaction_no} hint={galat.transaction_no ? undefined : kunci ? 'Dikunci karena trip sudah jalan.' : 'Nomor urut otomatis per bulan.'}>
-              {(fid) => (
-                <KodeInput id={fid} value={bersama.transaction_no} invalid={!!galat.transaction_no} readOnly={kunci}
-                  generateTitle="Buat nomor trip berikutnya untuk bulan tanggal trip"
-                  onChange={(v) => setB('transaction_no', v)}
-                  onGenerate={() => setB('transaction_no', nomorTripBerikut(
-                    dbAll.transactions.filter((t) => t.id !== existing?.id).map((t) => t.transaction_no), bersama.transaction_date || todayISO(),
-                  ))} />
-              )}
-            </Field>
-          )}
-          <Field label="Catatan" className={mode === 'edit' ? 'sm:col-span-2 xl:col-span-3' : 'sm:col-span-2 xl:col-span-4'}>
-            {(fid) => <Textarea id={fid} rows={2} value={bersama.notes} onChange={(e) => setB('notes', e.target.value)} />}
-          </Field>
-        </div>
-      </Card>
-
-      {/* Rute baru: nama diawali lokasi muat (mis. backload "DURI - "), klien ikut trip asal / kontrak / rute terpilih. */}
+      {/* Rute baru langsung dipilih untuk trip ini. */}
       <ModalRute
         open={tambahRute}
         onClose={() => setTambahRute(false)}
-        awal={{
-          route_name: bersama.lokasi_muat.trim() ? `${bersama.lokasi_muat.trim()} - ` : '',
-          project_id: asal?.project_id || klienKontrak?.id || rute?.project_id || '',
-        }}
+        awal={{ kode_area_asal: areaBackload || undefined }}
         keterangan="Rute baru langsung dipilih untuk trip ini. Tanda * wajib diisi."
         pesanSukses={(r) => `Rute ${r.route_name} tersimpan dan dipilih untuk trip ini.`}
         onSaved={(r) => pilihRute(r.id, r)}
+        onPakai={(r) => pilihRute(r.id, r)}
+      />
+      <ModalAlamat
+        open={!!tambahAlamat}
+        onClose={() => setTambahAlamat(null)}
+        awal={{ nama: tambahAlamat?.nama ?? '', kode_area: tambahAlamat?.kode }}
+        keterangan={tambahAlamat?.sisi === 'penerima' ? 'Alamat tujuan baru langsung dipilih sebagai Destination Details.' : 'Alamat baru langsung dipilih sebagai Pick Up Details.'}
+        pesanSukses={(a) => `${a.nama} tersimpan di Master Alamat.`}
+        onSaved={(a: Alamat) => {
+          if (tambahAlamat?.sisi === 'penerima') ubah({ penerima: a.id })
+          else ubah({ pengirim: a.id })
+          setOtomatis((o) => ({ ...o, [tambahAlamat?.sisi ?? 'pengirim']: false }))
+        }}
       />
 
       {/* Bar dimulai setelah rel sidebar (68px) supaya teks kirinya tidak tertutup. */}
-      <div className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-surface/95 px-4 py-3 backdrop-blur lg:left-[68px] lg:px-6">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-3">
-          <p className="hidden truncate text-[12.5px] text-ink-3 sm:block">
-            {ringkas}
-            {rute && <> · patokan UJ {formatRupiah(rute.ujroute)}{mobil.length > 1 && ' per mobil'}</>}
-          </p>
+      <div className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-surface/95 px-4 py-2.5 backdrop-blur lg:left-[68px] lg:px-6">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+          <p className="tnum min-w-0 flex-1 basis-full truncate text-[12.5px] text-ink-3 sm:basis-0">{ringkasan}</p>
           <div className="ml-auto flex items-center gap-2">
             <Button onClick={() => navigate(existing ? `/transaksi/trip/${existing.id}` : asal ? `/transaksi/trip/${asal.id}` : '/transaksi/trip')}>Batal</Button>
-            <Button icon={<FaPrint size={15} />} disabled={!bolehSimpan} onClick={() => simpan(true)}>Simpan &amp; Cetak</Button>
-            <Button variant="primary" icon={<FaFloppyDisk size={15} />} disabled={!bolehSimpan} onClick={() => simpan(false)}>
-              {mode === 'create' && mobil.length > 1 ? `Simpan ${mobil.length} trip` : 'Simpan'}
-            </Button>
+            <Button icon={<FaPrint size={15} />} disabled={!bolehSimpan} onClick={() => simpan(true)}>Simpan &amp; Cetak BAST</Button>
+            <Button variant="primary" icon={<FaFloppyDisk size={15} />} disabled={!bolehSimpan} onClick={() => simpan(false)}>Simpan</Button>
           </div>
         </div>
       </div>
@@ -819,152 +856,3 @@ export function FormTripKarawang({ mode, tripId, backloadDari }: {
   )
 }
 
-interface Opsi { value: string; label: string; meta?: string; keywords?: string }
-
-/** Satu mobil: kendaraan, sopir, ID Perjalanan, TR, dan harga. */
-function KartuMobil({
-  urutan, jumlah, nomor, mode, m, galat, terkunci, alasanKunci, dedicated, hargaRoute, bolehOverride, vehicleOptions, sopirOptions, trLain,
-  onKendaraan, onSopir, onTambahSopir, onHapusSopir, onId, onGenerateId, onTr, onHarga, onHapus,
-}: {
-  urutan: number
-  jumlah: number
-  nomor: string
-  mode: 'create' | 'edit'
-  m: MobilForm
-  galat: Galat
-  /** Kendaraan & sopir dikunci: backload (mengikuti trip asal) atau trip yang sudah jalan. */
-  terkunci: boolean
-  alasanKunci: string
-  dedicated: boolean
-  hargaRoute: number
-  bolehOverride: boolean
-  vehicleOptions: Opsi[]
-  sopirOptions: (pilihanIni: string) => Opsi[]
-  trLain: Map<string, string[]>
-  onKendaraan: (v: string | null) => void
-  onSopir: (k: number, v: string | null) => void
-  onTambahSopir: () => void
-  onHapusSopir: (k: number) => void
-  onId: (v: string) => void
-  onGenerateId: () => void
-  onTr: (tr: string[]) => void
-  onHarga: (v: number) => void
-  onHapus: () => void
-}) {
-  const g = (k: string) => galat[`m${urutan}.${k}`]
-  const dipakai = m.tr.map((tr) => ({ tr, trip: trLain.get(kunciTr(tr)) ?? [] })).filter((x) => x.trip.length)
-  const judul = jumlah > 1 ? `Mobil ${urutan + 1}` : 'Mobil'
-  const petunjukHarga: ReactNode = !bolehOverride
-    ? 'Mengikuti Harga route. Harga berbeda perlu Manager atau Owner.'
-    : !hargaRoute ? 'Terisi dari Harga route setelah rute dipilih.'
-    : m.harga === hargaRoute ? 'Sama dengan Harga route. Ubah bila harga mobil ini beda.'
-    : <>Harga khusus (Harga route {formatRupiah(hargaRoute)}) · <PakaiNilai label="Pakai Harga route" onClick={() => onHarga(hargaRoute)} /></>
-
-  return (
-    <Card>
-      <CardHeader
-        title={judul}
-        subtitle={mode === 'create' ? `Tersimpan sebagai Trip ${nomor}` : `Trip ${nomor}`}
-        actions={mode === 'create' && jumlah > 1 && (
-          <IconButton label={`Hapus ${judul.toLowerCase()}`} tone="danger" icon={<FaXmark size={14} />} onClick={onHapus} />
-        )}
-      />
-      <div className="grid gap-4 p-4 lg:grid-cols-2">
-        <Field label="No. Kendaraan" required={mode === 'create'} error={g('vehicle')}
-          hint={g('vehicle') ? undefined : terkunci ? alasanKunci
-            : m.otomatis.kendaraan ? `Terisi dari trip terakhir ${m.otomatis.kendaraan}. Ganti bila beda.` : 'Head unit. Memilih mobil ikut mengisi sopir terakhirnya.'}>
-          {(fid) => (
-            <SearchableSelect id={fid} options={vehicleOptions} value={m.vehicle_id || null} invalid={!!g('vehicle')} disabled={terkunci}
-              placeholder="Pilih nomor kendaraan..." onChange={onKendaraan} />
-          )}
-        </Field>
-        <Field label="Sopir" error={g('sopir')}
-          hint={g('sopir') ? undefined : terkunci ? alasanKunci
-            : m.otomatis.sopir ? `Terisi dari trip terakhir mobil ${m.otomatis.sopir}. Ganti bila beda.`
-            : m.driver_ids.length > 1 ? 'Sopir pertama adalah sopir utama (penerima komisi).' : 'Boleh dikosongkan dulu: trip tersimpan sebagai Menunggu Sopir.'}>
-          {(fid) => (
-            <div className="space-y-2">
-              {m.driver_ids.map((v, k) => (
-                <div key={k} className="flex items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <SearchableSelect id={k === 0 ? fid : undefined} options={sopirOptions(v)} value={v || null} disabled={terkunci}
-                      placeholder={k === 0 ? 'Cari kode / nama sopir...' : 'Sopir tambahan...'} onChange={(nv) => onSopir(k, nv)} />
-                  </div>
-                  {m.driver_ids.length > 1 && !terkunci && (
-                    <IconButton label="Hapus sopir ini" tone="danger" icon={<FaXmark size={14} />} onClick={() => onHapusSopir(k)} />
-                  )}
-                </div>
-              ))}
-              {!terkunci && <Button size="sm" variant="ghost" icon={<FaPlus size={14} />} onClick={onTambahSopir}>Tambah sopir</Button>}
-            </div>
-          )}
-        </Field>
-        <Field label="ID Perjalanan" required={mode === 'create'} error={g('id')}
-          hint={g('id') ? undefined : mode === 'edit' ? 'ID Perjalanan dikunci setelah trip tersimpan.'
-            : terkunci ? 'ID trip asal + BL, supaya backload tetap terhubung.' : 'Satu ID per trip, dibuat otomatis. Boleh diganti.'}>
-          {(fid) => (
-            <KodeInput id={fid} value={m.trip_id} invalid={!!g('id')} uppercase readOnly={mode === 'edit'}
-              placeholder={mode === 'edit' ? 'Belum ada ID Perjalanan' : 'Klik Generate'}
-              generateTitle="Buat ID Perjalanan unik" onChange={onId} onGenerate={onGenerateId} />
-          )}
-        </Field>
-        <Field label="TR"
-          hint={dipakai.length > 0
-            ? `${dipakai.map((x) => `${x.tr} juga dipakai Trip ${x.trip.join(', ')}`).join('; ')}. Wajar bila satu order dikirim beberapa mobil.`
-            : 'Nomor order dari klien (TR / Order Release). Boleh lebih dari satu; kosongkan bila belum ada, nanti ditulis di Berita Acara.'}>
-          {(fid) => <TrInput id={fid} value={m.tr} onChange={onTr} />}
-        </Field>
-        {!dedicated && (
-          <Field label="Harga" hint={petunjukHarga}>
-            {(fid) => <CurrencyInput id={fid} value={m.harga} disabled={!bolehOverride} onValueChange={onHarga} />}
-          </Field>
-        )}
-      </div>
-    </Card>
-  )
-}
-
-/** Isian TR: ketik lalu Enter (atau koma) untuk menambah; TR dari klien, tidak dibuat sistem. */
-function TrInput({ id, value, onChange }: { id?: string; value: string[]; onChange: (v: string[]) => void }) {
-  const [ketik, setKetik] = useState('')
-  function tambah(teks = ketik) {
-    const baru = teks.split(/[,;\n]/).map(rapikanTr).filter(Boolean)
-    const gabung = [...value]
-    for (const tr of baru) if (!gabung.some((x) => kunciTr(x) === kunciTr(tr))) gabung.push(tr)
-    if (gabung.length !== value.length) onChange(gabung)
-    setKetik('')
-  }
-  function tombol(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); tambah() }
-    if (e.key === 'Backspace' && !ketik && value.length) onChange(value.slice(0, -1))
-  }
-  return (
-    <div>
-      <div className="flex items-center gap-2">
-        <Input id={id} value={ketik} placeholder="TR2600512595" className="min-w-0 flex-1"
-          onChange={(e) => setKetik(e.target.value)} onKeyDown={tombol} onBlur={() => ketik.trim() && tambah()} />
-        <Button size="sm" icon={<FaPlus size={13} />} disabled={!ketik.trim()} onClick={() => tambah()}>Tambah</Button>
-      </div>
-      {value.length > 0 && (
-        <ul className="mt-2 flex flex-wrap gap-1.5">
-          {value.map((tr) => (
-            <li key={tr} className="tnum inline-flex items-center gap-1 rounded-md border border-hairline bg-sunken py-0.5 pr-1 pl-2 text-[12.5px] font-medium text-ink">
-              {tr}
-              <button type="button" aria-label={`Hapus TR ${tr}`} onClick={() => onChange(value.filter((x) => x !== tr))}
-                className="grid h-5 w-5 place-items-center rounded text-ink-3 transition hover:bg-surface hover:text-[color:var(--color-critical)]">
-                <FaXmark size={11} />
-              </button>
-            </li>
-          ))}
-          {value.length > 1 && (
-            <li>
-              <button type="button" onClick={() => onChange([])} className="inline-flex items-center gap-1 px-1 py-0.5 text-[12px] text-ink-3 hover:text-ink">
-                <FaRotateLeft size={11} /> Kosongkan
-              </button>
-            </li>
-          )}
-        </ul>
-      )}
-    </div>
-  )
-}

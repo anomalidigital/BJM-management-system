@@ -50,12 +50,13 @@ export function Terbaru({
               <li key={t.id}>
                 <Link to={`/transaksi/trip/${t.id}`} className={baris}>
                   <span className="min-w-0 flex-1">
-                    <span className="flex items-baseline gap-2">
-                      <span className="tnum text-[13px] font-semibold text-ink">{t.transaction_no}</span>
-                      <span className="tnum text-[12px] text-ink-3">{formatDate(t.transaction_date)}</span>
+                    {/* Penanda trip: Kode Trip (ID Trip). */}
+                    <span className="flex min-w-0 items-baseline gap-2">
+                      <span className="tnum min-w-0 truncate text-[13px] font-semibold text-ink">{t.id_tampil}</span>
+                      <span className="tnum shrink-0 text-[12px] text-ink-3">{formatDate(t.transaction_date)}</span>
                     </span>
                     <span className="mt-0.5 flex min-w-0 gap-3 text-[12px] text-ink-3">
-                      <span className="truncate">{t.driver_name || 'Sopir belum dipilih'}</span>
+                      <span className="truncate">{t.driver_name || 'Supir belum dipilih'}</span>
                       {t.plate_number && <span className="shrink-0">{t.plate_number}</span>}
                     </span>
                     {t.route_name && <span className="mt-0.5 block truncate text-[12px] text-ink-3">{t.route_name}</span>}
@@ -88,7 +89,7 @@ export function Terbaru({
                     <span className="min-w-0 flex-1">
                       <span className="tnum block truncate text-[13px] font-semibold text-ink">{t.pi_number || '—'}</span>
                       <span className="mt-0.5 flex min-w-0 gap-3 text-[12px] text-ink-3">
-                        <span className="tnum shrink-0">Trip {t.transaction_no}</span>
+                        <span className="tnum shrink-0">Trip {t.id_tampil}</span>
                         <span className="truncate">{t.tr_list.join(', ')}</span>
                       </span>
                     </span>

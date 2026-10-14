@@ -1,28 +1,27 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
-import { useId } from 'react'
+import { Children, Fragment, isValidElement, useId } from 'react'
+import type { ChangeEvent, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
 import { cn } from '../../lib/utils'
+import { SearchableSelect } from './SearchableSelect'
+import type { Option } from './SearchableSelect'
 
-const BASE =
-  'w-full rounded-md border bg-surface px-2.5 text-[13px] text-ink placeholder:text-ink-3/70 transition-colors ' +
-  'focus:border-brand-400 focus:ring-2 focus:ring-brand-500/15 focus:outline-none ' +
-  'disabled:cursor-not-allowed disabled:bg-sunken disabled:text-ink-3 read-only:bg-sunken read-only:text-ink-2'
+/* Isian bergaya Bootstrap 5: .form-label, .form-control, .form-select, .form-text, .invalid-feedback. */
 
 export function Label({ children, required, htmlFor }: { children: ReactNode; required?: boolean; htmlFor?: string }) {
   return (
-    <label htmlFor={htmlFor} className="mb-1.5 block text-[12px] font-semibold tracking-wide text-ink-2">
+    <label htmlFor={htmlFor} className="form-label">
       {children}
-      {required && <span className="ml-0.5 text-[color:var(--color-critical)]">*</span>}
+      {required && <span className="wajib">*</span>}
     </label>
   )
 }
 
 export function FieldError({ children }: { children?: ReactNode }) {
   if (!children) return null
-  return <p className="mt-1 text-[12px] font-medium text-[color:var(--color-critical)]">{children}</p>
+  return <p className="invalid-feedback">{children}</p>
 }
 
 export function Hint({ children }: { children: ReactNode }) {
-  return <p className="mt-1 text-[12px] text-ink-3">{children}</p>
+  return <p className="form-text">{children}</p>
 }
 
 interface FieldWrapProps {
@@ -51,18 +50,72 @@ export function Field({ label, required, error, hint, className, children }: Fie
 }
 
 export function Input({ className, invalid, ...rest }: InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) {
-  return <input className={cn(BASE, 'h-9', invalid ? 'border-[color:var(--color-critical)]' : 'border-hairline', className)} {...rest} />
+  return <input className={cn('form-control', invalid && 'is-invalid', className)} {...rest} />
 }
 
 export function Textarea({ className, invalid, ...rest }: TextareaHTMLAttributes<HTMLTextAreaElement> & { invalid?: boolean }) {
-  return <textarea className={cn(BASE, 'py-2 leading-relaxed', invalid ? 'border-[color:var(--color-critical)]' : 'border-hairline', className)} {...rest} />
+  return <textarea className={cn('form-control', invalid && 'is-invalid', className)} {...rest} />
 }
 
-export function Select({ className, invalid, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement> & { invalid?: boolean }) {
+/** Teks dari isi elemen (mis. isi <option>{n} / halaman</option>). */
+function teks(node: ReactNode): string {
+  if (node == null || typeof node === 'boolean') return ''
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(teks).join('')
+  if (isValidElement(node)) return teks((node.props as { children?: ReactNode }).children)
+  return ''
+}
+
+/** Pilihan dari anak <option> (juga di dalam <optgroup> atau fragment). */
+function bacaOpsi(children: ReactNode): Option[] {
+  const out: Option[] = []
+  Children.forEach(children, (anak) => {
+    if (!isValidElement(anak)) return
+    const p = anak.props as { value?: unknown; children?: ReactNode; disabled?: boolean }
+    if (anak.type === 'option') {
+      const label = teks(p.children).trim()
+      out.push({ value: p.value === undefined ? label : String(p.value), label: label || '—', disabled: p.disabled })
+    } else if (anak.type === 'optgroup' || anak.type === Fragment) {
+      out.push(...bacaOpsi(p.children))
+    }
+  })
+  return out
+}
+
+type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'onChange'> & {
+  invalid?: boolean
+  onChange?: (e: ChangeEvent<HTMLSelectElement>) => void
+  ukuran?: 'sm' | 'md'
+}
+
+/**
+ * Pilihan dengan daftar <option> seperti select biasa, tetapi tampil memakai dropdown
+ * SIKOTIS yang sama dengan dropdown trip (permintaan Baldy 13 Okt 2026: semua dropdown seragam).
+ * onChange tetap menerima event dengan `e.target.value`, jadi pemakai lama tidak perlu diubah.
+ * Daftar lebih dari 8 pilihan otomatis punya kotak pencarian.
+ */
+export function Select({ className, invalid, children, value, onChange, disabled, id, ukuran, 'aria-label': ariaLabel }: SelectProps) {
+  const opsi = bacaOpsi(children)
+  const nilai = value == null ? '' : String(value)
+  const ada = opsi.some((o) => o.value === nilai)
   return (
-    <select className={cn(BASE, 'h-9 cursor-pointer pr-8', invalid ? 'border-[color:var(--color-critical)]' : 'border-hairline', className)} {...rest}>
-      {children}
-    </select>
+    <SearchableSelect
+      id={id}
+      options={opsi}
+      value={ada ? nilai : opsi[0]?.value ?? null}
+      onChange={(v) => {
+        const target = { value: v ?? '' }
+        onChange?.({ target, currentTarget: target } as unknown as ChangeEvent<HTMLSelectElement>)
+      }}
+      cari={opsi.length > 8}
+      clearable={false}
+      disabled={disabled}
+      invalid={invalid}
+      className={className}
+      ukuran={ukuran}
+      aria-label={ariaLabel}
+      placeholder={opsi[0]?.label ?? 'Pilih...'}
+    />
   )
 }
 
@@ -71,30 +124,21 @@ export { DateInput } from './DateInput'
 
 export function Checkbox({ label, className, ...rest }: InputHTMLAttributes<HTMLInputElement> & { label: ReactNode }) {
   return (
-    <label className={cn('inline-flex cursor-pointer items-center gap-2 text-[13px] text-ink select-none', className)}>
-      <input
-        type="checkbox"
-        className="h-4 w-4 cursor-pointer rounded border-hairline accent-[color:var(--color-brand-500)]"
-        {...rest}
-      />
+    <label className={cn('cek', className)}>
+      <input type="checkbox" className="form-check-input" {...rest} />
       {label}
     </label>
   )
 }
 
+/** Pilihan berbentuk kartu (radio): Callout / Dedicated, Ya / Tidak, ... */
 export function Radio({ label, description, className, ...rest }: InputHTMLAttributes<HTMLInputElement> & { label: ReactNode; description?: ReactNode }) {
   return (
-    <label
-      className={cn(
-        'flex cursor-pointer items-start gap-2.5 rounded-lg border border-hairline p-3 transition-colors',
-        'hover:border-brand-200 hover:bg-brand-50/50 has-checked:border-brand-400 has-checked:bg-brand-50',
-        className,
-      )}
-    >
-      <input type="radio" className="mt-0.5 h-4 w-4 cursor-pointer accent-[color:var(--color-brand-500)]" {...rest} />
+    <label className={cn('opsi-kartu', className)}>
+      <input type="radio" className="form-check-input" {...rest} />
       <span>
-        <span className="block text-[13px] font-medium text-ink">{label}</span>
-        {description && <span className="mt-0.5 block text-[12px] text-ink-3">{description}</span>}
+        <span className="judul-opsi">{label}</span>
+        {description && <span className="ket-opsi">{description}</span>}
       </span>
     </label>
   )

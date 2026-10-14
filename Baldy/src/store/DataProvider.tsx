@@ -1,16 +1,23 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
-  Billing, BillingRow, CommissionTransaction, Database, EntityKey, KasbonEntry, PenyelesaianUj, TransactionRow, TripEvent, UjPayment, Workspace,
+  AksiAudit, AuditLog, Billing, BillingRow, CommissionTransaction, Database, EntityKey, KasbonEntry, PenyelesaianUj, PerubahanAudit,
+  TransactionRow, TripEvent, UjPayment, Workspace,
 } from '../types'
 import { loadDatabase, resetDatabase, resetToSampleDatabase, saveDatabase } from './persistence'
 import { nowISO, uid } from '../lib/utils'
 import { todayISO } from '../lib/format'
 import { petaSaldoKasbon } from '../lib/kasbon'
 import { hargaTrip, hitungKomisiTrip } from '../lib/komisi'
-import { ataDari, biayaDitagihkan, dibayarPerusahaan, lokasiTrip, trTrip } from '../lib/trip'
+import {
+  ataDari, biayaDitagihkan, dibayarPerusahaan, idPerjalanan, idTampil, kodeAreaRute, lokasiTrip, menahanKendaraan, normalKodeArea,
+  sekarangLokal, trTrip,
+} from '../lib/trip'
+import { bedaRecord, LABEL_ENTITAS, labelRecord } from '../lib/audit'
+import { formatRupiah } from '../lib/format'
 import { bersihkanLampiran, hapusLampiran } from '../lib/lampiran'
 import { useWorkspace } from './WorkspaceProvider'
+import { useAuth } from './AuthProvider'
 
 type Row<K extends EntityKey> = Database[K][number]
 type NewRow<K extends EntityKey> = Omit<Row<K>, 'id' | 'created_at' | 'updated_at'>
@@ -20,13 +27,27 @@ type NewRow<K extends EntityKey> = Omit<Row<K>, 'id' | 'created_at' | 'updated_a
  * project, SI/JO) dan kasbon karyawan sengaja dipakai bersama supaya relasi
  * antar data tidak putus saat workspace berganti - lihat TBD-17.
  */
-const SCOPED_KEYS = ['transactions', 'billings', 'commissionSchemes', 'contracts'] as const
+const SCOPED_KEYS = ['transactions', 'billings', 'commissionSchemes', 'contracts', 'dokumen'] as const
+
+/** Batas catatan Audit Log yang disimpan di browser (ruang localStorage terbatas). */
+const BATAS_AUDIT = 3000
+
+/** Isian satu catatan Audit Log; siapa & kapan diisi otomatis. */
+export interface CatatanAudit {
+  aksi: AksiAudit
+  entitas: string
+  entity_id: string
+  label: string
+  ringkasan: string
+  perubahan?: PerubahanAudit[]
+}
 
 /** Data lama tanpa penanda cabang diperlakukan sebagai Priok. */
 const wsOf = (row: { workspace?: Workspace }): Workspace => row.workspace ?? 'priok'
 
 /** Isian termin uang jalan dari form. */
 export type TerminForm = Pick<UjPayment, 'payment_date' | 'driver_id' | 'jenis' | 'uj_amount' | 'kasbon_deduction' | 'notes' | 'attachments'>
+  & Partial<Pick<UjPayment, 'override_note' | 'override_by'>>
 
 /** Seluruh id lampiran yang masih dirujuk record, lintas workspace. */
 function lampiranDipakai(d: Database): Set<string> {
@@ -34,7 +55,9 @@ function lampiranDipakai(d: Database): Set<string> {
   const ambil = (rows: Array<{ attachments?: string[] }>) => rows.forEach((r) => r.attachments?.forEach((a) => ids.add(a)))
   ambil(d.vehicles); ambil(d.drivers); ambil(d.contracts ?? [])
   ambil(d.ujPayments); ambil(d.expenses); ambil(d.internalCosts); ambil(d.tripNotes); ambil(d.kasbonEntries)
-  ambil(d.tripEvents ?? [])
+  ambil(d.tripEvents ?? []); ambil(d.dokumen ?? [])
+  // Dokumen penting karyawan & kendaraan (KTP, SIM, STNK, KIR, ...).
+  for (const r of [...d.drivers, ...d.vehicles]) Object.values(r.dokumen ?? {}).forEach((x) => x.berkas?.forEach((a) => ids.add(a)))
   // Lampiran yang menempel langsung di trip: bukti override harga dan foto POD.
   for (const t of d.transactions) {
     t.override_attachments?.forEach((a) => ids.add(a))
@@ -90,8 +113,13 @@ export interface OpsiTutup {
   /** Dokumen fisik sudah diterima di pool; false = baru foto, fisik menyusul. */
   podFisik: boolean
   podFoto: string[]
-  /** Ada muatan balik dari lokasi bongkar: dicatat, lalu form backload dibuka. */
-  adaBackload: boolean
+  /**
+   * Ada muatan balik dari lokasi bongkar. Sejak 13 Okt 2026 backload dibuat dari menu ⋯ tabel trip,
+   * jadi Tutup Trip tidak menanyakannya lagi; kosong = penanda lama trip dibiarkan.
+   */
+  adaBackload?: boolean
+  /** Mobil sudah kembali di pool: kendaraannya langsung bisa dipakai trip lain. */
+  diPool?: boolean
 }
 
 interface DataContextValue {
@@ -139,6 +167,14 @@ interface DataContextValue {
   tutupTrip: (tripId: string, opsi: OpsiTutup) => void
   /** Hapus trip beserta seluruh catatannya, seolah tidak pernah ada. */
   hapusTrip: (tripId: string) => void
+  /** Catat kendaraan trip sudah kembali di pool: kendaraannya bisa dipilih trip lain lagi. */
+  tandaiDiPool: (tripId: string, waktu?: string, lokasi?: string) => void
+
+  /* ── Audit Log ────────────────────────────────────────── */
+  /** Tulis satu catatan Audit Log (siapa & kapan diisi otomatis). */
+  catatAudit: (e: CatatanAudit) => void
+  /** Jalankan beberapa perubahan sebagai satu catatan Audit Log yang bermakna. */
+  denganAudit: <T>(e: CatatanAudit, kerja: () => T) => T
 }
 
 const DataContext = createContext<DataContextValue | null>(null)
@@ -147,10 +183,12 @@ const EMPTY_DB: Database = {
   drivers: [], routes: [], vehicles: [], jobOrders: [], transactions: [],
   billings: [], projects: [], ujPayments: [], expenses: [],
   internalCosts: [], tripNotes: [], tripEvents: [], kasbonEntries: [], commissionSchemes: [], contracts: [],
+  alamat: [], auditLogs: [], dokumen: [],
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const { workspace } = useWorkspace()
+  const { user } = useAuth()
   const [db, setDb] = useState<Database>(EMPTY_DB)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -158,6 +196,43 @@ export function DataProvider({ children }: { children: ReactNode }) {
   /** Salinan terbaru untuk aksi domain yang perlu membaca sebelum menulis. */
   const dbRef = useRef(db)
   dbRef.current = db
+  /** Pengguna & workspace terbaru untuk Audit Log, tanpa membuat ulang fungsi tiap render. */
+  const userRef = useRef(user)
+  userRef.current = user
+  const wsRef = useRef(workspace)
+  wsRef.current = workspace
+  /** > 0 selama aksi domain berjalan: perubahan di dalamnya dicatat sebagai satu catatan. */
+  const diam = useRef(0)
+
+  const catatAudit = useCallback((e: CatatanAudit) => {
+    if (diam.current > 0) return
+    const u = userRef.current
+    const waktu = nowISO()
+    const log: AuditLog = {
+      id: uid('aud'), waktu, username: u?.username ?? '', nama: u?.name ?? '', peran: u?.role ?? '', workspace: wsRef.current,
+      aksi: e.aksi, entitas: e.entitas, entity_id: e.entity_id, label: e.label, ringkasan: e.ringkasan, perubahan: e.perubahan ?? [],
+      created_at: waktu, updated_at: waktu,
+    }
+    setDb((prev) => ({ ...prev, auditLogs: [log, ...(prev.auditLogs ?? [])].slice(0, BATAS_AUDIT) }))
+  }, [])
+
+  const denganAudit = useCallback(<T,>(e: CatatanAudit, kerja: () => T): T => {
+    diam.current += 1
+    try {
+      return kerja()
+    } finally {
+      diam.current -= 1
+      catatAudit(e)
+    }
+  }, [catatAudit])
+
+  /** Nama jenis data untuk ringkasan Audit Log. */
+  const namaEntitas = (key: EntityKey) => (LABEL_ENTITAS[key] ?? key).toLowerCase()
+  /** Penanda trip untuk Audit Log & ringkasan. */
+  const labelTrip = (tripId: string) => {
+    const t = dbRef.current.transactions.find((x) => x.id === tripId)
+    return t ? idTampil(t) : ''
+  }
 
   // Pemuatan awal sengaja diberi jeda kecil supaya skeleton loading terlihat.
   const runLoad = useCallback(() => {
@@ -191,22 +266,50 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const scoped = (SCOPED_KEYS as readonly string[]).includes(key) ? { workspace } : null
     const created = { ...scoped, ...row, id: uid(key.slice(0, 3)), created_at: nowISO(), updated_at: nowISO() } as Row<K>
     setDb((prev) => ({ ...prev, [key]: [created, ...(prev[key] as Row<K>[])] }))
+    if (key !== 'auditLogs') {
+      catatAudit({
+        aksi: 'buat', entitas: key, entity_id: created.id, label: labelRecord(key, created as unknown as Record<string, unknown>, dbRef.current),
+        ringkasan: `Menambah ${namaEntitas(key)}`,
+      })
+    }
     return created
-  }, [workspace])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspace, catatAudit])
 
   const update = useCallback(<K extends EntityKey>(key: K, id: string, patch: Partial<Row<K>>) => {
+    const lama = (dbRef.current[key] as Row<K>[]).find((r) => r.id === id)
     setDb((prev) => ({
       ...prev,
       [key]: (prev[key] as Row<K>[]).map((r) => (r.id === id ? { ...r, ...patch, updated_at: nowISO() } : r)),
     }))
-  }, [])
+    if (key !== 'auditLogs' && lama) {
+      const perubahan = bedaRecord(lama, patch)
+      if (perubahan.length) {
+        catatAudit({
+          aksi: 'ubah', entitas: key, entity_id: id, label: labelRecord(key, { ...lama, ...patch } as unknown as Record<string, unknown>, dbRef.current),
+          ringkasan: `Mengubah ${namaEntitas(key)}: ${perubahan.map((p) => p.field).join(', ')}`.slice(0, 160), perubahan,
+        })
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catatAudit])
 
   const remove = useCallback(<K extends EntityKey>(key: K, ids: string | string[]): number => {
     const list = Array.isArray(ids) ? ids : [ids]
+    if (list.length === 0) return 0
     const target = new Set(list)
+    const lama = (dbRef.current[key] as Row<K>[]).filter((r) => target.has(r.id))
     setDb((prev) => ({ ...prev, [key]: (prev[key] as Row<K>[]).filter((r) => !target.has(r.id)) }))
+    if (key !== 'auditLogs' && lama.length) {
+      catatAudit({
+        aksi: 'hapus', entitas: key, entity_id: lama[0].id,
+        label: lama.map((r) => labelRecord(key, r as unknown as Record<string, unknown>, dbRef.current)).filter(Boolean).join(', ').slice(0, 120),
+        ringkasan: lama.length > 1 ? `Menghapus ${lama.length} ${namaEntitas(key)}` : `Menghapus ${namaEntitas(key)}`,
+      })
+    }
     return list.length
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catatAudit])
 
   const muatUlangData = useCallback(() => {
     setLoading(true)
@@ -252,22 +355,37 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [update])
 
   const simpanTermin = useCallback((tripId: string, form: TerminForm, ada?: UjPayment) => {
-    if (ada) {
-      update('ujPayments', ada.id, form)
-      selaraskanKasbon(tripId, { ...form, id: ada.id })
-    } else {
-      const seq = dbRef.current.ujPayments.filter((p) => p.trip_id === tripId).reduce((m, p) => Math.max(m, p.sequence), 0) + 1
-      const baru = create('ujPayments', { ...form, trip_id: tripId, sequence: seq })
-      selaraskanKasbon(tripId, baru)
-    }
-  }, [create, update, selaraskanKasbon])
+    const seq = ada?.sequence ?? dbRef.current.ujPayments.filter((p) => p.trip_id === tripId).reduce((m, p) => Math.max(m, p.sequence), 0) + 1
+    const potong = form.kasbon_deduction > 0 ? `, potong kasbon ${formatRupiah(form.kasbon_deduction)}` : ''
+    const disetujui = form.override_note?.trim() ? ` (di atas patokan, disetujui ${form.override_by || 'Manager / Owner'}: ${form.override_note.trim()})` : ''
+    denganAudit({
+      aksi: ada ? 'ubah' : 'buat', entitas: 'ujPayments', entity_id: ada?.id ?? '', label: `Termin ${seq} · ${labelTrip(tripId)}`,
+      ringkasan: `${ada ? 'Mengubah' : 'Menambah'} termin ${seq} uang jalan ${formatRupiah(form.uj_amount)}${potong}${disetujui}`.slice(0, 240),
+      perubahan: ada ? bedaRecord(ada, form) : [],
+    }, () => {
+      if (ada) {
+        update('ujPayments', ada.id, form)
+        selaraskanKasbon(tripId, { ...form, id: ada.id })
+      } else {
+        const baru = create('ujPayments', { ...form, trip_id: tripId, sequence: seq })
+        selaraskanKasbon(tripId, baru)
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [create, update, selaraskanKasbon, denganAudit])
 
   const hapusTermin = useCallback((p: UjPayment) => {
-    remove('ujPayments', p.id)
-    const terkait = dbRef.current.kasbonEntries.filter((e) => e.uj_payment_id === p.id)
-    if (terkait.length) remove('kasbonEntries', terkait.map((e) => e.id))
+    denganAudit({
+      aksi: 'hapus', entitas: 'ujPayments', entity_id: p.id, label: `Termin ${p.sequence} · ${labelTrip(p.trip_id)}`,
+      ringkasan: `Menghapus termin ${p.sequence} uang jalan ${formatRupiah(p.uj_amount)}`,
+    }, () => {
+      remove('ujPayments', p.id)
+      const terkait = dbRef.current.kasbonEntries.filter((e) => e.uj_payment_id === p.id)
+      if (terkait.length) remove('kasbonEntries', terkait.map((e) => e.id))
+    })
     void hapusLampiran(p.attachments ?? [])
-  }, [remove])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remove, denganAudit])
 
   const isiTrip = useCallback((tripId: string): IsiTrip => {
     const d = dbRef.current
@@ -315,8 +433,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const batalkanTrip = useCallback((tripId: string, opsi: OpsiBatal) => {
     const d = dbRef.current
     const trip = d.transactions.find((t) => t.id === tripId)
-    const no = trip?.transaction_no ?? ''
+    const no = trip ? idTampil(trip) : ''
     const hariIni = todayISO()
+    diam.current += 1
+    try {
     // Potongan kasbon dikembalikan satu per satu. Pasangan otomatis ini tetap
     // menunjuk termin asalnya, sehingga terkunci dari ubah / hapus manual.
     for (const e of potonganTrip(d.kasbonEntries, tripId)) {
@@ -344,22 +464,54 @@ export function DataProvider({ children }: { children: ReactNode }) {
       status: 'batal', cancelled_at: hariIni, cancel_reason: opsi.alasan.trim(), cancel_settlement: penyelesaian,
       cancel_fee: Math.max(0, opsi.biayaCancel ?? 0),
     })
-  }, [create, update])
+    } finally {
+      diam.current -= 1
+    }
+    catatAudit({
+      aksi: 'batal', entitas: 'transactions', entity_id: tripId, label: no,
+      ringkasan: `Membatalkan trip: ${opsi.alasan.trim()}${opsi.biayaCancel ? ` (biaya cancel ${formatRupiah(opsi.biayaCancel)})` : ''}`.slice(0, 200),
+    })
+  }, [create, update, catatAudit])
+
+  /** Kejadian "Tiba di pool" sudah tercatat untuk trip ini? */
+  const punyaPool = (tripId: string) => (dbRef.current.tripEvents ?? []).some((e) => e.trip_id === tripId && e.jenis === 'pool')
 
   const tutupTrip = useCallback((tripId: string, opsi: OpsiTutup) => {
-    update('transactions', tripId, {
-      status: 'selesai', closed_at: todayISO(), pod_fisik: opsi.podFisik, pod_fisik_at: opsi.podFisik ? todayISO() : null,
-      pod_attachments: opsi.podFoto, ada_backload: opsi.adaBackload,
+    const waktu = sekarangLokal()
+    const catatan = [
+      `POD ${opsi.podFisik ? 'fisik diterima' : 'baru foto'}`, opsi.adaBackload ? 'ada backload / lanjutan' : '', opsi.diPool ? 'mobil sudah di pool' : '',
+    ].filter(Boolean).join(', ')
+    denganAudit({ aksi: 'tutup', entitas: 'transactions', entity_id: tripId, label: labelTrip(tripId), ringkasan: `Menutup trip: ${catatan}` }, () => {
+      update('transactions', tripId, {
+        status: 'selesai', closed_at: todayISO(), pod_fisik: opsi.podFisik, pod_fisik_at: opsi.podFisik ? todayISO() : null,
+        pod_attachments: opsi.podFoto, ...(opsi.adaBackload !== undefined ? { ada_backload: opsi.adaBackload } : {}),
+        ...(opsi.diPool ? { pool_at: waktu } : {}),
+      })
+      if (opsi.diPool && !punyaPool(tripId)) {
+        create('tripEvents', { trip_id: tripId, jenis: 'pool', waktu, lokasi: 'Pool', catatan: 'Dicatat saat Tutup Trip', attachments: [] })
+      }
     })
-  }, [update])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [create, update, denganAudit])
+
+  const tandaiDiPool = useCallback((tripId: string, waktu = sekarangLokal(), lokasi = 'Pool') => {
+    denganAudit({ aksi: 'pool', entitas: 'transactions', entity_id: tripId, label: labelTrip(tripId), ringkasan: `Mobil kembali di pool (${waktu.replace('T', ' ')})` }, () => {
+      update('transactions', tripId, { pool_at: waktu })
+      if (!punyaPool(tripId)) create('tripEvents', { trip_id: tripId, jenis: 'pool', waktu, lokasi, catatan: '', attachments: [] })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [create, update, denganAudit])
 
   const hapusTrip = useCallback((tripId: string) => {
     const d = dbRef.current
-    kosongkanTrip(tripId)
-    const mutasi = d.kasbonEntries.filter((e) => e.trip_id === tripId)
-    if (mutasi.length) remove('kasbonEntries', mutasi.map((e) => e.id))
-    remove('transactions', tripId)
-  }, [kosongkanTrip, remove])
+    denganAudit({ aksi: 'hapus', entitas: 'transactions', entity_id: tripId, label: labelTrip(tripId), ringkasan: 'Menghapus trip beserta seluruh catatannya' }, () => {
+      kosongkanTrip(tripId)
+      const mutasi = d.kasbonEntries.filter((e) => e.trip_id === tripId)
+      if (mutasi.length) remove('kasbonEntries', mutasi.map((e) => e.id))
+      remove('transactions', tripId)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kosongkanTrip, remove, denganAudit])
 
   /**
    * Penyaringan per workspace dikerjakan di satu tempat ini, sehingga seluruh
@@ -418,6 +570,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       jalan.set(e.trip_id, list)
     }
     const contracts = new Map(scopedDb.contracts.map((c) => [c.id, c]))
+    // Trip yang sudah dilanjutkan backload / rute lanjutan: kendaraannya pindah ke trip lanjutan.
+    const dilanjutkan = new Set(scopedDb.transactions.filter((t) => t.backload_dari && t.status !== 'batal').map((t) => t.backload_dari as string))
     const aturan = scopedDb.commissionSchemes
     const internal = new Map<string, number>()
     for (const c of scopedDb.internalCosts) internal.set(c.trip_id, (internal.get(c.trip_id) ?? 0) + c.amount)
@@ -444,6 +598,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const batal = t.status === 'batal'
       const kejadian = jalan.get(t.id) ?? []
       const lokasi = lokasiTrip(t, r?.route_name ?? '')
+      const area = r ? kodeAreaRute(r) : { asal: normalKodeArea(lokasi.muat), tujuan: normalKodeArea(lokasi.bongkar) }
+      const harga = hargaTrip({ cost_value: t.cost_value ?? 0, route_price: r?.price ?? 0 })
       const kSopir = batal ? null : hitungKomisiTrip(aturan, { ...dasar, role: 'sopir' })
       const kManager = batal || !(t.manager_id || t.manager_name) ? null : hitungKomisiTrip(aturan, { ...dasar, role: 'manager' })
       return {
@@ -457,8 +613,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         route_code: r?.route_code ?? '',
         route_name: r?.route_name ?? '',
         route_price: r?.price ?? 0,
-        harga: hargaTrip({ cost_value: t.cost_value ?? 0, route_price: r?.price ?? 0 }),
-        harga_khusus: (t.cost_value ?? 0) > 0,
+        harga,
+        // Harga trip = salinan Harga Rute saat trip dibuat; khusus bila memang berbeda dari Harga Rute.
+        harga_khusus: (t.cost_value ?? 0) > 0 && t.cost_value !== (r?.price ?? 0),
         ujroute: r?.ujroute ?? 0,
         toll: r?.toll ?? 0,
         commissioner: r?.commissioner ?? 0,
@@ -487,6 +644,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         komisi_keterangan: batal ? 'Trip dibatalkan'
           : !kSopir?.aturan && !t.vehicle_id ? 'Kendaraan trip belum diisi, jadi aturan komisi belum bisa dipilih'
           : kSopir?.keterangan ?? '',
+        id_tampil: idTampil(t),
+        id_perjalanan: idPerjalanan(t),
+        menahan_kendaraan: menahanKendaraan(t, kejadian.some((e) => e.jenis === 'pool'), dilanjutkan.has(t.id)),
+        tagihan_total: batal ? t.cancel_fee ?? 0 : harga + (tagih.get(t.id) ?? 0),
+        area_asal: area.asal,
+        area_tujuan: area.tujuan,
       }
     })
   }, [scopedDb])
@@ -511,10 +674,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     () => ({
       db: scopedDb, dbAll: db, loading, error, reload: runLoad, simulateError, muatUlangData, resetToSample,
       create, update, remove, transactionRows, billingRows, saldoKasbon,
-      buatTrip, ubahTrip, simpanTermin, hapusTermin, isiTrip, batalkanTrip, tutupTrip, hapusTrip,
+      buatTrip, ubahTrip, simpanTermin, hapusTermin, isiTrip, batalkanTrip, tutupTrip, hapusTrip, tandaiDiPool, catatAudit, denganAudit,
     }),
     [scopedDb, db, loading, error, runLoad, simulateError, muatUlangData, resetToSample, create, update, remove,
-      transactionRows, billingRows, saldoKasbon, buatTrip, ubahTrip, simpanTermin, hapusTermin, isiTrip, batalkanTrip, tutupTrip, hapusTrip],
+      transactionRows, billingRows, saldoKasbon, buatTrip, ubahTrip, simpanTermin, hapusTermin, isiTrip, batalkanTrip, tutupTrip, hapusTrip,
+      tandaiDiPool, catatAudit, denganAudit],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

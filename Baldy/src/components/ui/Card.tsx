@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/utils'
 
+/** Kartu Bootstrap (.card) dengan bayangan tipis SIKOTIS. */
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <section className={cn('shadow-card rounded-xl border border-hairline bg-surface', className)}>{children}</section>
+  return <section className={cn('card', className)}>{children}</section>
 }
 
 export function CardHeader({
@@ -17,10 +18,10 @@ export function CardHeader({
   className?: string
 }) {
   return (
-    <header className={cn('flex flex-wrap items-start justify-between gap-3 border-b border-hairline px-4 py-3', className)}>
+    <header className={cn('card-header flex flex-wrap items-start justify-between gap-3', className)}>
       <div className="min-w-0">
-        <h2 className="text-[14px] leading-tight font-semibold text-ink">{title}</h2>
-        {subtitle && <p className="mt-0.5 text-[12px] text-ink-3">{subtitle}</p>}
+        <h2 className="card-title">{title}</h2>
+        {subtitle && <p className="card-subtitle">{subtitle}</p>}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </header>
@@ -28,7 +29,7 @@ export function CardHeader({
 }
 
 export function CardBody({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cn('p-4', className)}>{children}</div>
+  return <div className={cn('card-body', className)}>{children}</div>
 }
 
 /** Blok kanan-kiri untuk menampilkan pasangan label + nilai. */

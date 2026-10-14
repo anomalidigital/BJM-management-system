@@ -66,5 +66,5 @@ export function usePeriodeDefault(tanggal: string[]) {
     setTo(periode.end)
   }, [periode, tanggal.length])
 
-  return { from, setFrom, to, setTo, reset: () => { setFrom(periode.start); setTo(periode.end) } }
+  return { from, setFrom, to, setTo, awal: periode.start, akhir: periode.end, reset: () => { setFrom(periode.start); setTo(periode.end) } }
 }

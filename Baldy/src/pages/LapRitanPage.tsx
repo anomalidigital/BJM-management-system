@@ -6,7 +6,7 @@ import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
 import type { Column } from '../components/ui/DataTable'
 import { Pagination } from '../components/ui/Pagination'
-import { FilterField, SearchInput, Toolbar } from '../components/ui/Toolbar'
+import { PanelFilter, SearchInput, Toolbar } from '../components/ui/Toolbar'
 import { Button } from '../components/ui/Button'
 import { ConfirmDialog } from '../components/ui/Modal'
 import { DateInput, Select } from '../components/ui/Field'
@@ -20,6 +20,7 @@ import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
 import { useWorkspace } from '../store/WorkspaceProvider'
 import { useTable } from '../lib/useTable'
+import { useFilter } from '../lib/useFilter'
 import { matchesQuery, sum } from '../lib/utils'
 import { periodeAktif } from '../lib/periode'
 import { formatDate, formatNumber, formatRupiah, monthLabel } from '../lib/format'
@@ -42,8 +43,8 @@ export function LapRitanPage() {
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [driverFilter, setDriverFilter] = useState('')
-  const [cityFilter, setCityFilter] = useState('')
+  const filter = useFilter({ driver: '', city: '' })
+  const { driver: driverFilter, city: cityFilter } = filter.nilai
   const [preview, setPreview] = useState(false)
 
   const periode = useMemo(() => periodeAktif(transactionRows.map((t) => t.transaction_date)), [transactionRows])
@@ -169,7 +170,7 @@ export function LapRitanPage() {
                   { label: 'No.', align: 'right', width: '5%' },
                   { label: 'NoTrans', width: '12%' },
                   { label: 'Mobil', width: '13%' },
-                  { label: 'No.Route', width: '11%' },
+                  { label: 'No. Rute', width: '11%' },
                   { label: 'Tgl Bon', width: '10%' },
                   { label: 'Bon Pribadi', align: 'right', width: '13%' },
                   { label: 'SI - JOB ORDER', width: '12%' },
@@ -221,7 +222,7 @@ export function LapRitanPage() {
   const columns: Column<TransactionRow>[] = [
     { key: 'transaction_no', header: 'NoTrans', sortable: true, width: '116px', render: (t) => <span className="tnum font-semibold text-ink">{t.transaction_no}</span> },
     { key: 'plate_number', header: 'Mobil', sortable: true, width: '128px', render: (t) => <span className="tnum text-ink-2">{t.plate_number || '—'}</span> },
-    { key: 'route_code', header: 'No.Route', sortable: true, width: '112px', render: (t) => <span className="tnum text-ink-2">{t.route_code || '—'}</span> },
+    { key: 'route_code', header: 'No. Rute', sortable: true, width: '112px', render: (t) => <span className="tnum text-ink-2">{t.route_code || '—'}</span> },
     {
       key: 'bon_date', header: 'Tgl Bon', sortable: true, width: '150px',
       render: (t) => {
@@ -293,24 +294,28 @@ export function LapRitanPage() {
         <Toolbar
           left={
             <>
-              <SearchInput value={table.query} onChange={table.setQuery} width="w-72" placeholder="Cari No. Transaksi, mobil, route..." />
-              <FilterField label="Sopir">
-                <Select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="w-56">
-                  <option value="">Semua Sopir</option>
-                  {db.drivers.map((d) => (
-                    <option key={d.id} value={d.id}>{d.driver_code} — {d.driver_name}</option>
-                  ))}
-                </Select>
-              </FilterField>
-              <FilterField label="Kota">
-                <Select value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} className="w-40">
-                  <option value="">Semua Kota</option>
-                  {cities.map((c) => <option key={c} value={c}>{c}</option>)}
-                </Select>
-              </FilterField>
-              {(table.isFiltered || filterActive) && (
-                <Button size="sm" variant="ghost" icon={<FaXmark size={14} />} onClick={() => { table.reset(); setDriverFilter(''); setCityFilter('') }}>Reset</Button>
-              )}
+              <SearchInput value={table.query} onChange={table.setQuery} width="w-72" placeholder="Cari No. Transaksi, mobil, rute..." />
+              <PanelFilter filter={filter} chips={[
+                driverFilter && { label: `Supir: ${db.drivers.find((x) => x.id === driverFilter)?.driver_name ?? '—'}`, lepas: () => filter.lepas('driver') },
+                cityFilter && { label: `Kota: ${cityFilter}`, lepas: () => filter.lepas('city') },
+              ]}>
+                <div>
+                  <p className="form-label">Supir</p>
+                  <Select value={filter.draf.driver} onChange={(e) => filter.ubah({ driver: e.target.value })} aria-label="Filter supir">
+                    <option value="">Semua Supir</option>
+                    {db.drivers.map((d) => (
+                      <option key={d.id} value={d.id}>{d.driver_code} — {d.driver_name}</option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <p className="form-label">Kota</p>
+                  <Select value={filter.draf.city} onChange={(e) => filter.ubah({ city: e.target.value })} aria-label="Filter kota">
+                    <option value="">Semua Kota</option>
+                    {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </Select>
+                </div>
+              </PanelFilter>
             </>
           }
           right={
@@ -354,7 +359,7 @@ export function LapRitanPage() {
           onToggleAll={editMode ? undefined : toggleAll}
           maxHeight="560px"
           empty={<EmptyState entity="ritan bulan ini" />}
-          notFound={<NotFoundState onReset={() => { table.reset(); setDriverFilter(''); setCityFilter('') }} />}
+          notFound={<NotFoundState onReset={() => { table.reset(); filter.lepasSemua() }} />}
         />
 
         {table.total > 0 && (

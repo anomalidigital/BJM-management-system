@@ -10,9 +10,11 @@ export interface MenuAction {
   onSelect: () => void
   tone?: 'default' | 'danger'
   disabled?: boolean
+  /** Alasan aksi tidak bisa dipakai, tampil kecil di bawah labelnya (mis. "Sudah ditagih lewat PI 0473"). */
+  alasan?: string
 }
 
-const LEBAR = 192
+const LEBAR = 216
 
 /**
  * Menu overflow ringkas untuk aksi sekunder pada baris tabel.
@@ -78,10 +80,7 @@ export function OverflowMenu({ actions, label = 'Aksi lainnya' }: { actions: Men
           e.stopPropagation()
           setOpen((o) => !o)
         }}
-        className={cn(
-          'inline-flex h-7.5 w-7.5 items-center justify-center rounded-md border border-transparent text-ink-3 transition-colors hover:border-hairline hover:bg-sunken hover:text-ink',
-          open && 'border-hairline bg-sunken text-ink',
-        )}
+        className="btn btn-icon"
       >
         <FaEllipsis size={15} />
       </button>
@@ -90,9 +89,9 @@ export function OverflowMenu({ actions, label = 'Aksi lainnya' }: { actions: Men
         <div
           ref={panelRef}
           role="menu"
-          style={{ ...posisi, width: LEBAR }}
+          style={{ ...posisi, width: LEBAR, position: 'fixed', zIndex: 85 }}
           // Di atas isi halaman dan popup biasa, di bawah modal (z-90) dan notifikasi.
-          className="animate-in-pop fixed z-[85] overflow-hidden rounded-lg border border-hairline bg-surface py-1 shadow-pop"
+          className="dropdown-menu show"
           onClick={(e) => e.stopPropagation()}
         >
           {actions.map((a) => (
@@ -105,13 +104,12 @@ export function OverflowMenu({ actions, label = 'Aksi lainnya' }: { actions: Men
                 setOpen(false)
                 a.onSelect()
               }}
-              className={cn(
-                'flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors disabled:pointer-events-none disabled:opacity-40',
-                a.tone === 'danger' ? 'text-[color:var(--color-critical)] hover:bg-[#fdf2f2]' : 'text-ink-2 hover:bg-sunken hover:text-ink',
-              )}
+              className={cn('dropdown-item', a.tone === 'danger' && 'dropdown-item-danger')}
             >
               {a.icon}
-              {a.label}
+              {a.disabled && a.alasan
+                ? <span className="min-w-0"><span className="block">{a.label}</span><span className="block text-[11px] leading-snug font-normal">{a.alasan}</span></span>
+                : a.label}
             </button>
           ))}
         </div>,

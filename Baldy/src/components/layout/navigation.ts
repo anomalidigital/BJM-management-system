@@ -1,6 +1,6 @@
 import {
-  FaBuilding, FaFileInvoiceDollar, FaGaugeHigh, FaMagnifyingGlass,
-  FaRoute, FaSackDollar, FaScrewdriverWrench, FaShieldHalved, FaTruck, FaTruckFast, FaUsers, FaWallet,
+  FaBuilding, FaClockRotateLeft, FaFileInvoiceDollar, FaFolderOpen, FaGaugeHigh, FaHandHoldingDollar, FaMagnifyingGlass,
+  FaMapLocationDot, FaRoute, FaSackDollar, FaTruck, FaTruckFast, FaUsers, FaUsersGear, FaWallet,
 } from '../ui/icons'
 import type { IconComponent } from '../ui/icons'
 import type { Workspace } from '../../types'
@@ -20,8 +20,10 @@ export interface NavGroup {
 }
 
 /**
- * Struktur navigasi utama, mengikuti susunan menu dari atasan (6 Okt 2026):
- * Dashboard, Trip / Job Order, Laporan, Master Data, Administrasi.
+ * Struktur navigasi utama, mengikuti susunan menu Ibu Anne (revisi 12 Okt 2026):
+ * Dashboard, Trip / Job Order, Laporan (Pengeluaran, Tagihan, Komisi, Piutang Karyawan),
+ * Master Data (Supir / Karyawan, Kendaraan, Rute, Alamat, Klien / Pelanggan), Dokumen,
+ * Pengaturan (Pengguna & Peran, Audit Log). Tools tidak ada di susunan itu: dibuka dari menu akun.
  * Pengeluaran = uang jalan, biaya operasional, dan biaya internal per trip.
  * Netto dan Ritan tidak ada di susunan atasan, dibuka dari Dashboard.
  * Aturan Komisi menjadi tab Aturan di halaman Komisi, bukan menu Master Data.
@@ -39,6 +41,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'Pengeluaran', to: '/laporan/pengeluaran', icon: FaWallet },
       { label: 'Tagihan', to: '/transaksi/tagihan', icon: FaFileInvoiceDollar },
       { label: 'Komisi', to: '/laporan/komisi', icon: FaSackDollar },
+      { label: 'Piutang Karyawan', to: '/laporan/piutang-karyawan', icon: FaHandHoldingDollar },
     ],
   },
   {
@@ -46,19 +49,23 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: 'Supir / Karyawan', to: '/master/karyawan', icon: FaUsers },
       { label: 'Kendaraan', to: '/master/mobil', icon: FaTruck },
-      { label: 'Rute', to: '/master/route', icon: FaRoute },
+      { label: 'Rute', to: '/master/rute', icon: FaRoute },
+      { label: 'Alamat', to: '/master/alamat', icon: FaMapLocationDot },
       { label: 'Klien / Pelanggan', to: '/master/klien', icon: FaBuilding },
     ],
+  },
+  {
+    items: [{ label: 'Dokumen', to: '/dokumen', icon: FaFolderOpen }],
   },
   {
     title: 'Pencarian',
     items: [{ label: 'SI / Job Order', to: '/pencarian/sijo', icon: FaMagnifyingGlass, workspace: 'priok' }],
   },
   {
-    title: 'Administrasi',
+    title: 'Pengaturan',
     items: [
-      { label: 'User & Roles', to: '/admin/peran', icon: FaShieldHalved },
-      { label: 'Tools', to: '/tools', icon: FaScrewdriverWrench },
+      { label: 'Pengguna & Peran', to: '/pengaturan/pengguna', icon: FaUsersGear },
+      { label: 'Audit Log', to: '/pengaturan/audit-log', icon: FaClockRotateLeft },
     ],
   },
 ]

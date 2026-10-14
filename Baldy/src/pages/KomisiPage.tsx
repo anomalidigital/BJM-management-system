@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useId, useMemo, useState } from 'react'
 import { FaPen, FaPlus, FaTrashCan, FaXmark } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
@@ -9,7 +9,7 @@ import { Modal, ConfirmDialog } from '../components/ui/Modal'
 import { Checkbox, Field, Input, Select, Textarea } from '../components/ui/Field'
 import { CurrencyInput } from '../components/ui/CurrencyInput'
 import { Badge } from '../components/ui/Badge'
-import { FilterField, Toolbar } from '../components/ui/Toolbar'
+import { PanelFilter, Toolbar } from '../components/ui/Toolbar'
 import { EmptyState, NotFoundState } from '../components/ui/States'
 import { useData } from '../store/DataProvider'
 import { useAuth } from '../store/AuthProvider'
@@ -17,6 +17,8 @@ import { useToast } from '../store/ToastProvider'
 import { currencyInputValue, formatRupiah, parseCurrencyInput } from '../lib/format'
 import { terapkan, tulisRentang } from '../lib/komisi'
 import { cn } from '../lib/utils'
+import { useFilter } from '../lib/useFilter'
+import { KotakInfo } from './trip/bagian'
 import { DASAR_KOMISI, DASAR_KOMISI_LABEL, EMPLOYEE_ROLES, ROLE_LABEL, SERVICE_LABEL, SERVICE_TYPES, VEHICLE_CONFIGS } from '../types'
 import type { CommissionScheme, CommissionTier, CommissionUnit, DasarKomisi, EmployeeRole, ServiceType } from '../types'
 
@@ -30,10 +32,13 @@ const BLANK: FormState = {
 
 const LAYANAN_LABEL: Record<ServiceType | 'semua', string> = { ...SERVICE_LABEL, semua: 'Semua layanan' }
 
+/** Nama peran di layar memakai istilah "Supir"; kode datanya tetap `sopir`. */
+const LABEL_PERAN: Record<EmployeeRole, string> = { ...ROLE_LABEL, sopir: 'Supir' }
+
 /** Penjelasan dasar hitung, ditampilkan di bawah pilihan. */
 const PENJELASAN_DASAR: Record<DasarKomisi, string> = {
-  nilai: 'Harga yang diisi di trip; bila kosong memakai Harga route.',
-  uj: 'UJROUTE route; bila kosong memakai total UJ yang dibayar.',
+  nilai: 'Harga yang diisi di trip; bila kosong memakai Harga Rute.',
+  uj: 'Uang jalan rute (UJ Rute); bila kosong memakai total uang jalan yang dibayar.',
   kontrak: 'Nilai kontrak Dedicated, dihitung per kontrak (bukan per trip).',
 }
 
@@ -86,28 +91,25 @@ function NilaiKomisi({
 
   return (
     <>
-      <div
-        className={cn(
-          'flex h-9 w-full items-center overflow-hidden rounded-md border bg-surface transition-colors',
-          'focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-500/15',
-          invalid ? 'border-[color:var(--color-critical)]' : 'border-hairline',
-        )}
-      >
-        <select
-          value={unit}
-          aria-label="Satuan komisi"
-          onChange={(e) => gantiSatuan(e.target.value as CommissionUnit)}
-          className="h-full cursor-pointer border-r border-hairline bg-sunken pr-6 pl-2.5 text-[12px] font-semibold text-ink-2 outline-none"
-        >
-          <option value="rp">Rp</option>
-          <option value="persen">%</option>
-        </select>
+      {/* Satuan sebagai dua tombol yang menempel di isian (Bootstrap .input-group). */}
+      <div className="input-group" role="group" aria-label="Satuan komisi">
+        {(['rp', 'persen'] as const).map((u) => (
+          <button
+            key={u}
+            type="button"
+            aria-pressed={unit === u}
+            onClick={() => unit !== u && gantiSatuan(u as CommissionUnit)}
+            className={cn('btn px-2.5 text-[12px] font-semibold', unit === u ? 'btn-primary' : 'btn-outline-secondary')}
+          >
+            {u === 'rp' ? 'Rp' : '%'}
+          </button>
+        ))}
         <input
           id={id}
           inputMode="decimal"
           value={persen ? tulisAngka(value) : currencyInputValue(value)}
           onChange={(e) => ubah(e.target.value)}
-          className="tnum h-full min-w-0 flex-1 bg-transparent px-2.5 text-right text-[13px] text-ink outline-none"
+          className={cn('form-control tnum text-right', invalid && 'is-invalid')}
         />
       </div>
       {persen && (
@@ -123,22 +125,28 @@ function NilaiKomisi({
 
 /**
  * Aturan komisi: tab Aturan di halaman Laporan -> Komisi (dulu menu Master Data ->
- * Aturan Komisi). Satu pengaturan = satu peran (sopir / manager) dengan beberapa
+ * Aturan Komisi). Satu pengaturan = satu peran (supir / manager) dengan beberapa
  * tingkat target. Di sini hanya mengatur nilai; pencapaiannya dilaporkan di tab Laporan.
+ *
+ * Hanya Owner (super admin) yang boleh menambah, mengubah, menghapus, dan mengaktifkan /
+ * menonaktifkan aturan (izin `komisi`); Manager dan Admin hanya melihat.
  *
  * `tertanam`: dirender sebagai tab di halaman Komisi, tanpa kepala halaman sendiri.
  */
 export function KomisiPage({ tertanam = false }: { tertanam?: boolean } = {}) {
   const { db, loading, error, reload, create, update, remove } = useData()
-  const { canEdit } = useAuth()
+  const { bisa } = useAuth()
+  const boleh = bisa('komisi')
   const toast = useToast()
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<CommissionScheme | null>(null)
   const [form, setForm] = useState<FormState>(BLANK)
   const [galat, setGalat] = useState<{ umum?: string; name?: string; tingkat?: Record<number, string> }>({})
+  const idForm = useId()
   const [deleting, setDeleting] = useState<CommissionScheme | null>(null)
-  const [peran, setPeran] = useState('')
+  const filter = useFilter({ peran: '' })
+  const { peran } = filter.nilai
   const [coba, setCoba] = useState(15_000_000)
 
   const rows = useMemo(
@@ -147,10 +155,12 @@ export function KomisiPage({ tertanam = false }: { tertanam?: boolean } = {}) {
   )
 
   function openCreate() {
+    if (!boleh) return
     setEditing(null); setForm({ ...BLANK, tiers: [{ ...TINGKAT_KOSONG }] }); setGalat({}); setFormOpen(true)
   }
 
   function openEdit(s: CommissionScheme) {
+    if (!boleh) return
     setEditing(s)
     setForm({
       name: s.name, role: s.role ?? 'sopir', notes: s.notes ?? '',
@@ -190,6 +200,7 @@ export function KomisiPage({ tertanam = false }: { tertanam?: boolean } = {}) {
   const hasilCoba = terapkan({ ...form, id: '', created_at: '', updated_at: '' }, coba)
 
   function onSubmit() {
+    if (!boleh) return
     const tingkat: Record<number, string> = {}
     if (!form.name.trim()) setGalat((g) => ({ ...g, name: 'Nama wajib diisi.' }))
     form.tiers.forEach((t, i) => {
@@ -215,7 +226,7 @@ export function KomisiPage({ tertanam = false }: { tertanam?: boolean } = {}) {
   }
 
   function onDelete() {
-    if (!deleting) return
+    if (!deleting || !boleh) return
     remove('commissionSchemes', deleting.id)
     toast.success('Komisi berhasil dihapus.')
     setDeleting(null)
@@ -236,7 +247,7 @@ export function KomisiPage({ tertanam = false }: { tertanam?: boolean } = {}) {
     },
     {
       key: 'role', header: 'Untuk', width: '110px',
-      render: (s) => <Badge tone={s.role === 'manager' ? 'brand' : 'neutral'}>{ROLE_LABEL[s.role ?? 'sopir']}</Badge>,
+      render: (s) => <Badge tone={s.role === 'manager' ? 'brand' : 'neutral'}>{LABEL_PERAN[s.role ?? 'sopir']}</Badge>,
     },
     {
       key: 'configurations', header: 'Berlaku', width: '190px',
@@ -273,8 +284,8 @@ export function KomisiPage({ tertanam = false }: { tertanam?: boolean } = {}) {
       key: 'action', header: 'Action', align: 'right', width: '92px',
       render: (s) => (
         <div className="flex justify-end gap-1">
-          <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!canEdit} onClick={() => openEdit(s)} />
-          <IconButton label="Hapus" tone="danger" icon={<FaTrashCan size={14} />} disabled={!canEdit} onClick={() => setDeleting(s)} />
+          <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!boleh} onClick={() => openEdit(s)} />
+          <IconButton label="Hapus" tone="danger" icon={<FaTrashCan size={14} />} disabled={!boleh} onClick={() => setDeleting(s)} />
         </div>
       ),
     },
@@ -287,28 +298,35 @@ export function KomisiPage({ tertanam = false }: { tertanam?: boolean } = {}) {
       )}
 
       <p className="mb-3 max-w-3xl px-1 text-[13px] leading-relaxed text-ink-2">
-        Aturan komisi menentukan besar komisi sopir dan manager. Komisi setiap trip dihitung otomatis: sistem memakai
+        Aturan komisi menentukan besar komisi supir dan manager. Komisi setiap trip dihitung otomatis: sistem memakai
         aturan aktif yang cocok dengan peran, layanan, dan jenis kendaraan trip itu, lalu memilih tingkat sesuai nilai
         dasarnya (biasanya harga trip). Hasilnya langsung tampil di detail trip dan laporan komisi.
       </p>
+      {!boleh && (
+        <KotakInfo className="mb-3 max-w-3xl">Hanya lihat. Aturan komisi diubah oleh Owner (super admin).</KotakInfo>
+      )}
 
       <Card>
         <Toolbar
           left={
             <>
-              <FilterField label="Untuk">
-                <Select value={peran} onChange={(e) => setPeran(e.target.value)} className="h-9 w-36">
-                  <option value="">Semua</option>
-                  {EMPLOYEE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
-                </Select>
-              </FilterField>
-              {peran && <Button size="sm" variant="ghost" icon={<FaXmark size={14} />} onClick={() => setPeran('')}>Reset</Button>}
+              <PanelFilter filter={filter}
+                chips={[peran && { label: `Untuk: ${LABEL_PERAN[peran as EmployeeRole] ?? peran}`, lepas: () => filter.lepas('peran') }]}>
+                <Field label="Aturan untuk">
+                  {(id) => (
+                    <Select id={id} value={filter.draf.peran} onChange={(e) => filter.ubah({ peran: e.target.value })}>
+                      <option value="">Semua peran</option>
+                      {EMPLOYEE_ROLES.map((r) => <option key={r} value={r}>{LABEL_PERAN[r]}</option>)}
+                    </Select>
+                  )}
+                </Field>
+              </PanelFilter>
             </>
           }
           right={
             <>
               <span className="text-[12.5px] text-ink-3">{db.commissionSchemes.length} pengaturan komisi</span>
-              <Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}>
+              <Button variant="primary" icon={<FaPlus size={15} />} disabled={!boleh} onClick={openCreate}>
                 Tambah Komisi
               </Button>
             </>
@@ -324,7 +342,7 @@ export function KomisiPage({ tertanam = false }: { tertanam?: boolean } = {}) {
           isFiltered={!!peran}
           skeletonCols={7}
           empty={<EmptyState entity="aturan komisi" />}
-          notFound={<NotFoundState onReset={() => setPeran('')} />}
+          notFound={<NotFoundState onReset={() => filter.lepasSemua()} />}
         />
       </Card>
 
@@ -337,68 +355,46 @@ export function KomisiPage({ tertanam = false }: { tertanam?: boolean } = {}) {
         footer={
           <>
             <Button onClick={() => setFormOpen(false)}>Batal</Button>
-            <Button variant="primary" onClick={onSubmit}>Save</Button>
+            <Button variant="primary" onClick={onSubmit}>Simpan</Button>
           </>
         }
       >
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-[180px_1fr]">
-            <Field label="Untuk" required hint="Peran karyawan penerima komisi ini.">
+        {/* Ringkas tanpa scroll (Baldy 14 Okt 2026): penjelasan dipadatkan, tiap tingkat satu baris. */}
+        <div className="space-y-3.5">
+          <div className="grid gap-x-4 gap-y-3 sm:grid-cols-[170px_1fr_auto]">
+            <Field label="Untuk" required>
               {(id) => (
                 <Select id={id} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as EmployeeRole })}>
-                  {EMPLOYEE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+                  {EMPLOYEE_ROLES.map((r) => <option key={r} value={r}>{LABEL_PERAN[r]}</option>)}
                 </Select>
               )}
             </Field>
             <Field label="Nama" required error={galat.name}>
               {(id) => (
-                <Input id={id} value={form.name} invalid={!!galat.name} placeholder="Komisi Sopir"
+                <Input id={id} value={form.name} invalid={!!galat.name} placeholder="Komisi Supir"
                   onChange={(e) => setForm({ ...form, name: e.target.value })} />
               )}
             </Field>
+            <Checkbox className="self-start sm:mt-[30px]" checked={form.is_active} title="Aturan aktif dipakai untuk menghitung komisi trip"
+              onChange={(e) => setForm({ ...form, is_active: e.target.checked })} label="Aktif" />
           </div>
 
-          <div className="grid gap-4 rounded-lg border border-hairline bg-sunken p-3.5 sm:grid-cols-2">
-            <Field label="Layanan" hint="Aturan hanya dipakai trip dengan layanan ini.">
+          <div className="grid gap-x-4 gap-y-3 sm:grid-cols-3">
+            <Field label="Layanan">
               {(id) => (
                 <Select id={id} value={form.service_type} onChange={(e) => setForm({ ...form, service_type: e.target.value as FormState['service_type'] })}>
                   {[...SERVICE_TYPES, 'semua' as const].map((l) => <option key={l} value={l}>{LAYANAN_LABEL[l]}</option>)}
                 </Select>
               )}
             </Field>
-            <Field label="Dasar hitung" hint={PENJELASAN_DASAR[form.basis]}>
+            <Field label="Dasar hitung">
               {(id) => (
                 <Select id={id} value={form.basis} onChange={(e) => setForm({ ...form, basis: e.target.value as DasarKomisi })}>
                   {DASAR_KOMISI.map((d) => <option key={d} value={d}>{DASAR_KOMISI_LABEL[d]}</option>)}
                 </Select>
               )}
             </Field>
-            <div className="sm:col-span-2">
-              <p className="mb-1.5 text-[12px] font-semibold tracking-wide text-ink-2">Jenis kendaraan</p>
-              <div className="flex flex-wrap gap-1.5">
-                {VEHICLE_CONFIGS.map((k) => {
-                  const aktif = form.configurations.includes(k)
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      aria-pressed={aktif}
-                      onClick={() => toggleKendaraan(k)}
-                      className={cn(
-                        'rounded-md border px-2.5 py-1 text-[12px] font-semibold transition-colors',
-                        aktif ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-hairline bg-surface text-ink-3 hover:text-ink',
-                      )}
-                    >
-                      {k}
-                    </button>
-                  )
-                })}
-              </div>
-              <p className="mt-1 text-[12px] text-ink-3">
-                {form.configurations.length ? `Berlaku untuk ${form.configurations.join(', ')}.` : 'Tidak ada yang dipilih = berlaku untuk semua kendaraan.'}
-              </p>
-            </div>
-            <Field label="Potongan dasar (%)" hint="Dasar dikurangi dulu sebelum dicari tingkatnya, mis. 5 untuk (nilai − 5%).">
+            <Field label="Potongan dasar (%)">
               {(id) => (
                 <Input id={id} inputMode="decimal" className="tnum text-right"
                   value={String(form.base_deduction_pct).replace('.', ',')}
@@ -408,72 +404,100 @@ export function KomisiPage({ tertanam = false }: { tertanam?: boolean } = {}) {
                   }} />
               )}
             </Field>
+            <p className="form-text -mt-1.5 mb-0 sm:col-span-3">
+              {PENJELASAN_DASAR[form.basis]} Potongan dasar dikurangkan dulu sebelum dicari tingkatnya, mis. 5 untuk (nilai − 5%).
+            </p>
           </div>
 
-          {form.tiers.map((t, i) => (
-            <section key={i} className="rounded-lg border border-hairline">
-              <header className="flex items-center justify-between border-b border-hairline bg-sunken px-3.5 py-2">
-                <p className="text-[12.5px] font-semibold text-ink-2">Tingkat {i + 1}</p>
-                {form.tiers.length > 1 && (
-                  <button type="button" onClick={() => hapusTingkat(i)}
-                    className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[12px] font-medium text-ink-3 transition hover:bg-[#fdf2f2] hover:text-[color:var(--color-critical)]">
-                    <FaXmark size={13} /> Hapus tingkat
+          <div>
+            <p className="form-label">
+              Jenis kendaraan{' '}
+              <span className="font-normal text-ink-3">
+                · {form.configurations.length ? `berlaku untuk ${form.configurations.join(', ')}` : 'tidak ada yang dipilih = semua kendaraan'}
+              </span>
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {VEHICLE_CONFIGS.map((k) => {
+                const aktif = form.configurations.includes(k)
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={aktif}
+                    onClick={() => toggleKendaraan(k)}
+                    className={cn(
+                      'rounded-md border px-2.5 py-1 text-[12px] font-semibold transition-colors',
+                      aktif ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-hairline bg-surface text-ink-3 hover:text-ink',
+                    )}
+                  >
+                    {k}
                   </button>
-                )}
-              </header>
-              <div className="grid gap-4 p-3.5 sm:grid-cols-2">
-                <Field label="Target Awal" required>
-                  {(id) => <CurrencyInput id={id} value={t.target_awal} onValueChange={(v) => ubahTingkat(i, { target_awal: v })} />}
-                </Field>
-                <Field label="Target Akhir" hint="Kosongkan (0) bila tanpa batas atas.">
-                  {(id) => <CurrencyInput id={id} value={t.target_akhir} onValueChange={(v) => ubahTingkat(i, { target_akhir: v })} />}
-                </Field>
-                <Field label="Komisi" required className="sm:col-span-2">
-                  {(id) => (
-                    <NilaiKomisi
-                      id={id}
-                      value={t.commission}
-                      unit={t.commission_unit}
-                      target={t.target_awal || t.target_akhir}
-                      invalid={!!galat.tingkat?.[i]}
-                      onValue={(v) => ubahTingkat(i, { commission: v })}
-                      onUnit={(u) => ubahTingkat(i, { commission_unit: u })}
-                    />
-                  )}
-                </Field>
-                {galat.tingkat?.[i] && (
-                  <p className="text-[12px] font-medium text-[color:var(--color-critical)] sm:col-span-2">{galat.tingkat[i]}</p>
-                )}
-              </div>
-            </section>
-          ))}
-
-          <Button icon={<FaPlus size={15} />} onClick={tambahTingkat} className="w-full justify-center border-dashed">
-            Tambah tingkat
-          </Button>
-
-          <div className="rounded-lg border border-brand-100 bg-brand-50/60 px-3.5 py-3">
-            <p className="text-[12px] font-semibold tracking-wide text-brand-800">Coba hitung</p>
-            <div className="mt-2 grid items-center gap-3 sm:grid-cols-[220px_1fr]">
-              <CurrencyInput value={coba} onValueChange={setCoba} aria-label="Harga contoh" />
-              <p className="text-[12.5px] text-brand-800">
-                {hasilCoba.tingkat
-                  ? <>Masuk tingkat <span className="tnum font-semibold">{tulisRentang(hasilCoba.tingkat)}</span> → komisi <span className="tnum font-semibold">{formatRupiah(hasilCoba.nilai)}</span></>
-                  : 'Tidak masuk tingkat mana pun, jadi tidak dapat komisi.'}
-                {form.base_deduction_pct > 0 && hasilCoba.dasar > 0 && <> (dasar setelah potongan {formatRupiah(hasilCoba.dasar)})</>}
-              </p>
+                )
+              })}
             </div>
           </div>
 
-          <Checkbox
-            checked={form.is_active}
-            onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-            label="Aktif — dipakai untuk menghitung komisi trip"
-          />
+          <div>
+            <div aria-hidden className="form-label hidden grid-cols-[28px_1fr_1fr_1.35fr_32px] gap-x-2.5 sm:grid">
+              <span>#</span>
+              <span>Target Awal<span className="wajib">*</span></span>
+              <span>Target Akhir <span className="font-normal text-ink-3">(0 = tanpa batas)</span></span>
+              <span>Komisi<span className="wajib">*</span></span>
+              <span />
+            </div>
+            <div className="space-y-2">
+              {form.tiers.map((t, i) => (
+                <div key={i}>
+                  <div className="grid items-start gap-x-2.5 gap-y-1.5 rounded-lg border border-hairline p-2.5 sm:grid-cols-[28px_1fr_1fr_1.35fr_32px] sm:rounded-none sm:border-0 sm:p-0">
+                    <span className="text-[12.5px] font-semibold text-ink-3 sm:pt-2.5"><span className="sm:hidden">Tingkat </span>{i + 1}</span>
+                    <div>
+                      <label htmlFor={`${idForm}-awal-${i}`} className="form-label sm:sr-only">Target Awal tingkat {i + 1}</label>
+                      <CurrencyInput id={`${idForm}-awal-${i}`} value={t.target_awal} onValueChange={(v) => ubahTingkat(i, { target_awal: v })} />
+                    </div>
+                    <div>
+                      <label htmlFor={`${idForm}-akhir-${i}`} className="form-label sm:sr-only">Target Akhir tingkat {i + 1}</label>
+                      <CurrencyInput id={`${idForm}-akhir-${i}`} value={t.target_akhir} onValueChange={(v) => ubahTingkat(i, { target_akhir: v })} />
+                    </div>
+                    <div>
+                      <label htmlFor={`${idForm}-komisi-${i}`} className="form-label sm:sr-only">Komisi tingkat {i + 1}</label>
+                      <NilaiKomisi
+                        id={`${idForm}-komisi-${i}`}
+                        value={t.commission}
+                        unit={t.commission_unit}
+                        target={t.target_awal || t.target_akhir}
+                        invalid={!!galat.tingkat?.[i]}
+                        onValue={(v) => ubahTingkat(i, { commission: v })}
+                        onUnit={(u) => ubahTingkat(i, { commission_unit: u })}
+                      />
+                    </div>
+                    {form.tiers.length > 1 ? (
+                      <button type="button" onClick={() => hapusTingkat(i)} aria-label={`Hapus tingkat ${i + 1}`} title="Hapus tingkat"
+                        className="grid h-[37px] w-8 place-items-center rounded-md text-ink-3 transition hover:bg-[#fdf2f2] hover:text-[color:var(--color-critical)]">
+                        <FaXmark size={14} />
+                      </button>
+                    ) : <span />}
+                  </div>
+                  {galat.tingkat?.[i] && <p className="mt-1 text-[12px] font-medium text-[color:var(--color-critical)]">{galat.tingkat[i]}</p>}
+                </div>
+              ))}
+            </div>
+            <Button size="sm" variant="ghost" icon={<FaPlus size={13} />} onClick={tambahTingkat} className="mt-1.5">Tambah tingkat</Button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-brand-100 bg-brand-50/60 px-3 py-2">
+            <label htmlFor={`${idForm}-coba`} className="text-[12px] font-semibold text-brand-800">Coba hitung</label>
+            <div className="w-[170px]"><CurrencyInput id={`${idForm}-coba`} value={coba} onValueChange={setCoba} /></div>
+            <p className="min-w-0 flex-1 text-[12.5px] text-brand-800">
+              {hasilCoba.tingkat
+                ? <>Masuk tingkat <span className="tnum font-semibold">{tulisRentang(hasilCoba.tingkat)}</span> → komisi <span className="tnum font-semibold">{formatRupiah(hasilCoba.nilai)}</span></>
+                : 'Tidak masuk tingkat mana pun, jadi tidak dapat komisi.'}
+              {form.base_deduction_pct > 0 && hasilCoba.dasar > 0 && <> (dasar setelah potongan {formatRupiah(hasilCoba.dasar)})</>}
+            </p>
+          </div>
 
           <Field label="Catatan">
             {(id) => (
-              <Textarea id={id} rows={3} value={form.notes} className="resize-y"
+              <Textarea id={id} rows={2} value={form.notes} className="resize-y"
                 placeholder="Keterangan tambahan, mis. syarat komisi atau masa berlaku."
                 onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             )}

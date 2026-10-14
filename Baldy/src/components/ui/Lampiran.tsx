@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FaChevronLeft, FaChevronRight, FaCircleNotch, FaFileLines, FaImage, FaXmark } from './icons'
+import { FaChevronLeft, FaChevronRight, FaCircleNotch, FaFileLines, FaImage, FaPlus, FaXmark } from './icons'
 import { TIPE_DITERIMA, simpanLampiran, urlLampiran } from '../../lib/lampiran'
 import type { Berkas } from '../../lib/lampiran'
 import { cn } from '../../lib/utils'
@@ -15,11 +15,13 @@ function useLampiran(id: string) {
   return data
 }
 
-function Ubin({ id, ukuran, onBuka, onHapus }: {
+function Ubin({ id, ukuran, onBuka, onHapus, keterangan }: {
   id: string
   ukuran: number
   onBuka?: () => void
   onHapus?: () => void
+  /** Nama slot dokumen di bagian bawah kotak, mis. "KTP". */
+  keterangan?: string
 }) {
   const data = useLampiran(id)
   const gambar = data?.berkas.type.startsWith('image/')
@@ -28,7 +30,7 @@ function Ubin({ id, ukuran, onBuka, onHapus }: {
       <button
         type="button"
         onClick={onBuka}
-        title={data?.berkas.name}
+        title={[keterangan, data?.berkas.name].filter(Boolean).join(': ')}
         className="grid h-full w-full place-items-center overflow-hidden rounded-md border border-hairline bg-sunken transition hover:border-brand-300"
       >
         {data === undefined ? (
@@ -44,11 +46,16 @@ function Ubin({ id, ukuran, onBuka, onHapus }: {
           </span>
         )}
       </button>
+      {keterangan && (
+        <span className="pointer-events-none absolute inset-x-px bottom-px truncate rounded-b-[5px] bg-ink/65 px-1 text-center text-[10px] leading-4 font-semibold text-white">
+          {keterangan}
+        </span>
+      )}
       {onHapus && (
         <button
           type="button"
           onClick={onHapus}
-          aria-label="Hapus lampiran"
+          aria-label={keterangan ? `Hapus ${keterangan}` : 'Hapus lampiran'}
           className="absolute -top-1.5 -right-1.5 grid h-5 w-5 place-items-center rounded-full border border-hairline bg-surface text-ink-3 shadow-card transition hover:text-[color:var(--color-critical)]"
         >
           <FaXmark size={11} />
@@ -138,6 +145,7 @@ export function LampiranInput({
   id,
   accept = TIPE_DITERIMA,
   label = 'Tambah gambar',
+  nama,
 }: {
   value: string[]
   onChange: (ids: string[]) => void
@@ -145,6 +153,11 @@ export function LampiranInput({
   /** Kosongkan ('') untuk menerima berkas apa saja. */
   accept?: string
   label?: string
+  /**
+   * Slot satu jenis dokumen (mis. "KTP"): namanya tertulis di kotak kosong dan di bawah
+   * gambar yang sudah diunggah; setelah terisi, tombol tambahnya mengecil.
+   */
+  nama?: string
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [mengunggah, setMengunggah] = useState(false)
@@ -170,19 +183,25 @@ export function LampiranInput({
     onChange(value.filter((v) => v !== target))
   }
 
+  const kecil = !!nama && value.length > 0
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2">
-        {value.map((v, i) => <Ubin key={v} id={v} ukuran={64} onBuka={() => setBuka(i)} onHapus={() => hapus(v)} />)}
+        {value.map((v, i) => <Ubin key={v} id={v} ukuran={64} keterangan={nama} onBuka={() => setBuka(i)} onHapus={() => hapus(v)} />)}
         <button
           id={id}
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={mengunggah}
-          className="flex h-16 min-w-16 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-hairline px-3 text-[11px] font-medium text-ink-3 transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-60"
+          title={nama ? `Upload ${nama}` : undefined}
+          aria-label={kecil ? `Tambah berkas ${nama}` : undefined}
+          className={cn(
+            'flex h-16 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-hairline text-[11px] font-medium text-ink-3 transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-60',
+            kecil ? 'w-8' : 'min-w-16 px-3',
+          )}
         >
-          {mengunggah ? <FaCircleNotch size={16} className="animate-spin" /> : <FaImage size={16} />}
-          {mengunggah ? 'Menyimpan...' : label}
+          {mengunggah ? <FaCircleNotch size={16} className="animate-spin" /> : kecil ? <FaPlus size={12} /> : <FaImage size={16} />}
+          {!kecil && (mengunggah ? 'Menyimpan...' : nama ?? label)}
         </button>
       </div>
       <input

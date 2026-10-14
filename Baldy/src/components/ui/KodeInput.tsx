@@ -37,7 +37,7 @@ export function KodeInput({
   'aria-label'?: string
 }) {
   return (
-    <div className={cn('flex gap-2', className)}>
+    <div className={cn(readOnly ? '' : 'input-group', className)}>
       <Input
         id={id}
         value={value}
@@ -49,7 +49,7 @@ export function KodeInput({
         onChange={(e) => onChange(uppercase ? e.target.value.toUpperCase() : e.target.value)}
       />
       {!readOnly && (
-        <Button icon={<FaWandMagicSparkles size={14} />} title={generateTitle} className="shrink-0" onClick={onGenerate}>
+        <Button icon={<FaWandMagicSparkles size={14} />} title={generateTitle} onClick={onGenerate}>
           Generate
         </Button>
       )}

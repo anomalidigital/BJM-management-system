@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FaTrashCan, FaXmark } from '../../components/ui/icons'
+import { FaTrashCan } from '../../components/ui/icons'
 import { DataTable } from '../../components/ui/DataTable'
 import type { Column } from '../../components/ui/DataTable'
 import { Pagination } from '../../components/ui/Pagination'
-import { FilterField, SearchInput, Toolbar } from '../../components/ui/Toolbar'
+import { PanelFilter, SearchInput, Toolbar } from '../../components/ui/Toolbar'
 import { Button } from '../../components/ui/Button'
 import { ConfirmDialog } from '../../components/ui/Modal'
 import { DateInput, Select } from '../../components/ui/Field'
@@ -14,8 +14,9 @@ import { useData } from '../../store/DataProvider'
 import { useAuth } from '../../store/AuthProvider'
 import { useToast } from '../../store/ToastProvider'
 import { useTable } from '../../lib/useTable'
+import { useFilter } from '../../lib/useFilter'
 import { matchesQuery, sum } from '../../lib/utils'
-import { formatDate, formatRupiah } from '../../lib/format'
+import { formatDate, formatRupiah, galatRentang, rentangTanggal } from '../../lib/format'
 import type { BillingRow } from '../../types'
 
 /**
@@ -28,9 +29,9 @@ export function BrowsingDataTab() {
   const toast = useToast()
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-  const [costCode, setCostCode] = useState('')
+  const filter = useFilter({ dateFrom: '', dateTo: '', costCode: '' })
+  const { dateFrom, dateTo, costCode } = filter.nilai
+  const d = filter.draf
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const costCodes = useMemo(
@@ -75,7 +76,7 @@ export function BrowsingDataTab() {
   }
 
   function resetFilters() {
-    table.reset(); setDateFrom(''); setDateTo(''); setCostCode('')
+    table.reset(); filter.lepasSemua()
   }
 
   const columns: Column<BillingRow>[] = [
@@ -115,16 +116,25 @@ export function BrowsingDataTab() {
         left={
           <>
             <SearchInput value={table.query} onChange={table.setQuery} width="w-72" placeholder="Cari faktur, Sijo, Kodecost..." />
-            <FilterField label="Tgl Tagih">
-              <DateInput value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-[150px]" aria-label="Tanggal dari" />
-            </FilterField>
-            <span className="text-[12px] text-ink-3">s/d</span>
-            <DateInput value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-[150px]" aria-label="Tanggal sampai" />
-            <Select value={costCode} onChange={(e) => setCostCode(e.target.value)} className="w-40" aria-label="Filter Kodecost">
-              <option value="">Semua Kodecost</option>
-              {costCodes.map((c) => <option key={c} value={c}>{c}</option>)}
-            </Select>
-            {(table.isFiltered || filterActive) && <Button size="sm" variant="ghost" icon={<FaXmark size={14} />} onClick={resetFilters}>Reset</Button>}
+            <PanelFilter filter={filter} galat={galatRentang(d.dateFrom, d.dateTo)} chips={[
+              (dateFrom || dateTo) && { label: `Tgl Tagih ${rentangTanggal(dateFrom, dateTo)}`, lepas: () => filter.lepas('dateFrom', 'dateTo') },
+              costCode && { label: `Kodecost: ${costCode}`, lepas: () => filter.lepas('costCode') },
+            ]}>
+              <div>
+                <p className="form-label">Tgl Tagih</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <DateInput value={d.dateFrom} onChange={(e) => filter.ubah({ dateFrom: e.target.value })} aria-label="Tanggal dari" />
+                  <DateInput value={d.dateTo} onChange={(e) => filter.ubah({ dateTo: e.target.value })} aria-label="Tanggal sampai" />
+                </div>
+              </div>
+              <div>
+                <p className="form-label">Kodecost</p>
+                <Select value={d.costCode} onChange={(e) => filter.ubah({ costCode: e.target.value })} aria-label="Filter Kodecost">
+                  <option value="">Semua Kodecost</option>
+                  {costCodes.map((c) => <option key={c} value={c}>{c}</option>)}
+                </Select>
+              </div>
+            </PanelFilter>
           </>
         }
       />

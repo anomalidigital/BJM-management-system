@@ -22,7 +22,7 @@ export function TrenHarian({
   const labels = hari.map(formatDateShort)
   const seri = [
     { nama: 'Pendapatan', warna: VIZ.series1, nilai: pendapatan },
-    { nama: 'Komisi sopir', warna: VIZ.series2, nilai: komisi },
+    { nama: 'Komisi supir', warna: VIZ.series2, nilai: komisi },
   ]
 
   return (

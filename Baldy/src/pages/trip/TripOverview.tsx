@@ -78,7 +78,7 @@ export function TripOverview({ trip }: { trip: TransactionRow }) {
                 mono
                 value={<>
                   {formatRupiah(trip.harga)}
-                  {!trip.harga_khusus && trip.harga > 0 && <span className="ml-1.5 font-sans text-[11.5px] font-normal text-ink-3">ikut Harga route</span>}
+                  {!trip.harga_khusus && trip.harga > 0 && <span className="ml-1.5 font-sans text-[11.5px] font-normal text-ink-3">ikut Harga Rute</span>}
                   {trip.override_note && <span className="mt-0.5 block font-sans text-[11.5px] font-normal text-ink-3">Alasan: {trip.override_note}</span>}
                 </>}
               />
@@ -155,10 +155,10 @@ export function TripOverview({ trip }: { trip: TransactionRow }) {
           <CardHeader title="Rute" subtitle={trip.route_name || 'Belum dipilih'} />
           {trip.route_code ? (
             <dl className="grid grid-cols-2 gap-4 p-4">
-              <InfoItem label="No. Route" value={<span className="break-all whitespace-normal">{trip.route_code}</span>} mono />
-              <InfoItem label="UJROUTE" value={formatRupiah(trip.ujroute)} mono />
+              <InfoItem label="No. Rute" value={<span className="break-all whitespace-normal">{trip.route_code}</span>} mono />
+              <InfoItem label="UJ Rute" value={formatRupiah(trip.ujroute)} mono />
               <InfoItem label="Uang Tol (patokan)" value={formatRupiah(trip.toll)} mono />
-              <InfoItem label="Harga route" value={formatRupiah(trip.route_price)} mono />
+              <InfoItem label="Harga Rute" value={formatRupiah(trip.route_price)} mono />
             </dl>
           ) : (
             <p className="px-4 py-6 text-center text-[13px] text-ink-3">Trip ini belum memakai route.</p>

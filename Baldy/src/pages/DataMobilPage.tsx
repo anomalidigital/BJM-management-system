@@ -1,30 +1,43 @@
 import { useCallback, useMemo, useState } from 'react'
-import { FaPen, FaPlus, FaTrashCan, FaXmark } from '../components/ui/icons'
+import { FaPen, FaPlus, FaTrashCan } from '../components/ui/icons'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { DataTable } from '../components/ui/DataTable'
 import type { Column } from '../components/ui/DataTable'
 import { Pagination } from '../components/ui/Pagination'
-import { FilterField, SearchInput, Toolbar } from '../components/ui/Toolbar'
+import { PanelFilter, SearchInput, Toolbar } from '../components/ui/Toolbar'
 import { Button, IconButton } from '../components/ui/Button'
 import { Modal, ConfirmDialog } from '../components/ui/Modal'
 import { Field, Input, Select } from '../components/ui/Field'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState, NotFoundState } from '../components/ui/States'
-import { LampiranInput, LampiranThumbs } from '../components/ui/Lampiran'
+import { LampiranThumbs } from '../components/ui/Lampiran'
+import { DokumenPentingInput, ringkasDokumen } from '../components/ui/DokumenPenting'
 import { useData } from '../store/DataProvider'
 import { useAuth } from '../store/AuthProvider'
 import { useToast } from '../store/ToastProvider'
 import { useTable } from '../lib/useTable'
+import { useFilter } from '../lib/useFilter'
 import { matchesQuery } from '../lib/utils'
 import { formatNumber } from '../lib/format'
-import { VEHICLE_CONFIGS } from '../types'
-import type { Vehicle } from '../types'
+import { DOKUMEN_KENDARAAN, GANDENGAN_LABEL, VEHICLE_CONFIGS } from '../types'
+import type { DokumenPenting, Vehicle } from '../types'
 
-type FormState = Omit<Vehicle, 'id' | 'created_at' | 'updated_at'>
-const BLANK: FormState = { plate_number: '', vehicle_type: '', configuration: '', status: 'aktif', attachments: [] }
+type FormState = Omit<Vehicle, 'id' | 'created_at' | 'updated_at' | 'dokumen'> & { dokumen: Record<string, DokumenPenting> }
+const BLANK: FormState = { plate_number: '', vehicle_type: '', configuration: '', status: 'aktif', dokumen: {}, attachments: [] }
 const TYPES = ['Tronton 6x2', 'Trailer 20 FT', 'Trailer 40 FT', 'Head Truck', 'Wingbox']
 
+/** Dokumen penting tersimpan tanpa slot kosong (tidak ada berkas & tanggal). */
+function rapikanDokumen(d: Record<string, DokumenPenting>): Record<string, DokumenPenting> | undefined {
+  const isi = Object.entries(d).filter(([, v]) => v.berkas.length > 0 || v.berlaku_sampai)
+    .map(([k, v]) => [k, { berkas: v.berkas, ...(v.berlaku_sampai ? { berlaku_sampai: v.berlaku_sampai } : {}) }] as const)
+  return isi.length ? Object.fromEntries(isi) : undefined
+}
+
+/**
+ * Master Data -> Kendaraan. Revisi 13 Okt 2026: surat penting (STNK, KIR, Pajak, Asuransi) punya
+ * tempat upload sendiri beserta masa berlakunya, terpisah dari foto & dokumen lainnya.
+ */
 export function DataMobilPage() {
   const { db, transactionRows, loading, error, reload, create, update, remove } = useData()
   const { canEdit } = useAuth()
@@ -35,8 +48,9 @@ export function DataMobilPage() {
   const [form, setForm] = useState<FormState>(BLANK)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
   const [deleting, setDeleting] = useState<Vehicle | null>(null)
-  const [configFilter, setConfigFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const filter = useFilter({ config: '', status: '', dok: '' })
+  const { config: configFilter, status: statusFilter, dok: dokFilter } = filter.nilai
+  const d = filter.draf
 
   /** Jumlah trip per kendaraan, untuk konteks sebelum menghapus. */
   const tripCount = useMemo(() => {
@@ -51,19 +65,33 @@ export function DataMobilPage() {
 
   const search = useCallback((v: Vehicle, q: string) => matchesQuery(q, v.plate_number, v.vehicle_type, v.configuration), [])
   const extraFilter = useCallback(
-    (v: Vehicle) => (!configFilter || v.configuration === configFilter) && (!statusFilter || v.status === statusFilter),
-    [configFilter, statusFilter],
+    (v: Vehicle) => {
+      const r = ringkasDokumen(DOKUMEN_KENDARAAN, v.dokumen)
+      return (!configFilter || v.configuration === configFilter) && (!statusFilter || v.status === statusFilter)
+        && (!dokFilter || (dokFilter === 'kurang' ? r.ada.length < r.total : r.habis.length + r.segera.length > 0))
+    },
+    [configFilter, statusFilter, dokFilter],
   )
-  const filterAktif = Boolean(configFilter || statusFilter)
+  const jumlahFilter = [configFilter, statusFilter, dokFilter].filter(Boolean).length
+  const filterAktif = jumlahFilter > 0
   const table = useTable(db.vehicles, {
     search, extraFilter, extraFilterActive: filterAktif, initialSortKey: 'plate_number', pageSize: 10,
   })
-  const resetFilter = () => { table.reset(); setConfigFilter(''); setStatusFilter('') }
+  const resetFilter = () => { table.reset(); filter.lepasSemua() }
+  const LABEL_STATUS: Record<string, string> = { aktif: 'Aktif', servis: 'Servis', nonaktif: 'Nonaktif' }
+  const chips = [
+    configFilter && { label: `Konfigurasi: ${GANDENGAN_LABEL[configFilter] ?? configFilter}`, lepas: () => filter.lepas('config') },
+    statusFilter && { label: `Status: ${LABEL_STATUS[statusFilter] ?? statusFilter}`, lepas: () => filter.lepas('status') },
+    dokFilter && { label: dokFilter === 'kurang' ? 'Surat belum lengkap' : 'Surat habis / segera habis', lepas: () => filter.lepas('dok') },
+  ]
 
   function openCreate() { setEditing(null); setForm(BLANK); setErrors({}); setFormOpen(true) }
   function openEdit(v: Vehicle) {
     setEditing(v)
-    setForm({ plate_number: v.plate_number, vehicle_type: v.vehicle_type, configuration: v.configuration, status: v.status, attachments: v.attachments ?? [] })
+    setForm({
+      plate_number: v.plate_number, vehicle_type: v.vehicle_type, configuration: v.configuration, status: v.status,
+      dokumen: { ...(v.dokumen ?? {}) }, attachments: v.attachments ?? [],
+    })
     setErrors({}); setFormOpen(true)
   }
 
@@ -83,7 +111,8 @@ export function DataMobilPage() {
 
   function onSubmit() {
     if (!validate()) return
-    const payload = { ...form, plate_number: form.plate_number.trim().toUpperCase() }
+    const { dokumen: dok, ...lain } = form
+    const payload = { ...lain, dokumen: rapikanDokumen(dok), plate_number: form.plate_number.trim().toUpperCase() }
     if (editing) { update('vehicles', editing.id, payload); toast.success('Data berhasil diperbarui.') }
     else { create('vehicles', payload); toast.success('Data berhasil disimpan.') }
     setFormOpen(false)
@@ -102,7 +131,23 @@ export function DataMobilPage() {
     { key: 'vehicle_type', header: 'Jenis Kendaraan', sortable: true, render: (v) => <span className="text-ink-2">{v.vehicle_type}</span> },
     {
       key: 'configuration', header: 'Konfigurasi', sortable: true, width: '130px',
-      render: (v) => (v.configuration ? <Badge tone="brand">{v.configuration}</Badge> : <span className="text-ink-3">—</span>),
+      render: (v) => (v.configuration ? <Badge tone="brand">{GANDENGAN_LABEL[v.configuration] ?? v.configuration}</Badge> : <span className="text-ink-3">—</span>),
+    },
+    {
+      key: 'dokumen', header: 'Surat', width: '170px',
+      render: (v) => {
+        const r = ringkasDokumen(DOKUMEN_KENDARAAN, v.dokumen)
+        return (
+          <span className="block leading-tight">
+            <span className={r.ada.length ? 'text-ink-2' : 'text-ink-3'}>{r.ada.length ? r.ada.join(', ') : 'Belum ada'}</span>
+            {(r.habis.length > 0 || r.segera.length > 0) && (
+              <span className="mt-0.5 block text-[11.5px] font-medium text-[color:var(--color-critical)]">
+                {[...r.habis, ...r.segera].join(', ')} {r.habis.length ? 'habis' : 'segera habis'}
+              </span>
+            )}
+          </span>
+        )
+      },
     },
     {
       key: 'trip', header: 'Jumlah Trip', align: 'right', width: '110px',
@@ -131,7 +176,7 @@ export function DataMobilPage() {
       <PageHeader
         title="Kendaraan"
         crumbs={[{ label: 'Master Data' }, { label: 'Kendaraan' }]}
-        description="Master kendaraan beserta konfigurasinya, terpisah dari data sopir."
+        description="Master kendaraan beserta konfigurasi dan surat pentingnya (STNK, KIR, Pajak, Asuransi)."
         actions={<Button variant="primary" icon={<FaPlus size={15} />} disabled={!canEdit} onClick={openCreate}>Tambah Kendaraan</Button>}
       />
 
@@ -140,21 +185,37 @@ export function DataMobilPage() {
           left={
             <>
               <SearchInput value={table.query} onChange={table.setQuery} placeholder="Cari nomor kendaraan atau jenis..." />
-              <FilterField label="Konfigurasi">
-                <Select value={configFilter} onChange={(e) => setConfigFilter(e.target.value)} className="w-32">
-                  <option value="">Semua</option>
-                  {VEHICLE_CONFIGS.map((c) => <option key={c} value={c}>{c}</option>)}
-                </Select>
-              </FilterField>
-              <FilterField label="Status">
-                <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-32">
-                  <option value="">Semua</option>
-                  <option value="aktif">Aktif</option>
-                  <option value="servis">Servis</option>
-                  <option value="nonaktif">Nonaktif</option>
-                </Select>
-              </FilterField>
-              {(table.isFiltered || filterAktif) && <Button size="sm" variant="ghost" icon={<FaXmark size={14} />} onClick={resetFilter}>Reset</Button>}
+              <PanelFilter filter={filter} chips={chips}>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Konfigurasi">
+                    {(id) => (
+                      <Select id={id} value={d.config} onChange={(e) => filter.ubah({ config: e.target.value })}>
+                        <option value="">Semua</option>
+                        {VEHICLE_CONFIGS.map((c) => <option key={c} value={c}>{GANDENGAN_LABEL[c] ?? c}</option>)}
+                      </Select>
+                    )}
+                  </Field>
+                  <Field label="Status">
+                    {(id) => (
+                      <Select id={id} value={d.status} onChange={(e) => filter.ubah({ status: e.target.value })}>
+                        <option value="">Semua</option>
+                        <option value="aktif">Aktif</option>
+                        <option value="servis">Servis</option>
+                        <option value="nonaktif">Nonaktif</option>
+                      </Select>
+                    )}
+                  </Field>
+                </div>
+                <Field label="Surat penting">
+                  {(id) => (
+                    <Select id={id} value={d.dok} onChange={(e) => filter.ubah({ dok: e.target.value })}>
+                      <option value="">Semua</option>
+                      <option value="kurang">Belum lengkap</option>
+                      <option value="habis">Habis / segera habis</option>
+                    </Select>
+                  )}
+                </Field>
+              </PanelFilter>
             </>
           }
           right={<span className="text-[12.5px] text-ink-3">{db.vehicles.length} mobil terdaftar</span>}
@@ -183,6 +244,7 @@ export function DataMobilPage() {
       <Modal
         open={formOpen}
         onClose={() => setFormOpen(false)}
+        size="lg"
         title={editing ? 'Ubah Kendaraan' : 'Tambah Kendaraan'}
         subtitle={editing ? editing.plate_number : 'Tanda * wajib diisi.'}
         footer={
@@ -192,7 +254,8 @@ export function DataMobilPage() {
           </>
         }
       >
-        <div className="grid gap-4 sm:grid-cols-2">
+        {/* Ringkas tanpa scroll (Baldy 14 Okt 2026): data kendaraan sebaris, surat sebaris di bawah. */}
+        <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 md:grid-cols-4">
           <Field label="No. Kendaraan" required error={errors.plate_number}>
             {(id) => (
               <Input id={id} value={form.plate_number} invalid={!!errors.plate_number} placeholder="B 9015 UWW"
@@ -208,11 +271,11 @@ export function DataMobilPage() {
               </Select>
             )}
           </Field>
-          <Field label="Konfigurasi" hint="Kosongkan bila kendaraan standar.">
+          <Field label="Konfigurasi">
             {(id) => (
               <Select id={id} value={form.configuration} onChange={(e) => setForm({ ...form, configuration: e.target.value })}>
-                <option value="">— tanpa konfigurasi —</option>
-                {VEHICLE_CONFIGS.map((c) => <option key={c} value={c}>{c}</option>)}
+                <option value="">Standar</option>
+                {VEHICLE_CONFIGS.map((c) => <option key={c} value={c}>{GANDENGAN_LABEL[c] ?? c}</option>)}
               </Select>
             )}
           </Field>
@@ -225,9 +288,11 @@ export function DataMobilPage() {
               </Select>
             )}
           </Field>
-          <Field label="Foto & dokumen" className="sm:col-span-2" hint="Foto kendaraan, STNK, KIR, atau informasi lain tentang kendaraan ini.">
-            {(id) => <LampiranInput id={id} value={form.attachments} onChange={(v) => setForm((f) => ({ ...f, attachments: v }))} />}
-          </Field>
+          <fieldset className="min-w-0 sm:col-span-2 md:col-span-4">
+            <legend className="form-label">Surat & dokumen <span className="font-normal text-ink-3">· klik kotak untuk upload; foto diperkecil otomatis, PDF juga bisa</span></legend>
+            <DokumenPentingInput jenis={DOKUMEN_KENDARAAN} value={form.dokumen} onChange={(v) => setForm((f) => ({ ...f, dokumen: v }))}
+              lainnya={{ label: 'Foto & lainnya', value: form.attachments, onChange: (v) => setForm((f) => ({ ...f, attachments: v })) }} />
+          </fieldset>
         </div>
       </Modal>
 

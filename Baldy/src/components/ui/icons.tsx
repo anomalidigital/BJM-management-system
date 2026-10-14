@@ -13,13 +13,13 @@ import {
   faArrowDown, faArrowLeft, faArrowRight, faArrowsRotate, faArrowTrendDown, faArrowTrendUp, faArrowUp, faBan,
   faBars, faBed, faBuilding, faCalendarDays, faChartLine, faCheck, faCheckDouble, faChevronDown, faChevronLeft,
   faChevronRight, faCircleCheck, faCircleExclamation, faCircleInfo, faCircleNotch, faCircleQuestion,
-  faClipboardCheck, faCompass, faDatabase, faDownload, faEllipsis, faEye, faEyeSlash, faFileArrowDown,
-  faFileContract, faFileExport, faFileInvoiceDollar, faFileLines, faFlagCheckered, faFloppyDisk, faGasPump,
+  faClipboardCheck, faClockRotateLeft, faCompass, faDatabase, faDownload, faEllipsis, faEye, faEyeSlash, faFileArrowDown,
+  faFileArrowUp, faFileContract, faFileExport, faFilter, faFileInvoiceDollar, faFileLines, faFlagCheckered, faFloppyDisk, faFolderOpen, faGasPump,
   faGaugeHigh, faHandHoldingDollar, faHandshake, faHashtag, faImage, faInbox, faKey, faLink, faListCheck,
-  faLocationDot, faLock, faLockOpen, faMagnifyingGlass, faMagnifyingGlassMinus, faMinus, faMugHot, faPaperPlane, faPen, faPercent,
+  faLocationDot, faLock, faLockOpen, faMagnifyingGlass, faMapLocationDot, faMagnifyingGlassMinus, faMinus, faMugHot, faPaperPlane, faPen, faPercent,
   faPlus, faPrint, faReceipt, faRightFromBracket, faRightToBracket, faRotateLeft, faRoute, faSackDollar,
   faScissors, faScrewdriverWrench, faShieldHalved, faShip, faSort, faTrashCan, faTriangleExclamation, faTruck,
-  faTruckFast, faTruckRampBox, faUser, faUserPlus, faUsers, faWallet, faWandMagicSparkles, faWarehouse,
+  faTruckFast, faTruckRampBox, faUser, faUserPlus, faUsers, faUsersGear, faWallet, faWandMagicSparkles, faWarehouse,
   faXmark,
 } from '@fortawesome/free-solid-svg-icons'
 
@@ -102,6 +102,12 @@ export const FaKey = ikon(faKey)
 export const FaLink = ikon(faLink)
 export const FaListCheck = ikon(faListCheck)
 export const FaLocationDot = ikon(faLocationDot)
+export const FaMapLocationDot = ikon(faMapLocationDot)
+export const FaFolderOpen = ikon(faFolderOpen)
+export const FaFileArrowUp = ikon(faFileArrowUp)
+export const FaFilter = ikon(faFilter)
+export const FaClockRotateLeft = ikon(faClockRotateLeft)
+export const FaUsersGear = ikon(faUsersGear)
 export const FaLock = ikon(faLock)
 export const FaLockOpen = ikon(faLockOpen)
 export const FaMagnifyingGlass = ikon(faMagnifyingGlass)

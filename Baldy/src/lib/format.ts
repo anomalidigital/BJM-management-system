@@ -107,3 +107,16 @@ export function daysBetween(fromISO: string, toISOStr: string): string[] {
 export function initials(name: string): string {
   return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
 }
+
+/** Rentang tanggal ringkas untuk tanda filter: "01/10/2026 – 31/10/2026", "sejak 01/10/2026", "s/d 31/10/2026". */
+export function rentangTanggal(dari: string, sampai: string): string {
+  if (dari && sampai) return `${formatDate(dari)} – ${formatDate(sampai)}`
+  if (dari) return `sejak ${formatDate(dari)}`
+  if (sampai) return `s/d ${formatDate(sampai)}`
+  return ''
+}
+
+/** Pesan bila rentang tanggal filter terbalik; null bila boleh diterapkan (ujung yang kosong dianggap terbuka). */
+export function galatRentang(dari: string, sampai: string): string | null {
+  return dari && sampai && dari > sampai ? 'Tanggal awal tidak boleh lebih besar dari tanggal akhir.' : null
+}

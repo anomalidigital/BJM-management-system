@@ -30,7 +30,10 @@ const labelHari = (iso: string) =>
 export function DashboardPage() {
   const { db, transactionRows, billingRows, loading } = useData()
   const { workspace } = useWorkspace()
-  /** SI/Job Order & nomor container hanya ada di Priok; Karawang memakai TR dan No PI. */
+  /**
+   * SI/Job Order & nomor container hanya ada di Priok; Karawang memakai No. Referensi (TR)
+   * dan No PI, dengan ID Trip sebagai penanda trip (row.id_tampil).
+   */
   const cabangContainer = workspace === 'priok'
 
   const model = useMemo(() => {
@@ -89,9 +92,15 @@ export function DashboardPage() {
     const tindak: ItemTindak[] = ([
       {
         id: 'menunggu-sopir', nada: 'perhatian', to: '/transaksi/trip',
-        label: 'Trip menunggu sopir', keterangan: 'Pilih sopir supaya trip bisa jalan.',
+        label: 'Trip menunggu supir', keterangan: 'Pilih supir supaya trip bisa jalan.',
         jumlah: perStatus.menunggu_sopir,
       },
+      // Karawang (12 Okt 2026): mobil baru bisa dipakai trip lain setelah tercatat kembali di pool.
+      ...(cabangContainer ? [] : [{
+        id: 'belum-pool', nada: 'perhatian' as const, to: '/transaksi/trip?pool=belum',
+        label: 'Mobil belum kembali ke pool', keterangan: 'Trip sudah selesai. Tandai setelah mobil kembali, supaya bisa dipakai trip lain.',
+        jumlah: transactionRows.filter((t) => t.status === 'selesai' && t.menahan_kendaraan).length,
+      }]),
       cabangContainer ? {
         id: 'sj-draft', nada: 'perhatian' as const, to: '/transaksi/trip',
         label: 'Surat Jalan belum dicetak', keterangan: 'Trip sudah bernomor Surat Jalan tapi belum dicetak.',
@@ -116,7 +125,7 @@ export function DashboardPage() {
       {
         id: 'belum-selesai', nada: 'info' as const, to: '/transaksi/trip',
         label: cabangContainer ? 'Trip belum ditandai Selesai' : 'Trip belum ditutup',
-        keterangan: cabangContainer ? 'Tandai setelah mobil kembali ke pool.' : 'Tutup setelah POD diterima, sekaligus tanyakan backload.',
+        keterangan: cabangContainer ? 'Tandai setelah mobil kembali ke pool.' : 'Tutup setelah POD diterima, sekaligus tanyakan backload / rute lanjutan.',
         jumlah: bulanIni.filter((t) => t.status !== 'selesai').length,
       },
       {
@@ -137,7 +146,7 @@ export function DashboardPage() {
         },
       ] : [{
         id: 'tanpa-tr', nada: 'info' as const, to: '/transaksi/trip',
-        label: 'Trip tanpa TR', keterangan: 'Isi nomor TR dari DHL di form trip.',
+        label: 'Trip tanpa No. Referensi', keterangan: 'Isi No. Referensi (nomor TR/OR dari DHL) di form trip.',
         jumlah: tripDokumen.filter((t) => t.tr_list.length === 0).length,
       }]),
     ] satisfies ItemTindak[]).filter((a) => a.jumlah > 0)
@@ -268,6 +277,7 @@ export function DashboardPage() {
             jumlahLalu={prev.transaksi}
             deltaTrip={deltaPersen(now.transaksi, prev.transaksi)}
             perStatus={model.perStatus}
+            tanpaDraft={!cabangContainer && model.perStatus.draft === 0}
             batal={model.batal}
             hari={model.hari}
             sopirBertugas={model.sopirBertugas}

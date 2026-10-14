@@ -2,8 +2,53 @@
  * Aturan kecil seputar trip Karawang yang dipakai banyak halaman: TR, lokasi
  * muat & bongkar, backload, ATA, dan nomor PI.
  */
-import type { CommissionTransaction, OperationalExpense, TripEvent, UjPayment } from '../types'
+import type { CommissionTransaction, ItemMuatan, OperationalExpense, Route, TripEvent, UjPayment } from '../types'
 import { BIAYA_DITAGIHKAN } from '../types'
+import { kodeUnikDari } from './kode'
+
+/** ID Perjalanan pertama trip (item muatan pertama yang ber-ID, atau trip_ids data lama). */
+export const idPerjalanan = (t: Pick<CommissionTransaction, 'trip_ids'> & Partial<Pick<CommissionTransaction, 'muatan'>>): string =>
+  (t.muatan ?? []).map((m) => m.id_perjalanan.trim()).find(Boolean) ?? (t.trip_ids ?? []).find(Boolean) ?? ''
+
+/**
+ * Penanda trip yang dibaca orang = Kode Trip (permintaan atasan 13 Okt 2026: "pakai kode trip"),
+ * mis. 2026100001; backload 2026100001-BL. ID Perjalanan pindah ke Add Items Details.
+ */
+export const idTampil = (t: Pick<CommissionTransaction, 'transaction_no'>): string => t.transaction_no
+
+/**
+ * Add Items Details trip: isian `muatan`, atau untuk trip lama disusun dari ID Perjalanan
+ * (trip_ids) dengan keterangan dari Jenis Barang.
+ */
+export function muatanTrip(t: Pick<CommissionTransaction, 'trip_ids' | 'goods_type'> & Partial<Pick<CommissionTransaction, 'muatan'>>): ItemMuatan[] {
+  if (Array.isArray(t.muatan)) return t.muatan
+  const ids = (t.trip_ids ?? []).filter(Boolean)
+  const barang = (t.goods_type ?? '').trim()
+  if (!ids.length) return barang ? [{ id_perjalanan: '', keterangan: barang }] : []
+  return ids.map((id, i) => ({ id_perjalanan: id, keterangan: i === 0 ? barang : '' }))
+}
+
+/**
+ * ID Perjalanan buatan sistem untuk trip lama (12 Okt 2026, saat ID Perjalanan masih penanda trip):
+ * waktu = tanggal berangkat 08.00 WIB + urutan; huruf dari id trip. Kini penanda trip = Kode Trip,
+ * jadi ID buatan ini dibuang saat migrasi (lihat buangIdPerjalananBuatan).
+ */
+function idPerjalananLama(t: Pick<CommissionTransaction, 'id' | 'transaction_date' | 'transaction_no'>): string {
+  const dasar = Date.parse(`${t.transaction_date || '2026-01-01'}T08:00:00+07:00`)
+  const urut = Number(String(t.transaction_no ?? '').slice(-4)) || 0
+  return kodeUnikDari((Number.isFinite(dasar) ? dasar : 0) + urut * 1000, t.id)
+}
+
+/**
+ * Buang ID Perjalanan yang dulu dibuatkan sistem untuk trip lama (persis idPerjalananLama).
+ * ID yang diketik / dibuat pengguna tetap.
+ */
+export function buangIdPerjalananBuatan<T extends Pick<CommissionTransaction, 'id' | 'transaction_date' | 'transaction_no' | 'trip_ids' | 'workspace'>>(trips: T[]): T[] {
+  return trips.map((t) => {
+    if (t.workspace !== 'karawang' || (t.trip_ids ?? []).length !== 1) return t
+    return t.trip_ids[0] === idPerjalananLama(t) ? { ...t, trip_ids: [] } : t
+  })
+}
 
 /** TR trip: daftar baru, atau satu TR data lama. */
 export function trTrip(t: Pick<CommissionTransaction, 'tr_numbers' | 'tr_reference'>): string[] {
@@ -52,13 +97,14 @@ export function pindahkanUangKeTermin(
 
 /**
  * Nama rute di data asli selalu "ASAL - TUJUAN" (CIB - DURI, KRG - INF 1 - CIB BCKLD).
- * Asal = sebelum " - " pertama, tujuan = sisanya. Penanda rute backload ("BCKLD") di
- * ujung nama bukan bagian lokasi, jadi dibuang: DURI - CIB BCKLD -> bongkar di CIB.
+ * Asal = sebelum " - " pertama, tujuan = sisanya. Penanda rute backload ("BCKLD", juga
+ * salah ketik "BKLD" di data asli) di ujung nama bukan bagian lokasi, jadi dibuang:
+ * DURI - CIB BCKLD -> bongkar di CIB.
  */
 export function lokasiRute(namaRute: string): { asal: string; tujuan: string } {
   const nama = namaRute.trim()
   const i = nama.indexOf(' - ')
-  const tanpaPenanda = (v: string) => v.replace(/\s+(BCKLD|BACKLOAD)$/i, '').trim()
+  const tanpaPenanda = (v: string) => v.replace(/\s+(BCKLD|BKLD|BACKLOAD)$/i, '').trim()
   if (i < 0) return { asal: '', tujuan: tanpaPenanda(nama) }
   return { asal: nama.slice(0, i).trim(), tujuan: tanpaPenanda(nama.slice(i + 3)) }
 }
@@ -69,12 +115,64 @@ export function lokasiTrip(t: Pick<CommissionTransaction, 'lokasi_muat' | 'lokas
   return { muat: (t.lokasi_muat ?? '').trim() || r.asal, bongkar: (t.lokasi_bongkar ?? '').trim() || r.tujuan }
 }
 
+/**
+ * Kode area dari satu sisi nama rute: nomor site di ujung dibuang supaya site satu area
+ * terkumpul ("RAWA 52" -> RAWA, "KB 575 1" -> KB 575, "BLSE (2)" -> BLSE, "AMJ 05" -> AMJ).
+ */
+export function normalKodeArea(v: string): string {
+  return v.trim().toUpperCase().replace(/\s*\(\d+\)$/, '').replace(/\s+\d{1,2}$/, '').trim()
+}
+
+/** Kode area pick up & destinasi rute: isian di master Rute, atau turunan namanya. */
+export function kodeAreaRute(r: Pick<Route, 'route_name' | 'kode_area_asal' | 'kode_area_tujuan'>): { asal: string; tujuan: string } {
+  const l = lokasiRute(r.route_name ?? '')
+  return {
+    asal: (r.kode_area_asal ?? '').trim().toUpperCase() || normalKodeArea(l.asal),
+    tujuan: (r.kode_area_tujuan ?? '').trim().toUpperCase() || normalKodeArea(l.tujuan),
+  }
+}
+
+/**
+ * Apakah trip ini masih menahan kendaraannya (aturan Baldy 12 Okt 2026): mobil yang sedang
+ * dalam satu perjalanan tidak bisa dipilih trip lain sampai perjalanannya selesai dan mobil
+ * kembali ke pool. Trip melepas kendaraannya bila batal, tercatat kembali di pool (pool_at
+ * atau kejadian "Tiba di pool"), dilanjutkan backload / rute lanjutan (kendaraan pindah ke
+ * trip lanjutan), atau trip lama dari rekap (selesai tanpa catatan Tutup Trip).
+ */
+export function menahanKendaraan(
+  t: Pick<CommissionTransaction, 'vehicle_id' | 'status' | 'pool_at' | 'closed_at'>,
+  sudahDiPool: boolean,
+  adaLanjutan: boolean,
+): boolean {
+  if (!t.vehicle_id || t.status === 'batal') return false
+  if (t.pool_at || sudahDiPool || adaLanjutan) return false
+  if (t.status === 'selesai' && !t.closed_at) return false
+  return true
+}
+
+/**
+ * Nilai PI dibekukan saat PI dibuat (12 Okt 2026). Trip yang sudah ber-PI sebelum aturan ini
+ * diberi nilai sekarang, sekali saat migrasi: harga trip (atau Harga rute) + biaya ditagihkan.
+ */
+export function bekukanNilaiPiLama<T extends CommissionTransaction>(trips: T[], routes: Pick<Route, 'id' | 'price'>[], expenses: OperationalExpense[]): T[] {
+  if (!trips.some((t) => t.pi_tahap && !t.pi_nilai)) return trips
+  const harga = new Map(routes.map((r) => [r.id, r.price ?? 0]))
+  const tagih = new Map<string, number>()
+  for (const e of expenses) if (biayaDitagihkan(e)) tagih.set(e.trip_id, (tagih.get(e.trip_id) ?? 0) + e.amount)
+  return trips.map((t) => {
+    if (!t.pi_tahap || t.pi_nilai) return t
+    const pokok = t.status === 'batal' ? t.cancel_fee ?? 0 : (t.cost_value ?? 0) > 0 ? t.cost_value : harga.get(t.route_id) ?? 0
+    const tambahan = t.status === 'batal' ? 0 : tagih.get(t.id) ?? 0
+    return { ...t, pi_nilai: { pokok, tambahan, total: pokok + tambahan } }
+  })
+}
+
 /** Sama tanpa beda huruf besar / spasi, untuk mencocokkan lokasi bongkar dengan asal rute. */
 export const samaLokasi = (a: string, b: string) => !!a && a.trim().toUpperCase() === b.trim().toUpperCase()
 
 /**
- * ID Perjalanan trip backload = ID trip asal + "-BL" (alur atasan: "[ID TRIP] - BL"),
- * jadi tetap unik dan langsung terbaca asalnya. Backload kedua dari trip yang sama: -BL2.
+ * Kode trip backload = kode trip asal + "-BL" (alur atasan: "[ID TRIP] - BL"), jadi tetap unik
+ * dan langsung terbaca asalnya. Backload kedua dari trip yang sama: -BL2.
  */
 export function idBackload(idAsal: string, terpakai: Iterable<string>): string {
   const ada = new Set([...terpakai].map((x) => x.toUpperCase()))

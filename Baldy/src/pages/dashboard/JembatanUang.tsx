@@ -31,7 +31,7 @@ interface Baris {
 
 /**
  * Jembatan uang: bagaimana pendapatan bulan ini menjadi netto, dan berapa
- * uang yang benar-benar keluar ke sopir. Tautan "Laporan netto" di judulnya
+ * uang yang benar-benar keluar ke supir. Tautan "Laporan netto" di judulnya
  * adalah jalan masuk ke halaman Netto, yang tidak tampil di sidebar.
  */
 export function JembatanUang({
@@ -81,17 +81,17 @@ export function JembatanUang({
   const p = (v: number) => Math.max(0, Math.min(1, v / skala))
   const baris: Baris[] = [
     { label: 'Pendapatan', keterangan: 'jumlah harga trip', nilai: pendapatan, dari: 0, sampai: p(pendapatan), jenis: 'masuk', persen: deltaPendapatan },
-    { label: 'Ditagihkan ke klien', keterangan: 'tol, solar, SPSI, nginap', nilai: ditagihkan, dari: p(pendapatan), sampai: p(masuk), jenis: 'masuk' },
-    { label: 'Uang jalan', keterangan: 'dibayar ke sopir; patokan bila masih jalan', nilai: -uangJalan, dari: p(masuk - uangJalan), sampai: p(masuk), jenis: 'kurang', persen: deltaUangJalan },
+    { label: 'Ditagihkan ke klien', keterangan: 'tol, solar, SPSI Banlok, overnight', nilai: ditagihkan, dari: p(pendapatan), sampai: p(masuk), jenis: 'masuk' },
+    { label: 'Uang jalan', keterangan: 'dibayar ke supir; patokan bila masih jalan', nilai: -uangJalan, dari: p(masuk - uangJalan), sampai: p(masuk), jenis: 'kurang', persen: deltaUangJalan },
     ...(biayaPerusahaan > 0 ? [{ label: 'Dibayar perusahaan', keterangan: 'solar / tol di luar uang jalan', nilai: -biayaPerusahaan, dari: p(masuk - perjalanan), sampai: p(masuk - uangJalan), jenis: 'kurang' as const }] : []),
-    { label: 'Komisi sopir', keterangan: 'dari master Komisi', nilai: -komisi, dari: p(masuk - perjalanan - komisi), sampai: p(masuk - perjalanan), jenis: 'kurang', persen: deltaKomisi },
+    { label: 'Komisi supir', keterangan: 'dari master Komisi', nilai: -komisi, dari: p(masuk - perjalanan - komisi), sampai: p(masuk - perjalanan), jenis: 'kurang', persen: deltaKomisi },
     { label: 'Netto', keterangan: 'sisa untuk perusahaan', nilai: netto, dari: 0, sampai: p(netto), jenis: 'hasil', persen: deltaNetto },
   ]
   const ke_sopir: Array<[string, number, string, (number | null)?]> = [
     ['Uang jalan dibayar', uj, `${formatNumber(termin)} termin`, deltaUj],
     ['Potong kasbon', kasbon, 'dipotong dari uang jalan'],
-    ['Transfer ke sopir', tf, 'uang jalan − potong kasbon'],
-    ['Biaya operasional', biaya, 'nota solar, tol, SPSI, nginap', deltaBiaya],
+    ['Transfer ke supir', tf, 'uang jalan − potong kasbon'],
+    ['Biaya operasional', biaya, 'nota solar, tol, SPSI Banlok, overnight', deltaBiaya],
   ]
 
   return (
@@ -127,7 +127,7 @@ export function JembatanUang({
         ))}
       </div>
       <div className="mt-auto border-t border-hairline px-5 py-4">
-        <h3 className="text-[12.5px] font-medium text-ink-2">Uang yang keluar ke sopir bulan ini</h3>
+        <h3 className="text-[12.5px] font-medium text-ink-2">Uang yang keluar ke supir bulan ini</h3>
         <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-4">
           {ke_sopir.map(([label, nilai, ket, persen]) => (
             <div key={label} className="min-w-0">

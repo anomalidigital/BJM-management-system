@@ -30,13 +30,13 @@ const IKON: Record<JenisPerjalanan, IconComponent> = {
 const PETUNJUK: Record<JenisPerjalanan, string> = {
   pickup: 'Jam barang diambil. Lampirkan manifest dan foto barang saat dimuat.',
   istirahat: 'Berhenti di rest area atau tempat istirahat.',
-  menginap: 'Biaya menginap dicatat di Biaya Operasional jenis Nginap; ikut ditagihkan ke klien.',
+  menginap: 'Biaya menginap dicatat di Biaya Operasional jenis Overnight; ikut ditagihkan ke klien.',
   kendala: 'Ban, mogok, razia, macet, atau kejadian lain di jalan.',
   dialihkan: 'Tulis alasan dan lokasi baru. Ubah rute lewat Edit bila tujuannya berganti.',
   tiba: 'Jam tiba di lokasi bongkar (ATA). Dipakai di PI dan laporan.',
-  bongkar: 'Lampirkan Berita Acara / SJ / TR yang sudah ditandatangani penerima dan foto barang diterima.',
+  bongkar: 'Lampirkan Berita Acara, surat jalan, atau TR/OR klien yang sudah ditandatangani penerima, dan foto barang diterima.',
   retur: 'Barang ditolak atau dikembalikan ke gudang: tulis alasannya.',
-  pool: 'Mobil kembali ke pool. Tutup trip setelah dokumen fisik diterima.',
+  pool: 'Mencatat Tiba di pool membuat kendaraan bisa dipakai trip lain. Tutup trip setelah dokumen fisik diterima.',
 }
 
 /** Jenis yang wajib diberi catatan (alasan). */
@@ -65,11 +65,15 @@ function lokal(iso: string): string {
 
 /**
  * Tab Perjalanan: riwayat trip dari dibuat sampai ditutup. Kejadian dicatat admin
- * dari kabar sopir (pick up, rest area, tiba, bongkar, retur, pool) beserta buktinya;
- * catatan sistem (dibuat, dicetak, ditutup, backload) ikut tampil di urutan yang sama.
+ * dari kabar supir (pick up, rest area, tiba, bongkar, retur, pool) beserta buktinya;
+ * catatan sistem (dibuat, dicetak, ditutup, backload / rute lanjutan) ikut tampil di
+ * urutan yang sama.
+ *
+ * "Tiba di pool" juga mengisi waktu pool trip (pool_at), sama seperti Tutup Trip: kendaraan
+ * bisa dipakai trip lain, dan tertahan lagi bila catatan pool terakhir dihapus.
  */
 export function TabPerjalanan({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah: boolean }) {
-  const { dbAll, transactionRows, create, update, remove } = useData()
+  const { dbAll, transactionRows, create, update, remove, denganAudit } = useData()
   const toast = useToast()
   const [terbuka, setTerbuka] = useState(false)
   const [editing, setEditing] = useState<TripEvent | null>(null)
@@ -87,8 +91,9 @@ export function TabPerjalanan({ trip, bisaUbah }: { trip: TransactionRow; bisaUb
       ikon: IKON[e.jenis], nada: e.jenis === 'tiba' || e.jenis === 'bongkar' ? 'penting' : 'kejadian', event: e,
     }))
     out.push({
-      kunci: 'dibuat', waktu: lokal(trip.created_at), judul: induk ? `Trip backload dibuat dari Trip ${induk.transaction_no}` : 'Trip dibuat',
-      ikon: FaCheck, nada: 'sistem', tautan: induk ? { to: `/transaksi/trip/${induk.id}`, label: `Buka Trip ${induk.transaction_no}` } : undefined,
+      kunci: 'dibuat', waktu: lokal(trip.created_at),
+      judul: induk ? `Dibuat sebagai backload / rute lanjutan dari trip ${induk.id_tampil}` : 'Trip dibuat',
+      ikon: FaCheck, nada: 'sistem', tautan: induk ? { to: `/transaksi/trip/${induk.id}`, label: `Buka trip ${induk.id_tampil}` } : undefined,
     })
     // Tanggal cetak & tutup tanpa jam: diletakkan di akhir hari itu.
     if (trip.printed_at) out.push({ kunci: 'cetak', waktu: `${trip.printed_at}T23:58`, judul: 'Berita Acara dicetak', ikon: FaPrint, nada: 'sistem' })
@@ -108,8 +113,8 @@ export function TabPerjalanan({ trip, bisaUbah }: { trip: TransactionRow; bisaUb
     }
     for (const a of anak) {
       out.push({
-        kunci: `bl-${a.id}`, waktu: lokal(a.created_at), judul: `Backload: Trip ${a.transaction_no}`, lokasi: `${a.muat || '?'} → ${a.bongkar || '?'}`,
-        ikon: FaRoute, nada: 'sistem', tautan: { to: `/transaksi/trip/${a.id}`, label: `Buka Trip ${a.transaction_no}` },
+        kunci: `bl-${a.id}`, waktu: lokal(a.created_at), judul: `Backload / rute lanjutan: trip ${a.id_tampil}`, lokasi: `${a.muat || '?'} → ${a.bongkar || '?'}`,
+        ikon: FaRoute, nada: 'sistem', tautan: { to: `/transaksi/trip/${a.id}`, label: `Buka trip ${a.id_tampil}` },
       })
     }
     // Di menit yang sama: trip dibuat lebih dulu, catatan penutup paling akhir.
@@ -140,19 +145,49 @@ export function TabPerjalanan({ trip, bisaUbah }: { trip: TransactionRow; bisaUb
     setForm((f) => ({ ...f, jenis: j, lokasi: !f.lokasi.trim() || f.lokasi === lokasiAwal(f.jenis) ? lokasiAwal(j) : f.lokasi }))
   }
 
+  /**
+   * Waktu "Tiba di pool" paling awal disalin ke trip (pool_at), seperti Tutup Trip / tandaiDiPool.
+   * Tanpa catatan pool tersisa, pool_at dikosongkan supaya kendaraan tertahan lagi.
+   */
+  function selaraskanPool(waktuPool: string[]) {
+    const awal = [...waktuPool].sort()[0] ?? null
+    if ((trip.pool_at ?? null) !== awal) update('transactions', trip.id, { pool_at: awal })
+  }
+
   function simpan() {
     if (!form.tanggal || !form.jam) { setGalat('Tanggal dan jam wajib diisi.'); return }
     if (WAJIB_CATATAN.includes(form.jenis) && !form.catatan.trim()) { setGalat(`Tulis keterangan untuk ${PERJALANAN_LABEL[form.jenis].toLowerCase()}.`); return }
     const isi = { jenis: form.jenis, waktu: `${form.tanggal}T${form.jam}`, lokasi: form.lokasi.trim(), catatan: form.catatan.trim(), attachments: form.attachments }
-    if (editing) { update('tripEvents', editing.id, isi); toast.success('Catatan perjalanan diperbarui.') }
-    else { create('tripEvents', { ...isi, trip_id: trip.id }); toast.success(`${PERJALANAN_LABEL[form.jenis]} tercatat.`) }
+    const tulis = () => {
+      if (editing) update('tripEvents', editing.id, isi)
+      else create('tripEvents', { ...isi, trip_id: trip.id })
+    }
+    if (form.jenis === 'pool' || editing?.jenis === 'pool') {
+      // Catatan pool & waktu pool trip berubah bersama: satu catatan Audit Log.
+      const lain = kejadian.filter((e) => e.jenis === 'pool' && e.id !== editing?.id).map((e) => e.waktu)
+      const waktuPool = form.jenis === 'pool' ? [...lain, isi.waktu] : lain
+      denganAudit({
+        aksi: 'pool', entitas: 'transactions', entity_id: trip.id, label: trip.id_tampil,
+        ringkasan: editing ? `Mengubah catatan tiba di pool (${formatWaktu(isi.waktu)})` : `Mobil kembali di pool (${formatWaktu(isi.waktu)})`,
+      }, () => { tulis(); selaraskanPool(waktuPool) })
+    } else tulis()
+    if (editing) toast.success('Catatan perjalanan diperbarui.')
+    else if (form.jenis === 'pool' && trip.vehicle_id) toast.success(`Tiba di pool tercatat. Kendaraan ${trip.plate_number || 'trip ini'} bisa dipakai trip lain.`)
+    else toast.success(`${PERJALANAN_LABEL[form.jenis]} tercatat.`)
     setTerbuka(false)
   }
 
   function hapus() {
     if (!menghapus) return
-    remove('tripEvents', menghapus.id)
-    void hapusLampiran(menghapus.attachments ?? [])
+    const ev = menghapus
+    if (ev.jenis === 'pool') {
+      const sisa = kejadian.filter((e) => e.jenis === 'pool' && e.id !== ev.id).map((e) => e.waktu)
+      denganAudit({
+        aksi: 'hapus', entitas: 'tripEvents', entity_id: ev.id, label: `${PERJALANAN_LABEL.pool} · ${trip.id_tampil}`,
+        ringkasan: 'Menghapus catatan tiba di pool',
+      }, () => { remove('tripEvents', ev.id); selaraskanPool(sisa) })
+    } else remove('tripEvents', ev.id)
+    void hapusLampiran(ev.attachments ?? [])
     toast.success('Catatan perjalanan dihapus.')
     setMenghapus(null)
   }
@@ -167,7 +202,7 @@ export function TabPerjalanan({ trip, bisaUbah }: { trip: TransactionRow; bisaUb
   return (
     <div>
       <KepalaTab
-        keterangan={trip.status === 'batal' ? 'Trip dibatalkan: riwayat di bawah hanya arsip.' : `${ringkas}. Catat kabar dari sopir beserta buktinya; jam tiba (ATA) dipakai di PI.`}
+        keterangan={trip.status === 'batal' ? 'Trip dibatalkan: riwayat di bawah hanya arsip.' : `${ringkas}. Catat kabar dari supir beserta buktinya; jam tiba (ATA) dipakai di PI.`}
         tombol="Catat kejadian"
         bisaUbah={bisaUbah}
         onTambah={() => buka()}
@@ -212,7 +247,7 @@ export function TabPerjalanan({ trip, bisaUbah }: { trip: TransactionRow; bisaUb
         open={terbuka}
         onClose={() => setTerbuka(false)}
         title={editing ? 'Ubah Kejadian' : 'Catat Kejadian'}
-        subtitle={`Trip ${trip.transaction_no}${trip.plate_number ? ` · ${trip.plate_number}` : ''}`}
+        subtitle={`Trip ${trip.id_tampil}${trip.plate_number ? ` · ${trip.plate_number}` : ''}`}
         size="md"
         footer={
           <>

@@ -1,22 +1,23 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { FaCircleNotch, FaFileLines } from './icons'
+import { FaFileLines } from './icons'
 import { cn } from '../../lib/utils'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'subtle' | 'outlineDanger'
 type Size = 'sm' | 'md'
 
+/** Varian tombol → kelas Bootstrap (btn-ghost & btn-subtle tambahan SIKOTIS, lihat styles/bootstrap.scss). */
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700 border border-transparent shadow-[0_1px_2px_rgba(11,11,11,.12)]',
-  secondary: 'bg-surface text-ink border border-hairline hover:bg-sunken active:bg-grid',
-  ghost: 'bg-transparent text-ink-2 border border-transparent hover:bg-black/[.045] hover:text-ink',
-  danger: 'bg-[color:var(--color-critical)] text-white border border-transparent hover:brightness-95 active:brightness-90',
-  subtle: 'bg-brand-50 text-brand-700 border border-brand-100 hover:bg-brand-100',
-  outlineDanger: 'bg-surface text-[color:var(--color-critical)] border border-[#f3d5d5] hover:bg-[#fdf2f2] active:bg-[#fbe6e6]',
+  primary: 'btn-primary',
+  secondary: 'btn-outline-secondary',
+  ghost: 'btn-ghost',
+  danger: 'btn-danger',
+  subtle: 'btn-subtle',
+  outlineDanger: 'btn-outline-danger',
 }
 
 const SIZES: Record<Size, string> = {
-  sm: 'h-8 px-2.5 text-[13px] gap-1.5 rounded-md',
-  md: 'h-9 px-3.5 text-[13px] gap-2 rounded-md',
+  sm: 'btn-sm',
+  md: '',
 }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -40,16 +41,10 @@ export function Button({
     <button
       type="button"
       disabled={disabled || loading}
-      className={cn(
-        'inline-flex shrink-0 items-center justify-center font-medium whitespace-nowrap transition-colors',
-        'disabled:pointer-events-none disabled:opacity-45',
-        VARIANTS[variant],
-        SIZES[size],
-        className,
-      )}
+      className={cn('btn', VARIANTS[variant], SIZES[size], className)}
       {...rest}
     >
-      {loading ? <FaCircleNotch size={15} className="animate-spin" /> : icon}
+      {loading ? <span className="spinner-border spinner-border-sm" aria-hidden="true" /> : icon}
       {children}
     </button>
   )
@@ -72,14 +67,7 @@ export function IconButton({
       type="button"
       title={label}
       aria-label={label}
-      className={cn(
-        'inline-flex h-7.5 w-7.5 items-center justify-center rounded-md border border-transparent transition-colors',
-        'disabled:pointer-events-none disabled:opacity-40',
-        tone === 'danger'
-          ? 'text-ink-3 hover:border-[#f3d5d5] hover:bg-[#fdf2f2] hover:text-[color:var(--color-critical)]'
-          : 'text-ink-3 hover:border-hairline hover:bg-sunken hover:text-brand-600',
-        className,
-      )}
+      className={cn('btn btn-icon', tone === 'danger' && 'btn-icon-danger', className)}
       {...rest}
     >
       {icon}

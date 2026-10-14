@@ -79,21 +79,21 @@ export function DataTable<T>({
 
   const selectable = Boolean(selectedKeys && onToggleRow)
   const allChecked = selectable && rows.length > 0 && rows.every((r) => selectedKeys!.has(rowKey(r)))
-  const cellPad = dense ? 'px-3 py-1.5' : 'px-3 py-2.5'
 
   return (
     <div className={cn('w-full overflow-x-auto', maxHeight && 'overflow-y-auto')} style={maxHeight ? { maxHeight } : undefined}>
-      <table className="print-table w-full min-w-max border-collapse text-[13px]">
-        <thead className={cn('bg-sunken', maxHeight && 'sticky top-0 z-10')}>
-          <tr className="border-b border-hairline">
+      {/* Tabel Bootstrap (.table .table-hover); gaya SIKOTIS di styles/bootstrap.scss. */}
+      <table className={cn('print-table table table-hover min-w-max', dense && 'table-sm')}>
+        <thead className={cn(maxHeight && 'sticky top-0 z-10')}>
+          <tr>
             {selectable && (
-              <th scope="col" className="w-10 px-3 py-2">
+              <th scope="col" className="w-10">
                 <input
                   type="checkbox"
                   checked={allChecked}
                   onChange={onToggleAll}
                   aria-label="Pilih semua baris"
-                  className="h-3.5 w-3.5 cursor-pointer rounded border-hairline accent-[color:var(--color-brand-500)]"
+                  className="form-check-input"
                 />
               </th>
             )}
@@ -104,11 +104,7 @@ export function DataTable<T>({
                   key={c.key}
                   scope="col"
                   style={c.width ? { width: c.width } : undefined}
-                  className={cn(
-                    'px-3 py-2 text-[11.5px] font-semibold tracking-wide whitespace-nowrap text-ink-2 uppercase',
-                    ALIGN[c.align ?? 'left'],
-                    c.headerClassName,
-                  )}
+                  className={cn(ALIGN[c.align ?? 'left'], c.headerClassName)}
                 >
                   {c.sortable && onSortChange ? (
                     <button
@@ -143,25 +139,21 @@ export function DataTable<T>({
               <tr
                 key={key}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={cn(
-                  'border-b border-grid transition-colors last:border-b-0',
-                  onRowClick && 'cursor-pointer',
-                  activeKey === key ? 'bg-brand-50' : checked ? 'bg-brand-50/45' : 'bg-surface hover:bg-sunken',
-                )}
+                className={cn(onRowClick && 'cursor-pointer', activeKey === key ? 'baris-aktif' : checked && 'baris-terpilih')}
               >
                 {selectable && (
-                  <td className="w-10 px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                  <td className="w-10" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={checked}
                       onChange={() => onToggleRow!(key)}
                       aria-label="Pilih baris"
-                      className="h-3.5 w-3.5 cursor-pointer rounded border-hairline accent-[color:var(--color-brand-500)]"
+                      className="form-check-input"
                     />
                   </td>
                 )}
                 {columns.map((c) => (
-                  <td key={c.key} className={cn(cellPad, 'align-middle text-ink', ALIGN[c.align ?? 'left'], c.cellClassName)}>
+                  <td key={c.key} className={cn(ALIGN[c.align ?? 'left'], c.cellClassName)}>
                     {c.render(row, i)}
                   </td>
                 ))}
@@ -169,11 +161,7 @@ export function DataTable<T>({
             )
           })}
         </tbody>
-        {footer && (
-          <tfoot className="border-t-2 border-hairline bg-sunken font-semibold">
-            {footer}
-          </tfoot>
-        )}
+        {footer && <tfoot>{footer}</tfoot>}
       </table>
     </div>
   )

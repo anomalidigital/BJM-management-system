@@ -13,7 +13,12 @@ import { KepalaTab, KepalaTabel, KosongTab, PesanGalat } from './bagian'
 
 type Form = Pick<TripNote, 'note_date' | 'title' | 'notes' | 'attachments'>
 
-/** Tab Lainnya (dulu Dokumen): berkas, gambar, atau catatan apa pun untuk trip ini. */
+/**
+ * Tab Dokumen (dulu Lainnya): dokumen trip, yaitu berkas apa pun untuk trip ini — Berita
+ * Acara bertanda tangan, surat jalan, foto barang / segel, tanda terima — beserta catatannya.
+ * Data tetap di koleksi tripNotes. Dokumen umum yang tidak menempel pada satu trip ada di
+ * menu Dokumen.
+ */
 export function TabLainnya({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah: boolean }) {
   const { dbAll, create, update, remove } = useData()
   const toast = useToast()
@@ -24,7 +29,7 @@ export function TabLainnya({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah:
   const [galat, setGalat] = useState<string | null>(null)
   const [menghapus, setMenghapus] = useState<TripNote | null>(null)
 
-  const catatan = useMemo(
+  const dokumen = useMemo(
     () => dbAll.tripNotes.filter((n) => n.trip_id === trip.id).sort((a, b) => b.note_date.localeCompare(a.note_date) || b.created_at.localeCompare(a.created_at)),
     [dbAll.tripNotes, trip.id],
   )
@@ -38,11 +43,11 @@ export function TabLainnya({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah:
   }
 
   function simpan() {
-    if (!form.title.trim()) { setGalat('Judul wajib diisi.'); return }
+    if (!form.title.trim()) { setGalat('Judul dokumen wajib diisi.'); return }
     if (!form.note_date) { setGalat('Tanggal wajib diisi.'); return }
     const isi = { ...form, title: form.title.trim(), notes: form.notes.trim() }
-    if (editing) { update('tripNotes', editing.id, isi); toast.success('Catatan berhasil diperbarui.') }
-    else { create('tripNotes', { ...isi, trip_id: trip.id }); toast.success('Catatan berhasil ditambahkan.') }
+    if (editing) { update('tripNotes', editing.id, isi); toast.success('Dokumen trip berhasil diperbarui.') }
+    else { create('tripNotes', { ...isi, trip_id: trip.id }); toast.success('Dokumen trip berhasil ditambahkan.') }
     setTerbuka(false)
   }
 
@@ -50,34 +55,37 @@ export function TabLainnya({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah:
     if (!menghapus) return
     remove('tripNotes', menghapus.id)
     void hapusLampiran(menghapus.attachments ?? [])
-    toast.success('Catatan berhasil dihapus.')
+    toast.success('Dokumen trip berhasil dihapus.')
     setMenghapus(null)
   }
 
   return (
     <div>
       <KepalaTab
-        keterangan="Simpan berkas, foto, atau catatan apa pun yang menyertai trip ini — mis. foto segel, tanda terima, atau kronologi di jalan."
-        tombol="Tambah Catatan"
+        judul="Dokumen trip"
+        keterangan="Berkas apa pun untuk trip ini: Berita Acara bertanda tangan, surat jalan, foto barang atau segel, tanda terima, atau kronologi di jalan."
+        tombol="Tambah Dokumen"
         bisaUbah={bisaUbah}
         onTambah={() => buka()}
       />
-      {catatan.length === 0 ? (
+      {dokumen.length === 0 ? (
         <KosongTab
-          judul="Belum ada catatan lain."
-          keterangan="Unggah berkas atau tulis catatan untuk trip ini."
+          judul="Belum ada dokumen trip."
+          keterangan="Unggah BA bertanda tangan, surat jalan, atau foto untuk trip ini."
         />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-max text-[13px]">
             <KepalaTabel kolom={[{ label: 'Tanggal' }, { label: 'Judul' }, { label: 'Catatan' }, { label: 'Berkas' }, { label: 'Action', kanan: true }]} />
             <tbody>
-              {catatan.map((n) => (
+              {dokumen.map((n) => (
                 <tr key={n.id} className="border-b border-grid align-top last:border-0 hover:bg-sunken">
                   <td className="tnum px-3 py-2.5 whitespace-nowrap text-ink-2">{formatDate(n.note_date)}</td>
                   <td className="px-3 py-2.5 font-medium text-ink">{n.title}</td>
                   <td className="max-w-md px-3 py-2.5 whitespace-pre-line text-ink-2">{n.notes || <span className="text-ink-3">—</span>}</td>
-                  <td className="px-3 py-2.5"><LampiranThumbs ids={n.attachments ?? []} ukuran={40} /></td>
+                  <td className="px-3 py-2.5">
+                    {(n.attachments?.length ?? 0) > 0 ? <LampiranThumbs ids={n.attachments ?? []} ukuran={40} /> : <span className="text-ink-3">—</span>}
+                  </td>
                   <td className="px-3 py-2.5 text-right">
                     <div className="flex justify-end gap-1">
                       <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!bisaUbah} onClick={() => buka(n)} />
@@ -94,8 +102,8 @@ export function TabLainnya({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah:
       <Modal
         open={terbuka}
         onClose={() => setTerbuka(false)}
-        title={editing ? 'Ubah Catatan' : 'Tambah Catatan'}
-        subtitle={`Trip ${trip.transaction_no}`}
+        title={editing ? 'Ubah Dokumen Trip' : 'Tambah Dokumen Trip'}
+        subtitle={`Trip ${trip.id_tampil}`}
         size="md"
         footer={
           <>
@@ -106,16 +114,16 @@ export function TabLainnya({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah:
       >
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Judul" required className="sm:col-span-2">
-            {(fid) => <Input id={fid} value={form.title} placeholder="Foto segel container" onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />}
+            {(fid) => <Input id={fid} value={form.title} placeholder="BA bertanda tangan penerima" onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />}
           </Field>
           <Field label="Tanggal" required>
             {(fid) => <DateInput id={fid} value={form.note_date} onChange={(e) => setForm((f) => ({ ...f, note_date: e.target.value }))} />}
           </Field>
-          <Field label="Catatan" className="sm:col-span-3">
-            {(fid) => <Textarea id={fid} rows={4} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />}
-          </Field>
           <Field label="Berkas" className="sm:col-span-3" hint="Gambar, PDF, atau berkas lain. Foto diperkecil otomatis.">
             {(fid) => <LampiranInput id={fid} accept="" label="Tambah berkas" value={form.attachments} onChange={(v) => setForm((f) => ({ ...f, attachments: v }))} />}
+          </Field>
+          <Field label="Catatan" className="sm:col-span-3">
+            {(fid) => <Textarea id={fid} rows={3} value={form.notes} placeholder="mis. diterima petugas gudang; dokumen fisik menyusul" onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />}
           </Field>
           <div className="sm:col-span-3"><PesanGalat>{galat}</PesanGalat></div>
         </div>
@@ -123,7 +131,7 @@ export function TabLainnya({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah:
 
       <ConfirmDialog
         open={!!menghapus}
-        title="Hapus catatan?"
+        title="Hapus dokumen trip?"
         message={`"${menghapus?.title}" akan dihapus beserta ${menghapus?.attachments?.length ?? 0} berkasnya.`}
         onCancel={() => setMenghapus(null)}
         onConfirm={hapus}

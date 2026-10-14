@@ -218,11 +218,10 @@ export function DateInput({
   }
 
   const tampil = ketik ?? (iso ? tulisTanggal(iso) : '')
-  // Lebar dari pemanggil (mis. filter w-[150px]) untuk pembungkus; tinggi (mis. h-8) untuk kolomnya.
+  // Lebar dari pemanggil (mis. filter w-[150px]) untuk pembungkus; kelas lain untuk kolomnya.
   const kelas = (className ?? '').split(/\s+/).filter(Boolean)
   const kelasLebar = kelas.filter((k) => /^(min-|max-)?w-/.test(k)).join(' ')
   const kelasKolom = kelas.filter((k) => !/^(min-|max-)?w-/.test(k))
-  const adaTinggi = kelasKolom.some((k) => /^h-/.test(k))
 
   return (
     <div ref={akarRef} className={cn('relative', kelasLebar || 'w-full')}>
@@ -239,11 +238,8 @@ export function DateInput({
         aria-haspopup="dialog"
         aria-expanded={buka}
         className={cn(
-          !adaTinggi && 'h-9',
-          'w-full rounded-md border bg-surface pr-9 pl-2.5 text-[13px] text-ink tnum placeholder:text-ink-3/70 transition-colors',
-          'focus:border-brand-400 focus:ring-2 focus:ring-brand-500/15 focus:outline-none',
-          'disabled:cursor-not-allowed disabled:bg-sunken disabled:text-ink-3 read-only:bg-sunken read-only:text-ink-2',
-          invalid ? 'border-[color:var(--color-critical)]' : 'border-hairline',
+          'form-control tnum pr-9',
+          invalid && 'is-invalid',
           !terkunci && 'cursor-pointer',
           kelasKolom.join(' '),
         )}
@@ -285,6 +281,7 @@ export function DateInput({
           ref={panelRef}
           role="dialog"
           aria-label="Pilih tanggal"
+          data-lapis-atas=""
           style={{ ...posisi, width: LEBAR_PANEL }}
           // Di atas popup (z-90), di bawah notifikasi (z-100).
           className="animate-in-pop fixed z-[95] overflow-hidden rounded-lg border border-[color:var(--color-nav-900)] bg-surface shadow-pop"

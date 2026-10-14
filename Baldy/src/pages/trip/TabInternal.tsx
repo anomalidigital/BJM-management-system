@@ -9,8 +9,10 @@ import { CurrencyInput } from '../../components/ui/CurrencyInput'
 import { LampiranInput, LampiranThumbs } from '../../components/ui/Lampiran'
 import { PilihKaryawan } from '../../components/ui/PilihKaryawan'
 import { useData } from '../../store/DataProvider'
+import { useAuth } from '../../store/AuthProvider'
 import { useToast } from '../../store/ToastProvider'
 import { hapusLampiran } from '../../lib/lampiran'
+import { hitungKomisiTrip } from '../../lib/komisi'
 import { formatDate, formatRupiah } from '../../lib/format'
 import { cn } from '../../lib/utils'
 import { EMPLOYEE_ROLES, INTERNAL_COST_TYPES, ROLE_LABEL } from '../../types'
@@ -21,12 +23,37 @@ type Form = Pick<InternalCost, 'cost_type' | 'amount' | 'cost_date' | 'notes' | 
 
 const KOSONG_PENERIMA = { recipient_role: '' as const, recipient_id: '', recipient_name: '' }
 
+/** Komisi satu peran pada trip ini: hasil hitung Aturan Komisi dibanding yang sudah dicatat dibayar. */
+interface KomisiPeran {
+  peran: EmployeeRole
+  judul: string
+  /** Penerima: supir utama / manager trip. Kosong = belum ada. */
+  penerimaId: string
+  penerimaNama: string
+  /** Hasil hitung otomatis dari Aturan Komisi. */
+  nilai: number
+  keterangan: string
+  /** Biaya internal jenis Komisi yang sudah dicatat untuk peran ini. */
+  dicatat: number
+  tanpaPenerima?: string
+}
+
+/** Status pembayaran komisi untuk satu peran. */
+function statusKomisi(k: Pick<KomisiPeran, 'nilai' | 'dicatat'>): { teks: string; nada: 'good' | 'warning' | 'neutral' } {
+  if (k.dicatat > 0 && k.dicatat >= k.nilai) return { teks: 'Sudah dicatat dibayar', nada: 'good' }
+  if (k.nilai > 0) return { teks: 'Belum dibayar', nada: 'warning' }
+  return { teks: 'Tidak ada komisi', nada: 'neutral' }
+}
+
 /**
- * Tab Biaya Internal: pengeluaran perusahaan sendiri atas trip ini. Jenis
- * "Komisi" mencatat penerimanya - manager atau sopir, terdaftar atau manual.
+ * Tab Komisi (dulu Biaya Internal, diganti atasan 13 Okt 2026): komisi supir utama dan manager
+ * dihitung otomatis dari Aturan Komisi (hanya Owner yang mengubah aturannya); pembayarannya
+ * dicatat sebagai biaya internal jenis "Komisi". Manager trip dipilih di sini (tidak lagi di
+ * form trip). Uang makan, kernet, servis, dan biaya internal lain dicatat di bawahnya.
  */
 export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah: boolean }) {
-  const { dbAll, create, update, remove } = useData()
+  const { db, dbAll, create, update, remove, ubahTrip } = useData()
+  const { bisa } = useAuth()
   const toast = useToast()
 
   const [terbuka, setTerbuka] = useState(false)
@@ -34,6 +61,12 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
   const [form, setForm] = useState<Form>({ cost_type: 'Uang Makan', amount: 0, cost_date: '', notes: '', ...KOSONG_PENERIMA, attachments: [] })
   const [galat, setGalat] = useState<string | null>(null)
   const [menghapus, setMenghapus] = useState<InternalCost | null>(null)
+  /** Isian pilih / ganti manager trip (belum disimpan). */
+  const [aturManager, setAturManager] = useState<{ id: string; nama: string } | null>(null)
+
+  const batal = trip.status === 'batal'
+  /** Catat biaya internal & pembayaran komisi: Manager & Owner. */
+  const bisaCatat = bisaUbah && bisa('biaya') && !batal
 
   // Dibaca dari seluruh data supaya arsip trip batal tetap terlihat.
   const internals = useMemo(
@@ -42,16 +75,53 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
   )
   const total = internals.reduce((a, c) => a + c.amount, 0)
   const drivers = useMemo(() => new Map(dbAll.drivers.map((d) => [d.id, d])), [dbAll.drivers])
-  const batal = trip.status === 'batal'
 
-  /* Komisi seharusnya (dari master Komisi) dibanding yang sudah dicatat dibayar. */
+  /* ── Komisi supir utama & manager ── */
   const sopirUtama = drivers.get(trip.driver_ids[0] ?? '')
-  const komisiDicatat = internals
-    .filter((c) => c.cost_type === 'Komisi' && c.recipient_role === 'sopir' && (!sopirUtama || c.recipient_id === sopirUtama.id))
-    .reduce((a, c) => a + c.amount, 0)
-  const komisiKurang = Math.max(0, trip.komisi_sopir - komisiDicatat)
+  const adaManager = !!(trip.manager_id || trip.manager_name)
+  /**
+   * Keterangan aturan komisi manager. Nilainya tetap dari trip.komisi_manager; keterangan
+   * dihitung dengan aturan & dasar yang sama seperti di DataProvider.
+   */
+  const keteranganManager = useMemo(() => {
+    if (batal || !adaManager) return ''
+    return hitungKomisiTrip(db.commissionSchemes, {
+      role: 'manager', layanan: trip.service_type ?? 'callout', konfigurasi: trip.vehicle_config,
+      cost_value: trip.cost_value ?? 0, route_price: trip.route_price, ujroute: trip.ujroute, uj_total: trip.uj_total,
+    }).keterangan
+  }, [batal, adaManager, db.commissionSchemes, trip.service_type, trip.vehicle_config, trip.cost_value, trip.route_price, trip.ujroute, trip.uj_total])
 
-  /** Karyawan sesuai peran; sopir trip ini ditaruh paling atas. */
+  const dicatatUntuk = (peran: EmployeeRole) =>
+    internals.filter((c) => c.cost_type === 'Komisi' && c.recipient_role === peran).reduce((a, c) => a + c.amount, 0)
+  const komisi: KomisiPeran[] = [
+    {
+      peran: 'sopir', judul: 'Komisi supir', penerimaId: sopirUtama?.id ?? '', penerimaNama: sopirUtama?.driver_name ?? '',
+      nilai: trip.komisi_sopir, keterangan: trip.komisi_keterangan || 'Belum ada aturan komisi yang cocok.', dicatat: dicatatUntuk('sopir'),
+      tanpaPenerima: sopirUtama ? undefined : 'Supir utama belum diisi.',
+    },
+    {
+      peran: 'manager', judul: 'Komisi manager', penerimaId: trip.manager_id, penerimaNama: trip.manager_label,
+      nilai: trip.komisi_manager, keterangan: adaManager ? keteranganManager || 'Belum ada aturan komisi yang cocok.' : '', dicatat: dicatatUntuk('manager'),
+      tanpaPenerima: adaManager ? undefined : 'Trip ini tanpa manager.',
+    },
+  ]
+
+  const managerTerdaftar = useMemo(
+    () => dbAll.drivers.filter((d) => d.role === 'manager' && (d.status === 'aktif' || d.id === trip.manager_id)),
+    [dbAll.drivers, trip.manager_id],
+  )
+  /** Ganti manager trip: Admin ke atas (izin trip), selama trip belum batal. */
+  const bisaAturManager = bisa('trip') && !batal
+
+  function simpanManager() {
+    if (!aturManager) return
+    const nama = aturManager.nama.trim()
+    ubahTrip(trip.id, { manager_id: aturManager.id, manager_name: aturManager.id ? '' : nama })
+    toast.success(aturManager.id || nama ? `Manager trip: ${nama || 'terpilih'}.` : 'Manager trip dikosongkan.')
+    setAturManager(null)
+  }
+
+  /** Karyawan sesuai peran; orang di trip ini ditaruh paling atas. */
   const karyawanPeran = useMemo(() => {
     const peran = form.recipient_role
     if (!peran) return []
@@ -60,7 +130,16 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
     return [...daftar.filter((d) => diTrip.has(d.id)), ...daftar.filter((d) => !diTrip.has(d.id))]
   }, [dbAll.drivers, form.recipient_role, form.recipient_id, trip.driver_ids, trip.manager_id])
 
-  const komisi = form.cost_type === 'Komisi'
+  const jenisKomisi = form.cost_type === 'Komisi'
+  /** Komisi menurut aturan untuk peran yang dipilih di form. */
+  const acuanKomisi = form.recipient_role === 'sopir' ? trip.komisi_sopir : form.recipient_role === 'manager' ? trip.komisi_manager : 0
+
+  /** Orang di trip ini untuk satu peran: supir utama, atau manager trip. */
+  function orangTrip(peran: EmployeeRole | ''): { recipient_id: string; recipient_name: string } {
+    if (peran === 'sopir') return { recipient_id: sopirUtama?.id ?? '', recipient_name: sopirUtama?.driver_name ?? '' }
+    if (peran === 'manager') return { recipient_id: trip.manager_id, recipient_name: trip.manager_label }
+    return { recipient_id: '', recipient_name: '' }
+  }
 
   function buka(c?: InternalCost) {
     setEditing(c ?? null)
@@ -74,12 +153,12 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
     setGalat(null); setTerbuka(true)
   }
 
-  /** Catat pembayaran komisi sopir utama sebesar kekurangannya. */
-  function catatKomisi() {
+  /** Form biaya internal terisi: jenis Komisi, peran, penerima dari trip, nominal hasil hitung (dikurangi yang sudah dicatat). */
+  function catatKomisi(k: KomisiPeran) {
     setEditing(null)
     setForm({
-      cost_type: 'Komisi', amount: komisiKurang, cost_date: trip.transaction_date, notes: trip.komisi_keterangan,
-      recipient_role: 'sopir', recipient_id: sopirUtama?.id ?? '', recipient_name: sopirUtama?.driver_name ?? '', attachments: [],
+      cost_type: 'Komisi', amount: Math.max(0, k.nilai - k.dicatat), cost_date: trip.transaction_date, notes: k.keterangan,
+      recipient_role: k.peran, recipient_id: k.penerimaId, recipient_name: k.penerimaNama, attachments: [],
     })
     setGalat(null); setTerbuka(true)
   }
@@ -89,30 +168,29 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
     ? [...INTERNAL_COST_TYPES, editing.cost_type]
     : [...INTERNAL_COST_TYPES]
 
-  /** Ganti jenis ke Komisi -> penerima awal: sopir utama trip ini. */
+  /** Ganti jenis ke Komisi -> penerima awal: supir utama trip ini. */
   function ubahJenis(jenis: string) {
     setForm((f) => {
-      if (jenis !== 'Komisi') return { ...f, cost_type: jenis }
-      if (f.recipient_role) return { ...f, cost_type: jenis }
-      const utama = drivers.get(trip.driver_ids[0] ?? '')
-      return { ...f, cost_type: jenis, recipient_role: 'sopir', recipient_id: utama?.id ?? '', recipient_name: utama?.driver_name ?? '' }
+      if (jenis !== 'Komisi' || f.recipient_role) return { ...f, cost_type: jenis }
+      return { ...f, cost_type: jenis, recipient_role: 'sopir', ...orangTrip('sopir') }
     })
   }
 
+  /** Ganti peran -> penerima awal: orang trip ini untuk peran itu (tetap bisa diganti). */
   function ubahPeran(peran: EmployeeRole | '') {
-    setForm((f) => ({ ...f, recipient_role: peran, recipient_id: '', recipient_name: '' }))
+    setForm((f) => ({ ...f, recipient_role: peran, ...orangTrip(peran) }))
   }
 
   function simpan() {
     if (form.amount <= 0) { setGalat('Nominal harus lebih dari 0.'); return }
     if (!form.cost_date) { setGalat('Tanggal wajib diisi.'); return }
-    if (komisi && !form.recipient_role) { setGalat('Pilih komisi ini untuk manager atau sopir.'); return }
-    if (komisi && !form.recipient_id && !form.recipient_name.trim()) { setGalat('Pilih penerima komisi, atau isi namanya.'); return }
-    const isi = komisi
+    if (jenisKomisi && !form.recipient_role) { setGalat('Pilih komisi ini untuk manager atau supir.'); return }
+    if (jenisKomisi && !form.recipient_id && !form.recipient_name.trim()) { setGalat('Pilih penerima komisi, atau isi namanya.'); return }
+    const isi = jenisKomisi
       ? { ...form, recipient_name: form.recipient_id ? drivers.get(form.recipient_id)?.driver_name ?? form.recipient_name : form.recipient_name.trim() }
       : { ...form, ...KOSONG_PENERIMA }
     if (editing) { update('internalCosts', editing.id, isi); toast.success('Biaya internal berhasil diperbarui.') }
-    else { create('internalCosts', { ...isi, trip_id: trip.id }); toast.success('Biaya internal berhasil ditambahkan.') }
+    else { create('internalCosts', { ...isi, trip_id: trip.id }); toast.success(jenisKomisi ? 'Pembayaran komisi berhasil dicatat.' : 'Biaya internal berhasil ditambahkan.') }
     setTerbuka(false)
   }
 
@@ -140,32 +218,96 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
   return (
     <div>
       <KepalaTab
+        judul="Komisi"
         keterangan={batal
-          ? 'Trip dibatalkan: biaya di bawah hanya arsip dan tidak dihitung di laporan.'
-          : 'Pengeluaran internal perusahaan atas trip ini — uang makan, kernet, komisi, servis, dan sejenisnya. Uang jalan dicatat di tab Uang Jalan.'}
+          ? 'Trip dibatalkan: tidak ada komisi, dan biaya di bawah hanya arsip yang tidak dihitung di laporan.'
+          : 'Komisi supir dan manager dihitung otomatis dari Aturan Komisi; pembayarannya dicatat di sini. Uang makan, kernet, dan biaya internal lain dicatat di bawahnya.'}
+      />
+
+      {!batal && (
+        <section aria-label="Komisi" className="border-b border-hairline px-4 py-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h4 className="flex items-center gap-2 text-[12px] font-semibold tracking-wide text-ink-2 uppercase">
+              <FaPercent size={13} className="text-brand-600" /> Komisi
+            </h4>
+            <Link to="/laporan/komisi?tab=aturan" className="text-[12.5px] font-medium text-brand-700 hover:underline">
+              {bisa('komisi') ? 'Ubah Aturan Komisi' : 'Lihat Aturan Komisi'}
+            </Link>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {komisi.map((k) => {
+              const status = statusKomisi(k)
+              const kurang = Math.max(0, k.nilai - k.dicatat)
+              const terdaftar = k.penerimaId ? drivers.get(k.penerimaId) : undefined
+              return (
+                <div key={k.peran} className="flex flex-col rounded-lg border border-hairline bg-surface p-3.5">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[12.5px] font-medium text-ink-3">{k.judul}</p>
+                      <p className="tnum mt-1 text-[18px] leading-none font-semibold text-ink">{formatRupiah(k.nilai)}</p>
+                    </div>
+                    <Badge tone={status.nada}>{status.teks}</Badge>
+                  </div>
+                  {k.peran === 'manager' && aturManager ? (
+                    <div className="mt-2 space-y-2">
+                      <PilihKaryawan id="manager-trip" karyawan={managerTerdaftar} valueId={aturManager.id} valueNama={aturManager.nama} peran="manager"
+                        placeholder="Pilih manager trip..." onChange={(mid, nama) => setAturManager({ id: mid, nama })} />
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="primary" onClick={simpanManager}>Simpan manager</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setAturManager(null)}>Batal</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-[12.5px] text-ink-2">
+                      {k.tanpaPenerima ?? (
+                        <>
+                          untuk{' '}
+                          {terdaftar
+                            ? <Link to={`/master/karyawan/${terdaftar.id}`} className="font-medium text-ink hover:text-brand-700 hover:underline">{terdaftar.driver_name}</Link>
+                            : <span className="font-medium text-ink">{k.penerimaNama}</span>}
+                        </>
+                      )}
+                      {k.peran === 'manager' && bisaAturManager && (
+                        <>
+                          {' · '}
+                          <button type="button" className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800"
+                            onClick={() => setAturManager({ id: trip.manager_id, nama: trip.manager_id ? '' : trip.manager_name })}>
+                            {adaManager ? 'Ganti manager' : 'Pilih manager'}
+                          </button>
+                        </>
+                      )}
+                    </p>
+                  )}
+                  {k.keterangan && <p className="mt-1 text-[11.5px] text-ink-3">{k.keterangan}</p>}
+                  {k.dicatat > 0 && (
+                    <p className={cn('mt-1 text-[11.5px]', k.nilai > 0 && k.dicatat > k.nilai ? 'font-medium text-[#8a6100]' : 'text-ink-3')}>
+                      Sudah dicatat dibayar {formatRupiah(k.dicatat)}
+                      {kurang > 0 ? `, kurang ${formatRupiah(kurang)}` : k.nilai > 0 && k.dicatat > k.nilai ? `, lebih ${formatRupiah(k.dicatat - k.nilai)} dari hasil hitung` : ''}.
+                    </p>
+                  )}
+                  {kurang > 0 && (
+                    <div className="mt-auto">
+                      <Button size="sm" className="mt-3" disabled={!bisaCatat} onClick={() => catatKomisi(k)}>Catat pembayaran komisi</Button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          {trip.driver_ids.length > 1 && (
+            <p className="mt-2.5 text-[12px] text-ink-3">Supir pendamping tidak otomatis dapat komisi; bayarkan lewat biaya operasional &ldquo;Double Driver&rdquo; bila ada.</p>
+          )}
+          {!bisa('biaya') && <p className="mt-2.5 text-[12px] text-ink-3">Pembayaran komisi dicatat oleh Manager / Owner.</p>}
+        </section>
+      )}
+
+      <KepalaTab
+        judul="Biaya internal lain"
+        keterangan="Uang makan, kernet, servis, dan sejenisnya. Pembayaran komisi yang sudah dicatat ikut tampil di tabel ini."
         tombol="Tambah Biaya Internal"
-        bisaUbah={bisaUbah}
+        bisaUbah={bisaCatat}
         onTambah={() => buka()}
       />
-      {!batal && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline bg-brand-50/50 px-4 py-2.5">
-          <p className="flex items-start gap-2 text-[12.5px] text-brand-800">
-            <FaPercent size={15} className="mt-px shrink-0" />
-            <span>
-              Komisi sopir menurut aturan: <span className="tnum font-semibold">{formatRupiah(trip.komisi_sopir)}</span>
-              {sopirUtama && <> untuk {sopirUtama.driver_name}</>}
-              {' · '}sudah dicatat <span className="tnum font-semibold">{formatRupiah(komisiDicatat)}</span>
-              <span className="block text-[11.5px] text-brand-700">{trip.komisi_keterangan || 'Belum ada aturan komisi yang cocok.'}</span>
-              {trip.driver_ids.length > 1 && (
-                <span className="block text-[11.5px] text-brand-700">Sopir tambahan tidak otomatis dapat komisi; bayarkan lewat biaya operasional &ldquo;Double Driver&rdquo; bila ada.</span>
-              )}
-            </span>
-          </p>
-          {komisiKurang > 0 && (
-            <Button size="sm" disabled={!bisaUbah} onClick={catatKomisi}>Catat pembayaran {formatRupiah(komisiKurang)}</Button>
-          )}
-        </div>
-      )}
       {internals.length === 0 ? (
         <KosongTab
           judul="Belum ada biaya internal."
@@ -189,8 +331,8 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
                   <td className="px-3 py-2.5"><LampiranThumbs ids={c.attachments ?? []} ukuran={30} /></td>
                   <td className="px-3 py-2.5 text-right">
                     <div className="flex justify-end gap-1">
-                      <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!bisaUbah} onClick={() => buka(c)} />
-                      <IconButton label="Hapus" tone="danger" icon={<FaTrashCan size={14} />} disabled={!bisaUbah} onClick={() => setMenghapus(c)} />
+                      <IconButton label="Ubah" icon={<FaPen size={14} />} disabled={!bisaCatat} onClick={() => buka(c)} />
+                      <IconButton label="Hapus" tone="danger" icon={<FaTrashCan size={14} />} disabled={!bisaCatat} onClick={() => setMenghapus(c)} />
                     </div>
                   </td>
                 </tr>
@@ -198,7 +340,7 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
             </tbody>
             <tfoot className="border-t-2 border-hairline bg-sunken font-semibold">
               <tr>
-                <td className="px-3 py-2.5 text-[12px] text-ink-2" colSpan={3}>Total {internals.length} biaya internal</td>
+                <td className="px-3 py-2.5 text-[12px] text-ink-2" colSpan={3}>Total {internals.length} biaya internal{batal && ' (arsip)'}</td>
                 <td className="tnum px-3 py-2.5 text-right text-ink">{formatRupiah(total)}</td>
                 <td colSpan={3} />
               </tr>
@@ -210,8 +352,8 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
       <Modal
         open={terbuka}
         onClose={() => setTerbuka(false)}
-        title={editing ? 'Ubah Biaya Internal' : 'Tambah Biaya Internal'}
-        subtitle={`Trip ${trip.transaction_no}`}
+        title={editing ? 'Ubah Biaya Internal' : jenisKomisi ? 'Catat Pembayaran Komisi' : 'Tambah Biaya Internal'}
+        subtitle={`Trip ${trip.id_tampil}`}
         size="md"
         footer={
           <>
@@ -229,7 +371,7 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
             )}
           </Field>
 
-          {komisi && (
+          {jenisKomisi && (
             <div className="grid gap-4 rounded-lg border border-hairline bg-sunken p-3.5 sm:col-span-2 sm:grid-cols-2">
               <Field label="Komisi untuk" required>
                 {(fid) => (
@@ -261,9 +403,9 @@ export function TabInternal({ trip, bisaUbah }: { trip: TransactionRow; bisaUbah
           <Field
             label="Nominal"
             required
-            hint={komisi && form.recipient_role === 'sopir' && trip.komisi_sopir > 0 && form.amount !== trip.komisi_sopir
-              ? <>Komisi menurut aturan {formatRupiah(trip.komisi_sopir)} · <PakaiNilai label="Pakai" onClick={() => setForm((f) => ({ ...f, amount: trip.komisi_sopir }))} /></>
-              : undefined}
+            hint={jenisKomisi && acuanKomisi > 0 && form.amount !== acuanKomisi
+              ? <>Komisi menurut aturan {formatRupiah(acuanKomisi)} · <PakaiNilai label="Pakai" onClick={() => setForm((f) => ({ ...f, amount: acuanKomisi }))} /></>
+              : jenisKomisi && acuanKomisi > 0 ? 'Sesuai hasil hitung Aturan Komisi.' : undefined}
           >
             {(fid) => <CurrencyInput id={fid} value={form.amount} onValueChange={(v) => setForm((f) => ({ ...f, amount: v }))} />}
           </Field>

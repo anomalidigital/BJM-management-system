@@ -11,8 +11,9 @@ import type {
 } from '../types'
 import { EXPENSE_TYPES, VEHICLE_CONFIGS } from '../types'
 import { susunKasbonDariDataLama } from '../lib/kasbon'
-import { pindahkanUangKeTermin, tandaiPembayarLama } from '../lib/trip'
-import { nomorTripBerikut } from '../lib/kode'
+import { bekukanNilaiPiLama, pindahkanUangKeTermin, tandaiPembayarLama } from '../lib/trip'
+import { alamatAwal } from './alamat-awal'
+import { nomorTripBerikut, rapikanNoRuteLama } from '../lib/kode'
 import REAL from './real.json'
 import { kasbonTerminContoh, keuanganTripContoh, lengkapiNominalRoute } from './lengkapi'
 import { toISO } from '../lib/format'
@@ -119,7 +120,7 @@ function makeProjects(): Project[] {
     id: `prj-${i + 1}`,
     project_code: code,
     project_name: name,
-    client_type: 'tetap' as const,
+    client_type: 'callout' as const,
     description: desc,
     requires_document: doc,
     status: 'aktif' as const,
@@ -653,7 +654,7 @@ export function makeKlienKontrak(cap = stamp): Project[] {
     id: `prj-ktr-${i + 1}`,
     project_code: code,
     project_name: name,
-    client_type: 'kontrak' as const,
+    client_type: 'dedicated' as const,
     description: 'Klien contoh layanan Dedicated.',
     requires_document: true,
     status: 'aktif' as const,
@@ -714,6 +715,7 @@ export function generateDatabase(): Database {
       ...(/di pool/i.test(t.pi_status ?? '') ? { pod_fisik: true } : {}),
       // PI yang sudah bernomor di rekap dianggap sudah dikirim ke klien (TBD-23).
       ...(t.pi_number?.trim() ? { pi_tahap: 'dikirim' as const } : {}),
+      // Penanda trip = Kode Trip (transaction_no); ID Perjalanan hanya ada bila rekap mencatatnya.
       trip_ids: kont ? [kont] : [],
       driver_ids: t.driver_id ? [t.driver_id] : [],
       container_no: '',
@@ -737,10 +739,11 @@ export function generateDatabase(): Database {
   // Uang dorong adalah uang untuk sopir, bukan nota: dicatat sebagai termin uang jalan.
   const dipindah = pindahkanUangKeTermin(biayaAsli, ujAsli, tripAsli, stamp)
   // Spreadsheet tidak memuat nominal route: diturunkan dari trip asli (lihat lengkapi.ts).
-  const routes = lengkapiNominalRoute(
+  // No. Rute aplikasi lama yang bentrok (CIBSAMB3 untuk CIB - SAMBAR 4) dirapikan (14 Okt 2026).
+  const routes = rapikanNoRuteLama(lengkapiNominalRoute(
     real.routes.map((r) => ({ ...r, toll: r.toll ?? 0, project_id: projectRoute.get(r.id) ?? '' })),
     tripAsli, ujAsli, biayaAsli,
-  )
+  ))
   // Trip contoh yang sudah jalan diberi uang jalan & biaya, supaya laporan bulan berjalan terisi.
   const contoh = keuanganTripContoh(tripSuratJalan, routes, { payments: [], expenses: [], internal: [] }, toISO(now), stamp)
   const ujPayments = [...dipindah.ujPayments, ...contoh.ujPayments]
@@ -753,9 +756,13 @@ export function generateDatabase(): Database {
     ...kasbonTerminContoh(contoh.ujPayments, stamp),
   ]
 
+  const projects = [...real.projects.map((p) => ({ ...p, client_type: 'callout' as const })), ...makeKlienKontrak()]
   return {
-    ...real, projects: [...real.projects.map((p) => ({ ...p, client_type: 'tetap' as const })), ...makeKlienKontrak()], drivers, vehicles, routes, transactions, jobOrders, billings,
+    ...real, projects, drivers, vehicles, routes,
+    // PI yang sudah ada dibekukan nilainya (12 Okt 2026).
+    transactions: bekukanNilaiPiLama(transactions, routes, expenses), jobOrders, billings,
     ujPayments, expenses, internalCosts, tripNotes: [], tripEvents: [], kasbonEntries, commissionSchemes, contracts: makeContracts(),
+    alamat: alamatAwal(projects, stamp), auditLogs: [], dokumen: [],
   }
 }
 
@@ -765,7 +772,7 @@ export function generateDatabase(): Database {
  */
 export function generateSampleDatabase(): Database {
   const drivers = [...makeDrivers(26), makeManager()]
-  const routes = makeRoutes(18)
+  const routes = rapikanNoRuteLama(makeRoutes(18))
   const vehicles = makeVehicles(16)
   const jobOrders = makeJobOrders(42)
   const projects = makeProjects()
@@ -786,6 +793,7 @@ export function generateSampleDatabase(): Database {
   return {
     drivers, routes, vehicles, jobOrders, projects: [...projects, ...makeKlienKontrak()], transactions, billings,
     ujPayments, expenses, internalCosts, tripNotes: [], tripEvents: [], kasbonEntries, commissionSchemes, contracts: makeContracts(),
+    alamat: alamatAwal(projects, stamp), auditLogs: [], dokumen: [],
   }
 }
 

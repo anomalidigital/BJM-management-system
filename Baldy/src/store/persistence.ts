@@ -1,19 +1,45 @@
 import type {
   CommissionTransaction, Database, InternalCost, KasbonEntry, OperationalExpense, Project, Route, UjPayment, Workspace,
 } from '../types'
+import { alamatAwal } from '../data/alamat-awal'
 import { aturanKomisiMeeting, generateDatabase, generateSampleDatabase, makeKlienKontrak, projectDominanPerRoute, workspaceForSeed, CATATAN_KOMISI_CALLOUT, NAMA_KOMISI_CALLOUT, cabangBawaan } from '../data/dummy'
 import { kasbonTerminContoh, keuanganTripContoh, lengkapiNominalRoute } from '../data/lengkapi'
 import { petaSaldoKasbon } from '../lib/kasbon'
 import { susunKasbonDariDataLama } from '../lib/kasbon'
 import { todayISO } from '../lib/format'
-import { kodeKlienBerikut, nomorTripBerikut } from '../lib/kode'
+import { kodeKlienBerikut, nomorTripBerikut, rapikanNoRuteLama } from '../lib/kode'
 import { uid } from '../lib/utils'
-import { pindahkanUangKeTermin, tandaiPembayarLama } from '../lib/trip'
+import { bekukanNilaiPiLama, buangIdPerjalananBuatan, pindahkanUangKeTermin, tandaiPembayarLama } from '../lib/trip'
 
 const DB_KEY = 'sikotis.db.v2'
 const AUTH_KEY = 'sikotis.auth.v1'
+/** Daftar akun (Pengaturan -> Pengguna & Peran), terpisah dari data karena dibaca AuthProvider. */
+const USERS_KEY = 'sikotis.users.v1'
 // v2: workspace utama pindah ke Karawang (6 Okt 2026); pilihan lama tidak dibawa.
 const WORKSPACE_KEY = 'sikotis.workspace.v2'
+
+/**
+ * Perapian data sekali jalan (bukan perubahan bentuk data), dicatat terpisah dari database supaya tidak
+ * diulang: mis. No. Rute yang sudah dirapikan tidak boleh berubah lagi walau nama rutenya diganti.
+ */
+const MIGRASI_KEY = 'sikotis.migrasi.v1'
+function sekali<T>(id: string, nilai: T, ubah: (v: T) => T): T {
+  let sudah: string[] = []
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(MIGRASI_KEY) ?? '[]')
+    if (Array.isArray(v)) sudah = v.filter((x): x is string => typeof x === 'string')
+  } catch {
+    // Catatan rusak: dianggap belum ada (perapiannya aman diulang).
+  }
+  if (sudah.includes(id)) return nilai
+  const hasil = ubah(nilai)
+  try {
+    localStorage.setItem(MIGRASI_KEY, JSON.stringify([...sudah, id]))
+  } catch {
+    // Penyimpanan tidak tersedia: perapian diulang saat dimuat lagi (hasilnya sama).
+  }
+  return hasil
+}
 
 /** Koleksi inti yang sudah ada sejak versi pertama. */
 const CORE_KEYS: Array<keyof Database> = ['drivers', 'routes', 'vehicles', 'jobOrders', 'transactions', 'billings']
@@ -365,11 +391,17 @@ function migrate(stored: Record<string, unknown>): Database {
     })
     merged.projects = klien
   }
-  // Jenis klien: yang punya kontrak (di workspace mana pun) = klien kontrak, lainnya klien tetap.
+  // Jenis klien = tipe layanan (13 Okt 2026): yang punya kontrak (di workspace mana pun) = Dedicated,
+  // lainnya Callout. Kode lama 'tetap' / 'kontrak' diganti 'callout' / 'dedicated'.
   const prj = merged.projects as Array<Record<string, unknown>> | undefined
-  if (Array.isArray(prj) && prj.some((p) => !p.client_type)) {
+  if (Array.isArray(prj)) {
     const berkontrak = new Set((merged.contracts as Array<Record<string, unknown>>).map((c) => String(c.project_id ?? '')))
-    merged.projects = prj.map((p) => (p.client_type ? p : { ...p, client_type: berkontrak.has(String(p.id)) ? 'kontrak' : 'tetap' }))
+    const kodeBaru: Record<string, string> = { tetap: 'callout', kontrak: 'dedicated' }
+    merged.projects = prj.map((p) => {
+      if (!p.client_type) return { ...p, client_type: berkontrak.has(String(p.id)) ? 'dedicated' : 'callout' }
+      const baru = kodeBaru[String(p.client_type)]
+      return baru ? { ...p, client_type: baru } : p
+    })
   }
   // Trip Dedicated yang belum berklien mengikuti klien kontraknya.
   const klienKontrak = new Map((merged.contracts as Array<Record<string, unknown>>).map((c) => [String(c.id), String(c.project_id ?? '')]))
@@ -445,6 +477,19 @@ function migrate(stored: Record<string, unknown>): Database {
     )
   }
 
+  // 12 Okt 2026: Master Alamat, Audit Log, dan Dokumen umum.
+  if (!Array.isArray(merged.alamat)) merged.alamat = alamatAwal((merged.projects ?? []) as Project[], stamp)
+  if (!Array.isArray(merged.auditLogs)) merged.auditLogs = []
+  if (!Array.isArray(merged.dokumen)) merged.dokumen = []
+  // Penanda trip = Kode Trip (13 Okt 2026): ID Perjalanan buatan sistem untuk trip lama dibuang.
+  merged.transactions = buangIdPerjalananBuatan(merged.transactions as CommissionTransaction[])
+  // Nilai PI dibekukan saat PI dibuat; PI lama diisi nilai sekarang, sekali.
+  merged.transactions = bekukanNilaiPiLama(
+    merged.transactions as CommissionTransaction[], (merged.routes ?? []) as Route[], (merged.expenses ?? []) as OperationalExpense[],
+  )
+  // 14 Okt 2026: No. Rute aplikasi lama yang bentrok ("kode yang sama") dirapikan sekali; kode lama di route_code_lama.
+  merged.routes = sekali('no-rute-v2', (merged.routes ?? []) as Route[], rapikanNoRuteLama)
+
   return merged as unknown as Database
 }
 
@@ -452,7 +497,7 @@ function migrate(stored: Record<string, unknown>): Database {
 function klienDariNama(nama: string, ada: Project[], stamp: string): Project {
   const kode = kodeKlienBerikut(nama, ada.map((p) => p.project_code))
   return {
-    id: uid('prj'), project_code: kode, project_name: nama, client_type: 'kontrak', description: 'Dibuat dari data kontrak.',
+    id: uid('prj'), project_code: kode, project_name: nama, client_type: 'dedicated', description: 'Dibuat dari data kontrak.',
     requires_document: true, status: 'aktif', created_at: stamp, updated_at: stamp,
   }
 }
@@ -521,6 +566,24 @@ export const workspaceStorage = {
   write(value: string): void {
     try {
       localStorage.setItem(WORKSPACE_KEY, value)
+    } catch {
+      /* abaikan */
+    }
+  },
+}
+
+export const usersStorage = {
+  read<T>(): T | null {
+    try {
+      const raw = localStorage.getItem(USERS_KEY)
+      return raw ? (JSON.parse(raw) as T) : null
+    } catch {
+      return null
+    }
+  },
+  write(value: unknown): void {
+    try {
+      localStorage.setItem(USERS_KEY, JSON.stringify(value))
     } catch {
       /* abaikan */
     }

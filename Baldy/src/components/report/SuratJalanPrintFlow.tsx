@@ -17,7 +17,7 @@ type Stage = 'settings' | 'preview'
  * Alur cetak Surat Jalan: Print Settings -> Preview -> Print / PDF.
  * Klik "Cetak" tidak pernah langsung memanggil printer (addendum bagian 21).
  * Trip Karawang dicetak sebagai Berita Acara Serah Terima Barang (format Meeting 2),
- * trip Priok sebagai Surat Jalan.
+ * satu lembar A4 per trip; trip Priok sebagai Surat Jalan.
  */
 export function SuratJalanPrintFlow({
   notes,
@@ -78,7 +78,8 @@ export function SuratJalanPrintFlow({
               <p className="text-[12px] font-semibold text-ink-2">{notes.length} dokumen</p>
               <ul className="tnum mt-1.5 max-h-56 space-y-0.5 overflow-y-auto text-[11.5px] text-ink-3">
                 {notes.map((n) => (
-                  <li key={n.id}>{n.workspace === 'karawang' ? [n.transaction_no, n.plate_number].filter(Boolean).join(' · ') : n.sj_no || n.transaction_no}</li>
+                  // Karawang: ID Trip (Kode Trip) dan plat.
+                  <li key={n.id} className="break-all">{n.workspace === 'karawang' ? [n.id_tampil, n.plate_number].filter(Boolean).join(' · ') : n.sj_no || n.transaction_no}</li>
                 ))}
               </ul>
             </div>

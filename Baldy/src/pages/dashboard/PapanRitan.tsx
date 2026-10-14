@@ -9,13 +9,13 @@ export interface BarisRitan {
   ritan: number
 }
 
-/** Peringkat sopir menurut jumlah ritan bulan ini. Nomor urut memang peringkat. */
+/** Peringkat supir menurut jumlah ritan bulan ini. Nomor urut memang peringkat. */
 export function PapanRitan({ rows, bulan }: { rows: BarisRitan[]; bulan: string }) {
   const tertinggi = Math.max(1, ...rows.map((r) => r.ritan))
   return (
     <Panel
-      title="Ritan sopir"
-      subtitle={`Sopir dengan trip terbanyak, ${bulan}.`}
+      title="Ritan supir"
+      subtitle={`Supir dengan trip terbanyak, ${bulan}.`}
       actions={<Link to="/laporan/ritan"><TautanPanel>Cek ritan</TautanPanel></Link>}
     >
       {rows.length === 0 ? (

@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { FaXmark } from './icons'
 import { Button } from './Button'
 import { cn } from '../../lib/utils'
 
@@ -16,6 +15,10 @@ interface ModalProps {
 
 const SIZES = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl', xl: 'max-w-5xl' } as const
 
+/**
+ * Dialog bergaya modal Bootstrap (.modal-content / -header / -body / -footer).
+ * Buka-tutupnya diatur React, jadi JavaScript Bootstrap tidak dipakai.
+ */
 export function Modal({ open, onClose, title, subtitle, footer, size = 'md', children }: ModalProps) {
   useEffect(() => {
     if (!open) return
@@ -33,29 +36,19 @@ export function Modal({ open, onClose, title, subtitle, footer, size = 'md', chi
   if (!open) return null
 
   return (
-    <div className="no-print fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto p-4 sm:p-6">
+    <div className="modal no-print fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto p-4 sm:p-6">
       <div className="animate-in-fade fixed inset-0 bg-ink/35 backdrop-blur-[1px]" onClick={onClose} aria-hidden />
-      <div
-        role="dialog"
-        aria-modal="true"
-        className={cn('animate-in-pop relative my-auto w-full rounded-xl border border-hairline bg-surface shadow-pop', SIZES[size])}
-      >
-        <header className="flex items-start justify-between gap-4 border-b border-hairline px-5 py-3.5">
+      <div role="dialog" aria-modal="true" className={cn('modal-content animate-in-pop relative my-auto w-full', SIZES[size])}>
+        <header className="modal-header">
           <div className="min-w-0">
-            <h2 className="text-[15px] leading-tight font-semibold text-ink">{title}</h2>
-            {subtitle && <p className="mt-0.5 text-[12.5px] text-ink-3">{subtitle}</p>}
+            <h2 className="modal-title">{title}</h2>
+            {subtitle && <p className="modal-subtitle">{subtitle}</p>}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Tutup"
-            className="-mt-1 -mr-1 rounded-md p-1.5 text-ink-3 transition hover:bg-sunken hover:text-ink"
-          >
-            <FaXmark size={17} />
-          </button>
+          <button type="button" onClick={onClose} aria-label="Tutup" className="btn-close" />
         </header>
-        <div className="max-h-[calc(100vh-16rem)] overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <footer className="flex items-center justify-end gap-2 rounded-b-xl border-t border-hairline bg-sunken px-5 py-3">{footer}</footer>}
+        {/* Setinggi layar dikurangi kepala, kaki, dan jarak tepi; form dirancang muat tanpa scroll (Baldy 14 Okt 2026). */}
+        <div className="modal-body max-h-[calc(100dvh-12rem)] overflow-y-auto">{children}</div>
+        {footer && <footer className="modal-footer">{footer}</footer>}
       </div>
     </div>
   )

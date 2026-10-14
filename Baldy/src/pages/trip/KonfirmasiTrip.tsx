@@ -10,8 +10,9 @@ import { useToast } from '../../store/ToastProvider'
 import { formatRupiah } from '../../lib/format'
 import { cn } from '../../lib/utils'
 import type { CommissionTransaction } from '../../types'
+import { idTampil } from '../../lib/trip'
 
-type TripRingkas = Pick<CommissionTransaction, 'id' | 'transaction_no' | 'workspace'>
+type TripRingkas = Pick<CommissionTransaction, 'id' | 'transaction_no' | 'workspace' | 'trip_ids'>
 type Cara = 'kembali' | 'kasbon'
 
 /** Daftar catatan trip, untuk isi peringatan. */
@@ -75,7 +76,7 @@ export function KonfirmasiBatalTrip({ trip, onClose, onDone }: {
       jadiKasbon ? `UJ ${formatRupiah(jadiKasbon)} jadi kasbon sopir` : '',
       biayaCancel > 0 ? `biaya cancel ${formatRupiah(biayaCancel)} masuk Tagihan` : '',
     ].filter(Boolean)
-    toast.success(`Trip ${trip.transaction_no} dibatalkan${bagian.length ? `; ${bagian.join(', ')}` : ''}.`)
+    toast.success(`Trip ${idTampil(trip)} dibatalkan${bagian.length ? `; ${bagian.join(', ')}` : ''}.`)
     onClose()
     onDone?.()
   }
@@ -84,7 +85,7 @@ export function KonfirmasiBatalTrip({ trip, onClose, onDone }: {
     <Modal
       open
       onClose={onClose}
-      title={`Batalkan Trip ${trip.transaction_no}?`}
+      title={`Batalkan Trip ${idTampil(trip)}?`}
       size="md"
       footer={
         <>
@@ -196,7 +197,7 @@ export function KonfirmasiHapusTrip({ trip, onClose, onDeleted }: {
   function konfirmasi() {
     if (!trip) return
     hapusTrip(trip.id)
-    toast.success(`Trip ${trip.transaction_no} dihapus.`)
+    toast.success(`Trip ${idTampil(trip)} dihapus.`)
     onClose()
     onDeleted?.(trip.id)
   }
@@ -205,7 +206,7 @@ export function KonfirmasiHapusTrip({ trip, onClose, onDeleted }: {
     <Modal
       open
       onClose={onClose}
-      title={`Hapus Trip ${trip.transaction_no}?`}
+      title={`Hapus Trip ${idTampil(trip)}?`}
       size="sm"
       footer={
         <>
