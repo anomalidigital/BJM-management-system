@@ -168,14 +168,14 @@
     private List<Kolom<BarisKaryawan>> Kolom =>
     [
         new() { Key = "driver_code", Header = "Kode", Sortable = true, Width = "96px", Render = d => @<span class="tnum fw-semibold text-ink">@d.K.DriverCode</span> },
-        new() { Key = "driver_name", Header = "Nama", Sortable = true, Render = d => @<span class="fw-medium">@d.K.DriverName</span> },
+        new() { Key = "driver_name", Header = "Nama", Sortable = true, Render = d => @<a href="@($"master/karyawan/{d.K.Id}")" class="fw-medium text-ink text-decoration-none">@d.K.DriverName</a> },
         new() { Key = "role", Header = "Peran", Sortable = true, Width = "104px", Render = d => @<Badge Tone="@(d.K.Role == PeranKaryawan.Manager ? "brand" : "neutral")">@PeranKaryawan.Label(d.K.Role)</Badge> },
         new() { Key = "address_1", Header = "Alamat", Sortable = true, Render = SelAlamat },
         new() { Key = "jumlahDok", Header = "Dokumen", Sortable = true, Width = "150px", Render = SelDokumen },
         // Piutang dari sisi karyawan (atasan 13 Okt 2026): minus merah = masih punya piutang.
         new() { Key = "saldo", Header = "Piutang", Sortable = true, Align = "right", Width = "140px", Render = d => @<NilaiPiutang Nilai="d.Saldo" Tebal="@(d.Saldo < 0)" /> },
         new() { Key = "status", Header = "Status", Sortable = true, Width = "100px", Render = SelStatus },
-        new() { Key = "action", Header = "Action", Align = "right", Width = "124px", NoPrint = true, Render = SelAksi },
+        new() { Key = "action", Header = "Action", Align = "right", Width = "92px", NoPrint = true, Render = SelAksi },
     ];
 
     private static RenderFragment SelAlamat(BarisKaryawan d)
@@ -212,7 +212,6 @@
         var bisa = Bisa("master");
         var dipakai = DipakaiTrip(d.K.Id);
         return @<span class="d-inline-flex justify-content-end gap-1">
-            <TombolIkon Label="@($"Lihat detail {d.K.DriverName} (piutang & trip)")" Icon="Ikon.FileLines" OnClick="@(() => Ke($"master/karyawan/{d.K.Id}"))" />
             <TombolIkon Label="Ubah" Icon="Ikon.Pen" Disabled="@(!bisa)" OnClick="() => BukaUbah(d.K)" />
             <TombolIkon Label="Hapus" Tone="danger" Icon="Ikon.TrashCan" Disabled="@(!bisa || dipakai > 0)" Title="@(bisa && dipakai > 0 ? $"Dipakai {dipakai} trip" : null)" OnClick="() => _hapus = d.K" />
         </span>;
