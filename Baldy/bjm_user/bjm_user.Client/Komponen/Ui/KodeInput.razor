@@ -1,0 +1,32 @@
+@* Kolom kode: terisi otomatis, tetap bisa diketik, tombol Generate membuat kode baru. *@
+<div class="@(ReadOnly ? "" : "input-group") @Class">
+    <input id="@Id" class="form-control tnum fw-medium @(Invalid ? "is-invalid" : "") @InputClass" value="@Value" placeholder="@Placeholder" readonly="@ReadOnly"
+           aria-label="@AriaLabel" style="letter-spacing:.02em" @oninput="Ketik" />
+    @if (!ReadOnly)
+    {
+        <Tombol Icon="Ikon.WandMagicSparkles" IconSize="14" Title="@GenerateTitle" OnClick="OnGenerate">Generate</Tombol>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public EventCallback OnGenerate { get; set; }
+    [Parameter] public bool Invalid { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool Uppercase { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? InputClass { get; set; }
+    [Parameter] public string GenerateTitle { get; set; } = "Buat kode otomatis";
+    [Parameter] public string? AriaLabel { get; set; }
+
+    private async Task Ketik(ChangeEventArgs e)
+    {
+        var v = e.Value?.ToString() ?? "";
+        if (Uppercase) v = v.ToUpperInvariant();
+        Value = v;
+        await ValueChanged.InvokeAsync(v);
+    }
+}

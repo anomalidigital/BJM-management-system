@@ -1,0 +1,129 @@
+@inherits KomponenData
+@inject Lampiran LampiranSvc
+@*
+    Tab Dokumen (dulu Lainnya): berkas apa pun untuk trip ini — Berita Acara bertanda tangan, surat jalan, foto barang / segel,
+    tanda terima — beserta catatannya. Data tetap di koleksi tripNotes. Dokumen umum yang tidak menempel pada satu trip ada di menu Dokumen.
+*@
+@{
+    var dokumen = Dokumen;
+}
+<div>
+    <KepalaTab Judul="Dokumen trip" Tombol="Tambah Dokumen" BisaUbah="BisaUbah" OnTambah="() => Buka(null)">
+        <Keterangan>Berkas apa pun untuk trip ini: Berita Acara bertanda tangan, surat jalan, foto barang atau segel, tanda terima, atau kronologi di jalan.</Keterangan>
+    </KepalaTab>
+    @if (dokumen.Count == 0)
+    {
+        <KosongTab Judul="Belum ada dokumen trip." Keterangan="Unggah Berita Acara bertanda tangan, surat jalan, atau foto untuk trip ini." />
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-top">
+                <thead><tr><th>Tanggal</th><th>Judul</th><th>Catatan</th><th>Berkas</th><th class="text-end">Action</th></tr></thead>
+                <tbody>
+                    @foreach (var n in dokumen)
+                    {
+                        var nn = n;
+                        <tr>
+                            <td class="tnum text-nowrap text-ink-2">@Format.Tanggal(nn.NoteDate)</td>
+                            <td class="fw-medium text-ink">@nn.Title</td>
+                            <td class="text-ink-2" style="max-width:28rem;white-space:pre-line">@if (nn.Notes != "") { @nn.Notes } else { <span class="text-ink-3">—</span> }</td>
+                            <td>@if (nn.Attachments.Count > 0) { <LampiranThumbs Ids="nn.Attachments" Ukuran="40" /> } else { <span class="text-ink-3">—</span> }</td>
+                            <td class="text-end">
+                                <span class="d-inline-flex justify-content-end gap-1">
+                                    <TombolIkon Label="Ubah" Icon="Ikon.Pen" Disabled="@(!BisaUbah)" OnClick="() => Buka(nn)" />
+                                    <TombolIkon Label="Hapus" Icon="Ikon.TrashCan" Tone="danger" Disabled="@(!BisaUbah)" OnClick="() => _menghapus = nn" />
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<Modal Open="_terbuka" Title="@(_editing is not null ? "Ubah Dokumen Trip" : "Tambah Dokumen Trip")" Subtitle="@($"Trip {Trip.IdTampil}")" Size="md" OnClose="() => _terbuka = false">
+    <ChildContent>
+        @if (_terbuka)
+        {
+            <div class="row gx-3 gy-3">
+                <Field Label="Judul" Required Class="col-sm-8">
+                    <input id="@context" class="form-control" value="@_judul" placeholder="Berita Acara bertanda tangan penerima" @oninput="e => _judul = e.Value?.ToString() ?? string.Empty" />
+                </Field>
+                <Field Label="Tanggal" Required Class="col-sm-4">
+                    <TanggalInput Id="@context" Value="@_tanggal" ValueChanged="v => _tanggal = v" />
+                </Field>
+                <Field Label="Berkas" Class="col-12" Hint="@AturDetail.Teks("Gambar, PDF, atau berkas lain. Foto diperkecil otomatis.")">
+                    <LampiranInput Id="@context" Accept="" Label="Tambah berkas" Value="_lampiran" ValueChanged="v => _lampiran = v" />
+                </Field>
+                <Field Label="Catatan" Class="col-12">
+                    <textarea id="@context" class="form-control" rows="3" value="@_catatan" placeholder="mis. diterima petugas gudang; dokumen fisik menyusul" @oninput="e => _catatan = e.Value?.ToString() ?? string.Empty"></textarea>
+                </Field>
+                @if (_galat is not null) { <div class="col-12"><PesanGalat Teks="@_galat" /></div> }
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="() => _terbuka = false">Batal</Tombol>
+        <Tombol Variant="primary" OnClick="Simpan">Simpan</Tombol>
+    </Footer>
+</Modal>
+
+<KonfirmasiDialog Open="_menghapus is not null" Title="Hapus dokumen trip?" ConfirmLabel="Hapus" Tone="danger"
+                  Message="@PesanHapus"
+                  OnCancel="() => _menghapus = null" OnConfirm="Hapus" />
+
+@code {
+    [Parameter, EditorRequired] public BarisTrip Trip { get; set; } = default!;
+    [Parameter] public bool BisaUbah { get; set; }
+
+    private bool _terbuka;
+    private CatatanTrip? _editing;
+    private string _judul = "", _tanggal = "", _catatan = "";
+    private List<string> _lampiran = [];
+    private string? _galat;
+    private CatatanTrip? _menghapus;
+
+    private List<CatatanTrip> Dokumen => Db.Semua.CatatanTrip.Where(n => n.TripId == Trip.Id)
+        .OrderByDescending(n => n.NoteDate, StringComparer.Ordinal).ThenByDescending(n => n.CreatedAt, StringComparer.Ordinal).ToList();
+
+    private string PesanHapus => _menghapus is null ? "" : $"“{_menghapus.Title}” akan dihapus beserta {_menghapus.Attachments.Count} berkasnya.";
+
+    private void Buka(CatatanTrip? n)
+    {
+        _editing = n;
+        if (n is not null) { _judul = n.Title; _tanggal = n.NoteDate; _catatan = n.Notes; _lampiran = n.Attachments.ToList(); }
+        else { _judul = ""; _tanggal = Trip.T.TransactionDate; _catatan = ""; _lampiran = []; }
+        _galat = null;
+        _terbuka = true;
+    }
+
+    private void Simpan()
+    {
+        if (_judul.Trim() == "") { _galat = "Judul dokumen wajib diisi."; return; }
+        if (_tanggal == "") { _galat = "Tanggal wajib diisi."; return; }
+        var (judul, tanggal, catatan, lampiran) = (_judul.Trim(), _tanggal, _catatan.Trim(), _lampiran.ToList());
+        if (_editing is not null)
+        {
+            Db.Ubah<CatatanTrip>(_editing.Id, x => { x.Title = judul; x.NoteDate = tanggal; x.Notes = catatan; x.Attachments = lampiran; });
+            Toast.Sukses("Dokumen trip berhasil diperbarui.");
+        }
+        else
+        {
+            Db.Buat(new CatatanTrip { TripId = Trip.Id, Title = judul, NoteDate = tanggal, Notes = catatan, Attachments = lampiran });
+            Toast.Sukses("Dokumen trip berhasil ditambahkan.");
+        }
+        _terbuka = false;
+    }
+
+    private async Task Hapus()
+    {
+        if (_menghapus is null) return;
+        var n = _menghapus;
+        _menghapus = null;
+        Db.Hapus<CatatanTrip>(n.Id);
+        Toast.Sukses("Dokumen trip berhasil dihapus.");
+        await LampiranSvc.HapusAsync(n.Attachments);
+    }
+}

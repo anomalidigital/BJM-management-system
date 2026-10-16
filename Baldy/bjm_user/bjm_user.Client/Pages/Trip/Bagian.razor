@@ -1,0 +1,22 @@
+@* Satu bagian form trip: kartu selebar halaman dengan judul (dan nomor urut opsional). *@
+<Kartu>
+    <header class="card-header d-flex flex-wrap align-items-start justify-content-between gap-3">
+        <div class="min-w-0">
+            <h2 class="card-title d-flex align-items-center gap-2">
+                @if (Nomor is int n) { <span aria-hidden="true" class="tnum place-center rounded-circle bg-brand-50 text-brand fw-semibold px-1" style="height:20px;min-width:20px;font-size:11px">@n</span> }
+                @Judul
+            </h2>
+            @if (Keterangan is not null) { <p class="card-subtitle">@Keterangan</p> }
+        </div>
+        @if (Aksi is not null) { <div class="d-flex flex-shrink-0 align-items-center gap-2">@Aksi</div> }
+    </header>
+    <div class="p-3">@ChildContent</div>
+</Kartu>
+
+@code {
+    [Parameter] public int? Nomor { get; set; }
+    [Parameter] public string Judul { get; set; } = "";
+    [Parameter] public RenderFragment? Keterangan { get; set; }
+    [Parameter] public RenderFragment? Aksi { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

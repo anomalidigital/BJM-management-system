@@ -1,0 +1,15 @@
+@* Tombol segmen: beberapa pilihan bersebelahan, yang terpilih biru penuh (Potret | Lanskap). *@
+<div role="group" aria-label="@Label" class="segmen @Class">
+    @foreach (var p in Pilihan)
+    {
+        <button type="button" aria-pressed="@(p.Id == Value)" title="@p.Judul" class="@(p.Id == Value ? "aktif" : "")" @onclick="() => ValueChanged.InvokeAsync(p.Id)">@p.Label</button>
+    }
+</div>
+
+@code {
+    [Parameter] public List<Segmen> Pilihan { get; set; } = [];
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string? Class { get; set; }
+}

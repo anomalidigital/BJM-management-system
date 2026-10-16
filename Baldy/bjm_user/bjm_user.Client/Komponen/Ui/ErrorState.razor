@@ -1,0 +1,11 @@
+<States Title="Gagal memuat data." Description="@(Message ?? "Terjadi kendala saat mengambil data dari server.")">
+    <Icon><IkonSvg Def="Ikon.TriangleExclamation" Size="20" Style="color:var(--critical)" /></Icon>
+    <Action>
+        @if (OnRetry.HasDelegate) { <Tombol Size="sm" Variant="primary" Icon="Ikon.RotateLeft" IconSize="14" OnClick="OnRetry">Coba lagi</Tombol> }
+    </Action>
+</States>
+
+@code {
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+}

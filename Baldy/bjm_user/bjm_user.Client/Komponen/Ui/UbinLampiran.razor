@@ -1,0 +1,56 @@
+@* Satu kotak thumbnail lampiran (gambar / berkas), dengan nama slot dan tombol hapus opsional. *@
+@inject Lampiran LampiranSvc
+
+<div class="position-relative flex-shrink-0" style="width:@(Ukuran)px;height:@(Ukuran)px">
+    <button type="button" class="lampiran-tile w-100 h-100" title="@Judul" @onclick="OnBuka">
+        @if (!_dimuat)
+        {
+            <span class="spinner-border spinner-border-sm text-ink-3"></span>
+        }
+        else if (_info is null)
+        {
+            <span class="px-1 text-center" style="font-size:10px">hilang</span>
+        }
+        else if (_info.Gambar)
+        {
+            <img src="@_info.Url" alt="@_info.Name" />
+        }
+        else
+        {
+            <span class="d-flex flex-column align-items-center gap-1 px-1 text-ink-3">
+                <IkonSvg Def="Ikon.FileLines" Size="@(Ukuran > 48 ? 18 : 14)" />
+                <span class="mw-100 text-truncate" style="font-size:9.5px">@_info.Name</span>
+            </span>
+        }
+    </button>
+    @if (Keterangan is not null)
+    {
+        <span class="position-absolute bottom-0 start-0 end-0 text-center text-white fw-semibold text-truncate px-1" style="font-size:10px;line-height:16px;background:rgba(11,11,11,.65);border-radius:0 0 5px 5px;pointer-events:none">@Keterangan</span>
+    }
+    @if (OnHapus.HasDelegate)
+    {
+        <button type="button" class="hapus" aria-label="@(Keterangan is not null ? $"Hapus {Keterangan}" : "Hapus lampiran")" @onclick="OnHapus" @onclick:stopPropagation="true"><IkonSvg Def="Ikon.Xmark" Size="11" /></button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Id { get; set; } = "";
+    [Parameter] public int Ukuran { get; set; } = 64;
+    [Parameter] public string? Keterangan { get; set; }
+    [Parameter] public EventCallback OnBuka { get; set; }
+    [Parameter] public EventCallback OnHapus { get; set; }
+
+    private InfoLampiran? _info;
+    private bool _dimuat;
+    private string? _idDimuat;
+
+    private string Judul => string.Join(": ", new[] { Keterangan, _info?.Name }.Where(x => !string.IsNullOrEmpty(x)));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_idDimuat == Id) return;
+        _idDimuat = Id; _dimuat = false;
+        _info = await LampiranSvc.InfoAsync(Id);
+        _dimuat = true;
+    }
+}

@@ -1,0 +1,24 @@
+@* Panel kertas di bawah papan depo: polos, tanpa bayangan, judul tebal. Tautan di pojok kanan judul lewat Href + Tautan. *@
+<section class="kartu d-flex h-100 flex-column @Class">
+    <header class="dash-panel-kepala d-flex align-items-start justify-content-between gap-3">
+        <div class="min-w-0 flex-grow-1">
+            <h2 class="dash-judul">@Title</h2>
+            @if (!string.IsNullOrEmpty(Subtitle)) { <p class="dash-sub">@Subtitle</p> }
+        </div>
+        @if (Href is not null)
+        {
+            <div class="flex-shrink-0 pt-1"><a href="@Href" class="dash-tautan">@Tautan</a></div>
+        }
+    </header>
+    <div class="d-flex flex-grow-1 flex-column">@ChildContent</div>
+</section>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string? Subtitle { get; set; }
+    /// <summary>Tujuan tautan kecil di kanan judul (mis. "Laporan netto").</summary>
+    [Parameter] public string? Href { get; set; }
+    [Parameter] public string? Tautan { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

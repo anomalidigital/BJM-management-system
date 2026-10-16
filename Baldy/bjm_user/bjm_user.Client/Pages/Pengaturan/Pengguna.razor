@@ -1,0 +1,257 @@
+@page "/pengaturan/pengguna"
+@inherits KomponenData
+@*
+    Pengaturan -> Pengguna & Peran. Bagian Akun: siapa saja yang boleh masuk dan perannya. Hanya Owner (Bisa("pengguna")) yang
+    menambah, mengubah, menonaktifkan, atau mengaktifkan akun; perubahannya tercatat di Audit Log. Bagian Izin: matriks yang sama
+    dengan yang dipakai seluruh halaman lewat Sesi.Bisa(), jadi aksi baru di Sesi.Izin otomatis ikut tampil.
+*@
+<PageTitle>Pengguna & Peran — SIKOTIS</PageTitle>
+
+@{
+    var boleh = Bisa("pengguna");
+    var akun = Sesi.Akun.OrderBy(p => Array.IndexOf(SemuaPeran, p.Role)).ThenBy(p => p.Username, StringComparer.Ordinal).ToList();
+}
+
+<PageHeader Title="Pengguna & Peran" Crumbs="@(new List<Crumb> { new("Pengaturan"), new("Pengguna & Peran") })">
+    <Description>Akun yang boleh masuk dan izin tiap peran. Peran melekat pada akun, bukan dipilih saat masuk. Hanya Owner yang bisa menambah atau mengubah akun.</Description>
+    <Actions>
+        <Tombol Variant="primary" Icon="Ikon.UserPlus" Disabled="@(!boleh)" OnClick="() => BukaForm(null)">Tambah Akun</Tombol>
+    </Actions>
+</PageHeader>
+
+<div class="row g-3 align-items-start">
+    <div class="col-xl-6">
+        <Kartu>
+            <KepalaKartu Title="Akun" Subtitle="@($"{Sesi.Akun.Count(p => p.Aktif)} aktif dari {Sesi.Akun.Count} akun.{(boleh ? "" : " Anda hanya bisa melihat daftar ini.")}")" />
+            <ul class="list-unstyled m-0">
+                @for (var i = 0; i < akun.Count; i++)
+                {
+                    var p = akun[i]; var alasan = AlasanTidakBisaNonaktif(p);
+                    <li class="d-flex flex-wrap align-items-center px-3 py-3 @(p.Aktif ? "" : "bg-sunken")" style="column-gap:1rem;row-gap:.5rem;@(i > 0 ? "border-top:1px solid var(--grid)" : "")">
+                        <div class="min-w-0 flex-grow-1" style="flex-basis:0;min-width:170px">
+                            <p class="m-0 fs-13 fw-semibold @(p.Aktif ? "text-ink" : "text-ink-3")">
+                                @p.Name
+                                @if (AkunSaya(p)) { <span class="ms-1 fs-11-5 fw-normal text-ink-3">(Anda)</span> }
+                            </p>
+                            <p class="m-0 fs-12 text-ink-3">
+                                Username <span class="tnum fw-medium text-ink-2">@p.Username</span>
+                                @if (p.UpdatedAt != "") { <span class="ms-1">· diubah @WaktuLokal(p.UpdatedAt)</span> }
+                            </p>
+                        </div>
+                        <div class="min-w-0" style="min-width:150px">
+                            <div class="d-flex flex-wrap align-items-center gap-1">
+                                <Badge Tone="@NadaPeran(p.Role)">@Peran.Label(p.Role)</Badge>
+                                @if (p.Aktif) { <Badge Tone="good">Aktif</Badge> } else { <Badge Tone="neutral">Nonaktif</Badge> }
+                            </div>
+                            <p class="m-0 mt-1 fs-11-5 text-ink-3">@Peran.Ringkas(p.Role)</p>
+                        </div>
+                        <div class="ms-auto d-flex flex-shrink-0 gap-1">
+                            <TombolIkon Label="@($"Ubah akun {p.Username}")" Icon="Ikon.Pen" Disabled="@(!boleh)" OnClick="() => BukaForm(p)" />
+                            @if (p.Aktif)
+                            {
+                                <TombolIkon Label="@($"Nonaktifkan akun {p.Username}")" Title="@(boleh && alasan != "" ? alasan : null)" Tone="danger" Icon="Ikon.Ban"
+                                            Disabled="@(!boleh || alasan != "")" OnClick="() => _menonaktifkan = p" />
+                            }
+                            else
+                            {
+                                <TombolIkon Label="@($"Aktifkan lagi akun {p.Username}")" Icon="Ikon.CircleCheck" Disabled="@(!boleh)" OnClick="() => UbahAktif(p, true)" />
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+            <div class="d-flex align-items-start gap-2 border-top border-hairline bg-sunken px-3 py-3 fs-12 text-ink-2" style="line-height:1.6">
+                <IkonSvg Def="Ikon.CircleInfo" Size="14" Class="mt-1 flex-shrink-0 text-brand" />
+                <div>
+                    <p class="m-0">
+                        <span class="fw-semibold text-ink">Sandi belum disimpan:</span> login masih simulasi sampai terhubung ke API backend
+                        (<code class="rounded bg-surface px-1 py-0 fs-11-5">POST /api/v1/auth/public/login</code>).
+                    </p>
+                    <p class="m-0 mt-1 text-ink-3">
+                        Selama simulasi, sandi bebas (minimal 4 karakter) dan username yang tidak terdaftar masuk sebagai Admin. Akun nonaktif tidak bisa masuk.
+                    </p>
+                </div>
+            </div>
+        </Kartu>
+    </div>
+
+    <div class="col-xl-6">
+        <Kartu>
+            <KepalaKartu Title="Izin per peran" Subtitle="@($"Anda masuk sebagai {(Sesi.Pengguna is { } u ? Peran.Label(u.Role) : "—")}. Viewer hanya melihat dan export.")" />
+            <div class="overflow-x-auto">
+                <table class="w-100 fs-12-5" style="min-width:420px">
+                    <thead>
+                        <tr class="border-bottom border-hairline text-ink-3">
+                            <th class="px-3 py-2 text-start fw-medium">Aksi</th>
+                            @foreach (var r in PeranMatriks) { <th class="px-2 py-2 text-center fw-medium" style="width:5rem">@Peran.Label(r)</th> }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var i = 0; i < Sesi.Izin.Length; i++)
+                        {
+                            var izin = Sesi.Izin[i];
+                            <tr style="@(i < Sesi.Izin.Length - 1 ? "border-bottom:1px solid var(--grid)" : null)">
+                                <td class="px-3 py-2 text-ink-2">@izin.Label</td>
+                                @foreach (var r in PeranMatriks)
+                                {
+                                    <td class="px-2 py-2 text-center">
+                                        @if (izin.Peran.Contains(r)) { <span class="fw-semibold" style="color:#0a7d0a" aria-label="boleh">✓</span> }
+                                        else { <span class="text-ink-3" aria-label="tidak boleh">—</span> }
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </Kartu>
+    </div>
+</div>
+
+@if (_form)
+{
+    var kunci = _edit is not null && (AkunSaya(_edit) || OwnerTerakhir(_edit));
+    var akunSaya = _edit is not null && AkunSaya(_edit);
+    var ownerTerakhir = _edit is not null && OwnerTerakhir(_edit);
+    <Modal Open="true" Title="@(_edit is not null ? "Ubah Akun" : "Tambah Akun")" Size="sm" OnClose="() => _form = false"
+           Subtitle="@(_edit is not null ? $"Username {_edit.Username}" : "Tanda * wajib diisi. Sandi diatur setelah terhubung ke backend.")">
+        <ChildContent>
+            <div class="d-flex flex-column gap-3">
+                <Field Label="Username" Required Error="@_galat.GetValueOrDefault("username")" Hint="@Teks("Dipakai untuk masuk. Huruf kecil tanpa spasi, mis. admin.krw")">
+                    <input id="@context" class="form-control @(_galat.ContainsKey("username") ? "is-invalid" : "")" value="@_isi.Username" autocomplete="off" spellcheck="false"
+                           placeholder="admin.krw" @oninput="e => _isi.Username = e.Value?.ToString() ?? string.Empty" />
+                </Field>
+                <Field Label="Nama" Required Error="@_galat.GetValueOrDefault("name")">
+                    <input id="@context" class="form-control @(_galat.ContainsKey("name") ? "is-invalid" : "")" value="@_isi.Name" placeholder="Nama lengkap pemakai akun"
+                           @oninput="e => _isi.Name = e.Value?.ToString() ?? string.Empty" />
+                </Field>
+                <Field Label="Peran" Required Error="@_galat.GetValueOrDefault("role")"
+                       Hint="@Teks(akunSaya ? "Peran akun Anda sendiri tidak bisa diubah di sini, supaya tidak terkunci. Minta Owner lain bila perlu."
+                                 : ownerTerakhir ? "Owner aktif terakhir: peran tetap Owner supaya selalu ada yang bisa mengatur pengguna." : Peran.Ringkas(_isi.Role))">
+                    <Pilihan Id="@context" Options="OpsiPeran" Value="@_isi.Role" Disabled="kunci" Invalid="@_galat.ContainsKey("role")" Cari="false" Clearable="false"
+                             ValueChanged="v => _isi.Role = v ?? Peran.Admin" />
+                </Field>
+                <div>
+                    <Checkbox Label="Akun aktif (bisa masuk)" Checked="_isi.Aktif" Disabled="kunci" CheckedChanged="v => _isi.Aktif = v" />
+                    @if (_galat.TryGetValue("aktif", out var ga)) { <p class="invalid-feedback fs-12 m-0 mt-1">@ga</p> }
+                    else if (kunci) { <p class="m-0 mt-1 fs-12 text-ink-3">@(akunSaya ? "Akun yang sedang dipakai tidak bisa dinonaktifkan." : "Owner aktif terakhir tidak bisa dinonaktifkan.")</p> }
+                </div>
+            </div>
+        </ChildContent>
+        <Footer>
+            <Tombol OnClick="() => _form = false">Batal</Tombol>
+            <Tombol Variant="primary" OnClick="Simpan">@(_edit is not null ? "Simpan Perubahan" : "Simpan")</Tombol>
+        </Footer>
+    </Modal>
+}
+
+<KonfirmasiDialog Open="_menonaktifkan is not null" Title="Nonaktifkan akun?" ConfirmLabel="Nonaktifkan" Tone="danger"
+                  OnCancel="() => _menonaktifkan = null" OnConfirm="KonfirmasiNonaktif">
+    <span class="d-block fs-13 fw-medium text-ink">@_menonaktifkan?.Name (@_menonaktifkan?.Username)</span>
+    <span class="d-block mt-1 fs-13 text-ink-2">Akun ini tidak bisa masuk lagi sampai diaktifkan kembali. Data yang pernah dibuatnya tetap tersimpan.</span>
+</KonfirmasiDialog>
+
+@code {
+    /// <summary>Kolom matriks: tiga peran dari meeting. Viewer tidak punya izin ubah apa pun.</summary>
+    private static readonly string[] PeranMatriks = [Peran.Owner, Peran.Manager, Peran.Admin];
+    /// <summary>Urutan peran di daftar akun & pilihan form.</summary>
+    private static readonly string[] SemuaPeran = [Peran.Owner, Peran.Manager, Peran.Admin, Peran.Viewer];
+    /// <summary>Username: huruf kecil, angka, titik, garis bawah, atau tanda minus; 3–32 karakter, tanpa spasi.</summary>
+    private static readonly System.Text.RegularExpressions.Regex PolaUsername = new(@"^[a-z0-9._-]{3,32}$");
+
+    private static readonly List<Opsi> OpsiPeran = SemuaPeran.Select(r => new Opsi(r, $"{Peran.Label(r)} — {Peran.Ringkas(r)}")).ToList();
+
+    private bool _form;
+    private Model.Pengguna? _edit;
+    private Model.Pengguna _isi = new();
+    private readonly Dictionary<string, string> _galat = [];
+    private Model.Pengguna? _menonaktifkan;
+
+    private static RenderFragment Teks(string s) => b => b.AddContent(0, s);
+    private static string NadaPeran(string r) => r switch { Peran.Owner => "warning", Peran.Manager => "brand", Peran.Admin => "good", _ => "neutral" };
+    private static string WaktuLokal(string iso) => DateTimeOffset.TryParse(iso, out var d) ? Format.WaktuCetak(d.ToLocalTime().DateTime) : "";
+
+    private string Saya => Sesi.Pengguna?.Username.ToLowerInvariant() ?? "";
+    private bool AkunSaya(Model.Pengguna p) => p.Username.ToLowerInvariant() == Saya;
+    /// <summary>Owner aktif terakhir: tidak boleh dinonaktifkan atau diturunkan perannya.</summary>
+    private bool OwnerTerakhir(Model.Pengguna p) => p.Role == Peran.Owner && p.Aktif && Sesi.Akun.Count(x => x.Role == Peran.Owner && x.Aktif) <= 1;
+
+    /// <summary>Alasan akun ini tidak bisa dinonaktifkan; kosong = boleh.</summary>
+    private string AlasanTidakBisaNonaktif(Model.Pengguna p)
+    {
+        if (AkunSaya(p)) return "Akun yang sedang dipakai tidak bisa dinonaktifkan.";
+        if (OwnerTerakhir(p)) return "Owner aktif terakhir tidak bisa dinonaktifkan: harus ada minimal satu Owner aktif.";
+        return "";
+    }
+
+    private static Model.Pengguna Salin(Model.Pengguna p) => new() { Username = p.Username, Name = p.Name, Role = p.Role, Aktif = p.Aktif, CreatedAt = p.CreatedAt, UpdatedAt = p.UpdatedAt };
+
+    private void BukaForm(Model.Pengguna? edit)
+    {
+        _edit = edit;
+        _isi = edit is not null ? Salin(edit) : new Model.Pengguna { Role = Peran.Admin, Aktif = true };
+        _galat.Clear();
+        _form = true;
+    }
+
+    private async Task Simpan()
+    {
+        _galat.Clear();
+        var akunSaya = _edit is not null && AkunSaya(_edit);
+        var ownerTerakhir = _edit is not null && OwnerTerakhir(_edit);
+        var username = _isi.Username.Trim().ToLowerInvariant();
+        if (username == "") _galat["username"] = "Username wajib diisi.";
+        else if (!PolaUsername.IsMatch(username)) _galat["username"] = "Gunakan 3–32 huruf kecil, angka, titik, garis bawah, atau tanda minus, tanpa spasi.";
+        else if (Sesi.Akun.Any(p => p.Username.ToLowerInvariant() == username && p.Username.ToLowerInvariant() != _edit?.Username.ToLowerInvariant()))
+            _galat["username"] = "Username ini sudah dipakai akun lain.";
+        if (_isi.Name.Trim() == "") _galat["name"] = "Nama wajib diisi.";
+        if (ownerTerakhir && _isi.Role != Peran.Owner) _galat["role"] = "Harus ada minimal satu Owner aktif.";
+        if ((akunSaya || ownerTerakhir) && !_isi.Aktif) _galat["aktif"] = akunSaya ? "Akun yang sedang dipakai tidak bisa dinonaktifkan." : "Harus ada minimal satu Owner aktif.";
+        if (_galat.Count > 0) return;
+
+        var isi = new Model.Pengguna { Username = username, Name = _isi.Name.Trim(), Role = _isi.Role, Aktif = _isi.Aktif };
+        var label = $"{isi.Name} ({isi.Username})";
+        if (_edit is not null)
+        {
+            var lama = Salin(_edit);
+            var baru = Salin(_edit); baru.Username = isi.Username; baru.Name = isi.Name; baru.Role = isi.Role; baru.Aktif = isi.Aktif;
+            var perubahan = AuditLogika.Beda(lama, baru);
+            if (perubahan.Count == 0) { Toast.Info("Tidak ada yang berubah."); _form = false; return; }
+            await Sesi.SimpanAkunAsync(isi, lama.Username);
+            Db.DenganAudit(new IsianAudit
+            {
+                Aksi = "ubah", Entitas = "pengguna", EntityId = isi.Username, Label = label,
+                Ringkasan = $"Mengubah akun {lama.Username}: {string.Join(", ", perubahan.Select(x => x.Field))}", Perubahan = perubahan,
+            }, () => { });
+            Toast.Sukses($"Akun {isi.Username} diperbarui.");
+        }
+        else
+        {
+            await Sesi.SimpanAkunAsync(isi);
+            Db.DenganAudit(new IsianAudit { Aksi = "buat", Entitas = "pengguna", EntityId = isi.Username, Label = label, Ringkasan = $"Menambah akun {isi.Username} sebagai {Peran.Label(isi.Role)}" }, () => { });
+            Toast.Sukses($"Akun {isi.Username} ({Peran.Label(isi.Role)}) ditambahkan.");
+        }
+        _form = false;
+    }
+
+    private async Task UbahAktif(Model.Pengguna p, bool aktif)
+    {
+        var lama = Salin(p);
+        var isi = new Model.Pengguna { Username = p.Username, Name = p.Name, Role = p.Role, Aktif = aktif };
+        await Sesi.SimpanAkunAsync(isi, p.Username);
+        var baru = Salin(lama); baru.Aktif = aktif;
+        Db.DenganAudit(new IsianAudit
+        {
+            Aksi = "ubah", Entitas = "pengguna", EntityId = p.Username, Label = $"{p.Name} ({p.Username})",
+            Ringkasan = $"{(aktif ? "Mengaktifkan" : "Menonaktifkan")} akun {p.Username}", Perubahan = AuditLogika.Beda(lama, baru),
+        }, () => { });
+        Toast.Sukses(aktif ? $"Akun {p.Username} aktif kembali dan bisa masuk." : $"Akun {p.Username} dinonaktifkan. Akun ini tidak bisa masuk sampai diaktifkan lagi.");
+    }
+
+    private async Task KonfirmasiNonaktif()
+    {
+        var p = _menonaktifkan;
+        _menonaktifkan = null;
+        if (p is not null) await UbahAktif(p, false);
+    }
+}

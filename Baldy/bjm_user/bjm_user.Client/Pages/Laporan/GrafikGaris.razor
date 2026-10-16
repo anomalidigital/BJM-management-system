@@ -1,0 +1,117 @@
+@* Grafik garis pada SATU sumbu Y (Rupiah), padanan LineChart React. Lebar mengikuti wadah (viewBox), garis lurus antar titik. *@
+@using System.Globalization
+@{
+    const double padL = 52, padR = 12, padT = 12, padB = 22;
+    var innerW = W - padL - padR;
+    var innerH = Height - padT - padB;
+    var maxValue = Math.Max(Series.SelectMany(s => s.Nilai).DefaultIfEmpty(0).Max(), 1);
+    var (max, ticks) = SkalaBulat(maxValue);
+    var n = Labels.Count;
+    var step = n > 1 ? innerW / (n - 1) : 0;
+    double X(int i) => padL + i * step;
+    double Y(double v) => padT + innerH - v / max * innerH;
+    var every = (int)Math.Ceiling(n / (double)Math.Max(3, (int)Math.Floor(innerW / 62)));
+    var akhir = n - 1;
+}
+<div class="position-relative w-100">
+    <svg viewBox="0 0 @F(W) @F(Height)" width="100%" role="img" aria-label="@LabelAria"
+         style="display:block;height:auto" @onmouseleave="() => _hover = null">
+        @foreach (var t in ticks)
+        {
+            <g>
+                <line x1="@F(padL)" x2="@F(W - padR)" y1="@F(Y(t))" y2="@F(Y(t))" stroke="#eceef1" stroke-width="1" />
+                <text x="@F(padL - 7)" y="@F(Y(t) + 3.5)" text-anchor="end" font-size="10.5" fill="#898781" style="font-variant-numeric:tabular-nums">@Format.Ringkas((long)t)</text>
+            </g>
+        }
+        <line x1="@F(padL)" x2="@F(W - padR)" y1="@F(padT + innerH)" y2="@F(padT + innerH)" stroke="#c3c2b7" stroke-width="1" />
+
+        @foreach (var s in Series)
+        {
+            var titik = s.Nilai.Select((v, i) => (X(i), Y(v))).ToList();
+            <g>
+                <path d="@Area(titik, padT + innerH)" style="@($"fill:{s.Warna}")" opacity="0.1" />
+                <path d="@Garis(titik)" fill="none" style="@($"stroke:{s.Warna}")" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+            </g>
+        }
+
+        @if (_hover is int h && h < n)
+        {
+            <line x1="@F(X(h))" x2="@F(X(h))" y1="@F(padT)" y2="@F(padT + innerH)" stroke="#c3c2b7" stroke-width="1" />
+        }
+
+        @foreach (var s in Series)
+        {
+            if (s.Nilai.Count == 0) continue;
+            var i = _hover is int hh && hh < s.Nilai.Count ? hh : s.Nilai.Count - 1;
+            <circle cx="@F(X(i))" cy="@F(Y(s.Nilai[i]))" r="4.5" style="@($"fill:{s.Warna}")" stroke="#ffffff" stroke-width="2" />
+        }
+
+        @for (var i = 0; i < n; i++)
+        {
+            // Label terakhir selalu tampil; label reguler yang terlalu dekat dengannya dilewati supaya tidak bertumpuk.
+            if (i != akhir && (i % every != 0 || akhir - i < every)) continue;
+            <g><text x="@F(X(i))" y="@F(Height - 6)" text-anchor="middle" font-size="10.5" fill="#898781">@Labels[i]</text></g>
+        }
+
+        @for (var i = 0; i < n; i++)
+        {
+            var ii = i;
+            <rect x="@F(X(ii) - step / 2)" y="@F(padT)" width="@F(Math.Max(step, 8))" height="@F(innerH)" fill="transparent" @onmouseenter="() => _hover = ii" />
+        }
+    </svg>
+
+    @if (_hover is int k && k < n)
+    {
+        var kiri = Math.Min(Math.Max(X(k), 92), W - 92) / W * 100;
+        <div class="pe-none position-absolute top-0 z-1 rounded-2 border border-hairline bg-surface px-2 py-2 shadow-pop"
+             style="@($"left:{F(kiri)}%;transform:translateX(-50%);min-width:168px")">
+            <p class="m-0 mb-1 fs-11 fw-medium text-ink-3">@Labels[k]</p>
+            @foreach (var s in Series)
+            {
+                <div class="d-flex align-items-center justify-content-between gap-4" style="padding:1px 0">
+                    <span class="d-flex align-items-center gap-1 fs-12 text-ink-2">
+                        <span class="rounded-circle" style="@($"width:8px;height:8px;background:{s.Warna}")"></span>
+                        @s.Nama
+                    </span>
+                    <span class="tnum fs-12 fw-semibold text-ink">@Format.RupiahRingkas(k < s.Nilai.Count ? s.Nilai[k] : 0)</span>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<string> Labels { get; set; } = [];
+    [Parameter] public List<SeriGrafik> Series { get; set; } = [];
+    [Parameter] public double Height { get; set; } = 210;
+    /// <summary>Lebar acuan viewBox; SVG diskalakan memenuhi lebar wadah.</summary>
+    [Parameter] public double W { get; set; } = 560;
+
+    private int? _hover;
+    private string LabelAria => "Grafik " + string.Join(" dan ", Series.Select(s => s.Nama));
+
+    private static string F(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private static string Garis(List<(double X, double Y)> p) =>
+        string.Join(" ", p.Select((t, i) => $"{(i == 0 ? "M" : "L")}{t.X.ToString("0.00", CultureInfo.InvariantCulture)},{t.Y.ToString("0.00", CultureInfo.InvariantCulture)}"));
+
+    private static string Area(List<(double X, double Y)> p, double dasar)
+    {
+        if (p.Count == 0) return "";
+        return $"{Garis(p)} L{p[^1].X.ToString("0.00", CultureInfo.InvariantCulture)},{F(dasar)} L{p[0].X.ToString("0.00", CultureInfo.InvariantCulture)},{F(dasar)} Z";
+    }
+
+    /// <summary>Skala sumbu Y dengan angka bulat (0 / 1.000 / 2.000 ...).</summary>
+    private static (double Max, List<double> Ticks) SkalaBulat(double max, int tickCount = 4)
+    {
+        if (max <= 0) return (1, [0, 1]);
+        var rough = max / tickCount;
+        var mag = Math.Pow(10, Math.Floor(Math.Log10(rough)));
+        var norm = rough / mag;
+        var step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+        var niceMax = Math.Ceiling(max / step) * step;
+        var ticks = new List<double>();
+        for (var v = 0.0; v <= niceMax + step / 2; v += step) ticks.Add(Math.Round(v * 1000) / 1000);
+        return (niceMax, ticks);
+    }
+}

@@ -1,0 +1,130 @@
+@* Rekap Trip sebagai dokumen A4 (Cetak / PDF). Trip ramai dicetak dua lembar. *@
+@{
+    var trip = Data.Trip;
+    var t = trip.T;
+    var angka = Data.Angka;
+    var baris = Data.Kejadian.Count + Data.Termin.Count + Data.Biaya.Count + Data.Muatan.Count;
+    var duaLembar = baris > 16;
+    var judul = $"Rekap Trip {t.TransactionNo}";
+    var sub = $"{Format.Tanggal(t.TransactionDate)} · {(trip.PlateNumber != "" ? trip.PlateNumber : "tanpa kendaraan")} · {(Data.Supir.Count > 0 ? string.Join(", ", Data.Supir) : "tanpa supir")}";
+}
+@if (duaLembar)
+{
+    <PrintPage Title="@judul" Subtitle="@sub" Page="1" TotalPages="2">@Identitas</PrintPage>
+    <PrintPage Title="@judul" Subtitle="@sub" Page="2" TotalPages="2">@Keuangan</PrintPage>
+}
+else
+{
+    <PrintPage Title="@judul" Subtitle="@sub" Page="1" TotalPages="1">@Identitas @Keuangan</PrintPage>
+}
+
+@code {
+    [Parameter, EditorRequired] public DataRekap Data { get; set; } = default!;
+
+    private const string Garis = "border:1px solid #6b7280;padding:3px 6px;vertical-align:top";
+    private const string Kepala = "border:1px solid #6b7280;padding:3px 6px;vertical-align:top;background:#f3f4f6;font-weight:600;text-align:left";
+
+    private static string TeksTitik(TitikAlamat? t) => t is null || (string.IsNullOrEmpty(t.Nama) && string.IsNullOrEmpty(t.Jalan))
+        ? "—"
+        : string.Join(" · ", new[] { t.Nama, t.Jalan, string.Join(" ", new[] { t.Kontak, t.Telepon }.Where(x => !string.IsNullOrEmpty(x))), string.IsNullOrEmpty(t.Catatan) ? "" : $"Catatan: {t.Catatan}" }.Where(x => !string.IsNullOrEmpty(x)));
+
+    private RenderFragment Judul(string teks) => @<p class="mb-1 fw-bold text-uppercase" style="margin-top:12px;font-size:10.5px">@teks</p>;
+
+    private RenderFragment Identitas => IsiIdentitas(BarisIdentitas());
+
+    private (string, string, string, string)[] BarisIdentitas()
+    {
+        var trip = Data.Trip; var t = trip.T;
+        var barang = string.Join("; ", Data.Muatan.Select(m => string.Join(" · ", new[] { m.IdPerjalanan, m.Keterangan }.Where(x => x != ""))).Where(x => x != ""));
+        return
+        [
+            ("ID Trip", t.TransactionNo, "Berangkat", Format.Tanggal(t.TransactionDate)),
+            ("Klien", Data.Klien, "Tipe Layanan", $"{Data.Layanan}{(Data.Kontrak != "" ? $" · {Data.Kontrak}" : "")}"),
+            ("No Referensi", trip.TrList.Count > 0 ? string.Join(", ", trip.TrList) : "—", "Status", StatusTrip.Label(t.Status)),
+            ("Kendaraan", $"{AturDetail.Strip(trip.PlateNumber)}{(Data.Gandengan != "" ? $" · {Data.Gandengan}" : "")}", "Supir", Data.Supir.Count > 0 ? string.Join(", ", Data.Supir) : "—"),
+            ("Rute", $"{AturDetail.Strip(trip.RouteName)}{(trip.RouteCode != "" ? $" ({trip.RouteCode})" : "")}", "Manager", AturDetail.Strip(Data.Manager)),
+            ("Pick Up", TeksTitik(t.Pengirim), "Destinasi", TeksTitik(t.Penerima)),
+            ("Barang", barang != "" ? barang : "—", "Kosongan", AturDetail.Strip(t.Kosongan)),
+        ];
+    }
+
+    private RenderFragment IsiIdentitas((string, string, string, string)[] isi) =>
+        @<div>
+            <table class="w-100" style="border-collapse:collapse;font-size:10px">
+                <tbody>
+                    @foreach (var r in isi)
+                    {
+                        <tr><th style="@Kepala;width:15%">@r.Item1</th><td style="@Garis;width:35%">@r.Item2</td><th style="@Kepala;width:15%">@r.Item3</th><td style="@Garis;width:35%">@r.Item4</td></tr>
+                    }
+                </tbody>
+            </table>
+            @Judul("Perjalanan")
+            <PrintTable Cols="@(new List<(string, string, string?)> { ("Waktu", "left", "18%"), ("Kejadian", "left", "22%"), ("Lokasi", "left", "25%"), ("Catatan", "left", null) })">
+                @if (Data.Kejadian.Count == 0) { <tr><td class="p-sel text-secondary" colspan="4">Belum ada catatan perjalanan.</td></tr> }
+                @foreach (var e in Data.Kejadian)
+                {
+                    <tr><td class="p-sel">@Format.Waktu(e.Waktu)</td><td class="p-sel">@JenisPerjalanan.Label(e.Jenis)</td><td class="p-sel">@AturDetail.Strip(e.Lokasi)</td><td class="p-sel">@AturDetail.Strip(e.Catatan)</td></tr>
+                }
+            </PrintTable>
+        </div>;
+
+    private RenderFragment Keuangan => @<div>
+        @Judul("Uang jalan")
+        <PrintTable Cols="@(new List<(string, string, string?)> { ("Termin", "left", "8%"), ("Tanggal", "left", "13%"), ("Jenis", "left", "15%"), ("Supir", "left", null), ("Uang Jalan", "right", "14%"), ("Potong Kasbon", "right", "14%"), ("Transfer", "right", "14%") })">
+            @if (Data.Termin.Count == 0) { <tr><td class="p-sel text-secondary" colspan="7">Uang jalan belum dicatat.</td></tr> }
+            @foreach (var p in Data.Termin)
+            {
+                <tr>
+                    <td class="p-sel">@p.Sequence</td><td class="p-sel">@Format.Tanggal(p.PaymentDate)</td><td class="p-sel">@Rekap.LabelTermin(p)</td><td class="p-sel">@Data.NamaKaryawan(p.DriverId)</td>
+                    <td class="p-sel text-end tnum">@Format.Rupiah(p.UjAmount)</td><td class="p-sel text-end tnum">@Format.Rupiah(p.KasbonDeduction)</td><td class="p-sel text-end tnum">@Format.Rupiah(p.UjAmount - p.KasbonDeduction)</td>
+                </tr>
+            }
+            @if (Data.Termin.Count > 0)
+            {
+                <tr class="total"><td class="p-sel" colspan="4">Total</td><td class="p-sel text-end tnum">@Format.Rupiah(Data.Angka.Uj)</td><td class="p-sel text-end tnum">@Format.Rupiah(Data.Angka.Kasbon)</td><td class="p-sel text-end tnum">@Format.Rupiah(Data.Angka.Tf)</td></tr>
+            }
+        </PrintTable>
+        @Judul("Biaya operasional")
+        <PrintTable Cols="@(new List<(string, string, string?)> { ("Jenis", "left", "20%"), ("Tanggal", "left", "13%"), ("Dibayar oleh", "left", null), ("Ke klien", "left", "13%"), ("Nominal", "right", "16%") })">
+            @if (Data.Biaya.Count == 0) { <tr><td class="p-sel text-secondary" colspan="5">Belum ada biaya operasional.</td></tr> }
+            @foreach (var e in Data.Biaya)
+            {
+                <tr>
+                    <td class="p-sel">@JenisBiaya.Label(e.ExpenseType)</td><td class="p-sel">@Format.Tanggal(e.ExpenseDate)</td><td class="p-sel">@PembayarBiaya.Label(e.Dibayar)</td>
+                    <td class="p-sel">@(TripLogika.Ditagihkan(e) ? "Ditagihkan" : "—")</td><td class="p-sel text-end tnum">@Format.Rupiah(e.Amount)</td>
+                </tr>
+            }
+            @if (Data.Biaya.Count > 0)
+            {
+                <tr class="total"><td class="p-sel" colspan="4">Total</td><td class="p-sel text-end tnum">@Format.Rupiah(Data.Angka.Biaya)</td></tr>
+            }
+        </PrintTable>
+        @Judul("Ringkasan keuangan")
+        <PrintTable Cols="@(new List<(string, string, string?)> { ("Pos", "left", null), ("Nominal", "right", "22%") })">
+            <tr><td class="p-sel">Harga trip</td><td class="p-sel text-end tnum">@Format.Rupiah(Data.Angka.Harga)</td></tr>
+            <tr><td class="p-sel">Biaya ditagihkan ke klien</td><td class="p-sel text-end tnum">@Format.Rupiah(Data.Angka.Ditagihkan)</td></tr>
+            <tr class="fw-semibold"><td class="p-sel">Tagihan ke klien@(Data.Trip.T.PiNumber != "" ? $" (PI {Data.Trip.T.PiNumber})" : "")</td><td class="p-sel text-end tnum">@Format.Rupiah(Data.Angka.Tagihan)</td></tr>
+            <tr><td class="p-sel">Uang jalan (patokan bila belum lunas dibayar)</td><td class="p-sel text-end tnum">− @Format.Rupiah(Data.Angka.UjDihitung)</td></tr>
+            <tr><td class="p-sel">Biaya dibayar perusahaan langsung</td><td class="p-sel text-end tnum">− @Format.Rupiah(Data.Angka.BiayaPerusahaan)</td></tr>
+            <tr><td class="p-sel">Komisi supir</td><td class="p-sel text-end tnum">− @Format.Rupiah(Data.Angka.Komisi)</td></tr>
+            <tr class="fw-semibold"><td class="p-sel">Perkiraan netto</td><td class="p-sel text-end tnum">@Format.Rupiah(Data.Angka.Netto)</td></tr>
+        </PrintTable>
+        @if (Data.Internal.Count > 0)
+        {
+            <p class="m-0 mt-1" style="font-size:9.5px;color:#404040">Biaya internal dicatat (tidak mengurangi netto): @string.Join(" · ", Data.Internal.Select(c => $"{JenisBiayaInternal.Label(c.CostType)} {Format.Rupiah(c.Amount)}")).</p>
+        }
+        @if (Data.Cek.Any(c => c.Tingkat != "ok"))
+        {
+            @Judul("Perlu dicek")
+            <ul class="m-0 ps-3" style="font-size:9.5px">
+                @foreach (var c in Data.Cek.Where(c => c.Tingkat != "ok")) { <li>@c.Teks</li> }
+            </ul>
+        }
+        <div class="row row-cols-3 g-4 text-center" style="margin-top:24px;font-size:9.5px">
+            @foreach (var p in new[] { "Dibuat oleh (Admin)", "Diperiksa (Manager)", "Disetujui" })
+            {
+                <div class="col"><p class="m-0">@p</p><p class="m-0 pt-1" style="margin-top:48px !important;border-top:1px solid #6b7280">(..............................)</p></div>
+            }
+        </div>
+    </div>;
+}

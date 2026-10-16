@@ -1,8 +1,7 @@
 name: Deploy ke GitHub Pages
 
-# Aplikasi berada di subfolder Baldy/, sedangkan GitHub hanya membaca
-# workflow dari .github/workflows di akar repo. Karena itu berkas ini
-# tinggal di akar, dan seluruh langkah build dijalankan di dalam Baldy/.
+# Aplikasi Blazor berada di Baldy/bjm_user/, sedangkan GitHub membaca
+# workflow dari .github/workflows di akar repo.
 
 on:
   push:
@@ -21,28 +20,24 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
-defaults:
-  run:
-    working-directory: Baldy
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Baldy/bjm_user
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-dotnet@v4
         with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: Baldy/package-lock.json
-      - run: npm ci
-      - run: npm run build
+          dotnet-version: '10.0.x'
+      - run: bash alat/pages/rakit.sh "$RUNNER_TEMP/situs" /BJM-management-system/
       - uses: actions/configure-pages@v5
         with:
           enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: Baldy/dist
+          path: ${{ runner.temp }}/situs
 
   deploy:
     needs: build

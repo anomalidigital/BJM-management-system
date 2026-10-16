@@ -1,0 +1,52 @@
+@* Satu lembar A4 laporan: kop perusahaan, judul, meta, isi, footer nomor halaman. *@
+@inject Sesi Sesi
+
+<section class="print-sheet mx-auto d-flex flex-column bg-white text-black border border-hairline shadow-card" style="width:210mm;max-width:100%;padding:14mm;font-size:11px">
+    <header class="mb-3 d-flex align-items-start justify-content-between gap-4 pb-2" style="border-bottom:2px solid #000">
+        <div class="d-flex align-items-start gap-3">
+            @if (WithLogo)
+            {
+                <div class="flex-shrink-0 d-grid rounded border border-2 border-black fw-bold lh-1" style="width:44px;height:44px;place-items:center;font-size:17px">BM</div>
+            }
+            <div>
+                <p class="m-0 fw-bold lh-tight" style="font-size:15px;letter-spacing:-.01em">PT BIMAJAYA MUSTIKA</p>
+                <p class="m-0" style="font-size:10.5px;letter-spacing:.04em">@(Sesi.Workspace == WorkspaceKode.Priok ? "JAKARTA" : "KARAWANG")</p>
+                <p class="m-0 mt-1 text-secondary" style="font-size:9.5px">Transportation, Driver Commission, Billing &amp; Reporting Management System</p>
+            </div>
+        </div>
+        <div class="text-end text-secondary" style="font-size:9.5px;line-height:1.6">
+            <p class="m-0">Dicetak: @Format.WaktuCetak()</p>
+            <p class="m-0">Halaman @Page dari @TotalPages</p>
+        </div>
+    </header>
+    <div class="mb-3 text-center">
+        <h1 class="m-0 fw-bold text-uppercase" style="font-size:14px;letter-spacing:.04em">@Title</h1>
+        @if (Subtitle is not null) { <p class="m-0 mt-1 text-secondary" style="font-size:10.5px">@Subtitle</p> }
+        @if (Periode is not null) { <p class="m-0 mt-1 fw-medium" style="font-size:10.5px">Periode: @Periode</p> }
+    </div>
+    @if (Meta.Count > 0)
+    {
+        <dl class="mb-3 border p-2 row row-cols-2 row-cols-sm-3 g-1 m-0 mb-3" style="border-color:#9ca3af!important;font-size:10.5px">
+            @foreach (var (label, nilai) in Meta)
+            {
+                <div class="d-flex gap-1"><dt class="flex-shrink-0 fw-semibold">@label:</dt><dd class="m-0 min-w-0 text-truncate">@nilai</dd></div>
+            }
+        </dl>
+    }
+    <div class="flex-grow-1">@ChildContent</div>
+    <footer class="mt-3 d-flex align-items-end justify-content-between gap-4 pt-2 text-secondary" style="border-top:1px solid #9ca3af;font-size:9px">
+        <p class="m-0">SIKOTIS — Sistem Komisi Otomatis · Dokumen ini dihasilkan otomatis oleh sistem.</p>
+        <p class="m-0">@Page / @TotalPages</p>
+    </footer>
+</section>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string? Periode { get; set; }
+    [Parameter] public int Page { get; set; } = 1;
+    [Parameter] public int TotalPages { get; set; } = 1;
+    [Parameter] public bool WithLogo { get; set; } = true;
+    [Parameter] public List<(string Label, string Nilai)> Meta { get; set; } = [];
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

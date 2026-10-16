@@ -1,0 +1,132 @@
+@inherits KomponenData
+@* Pencarian lanjutan multi-kriteria untuk data tagihan (Priok). *@
+
+<form class="border-bottom border-hairline p-3" @onsubmit="() => _diterapkan = Salin(_draf)" @onsubmit:preventDefault="true">
+    <div class="row g-3">
+        <div class="col-sm-6 col-xl-3">
+            <Field Label="No Faktur"><input id="@context" class="form-control" value="@_draf.InvoiceNo" placeholder="INV-001" @oninput="e => _draf.InvoiceNo = e.Value?.ToString() ?? string.Empty" /></Field>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <Field Label="Sijo"><input id="@context" class="form-control" value="@_draf.Sijo" placeholder="3252209" @oninput="e => _draf.Sijo = e.Value?.ToString() ?? string.Empty" /></Field>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <Field Label="Kodecost"><Pilihan Id="@context" Options="OpsiKodecost" Value="@_draf.CostCode" ValueChanged="v => _draf.CostCode = v ?? string.Empty" Clearable="false" /></Field>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <Field Label="Customer"><input id="@context" class="form-control" value="@_draf.Customer" placeholder="PT ..." @oninput="e => _draf.Customer = e.Value?.ToString() ?? string.Empty" /></Field>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <Field Label="Tanggal Tagih dari"><TanggalInput Id="@context" Value="@_draf.From" ValueChanged="v => _draf.From = v" /></Field>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <Field Label="Tanggal Tagih sampai"><TanggalInput Id="@context" Value="@_draf.To" ValueChanged="v => _draf.To = v" /></Field>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <Field Label="Jumlah minimal"><UangInput Id="@context" Value="_draf.MinAmount" ValueChanged="v => _draf.MinAmount = v" /></Field>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <Field Label="Jumlah maksimal"><UangInput Id="@context" Value="_draf.MaxAmount" ValueChanged="v => _draf.MaxAmount = v" /></Field>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+            <Field Label="Status pembayaran"><Pilihan Id="@context" Options="OpsiStatus" Value="@_draf.Status" ValueChanged="v => _draf.Status = v ?? string.Empty" Cari="false" Clearable="false" /></Field>
+        </div>
+        <div class="col-sm-12 col-xl-6 d-flex align-items-end gap-4 pb-1">
+            <Checkbox Label="Hanya SUNTING" Checked="_draf.OnlySunting" CheckedChanged="v => _draf.OnlySunting = v" />
+            <Checkbox Label="Hanya DITOLAK" Checked="_draf.OnlyRejected" CheckedChanged="v => _draf.OnlyRejected = v" />
+        </div>
+    </div>
+
+    <div class="mt-3 d-flex align-items-center gap-2">
+        <Tombol Type="submit" Variant="primary" Icon="Ikon.MagnifyingGlass">Cari</Tombol>
+        <Tombol Icon="Ikon.RotateLeft" IconSize="14" OnClick="Reset">Reset</Tombol>
+    </div>
+</form>
+
+@if (_diterapkan is null)
+{
+    <div class="px-4 py-5 text-center">
+        <div class="mx-auto mb-3 d-grid rounded-circle border border-hairline bg-sunken text-ink-3" style="width:44px;height:44px;place-items:center">
+            <IkonSvg Def="Ikon.MagnifyingGlass" Size="20" />
+        </div>
+        <p class="m-0 fs-14 fw-semibold text-ink">Isi kriteria lalu klik Cari.</p>
+        <p class="m-0 mt-1 fs-13 text-ink-3">Kriteria yang dikosongkan akan diabaikan.</p>
+    </div>
+}
+else
+{
+    var hasil = Hasil(_diterapkan);
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 border-bottom border-hairline bg-sunken px-3 py-2">
+        <p class="m-0 fs-12-5 text-ink-2">Ditemukan <span class="fw-semibold text-ink">@hasil.Count</span> data tagihan</p>
+        <p class="m-0 tnum fs-12-5 text-ink-2">Total Jumlah: <span class="fw-semibold text-ink">@Format.Rupiah(hasil.Sum(b => b.B.Amount))</span></p>
+    </div>
+    <DataTable T="BarisTagihan" Columns="Kolom" Rows="hasil" RowKey="b => b.B.Id" IsFiltered="true" MaxHeight="520px">
+        <NotFound><NotFoundState OnReset="Reset" /></NotFound>
+    </DataTable>
+}
+
+@code {
+    public sealed class Kriteria
+    {
+        public string InvoiceNo { get; set; } = "";
+        public string Sijo { get; set; } = "";
+        public string CostCode { get; set; } = "";
+        public string Customer { get; set; } = "";
+        public string From { get; set; } = "";
+        public string To { get; set; } = "";
+        public long MinAmount { get; set; }
+        public long MaxAmount { get; set; }
+        public string Status { get; set; } = "";
+        public bool OnlySunting { get; set; }
+        public bool OnlyRejected { get; set; }
+    }
+
+    private Kriteria _draf = new();
+    private Kriteria? _diterapkan;
+
+    private static Kriteria Salin(Kriteria k) => new()
+    {
+        InvoiceNo = k.InvoiceNo, Sijo = k.Sijo, CostCode = k.CostCode, Customer = k.Customer, From = k.From, To = k.To,
+        MinAmount = k.MinAmount, MaxAmount = k.MaxAmount, Status = k.Status, OnlySunting = k.OnlySunting, OnlyRejected = k.OnlyRejected,
+    };
+
+    private void Reset() { _draf = new Kriteria(); _diterapkan = null; }
+
+    private List<Opsi> OpsiKodecost =>
+        [new Opsi("", "Semua"), .. Db.BarisTagihan.Select(b => b.B.CostCode).Where(c => c != "").Distinct().OrderBy(c => c, StringComparer.Ordinal).Select(c => new Opsi(c, c))];
+    private static readonly List<Opsi> OpsiStatus = [new("", "Semua"), new("lunas", "Sudah lunas"), new("belum", "Belum lunas")];
+
+    private List<BarisTagihan> Hasil(Kriteria a)
+    {
+        bool Ada(string isi, string cari) => Util.Norm(isi).Contains(Util.Norm(cari));
+        return Db.BarisTagihan.Where(b =>
+        {
+            if (a.InvoiceNo != "" && !Ada(b.B.InvoiceNo, a.InvoiceNo)) return false;
+            if (a.Sijo != "" && !Ada(b.Sijo, a.Sijo)) return false;
+            if (a.CostCode != "" && b.B.CostCode != a.CostCode) return false;
+            if (a.Customer != "" && !Ada(b.CustomerName, a.Customer)) return false;
+            if (a.From != "" && string.CompareOrdinal(b.B.BillingDate, a.From) < 0) return false;
+            if (a.To != "" && string.CompareOrdinal(b.B.BillingDate, a.To) > 0) return false;
+            if (a.MinAmount > 0 && b.B.Amount < a.MinAmount) return false;
+            if (a.MaxAmount > 0 && b.B.Amount > a.MaxAmount) return false;
+            if (a.Status == "lunas" && string.IsNullOrEmpty(b.B.PaidDate)) return false;
+            if (a.Status == "belum" && (!string.IsNullOrEmpty(b.B.PaidDate) || b.B.IsRejected)) return false;
+            if (a.OnlySunting && !b.B.IsSunting) return false;
+            if (a.OnlyRejected && !b.B.IsRejected) return false;
+            return true;
+        }).ToList();
+    }
+
+    private static string StatusNada(Model.Tagihan b) => b.IsRejected ? "critical" : !string.IsNullOrEmpty(b.PaidDate) ? "good" : "warning";
+    private static string StatusLabel(Model.Tagihan b) => b.IsRejected ? "DITOLAK" : !string.IsNullOrEmpty(b.PaidDate) ? "Lunas" : "Belum lunas";
+
+    private static readonly List<Kolom<BarisTagihan>> Kolom =
+    [
+        new() { Key = "invoice_no", Header = "Nofaktur", Width = "118px", Render = b => @<span class="tnum fw-semibold text-ink">@b.B.InvoiceNo</span> },
+        new() { Key = "sijo", Header = "Sijo", Width = "110px", Render = b => @<a href="@($"pencarian/sijo?sijo={Uri.EscapeDataString(b.Sijo)}")" class="tnum fw-semibold text-decoration-none">@(b.Sijo != "" ? b.Sijo : "—")</a> },
+        new() { Key = "cost_code", Header = "Kodecost", Width = "104px", Render = b => @<Badge Tone="neutral">@b.B.CostCode</Badge> },
+        new() { Key = "customer_name", Header = "Customer", Render = b => @<span class="text-ink-2">@b.CustomerName</span> },
+        new() { Key = "billing_date", Header = "Tgltagih", Width = "104px", Render = b => @<span class="tnum text-ink-2">@Format.Tanggal(b.B.BillingDate)</span> },
+        new() { Key = "amount", Header = "Jumlah", Align = "right", Width = "138px", Render = b => @<span class="tnum fw-semibold text-ink">@Format.Rupiah(b.B.Amount)</span> },
+        new() { Key = "status", Header = "Status", Width = "116px", Render = b => @<Badge Tone="@StatusNada(b.B)">@StatusLabel(b.B)</Badge> },
+    ];
+}

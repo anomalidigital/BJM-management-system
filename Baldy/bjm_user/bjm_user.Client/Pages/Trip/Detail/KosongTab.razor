@@ -1,0 +1,10 @@
+@* Tab tanpa isi: cukup pesan. Tombol tambah hanya satu, di KepalaTab kanan atas. *@
+<div class="px-4 py-5 text-center">
+    <p class="m-0 fs-14 fw-semibold text-ink">@Judul</p>
+    <p class="m-0 mt-1 fs-13 text-ink-3">@Keterangan</p>
+</div>
+
+@code {
+    [Parameter] public string Judul { get; set; } = "";
+    [Parameter] public string Keterangan { get; set; } = "";
+}

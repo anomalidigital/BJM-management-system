@@ -1,0 +1,120 @@
+@* Satu tombol "Filter" untuk seluruh filter halaman. Isian panel = draf; berlaku setelah Terapkan. Chip filter yang berlaku di samping tombol. *@
+@typeparam T where T : class, new()
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="d-inline-flex flex-wrap align-items-center gap-2" @ref="_akar">
+    <button type="button" class="btn btn-outline-secondary bg-white text-ink border-hairline d-inline-flex align-items-center gap-2 @(Aktif > 0 ? "filter-aktif" : "") @Class"
+            aria-haspopup="dialog" aria-expanded="@_buka" @ref="_tombol" @onclick="Toggle">
+        <IkonSvg Def="Ikon.Filter" Size="13" />
+        @Label
+        @if (Aktif > 0) { <span class="badge-nada brand">@Aktif</span> }
+    </button>
+
+    @if (TampilChips)
+    {
+        <DaftarChipFilter Chips="Chips" OnLepasSemua="Filter.LepasSemua" />
+    }
+
+    @if (_buka)
+    {
+        <div role="dialog" aria-label="Filter" class="panel-filter d-flex flex-column overflow-hidden" data-lapis-atas style="@_gaya" @ref="_panel">
+            <div class="d-flex align-items-center justify-content-between gap-3 border-bottom border-hairline px-3 py-2">
+                <div>
+                    <p class="m-0 fs-13 fw-semibold text-ink" style="font-size:13.5px">Filter</p>
+                    <p class="m-0 fs-12 @(Filter.BelumDiterapkan ? "fw-medium" : "text-ink-3")" style="@(Filter.BelumDiterapkan ? "color:#8a6100" : null)">
+                        @(Filter.BelumDiterapkan ? "Ada perubahan, klik Terapkan untuk memakainya." : Aktif > 0 ? $"{Aktif} filter berlaku" : "Belum ada filter yang berlaku")
+                    </p>
+                </div>
+                <button type="button" class="btn-close" aria-label="Tutup filter" @onclick="Tutup"></button>
+            </div>
+            <div class="d-flex flex-column gap-3 overflow-y-auto px-3 py-3" style="min-height:0; flex:1">
+                @ChildContent
+                @if (Galat is not null) { <div role="alert"><p class="invalid-feedback">@Galat</p></div> }
+            </div>
+            <div class="d-flex align-items-center justify-content-between gap-2 border-top border-hairline bg-sunken px-3 py-2">
+                <button type="button" class="btn btn-link btn-sm text-decoration-none text-ink-2 d-inline-flex align-items-center gap-1 px-1" disabled="@(!Filter.DrafTerisi)" @onclick="Kosongkan"><IkonSvg Def="Ikon.RotateLeft" Size="12" /> Kosongkan</button>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm bg-white text-ink border-hairline" @onclick="Tutup">Batal</button>
+                    <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1" disabled="@(Galat is not null)" @onclick="Terapkan"><IkonSvg Def="Ikon.Check" Size="12" /> Terapkan</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public KendaliFilter<T> Filter { get; set; } = default!;
+    [Parameter] public List<ChipFilter> Chips { get; set; } = [];
+    [Parameter] public bool TampilChips { get; set; } = true;
+    [Parameter] public string? Galat { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string Label { get; set; } = "Filter";
+    [Parameter] public int Lebar { get; set; } = 340;
+    [Parameter] public string? Class { get; set; }
+
+    private bool _buka;
+    private string _gaya = "position:fixed;top:-9999px;left:-9999px";
+    private ElementReference _akar, _tombol, _panel;
+    private DotNetObjectReference<PanelFilter<T>>? _ref;
+    private IJSObjectReference? _pegangan;
+    private bool _terpasang;
+
+    private int Aktif => Chips.Count(c => c.Lepas is not null);
+
+    private async Task Toggle()
+    {
+        if (_buka) { await Tutup(); return; }
+        Filter.Mulai();
+        _buka = true;
+    }
+
+    private async Task Tutup()
+    {
+        if (!_buka) return;
+        _buka = false;
+        await LepasAsync();
+        StateHasChanged();
+    }
+
+    private async Task Terapkan()
+    {
+        if (Galat is not null) return;
+        Filter.Terapkan();
+        await Tutup();
+    }
+
+    private void Kosongkan() => Filter.Kosongkan();
+
+    [JSInvokable] public Task TutupDariLuar() => Tutup();
+
+    protected override async Task OnAfterRenderAsync(bool pertama)
+    {
+        if (_buka && !_terpasang)
+        {
+            _terpasang = true;
+            _ref ??= DotNetObjectReference.Create(this);
+            try { _pegangan = await JS.InvokeAsync<IJSObjectReference>("sikotis.pasangTutupLuar", _akar, _ref); } catch { /* abaikan */ }
+        }
+        if (_buka)
+        {
+            try
+            {
+                var gaya = await JS.InvokeAsync<string>("sikotis.posisiPanelFilter", _tombol, Lebar);
+                if (gaya != _gaya) { _gaya = gaya; StateHasChanged(); }
+            }
+            catch { /* abaikan */ }
+        }
+    }
+
+    private async Task LepasAsync()
+    {
+        _terpasang = false;
+        _gaya = "position:fixed;top:-9999px;left:-9999px";
+        if (_pegangan is null) return;
+        try { await JS.InvokeVoidAsync("sikotis.lepasTutupLuar", _pegangan); await _pegangan.DisposeAsync(); } catch { /* abaikan */ }
+        _pegangan = null;
+    }
+
+    public async ValueTask DisposeAsync() { await LepasAsync(); _ref?.Dispose(); }
+}

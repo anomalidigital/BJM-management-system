@@ -1,0 +1,143 @@
+@* Rapikan satu kelompok kode area yang mirip (kemungkinan salah ketik) sekaligus (Baldy 14 Okt 2026). Pilih penulisan yang benar,
+   lihat rute & alamat yang berubah, lalu simpan; tiap perubahan tercatat di Audit Log. Rute yang jadi kembar dengan rute lain
+   (harganya bisa berbeda) tidak diubah dan ditampilkan untuk dicek manual. *@
+@inherits KomponenData
+
+<Modal Open="true" Size="lg" Title="Rapikan kode area" Subtitle="@($"Satukan penulisan {string.Join(" / ", Kelompok)} yang mungkin salah ketik. No. Rute tidak berubah.")" OnClose="OnClose">
+    <ChildContent>
+        @{
+            var rencana = Rencana;
+            var jumlah = rencana.Rute.Count + rencana.Alamat.Count;
+        }
+        <div class="d-flex flex-column gap-3">
+            <fieldset>
+                <legend class="form-label">Penulisan yang benar</legend>
+                <div class="row g-2">
+                    @foreach (var k in Kelompok)
+                    {
+                        var kk = k;
+                        <div class="col-sm-4">
+                            <Radio Name="kode-benar" Checked="@(_benar == kk)" OnChange="() => _benar = kk" Label="@kk"
+                                   Description="@(Pakai.TryGetValue(kk, out var p) && p.Teks != "" ? p.Teks : "belum dipakai")" />
+                        </div>
+                    }
+                </div>
+            </fieldset>
+
+            <section aria-label="Yang akan diubah">
+                <p class="form-label">Yang akan diubah</p>
+                @if (jumlah == 0)
+                {
+                    <p class="m-0 fs-12-5 text-ink-3">Tidak ada rute atau alamat yang bisa diubah ke @_benar.</p>
+                }
+                else
+                {
+                    <ul class="list-unstyled m-0 d-flex flex-column gap-1 fs-12-5">
+                        @foreach (var u in rencana.Rute)
+                        {
+                            <li class="d-flex flex-wrap align-items-center column-gap-2 row-gap-1">
+                                <span class="tnum flex-shrink-0 fw-semibold text-ink" style="width:7rem">@u.Rute.RouteCode</span>
+                                <span class="text-ink-3 text-decoration-line-through">@u.Rute.RouteName</span>
+                                <IkonSvg Def="Ikon.ArrowRight" Size="10" Class="text-ink-3" />
+                                <span class="fw-medium text-ink">@u.NamaBaru</span>
+                                <span class="text-ink-3">· @TripPerRute.GetValueOrDefault(u.Rute.Id) trip</span>
+                            </li>
+                        }
+                        @foreach (var (a, kodeLama) in rencana.Alamat)
+                        {
+                            <li class="d-flex flex-wrap align-items-center column-gap-2 row-gap-1">
+                                <span class="flex-shrink-0 fw-semibold text-ink" style="width:7rem">Alamat</span>
+                                <span class="text-ink">@a.Nama</span>
+                                <span class="text-ink-3 text-decoration-line-through">@kodeLama</span>
+                                <IkonSvg Def="Ikon.ArrowRight" Size="10" Class="text-ink-3" />
+                                <span class="fw-medium text-ink">@_benar</span>
+                            </li>
+                        }
+                    </ul>
+                }
+                <p class="form-text">Trip lama ikut menampilkan nama rute yang baru; nilai uang jalan, biaya, dan PI-nya tidak berubah.</p>
+            </section>
+
+            @if (rencana.Kembar.Count > 0)
+            {
+                <section aria-label="Rute kembar" class="kotak-peringatan fs-12-5">
+                    <p class="m-0 d-flex align-items-start gap-2 fw-semibold">
+                        <IkonSvg Def="Ikon.TriangleExclamation" Size="14" Style="margin-top:1px" />
+                        @rencana.Kembar.Count rute tidak diubah: namanya akan sama dengan rute lain.
+                    </p>
+                    <p class="m-0 mt-1">Cek dulu mana yang benar (harganya bisa berbeda), lalu hapus salah satunya atau beri pembeda di Nama Rute.</p>
+                    <ul class="list-unstyled m-0 mt-2 d-flex flex-column gap-2">
+                        @foreach (var u in rencana.Kembar)
+                        {
+                            var uu = u;
+                            <li class="rounded-2 bg-white px-3 py-2 text-ink" style="border:1px solid #f6e2ac">
+                                @BarisKembar(uu.Rute)
+                                <p class="my-1 fs-11-5 text-ink-3">akan sama dengan</p>
+                                @if (uu.KembarDengan is not null) { @BarisKembar(uu.KembarDengan) }
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+        </div>
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="OnClose">Batal</Tombol>
+        <Tombol Variant="primary" Disabled="@(Rencana.Rute.Count + Rencana.Alamat.Count == 0)" OnClick="Simpan">
+            @(Rencana.Rute.Count + Rencana.Alamat.Count == 0 ? "Tidak ada yang bisa dirapikan" : $"Rapikan ke {_benar}")
+        </Tombol>
+    </Footer>
+</Modal>
+
+@code {
+    [Parameter, EditorRequired] public List<string> Kelompok { get; set; } = [];
+    /// <summary>Pemakaian kode di rute & Master Alamat.</summary>
+    [Parameter] public Dictionary<string, PakaiKode> Pakai { get; set; } = [];
+    [Parameter] public EventCallback OnClose { get; set; }
+    /// <summary>Buka form Ubah Rute untuk rute yang perlu dicek manual.</summary>
+    [Parameter] public EventCallback<Model.Rute> OnBuka { get; set; }
+
+    private string _benar = "";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _benar = Kelompok.FirstOrDefault() ?? "";
+    }
+
+    private RencanaRapikan Rencana => KodeArea.RencanaRapikan(Kelompok, _benar, Db.Data.Rute, Db.Data.Alamat);
+
+    private Dictionary<string, int> TripPerRute
+    {
+        get
+        {
+            var m = new Dictionary<string, int>();
+            foreach (var t in Db.Data.Trip) if (t.Status != StatusTrip.Batal) m[t.RouteId] = m.GetValueOrDefault(t.RouteId) + 1;
+            return m;
+        }
+    }
+
+    private string Ringkas(Model.Rute r) => $"{TripPerRute.GetValueOrDefault(r.Id)} trip · Uang jalan {Format.Rupiah(r.Ujroute)} · Harga {Format.Rupiah(r.Price)}";
+
+    private RenderFragment BarisKembar(Model.Rute r) => @<div class="d-flex flex-wrap align-items-center column-gap-2 row-gap-1">
+        <span class="tnum fw-semibold">@r.RouteCode</span>
+        <span class="fw-medium">@r.RouteName</span>
+        <span class="fs-12 text-ink-3">· @Ringkas(r)</span>
+        <button type="button" class="btn btn-link p-0 ms-auto fs-12 fw-semibold text-decoration-underline" @onclick="() => OnBuka.InvokeAsync(r)">Ubah</button>
+    </div>;
+
+    private async Task Simpan()
+    {
+        var rencana = Rencana;
+        var benar = _benar;
+        foreach (var u in rencana.Rute)
+        {
+            var uu = u;
+            Db.Ubah<Model.Rute>(uu.Rute.Id, r => { r.RouteName = uu.NamaBaru; r.KodeAreaAsal = uu.KodeAreaAsal; r.KodeAreaTujuan = uu.KodeAreaTujuan; });
+        }
+        foreach (var (a, _) in rencana.Alamat) Db.Ubah<Model.Alamat>(a.Id, x => x.KodeArea = benar);
+        var bagian = string.Join(" dan ", new[] { rencana.Rute.Count > 0 ? $"{rencana.Rute.Count} rute" : "", rencana.Alamat.Count > 0 ? $"{rencana.Alamat.Count} alamat" : "" }.Where(x => x != ""));
+        Toast.Sukses($"{bagian} dirapikan ke {benar}.{(rencana.Kembar.Count > 0 ? $" {rencana.Kembar.Count} rute kembar perlu dicek manual." : "")}");
+        await OnClose.InvokeAsync();
+    }
+}

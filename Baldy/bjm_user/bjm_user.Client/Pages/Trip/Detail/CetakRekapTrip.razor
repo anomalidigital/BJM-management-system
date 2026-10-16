@@ -1,0 +1,9 @@
+@* Preview cetak Rekap Trip: satu tombol Cetak / PDF, kertas potret. *@
+<ReportPreview OnClose="OnClose" OrientasiTetap="potret">
+    <PrintDocument><RekapTripDokumen Data="Data" /></PrintDocument>
+</ReportPreview>
+
+@code {
+    [Parameter, EditorRequired] public DataRekap Data { get; set; } = default!;
+    [Parameter] public EventCallback OnClose { get; set; }
+}

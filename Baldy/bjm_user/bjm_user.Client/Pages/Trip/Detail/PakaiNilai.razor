@@ -1,0 +1,7 @@
+@* Tombol kecil "Pakai ..." untuk mengisi nilai acuan dari rute / aturan. *@
+<button type="button" class="btn btn-link p-0 align-baseline fs-inherit fw-semibold text-brand" style="text-underline-offset:2px" @onclick="() => OnClick.InvokeAsync()">@Label</button>
+
+@code {
+    [Parameter] public string Label { get; set; } = "Pakai";
+    [Parameter] public EventCallback OnClick { get; set; }
+}

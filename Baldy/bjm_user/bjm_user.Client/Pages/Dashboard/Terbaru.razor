@@ -1,0 +1,168 @@
+@* Catatan terakhir yang masuk: trip, tagihan / PI, dan (khusus Priok) SI/Job Order berdampingan. *@
+<div class="dash-terbaru @(Sijo is not null ? "tiga" : "")">
+    <Panel Title="Trip terbaru" Subtitle="@($"{Format.Angka(Jumlah.Trip)} trip tercatat.")" Href="transaksi/trip" Tautan="Semua trip">
+        @if (Trip.Count == 0)
+        {
+            <p class="dash-kosong">Belum ada trip.</p>
+        }
+        else
+        {
+            <ul class="dash-daftar">
+                @foreach (var t in Trip)
+                {
+                    <li @key="t.Id">
+                        <a href="@($"transaksi/trip/{t.Id}")" class="dash-baris">
+                            <span class="min-w-0 flex-grow-1">
+                                @* Penanda trip: Kode Trip (ID Trip). *@
+                                <span class="d-flex min-w-0 align-items-baseline gap-2">
+                                    <span class="tnum min-w-0 text-truncate fs-13 fw-semibold text-ink">@t.IdTampil</span>
+                                    <span class="tnum flex-shrink-0 fs-12 text-ink-3">@Format.Tanggal(t.T.TransactionDate)</span>
+                                </span>
+                                <span class="d-flex min-w-0 gap-3 fs-12 text-ink-3" style="margin-top:2px">
+                                    <span class="text-truncate">@(t.DriverName != "" ? t.DriverName : "Supir belum dipilih")</span>
+                                    @if (t.PlateNumber != "") { <span class="flex-shrink-0">@t.PlateNumber</span> }
+                                </span>
+                                @if (t.RouteName != "") { <span class="d-block text-truncate fs-12 text-ink-3" style="margin-top:2px">@t.RouteName</span> }
+                            </span>
+                            <span class="flex-shrink-0 text-end">
+                                @* Trip Dedicated tidak punya harga sendiri; dibayar lewat nilai kontrak. *@
+                                @if (t.T.ServiceType == TipeKlien.Dedicated && t.Harga == 0)
+                                {
+                                    <span class="d-block fs-12 text-ink-3">Dedicated</span>
+                                }
+                                else
+                                {
+                                    <span class="tnum d-block fs-13 fw-semibold text-ink">@Format.RupiahRingkas(t.Harga)</span>
+                                }
+                                <Badge Tone="@StatusTrip.Nada(t.Status)" Class="dash-badge">@StatusTrip.Label(t.Status)</Badge>
+                            </span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+    </Panel>
+
+    @if (Pi is not null)
+    {
+        <Panel Title="PI terbaru" Subtitle="@($"{Format.Angka(Pi.Total)} PI, {Format.Angka(Pi.BelumLunas)} belum lunas.")" Href="transaksi/tagihan" Tautan="Semua tagihan">
+            @if (Pi.Rows.Count == 0)
+            {
+                <p class="dash-kosong">Belum ada PI.</p>
+            }
+            else
+            {
+                <ul class="dash-daftar">
+                    @foreach (var t in Pi.Rows)
+                    {
+                        <li @key="t.Id">
+                            <a href="@($"transaksi/trip/{t.Id}")" class="dash-baris">
+                                <span class="min-w-0 flex-grow-1">
+                                    <span class="tnum d-block text-truncate fs-13 fw-semibold text-ink">@(t.T.PiNumber != "" ? t.T.PiNumber : "—")</span>
+                                    <span class="d-flex min-w-0 gap-3 fs-12 text-ink-3" style="margin-top:2px">
+                                        <span class="tnum flex-shrink-0">Trip @t.IdTampil</span>
+                                        <span class="text-truncate">@string.Join(", ", t.TrList)</span>
+                                    </span>
+                                </span>
+                                <span class="flex-shrink-0 text-end">
+                                    <span class="tnum d-block fs-13 fw-semibold text-ink">@Format.RupiahRingkas(t.Harga + t.BiayaDitagihkan)</span>
+                                    @if (!string.IsNullOrEmpty(t.T.PiTahap))
+                                    {
+                                        <Badge Tone="@NadaPi(t.T.PiTahap)" Class="dash-badge">@TahapPi.Label(t.T.PiTahap)</Badge>
+                                    }
+                                </span>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            }
+        </Panel>
+    }
+    else
+    {
+        <Panel Title="Tagihan terbaru"
+               Subtitle="@($"{Format.Angka(Jumlah.Tagihan)} tagihan, {Format.Angka(Jumlah.BelumLunas)} belum lunas{(Jumlah.Ditolak > 0 ? $", {Format.Angka(Jumlah.Ditolak)} ditolak" : "")}.")"
+               Href="transaksi/tagihan" Tautan="Semua tagihan">
+            @if (Tagihan.Count == 0)
+            {
+                <p class="dash-kosong">Belum ada tagihan.</p>
+            }
+            else
+            {
+                <ul class="dash-daftar">
+                    @foreach (var b in Tagihan)
+                    {
+                        <li @key="b.B.Id">
+                            <a href="transaksi/tagihan" class="dash-baris">
+                                <span class="min-w-0 flex-grow-1">
+                                    <span class="d-flex align-items-baseline gap-2">
+                                        <span class="tnum fs-13 fw-semibold text-ink">@b.B.InvoiceNo</span>
+                                        <span class="tnum fs-12 text-ink-3">SI/JO @b.Sijo</span>
+                                    </span>
+                                    <span class="d-flex gap-3 fs-12 text-ink-3" style="margin-top:2px">
+                                        <span>@b.B.CostCode</span>
+                                        <span class="tnum">@Format.Tanggal(b.B.BillingDate)</span>
+                                    </span>
+                                </span>
+                                <span class="flex-shrink-0 text-end">
+                                    <span class="tnum d-block fs-13 fw-semibold text-ink">@Format.RupiahRingkas(b.B.Amount)</span>
+                                    @if (b.B.IsRejected) { <Badge Tone="critical" Class="dash-badge">DITOLAK</Badge> }
+                                    else if (!string.IsNullOrEmpty(b.B.PaidDate)) { <Badge Tone="good" Class="dash-badge">Lunas</Badge> }
+                                    else { <Badge Tone="warning" Class="dash-badge">Belum lunas</Badge> }
+                                </span>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            }
+        </Panel>
+    }
+
+    @if (Sijo is not null)
+    {
+        <Panel Title="SI / Job Order terbaru" Subtitle="@($"{Format.Angka(Jumlah.Sijo)} SI/Job Order, {Format.Angka(Jumlah.Komplit)} sudah komplit.")"
+               Href="pencarian/sijo" Tautan="Cari SI/JO">
+            @if (Sijo.Count == 0)
+            {
+                <p class="dash-kosong">Belum ada SI/Job Order.</p>
+            }
+            else
+            {
+                <ul class="dash-daftar">
+                    @foreach (var j in Sijo)
+                    {
+                        <li @key="j.Id">
+                            <a href="@($"pencarian/sijo?sijo={Uri.EscapeDataString(j.Sijo)}")" class="dash-baris">
+                                <span class="min-w-0 flex-grow-1">
+                                    <span class="d-flex align-items-baseline gap-2">
+                                        <span class="tnum fs-13 fw-semibold text-brand" style="color:var(--brand-700) !important">@j.Sijo</span>
+                                        <span class="fs-12 text-ink-3">@j.CustomerCode</span>
+                                    </span>
+                                    <span class="d-block text-truncate fs-12 text-ink-3" style="margin-top:2px">@j.CustomerName</span>
+                                </span>
+                                @if (j.IsComplete) { <Badge Tone="good">Komplit</Badge> } else { <Badge Tone="neutral">Belum komplit</Badge> }
+                            </a>
+                        </li>
+                    }
+                </ul>
+            }
+        </Panel>
+    }
+</div>
+
+@code {
+    [Parameter] public List<BarisTrip> Trip { get; set; } = [];
+    [Parameter] public List<BarisTagihan> Tagihan { get; set; } = [];
+    /// <summary>Kosongkan (null) untuk cabang tanpa SI/Job Order (Karawang).</summary>
+    [Parameter] public List<JobOrder>? Sijo { get; set; }
+    /// <summary>Karawang menagih lewat PI per trip: panel tagihan menampilkan PI terbaru.</summary>
+    [Parameter] public RingkasanPi? Pi { get; set; }
+    [Parameter] public JumlahTerbaru Jumlah { get; set; } = new(0, 0, 0, 0, 0, 0);
+
+    private static string NadaPi(string? tahap) => tahap switch
+    {
+        TahapPi.Lunas or TahapPi.Disetujui => "good",
+        TahapPi.Revisi => "warning",
+        _ => "brand",
+    };
+}

@@ -1,0 +1,23 @@
+@* Kartu Rute di Overview: patokan Uang Jalan, tol, dan Harga Rute. *@
+<Kartu>
+    <KepalaKartu Title="Rute" Subtitle="@(Trip.RouteName != "" ? Trip.RouteName : "Belum dipilih")" />
+    @if (Trip.RouteCode != "")
+    {
+        <div class="p-3">
+            <dl class="row row-cols-2 g-3 mb-0">
+                <InfoItem Label="No. Rute" Mono><span class="text-wrap text-break">@Trip.RouteCode</span></InfoItem>
+                <InfoItem Label="Uang Jalan Rute" Value="@Format.Rupiah(Trip.Ujroute)" Mono />
+                <InfoItem Label="Uang Tol (patokan)" Value="@Format.Rupiah(Trip.Toll)" Mono />
+                <InfoItem Label="Harga Rute" Value="@Format.Rupiah(Trip.RoutePrice)" Mono />
+            </dl>
+        </div>
+    }
+    else
+    {
+        <p class="m-0 px-3 py-4 text-center fs-13 text-ink-3">Trip ini belum memakai rute.</p>
+    }
+</Kartu>
+
+@code {
+    [Parameter, EditorRequired] public BarisTrip Trip { get; set; } = default!;
+}

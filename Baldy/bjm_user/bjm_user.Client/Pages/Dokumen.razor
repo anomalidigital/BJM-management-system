@@ -1,0 +1,691 @@
+@page "/dokumen"
+@inherits KomponenData
+@inject Lampiran LampiranSvc
+@inject IJSRuntime JS
+@*
+    Dokumen ("File upload"): daftar gabungan semua berkas yang sudah diunggah di workspace aktif, dari trip (POD, PI, override,
+    dokumen trip, perjalanan), uang jalan, nota biaya, biaya internal, kasbon, karyawan, kendaraan, kontrak, sampai dokumen
+    umum perusahaan. Berkas bisa dilihat dan diunduh di sini; berkas milik record lain diubah / dihapus dari tempat asalnya
+    (tautan di kolom Action). Dokumen umum diunggah dan dikelola di halaman ini.
+*@
+<PageTitle>Dokumen — SIKOTIS</PageTitle>
+
+@{
+    var semua = Semua;
+    _tabel.ExtraFilterActive = _filter.Aktif;
+    var tersaring = _tabel.Saring(semua);
+    var halaman = _tabel.Halaman(tersaring);
+    var totalUkuran = tersaring.Sum(r => Math.Max(0, r.Ukuran));
+    var hilang = semua.Count(r => r.Keadaan == "hilang");
+    var f = _filter.Nilai;
+}
+
+<PageHeader Title="Dokumen" Crumbs="@(new List<Crumb> { new("Dokumen") })">
+    <Description>File upload: semua berkas yang sudah diunggah di workspace @WorkspaceKode.Label(Sesi.Workspace), dari trip, nota biaya, kasbon, karyawan, kendaraan, kontrak, sampai dokumen umum perusahaan.</Description>
+    <Actions>
+        <Tombol Variant="primary" Icon="Ikon.FileArrowUp" Disabled="@(!BolehUnggah)" Title="@(BolehUnggah ? "Unggah dokumen umum, atau dokumen untuk satu trip" : null)" OnClick="() => BukaUnggah(null)">Unggah dokumen</Tombol>
+    </Actions>
+</PageHeader>
+
+<Kartu>
+    <Toolbar>
+        <Left>
+            <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Width="18rem" Placeholder="Cari nama berkas, judul, ID Trip, karyawan, plat..." />
+            <PanelFilter T="FilterBerkas" Filter="_filter" Chips="Chips" Lebar="360" Galat="@Format.GalatRentang(_filter.Draf.Dari, _filter.Draf.Sampai)">
+                <Field Label="Jenis / sumber berkas">
+                    <Pilihan Id="@context" Options="OpsiJenis(semua)" Value="@_filter.Draf.Jenis" ValueChanged="v => _filter.Ubah(d => d.Jenis = v ?? string.Empty)" Cari="false" Clearable="false" />
+                </Field>
+                <div>
+                    <p class="form-label">Tanggal</p>
+                    <div class="row g-2">
+                        <div class="col-6"><TanggalInput AriaLabel="Tanggal dari" Placeholder="Dari" Value="@_filter.Draf.Dari" ValueChanged="v => _filter.Ubah(d => d.Dari = v)" /></div>
+                        <div class="col-6"><TanggalInput AriaLabel="Tanggal sampai" Placeholder="Sampai" Value="@_filter.Draf.Sampai" ValueChanged="v => _filter.Ubah(d => d.Sampai = v)" /></div>
+                    </div>
+                </div>
+            </PanelFilter>
+        </Left>
+        <Right>
+            <span class="tnum fs-12-5 text-ink-3">@Format.Angka(_tabel.Total) berkas@(totalUkuran > 0 ? $" · {FormatUkuran(totalUkuran)}" : "")</span>
+        </Right>
+    </Toolbar>
+
+    @if (f.Dari != "" && f.Sampai != "" && string.CompareOrdinal(f.Dari, f.Sampai) > 0)
+    {
+        <p class="m-0 border-bottom border-hairline px-3 py-2 fs-12 fw-medium" style="color:var(--critical)">Tanggal “dari” lebih besar dari tanggal “sampai”: tidak ada berkas yang cocok.</p>
+    }
+    @if (hilang > 0)
+    {
+        <div class="d-flex align-items-start gap-2 border-bottom border-hairline px-3 py-2 fs-12-5" style="background:#fff8e6;color:#8a6100">
+            <IkonSvg Def="Ikon.TriangleExclamation" Size="14" Class="mt-1 flex-shrink-0" />
+            <span>
+                @Format.Angka(hilang) berkas bertanda <b>Hilang</b>: datanya masih menunjuk berkas itu, tetapi isinya tidak ada di penyimpanan browser ini.
+                Unggah ulang dari tempat asalnya bila masih diperlukan.
+            </span>
+        </div>
+    }
+
+    <DataTable T="BarisBerkas" Columns="Kolom" Rows="halaman" RowKey="r => r.Kunci" SortKey="@_tabel.SortKey" SortNaik="_tabel.Naik" OnSortChange="k => _tabel.ToggleSort(k)" IsFiltered="_tabel.IsFiltered">
+        <Empty>
+            <div class="px-4 py-5 text-center">
+                <p class="m-0 fs-14 fw-semibold text-ink">Belum ada berkas yang diunggah.</p>
+                <p class="mx-auto m-0 mt-1 fs-13 text-ink-3" style="max-width:28rem;line-height:1.6">
+                    Berkas yang dilampirkan di trip, nota biaya, kasbon, karyawan, kendaraan, dan kontrak otomatis tampil di sini.
+                    Dokumen perusahaan yang tidak menempel pada satu trip diunggah lewat tombol Unggah dokumen di kanan atas.
+                </p>
+            </div>
+        </Empty>
+        <NotFound>
+            <div class="px-4 py-5 text-center">
+                <p class="m-0 fs-14 fw-semibold text-ink">Berkas tidak ditemukan.</p>
+                <p class="m-0 mt-1 fs-13 text-ink-3">Coba periksa kembali kata kunci, jenis, atau tanggal.</p>
+                <Tombol Size="sm" Class="mt-3" OnClick="ResetFilter">Reset filter</Tombol>
+            </div>
+        </NotFound>
+    </DataTable>
+    @if (_tabel.Total > 0)
+    {
+        <Pagination Page="_tabel.Page" PageSize="_tabel.PageSize" Total="_tabel.Total" OnPageChange="p => _tabel.SetPage(p)" />
+    }
+    <p class="m-0 border-top border-hairline px-3 py-2 fs-12 text-ink-3" style="line-height:1.6">
+        Tanggal = tanggal dokumen, nota, atau transaksinya (karyawan &amp; kendaraan: tanggal unggah). Klik gambar kecil untuk melihat berkas.
+        Berkas milik trip, nota, karyawan, atau kendaraan diubah dan dihapus dari tempat asalnya lewat tombol tautan; dokumen umum dikelola di sini oleh Manager / Owner.
+    </p>
+</Kartu>
+
+@if (_unggah)
+{
+    var keTrip = _isi.Simpan == "trip";
+    <Modal Open="true" Title="@(_edit is not null ? "Ubah Dokumen Umum" : "Unggah Dokumen")" Size="md" OnClose="() => _unggah = false"
+           Subtitle="@(_edit is not null ? _edit.Judul : "Tanda * wajib diisi. Gambar diperkecil otomatis.")">
+        <ChildContent>
+            <div class="row g-3">
+                @if (_edit is null)
+                {
+                    <fieldset class="col-12">
+                        <legend class="mb-2 fs-12 fw-semibold text-ink-2" style="letter-spacing:.02em">Simpan sebagai</legend>
+                        <div class="row g-2">
+                            <div class="col-sm-6">
+                                <Radio Name="simpan-dokumen" Checked="!keTrip" OnChange="() => _isi.Simpan = TujuanUmum" Label="Dokumen umum"
+                                       Description="Tidak menempel pada satu trip: SOP, surat, dokumen perusahaan." />
+                            </div>
+                            <div class="col-sm-6">
+                                <Radio Name="simpan-dokumen" Checked="keTrip" OnChange="() => _isi.Simpan = TujuanTrip" Label="Dokumen trip"
+                                       Description="Masuk ke tab Dokumen trip yang dipilih: Berita Acara, surat jalan, foto barang." />
+                            </div>
+                        </div>
+                    </fieldset>
+                }
+                @if (keTrip)
+                {
+                    <Field Label="Trip" Required Class="col-12" Error="@_galat.GetValueOrDefault("trip_id")"
+                           Hint="@Teks("Ketik ID Trip, No. Referensi, plat, atau supir. Tanggal ikut tanggal berangkat trip, boleh diganti.")">
+                        <Pilihan Id="@context" Options="OpsiTrip" Value="@(_isi.TripId == "" ? null : _isi.TripId)" Invalid="@_galat.ContainsKey("trip_id")"
+                                 Placeholder="Pilih trip..." SearchPlaceholder="Cari ID Trip, plat, supir..." ValueChanged="PilihTrip" />
+                    </Field>
+                }
+                <Field Label="Judul" Required Class="col-sm-8" Error="@_galat.GetValueOrDefault("judul")">
+                    <input id="@context" class="form-control @(_galat.ContainsKey("judul") ? "is-invalid" : "")" value="@_isi.Judul"
+                           placeholder="@(keTrip ? "Berita Acara bertanda tangan penerima" : "SOP pemuatan alat berat")" @oninput="e => _isi.Judul = e.Value?.ToString() ?? string.Empty" />
+                </Field>
+                <Field Label="Tanggal" Required Class="col-sm-4" Error="@_galat.GetValueOrDefault("tanggal")">
+                    <TanggalInput Id="@context" Value="@_isi.Tanggal" Invalid="@_galat.ContainsKey("tanggal")" ValueChanged="UbahTanggal" />
+                </Field>
+                @if (!keTrip)
+                {
+                    <Field Label="Kategori" Class="col-12">
+                        <Pilihan Id="@context" Options="OpsiKategori" Value="@_isi.Kategori" ValueChanged="v => _isi.Kategori = v ?? KategoriDokumen.Semua[0]" Cari="false" Clearable="false" />
+                    </Field>
+                }
+                <Field Label="Berkas" Required Class="col-12" Error="@_galat.GetValueOrDefault("attachments")" Hint="@Teks("Gambar, PDF, atau berkas lain. Boleh lebih dari satu.")">
+                    <LampiranInput Id="@context" Accept="" Label="Tambah berkas" Value="_isi.Attachments" ValueChanged="UbahBerkas" />
+                </Field>
+                <Field Label="Catatan" Class="col-12">
+                    <textarea id="@context" class="form-control" rows="2" style="resize:vertical" value="@_isi.Catatan"
+                              placeholder="@(keTrip ? "mis. diterima petugas gudang; fisik menyusul" : "mis. berlaku mulai Oktober 2026")" @oninput="e => _isi.Catatan = e.Value?.ToString() ?? string.Empty"></textarea>
+                </Field>
+            </div>
+        </ChildContent>
+        <Footer>
+            <Tombol OnClick="() => _unggah = false">Batal</Tombol>
+            <Tombol Variant="primary" OnClick="SimpanUnggah">@(_edit is not null ? "Simpan Perubahan" : "Simpan")</Tombol>
+        </Footer>
+    </Modal>
+}
+
+@{
+    var dokumenHapus = _menghapus is null ? null : Db.Semua.Dokumen.FirstOrDefault(x => x.Id == _menghapus.RecordId);
+    var sisaBerkas = dokumenHapus is null ? 0 : dokumenHapus.Attachments.Count - 1;
+}
+<KonfirmasiDialog Open="_menghapus is not null" Title="Hapus berkas dokumen umum?" ConfirmLabel="Hapus" Tone="danger" OnCancel="() => _menghapus = null" OnConfirm="HapusBerkas">
+    <span class="d-block fs-13 fw-medium text-ink">@(_menghapus?.Nama is { Length: > 0 } nm ? nm : "Berkas ini")</span>
+    <span class="d-block mt-1 fs-13 text-ink-2">
+        @(sisaBerkas > 0
+            ? $"Berkas ini dikeluarkan dari dokumen “{dokumenHapus?.Judul}”. {sisaBerkas} berkas lain di dokumen itu tetap tersimpan."
+            : $"Ini satu-satunya berkas di dokumen “{dokumenHapus?.Judul ?? ""}”, jadi dokumennya ikut dihapus.")
+    </span>
+    <span class="d-block mt-1 fs-12-5 text-ink-3">Berkas yang sudah dihapus tidak dapat dikembalikan.</span>
+</KonfirmasiDialog>
+
+@code {
+    /// <summary>Sumber berkas: record mana yang menyimpan id lampirannya. Urutannya = urutan pilihan filter.</summary>
+    private static readonly string[] Sumber =
+        ["dokumen", "tripNotes", "pod", "pi", "override", "ujPayments", "expenses", "internalCosts", "tripEvents", "kasbonEntries", "drivers", "vehicles", "contracts"];
+
+    private static string LabelSumber(string s) => s switch
+    {
+        "dokumen" => "Dokumen umum", "tripNotes" => "Dokumen trip", "pod" => "Foto POD", "pi" => "Bukti PI", "override" => "Bukti override harga",
+        "ujPayments" => "Uang jalan", "expenses" => "Nota biaya operasional", "internalCosts" => "Biaya internal", "tripEvents" => "Perjalanan",
+        "kasbonEntries" => "Bukti kasbon", "drivers" => "Dokumen karyawan", "vehicles" => "Dokumen kendaraan", "contracts" => "Dokumen kontrak", _ => s,
+    };
+
+    /// <summary>Tempat berkas itu diubah atau dihapus (untuk tombol tautan).</summary>
+    private static string TempatSumber(string s) => s switch
+    {
+        "dokumen" => "halaman ini", "tripNotes" => "tab Dokumen di detail trip", "pod" => "Tutup Trip di detail trip", "pi" => "halaman Tagihan / detail trip",
+        "override" => "form trip", "ujPayments" => "tab Uang Jalan di detail trip", "expenses" => "tab Biaya Operasional di detail trip",
+        "internalCosts" => "tab Komisi di detail trip", "tripEvents" => "tab Perjalanan di detail trip", "kasbonEntries" => "menu Piutang Karyawan",
+        "drivers" => "Ubah karyawan di Supir / Karyawan", "vehicles" => "Ubah kendaraan di halaman Kendaraan", "contracts" => "daftar kontrak di halaman klien", _ => "",
+    };
+
+    private const string TujuanUmum = "umum", TujuanTrip = "trip";
+
+    /// <summary>Satu berkas beserta record pemiliknya.</summary>
+    public sealed record BerkasSumber(string Kunci, string LampiranId, string Sumber, string Rincian, string Judul, string Milik, string MilikKet,
+        string? Tautan, string Tanggal, string RecordId);
+
+    /// <summary>Metadata berkas dari IndexedDB.</summary>
+    public sealed class MetaBerkas
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "";
+        public long Size { get; set; }
+        public string Dibuat { get; set; } = "";
+        public bool Hilang { get; set; }
+    }
+
+    public sealed class BarisBerkas
+    {
+        public required BerkasSumber S { get; init; }
+        public string Kunci => S.Kunci;
+        public string JenisLabel { get; init; } = "";
+        public string Nama { get; init; } = "";
+        /// <summary>Byte; -1 bila belum diketahui.</summary>
+        public long Ukuran { get; init; }
+        public string Tipe { get; init; } = "";
+        /// <summary>Waktu unggah (ISO), dari metadata berkas.</summary>
+        public string Diunggah { get; init; } = "";
+        /// <summary>memuat | ada | hilang</summary>
+        public string Keadaan { get; init; } = "memuat";
+        /// <summary>Tanggal yang ditampilkan & disaring: tanggal record, atau tanggal unggah.</summary>
+        public string TanggalTampil { get; init; } = "";
+        public string RecordId => S.RecordId;
+    }
+
+    public sealed class FilterBerkas { public string Jenis { get; set; } = ""; public string Dari { get; set; } = ""; public string Sampai { get; set; } = ""; }
+
+    public sealed class IsiUnggah
+    {
+        public string Simpan { get; set; } = TujuanUmum;
+        public string TripId { get; set; } = "";
+        public string Judul { get; set; } = "";
+        public string Kategori { get; set; } = "Umum";
+        public string Tanggal { get; set; } = Format.HariIni();
+        public string Catatan { get; set; } = "";
+        public List<string> Attachments { get; set; } = [];
+    }
+
+    private readonly KendaliTabel<BarisBerkas> _tabel = new(25, "tanggalTampil", false);
+    private KendaliFilter<FilterBerkas> _filter = default!;
+    private readonly Dictionary<string, MetaBerkas?> _meta = [];
+    private bool _memuatMeta, _helperTerpasang;
+
+    private bool _unggah;
+    private Model.Dokumen? _edit;
+    private IsiUnggah _isi = new();
+    /// <summary>Tanggal sudah diubah sendiri: memilih trip tidak lagi mengganti tanggalnya.</summary>
+    private bool _tanggalSendiri;
+    private readonly Dictionary<string, string> _galat = [];
+    private BarisBerkas? _menghapus;
+
+    private bool BolehUnggah => Bisa("trip");
+    private bool BolehKelola => Bisa("master");
+
+    private static RenderFragment Teks(string s) => b => b.AddContent(0, s);
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _filter = new KendaliFilter<FilterBerkas>(() => new FilterBerkas(), StateHasChanged);
+        _tabel.Search = (r, q) => Util.CocokCari(q, r.Nama, r.JenisLabel, r.S.Rincian, r.S.Judul, r.S.Milik, r.S.MilikKet);
+        _tabel.SortAccessor = k => k switch
+        {
+            "nama" => r => r.Nama,
+            "jenisLabel" => r => r.JenisLabel,
+            "milik" => r => r.S.Milik,
+            "ukuran" => r => r.Ukuran,
+            _ => r => r.TanggalTampil,
+        };
+        _tabel.TieBreak = r => r.Diunggah;
+        _tabel.ExtraFilter = r =>
+        {
+            var f = _filter.Nilai;
+            return (f.Jenis == "" || r.S.Sumber == f.Jenis) && (f.Dari == "" || string.CompareOrdinal(r.TanggalTampil, f.Dari) >= 0)
+                && (f.Sampai == "" || (r.TanggalTampil != "" && string.CompareOrdinal(r.TanggalTampil, f.Sampai) <= 0));
+        };
+    }
+
+    /* ── Kumpulan berkas ─────────────────────────────────────────────────── */
+
+    private static string WsDari(string? ws) => string.IsNullOrEmpty(ws) ? WorkspaceKode.Priok : ws;
+    private static string Berlaku(string? iso) => iso is null ? "" : string.Join("/", iso.Split('-').Reverse());
+
+    /// <summary>Kumpulkan seluruh berkas yang dirujuk record di workspace ini (master & kasbon dipakai bersama).</summary>
+    private static List<BerkasSumber> KumpulkanBerkas(Database d, string workspace)
+    {
+        var keluar = new List<BerkasSumber>();
+        void Tambah(IEnumerable<string>? ids, string sumber, string rincian, string judul, string milik, string milikKet, string? tautan, string tanggal, string recordId)
+        {
+            foreach (var id in ids ?? []) if (!string.IsNullOrEmpty(id)) keluar.Add(new BerkasSumber($"{sumber}:{recordId}:{id}", id, sumber, rincian, judul, milik, milikKet, tautan, tanggal, recordId));
+        }
+        var trips = d.Trip.Where(t => WsDari(t.Workspace) == workspace).ToList();
+        var tripMap = trips.ToDictionary(t => t.Id);
+        string KetTrip(Model.Trip t) => t.Status == StatusTrip.Batal ? "Trip batal (arsip)" : "Trip";
+        string KeTrip(Model.Trip t, string? tab = null) => $"transaksi/trip/{t.Id}{(tab is not null ? $"?tab={tab}" : "")}";
+
+        foreach (var t in trips)
+        {
+            Tambah(t.PodAttachments, "pod", t.PodFisik == true ? "fisik diterima" : t.PodFisik == false ? "fisik menyusul" : "",
+                "Foto POD (Berita Acara / Surat Jalan bertanda tangan penerima)", t.TransactionNo, KetTrip(t), KeTrip(t), !string.IsNullOrEmpty(t.ClosedAt) ? t.ClosedAt : t.TransactionDate, t.Id);
+            Tambah(t.PiAttachments, "pi", t.PiNumber != "" ? $"PI {t.PiNumber}" : "", t.PiNote ?? "", t.TransactionNo, KetTrip(t), KeTrip(t),
+                !string.IsNullOrEmpty(t.PiTahapDate) ? t.PiTahapDate : !string.IsNullOrEmpty(t.PiDate) ? t.PiDate : t.TransactionDate, t.Id);
+            Tambah(t.OverrideAttachments, "override", "", t.OverrideNote ?? "", t.TransactionNo, KetTrip(t), KeTrip(t), t.TransactionDate, t.Id);
+        }
+        foreach (var n in d.CatatanTrip)
+            if (tripMap.TryGetValue(n.TripId, out var t))
+                Tambah(n.Attachments, "tripNotes", "", string.Join(" · ", new[] { n.Title, n.Notes }.Where(x => x != "")), t.TransactionNo, KetTrip(t), KeTrip(t, "lainnya"), n.NoteDate, n.Id);
+        foreach (var p in d.Termin)
+            if (tripMap.TryGetValue(p.TripId, out var t))
+            {
+                var jenis = !string.IsNullOrEmpty(p.Jenis) && p.Jenis != JenisTermin.Uj ? $" · {JenisTermin.Label(p.Jenis)}" : "";
+                Tambah(p.Attachments, "ujPayments", $"Termin {p.Sequence}{jenis}", p.Notes, t.TransactionNo, KetTrip(t), KeTrip(t, "uj"), p.PaymentDate, p.Id);
+            }
+        foreach (var e in d.Biaya)
+            if (tripMap.TryGetValue(e.TripId, out var t))
+                Tambah(e.Attachments, "expenses", JenisBiaya.Label(e.ExpenseType), e.Notes, t.TransactionNo, KetTrip(t), KeTrip(t, "biaya"), e.ExpenseDate, e.Id);
+        foreach (var c in d.BiayaInternal)
+            if (tripMap.TryGetValue(c.TripId, out var t))
+                Tambah(c.Attachments, "internalCosts", c.CostType, c.Notes, t.TransactionNo, KetTrip(t), KeTrip(t, "internal"), c.CostDate, c.Id);
+        foreach (var ev in d.Kejadian)
+            if (tripMap.TryGetValue(ev.TripId, out var t))
+                // Tab Perjalanan hanya ada di trip Karawang.
+                Tambah(ev.Attachments, "tripEvents", JenisPerjalanan.Label(ev.Jenis), string.Join(" · ", new[] { ev.Lokasi, ev.Catatan }.Where(x => x != "")),
+                    t.TransactionNo, KetTrip(t), KeTrip(t, WsDari(t.Workspace) == WorkspaceKode.Karawang ? "perjalanan" : null), ev.Waktu.Length >= 10 ? ev.Waktu[..10] : ev.Waktu, ev.Id);
+        var orang = d.Karyawan.ToDictionary(x => x.Id);
+        foreach (var k in d.Kasbon)
+        {
+            orang.TryGetValue(k.EmployeeId, out var o);
+            Tambah(k.Attachments, "kasbonEntries", JenisKasbon.Label(k.Kind), k.Notes, o?.DriverName ?? "Karyawan sudah dihapus", "Kasbon karyawan",
+                o is not null ? $"master/karyawan/{o.Id}" : null, k.EntryDate, k.Id);
+        }
+        foreach (var o in d.Karyawan)
+        {
+            var ket = o.Role == PeranKaryawan.Manager ? "Manager" : "Supir";
+            // Dokumen penting per jenis (KTP, SIM, ...), lalu dokumen lainnya.
+            foreach (var j in DokumenPentingJenis.Karyawan)
+            {
+                var dok = o.Dokumen?.GetValueOrDefault(j.Kode);
+                Tambah(dok?.Berkas, "drivers", j.Label, !string.IsNullOrEmpty(dok?.BerlakuSampai) ? $"Berlaku s/d {Berlaku(dok.BerlakuSampai)}" : j.Label,
+                    o.DriverName, ket, $"master/karyawan/{o.Id}", "", $"{o.Id}:{j.Kode}");
+            }
+            Tambah(o.Attachments, "drivers", "Lainnya", "Dokumen lainnya karyawan", o.DriverName, ket, $"master/karyawan/{o.Id}", "", o.Id);
+        }
+        foreach (var v in d.Kendaraan)
+        {
+            var ket = v.VehicleType != "" ? v.VehicleType : "Kendaraan";
+            foreach (var j in DokumenPentingJenis.Kendaraan)
+            {
+                var dok = v.Dokumen?.GetValueOrDefault(j.Kode);
+                Tambah(dok?.Berkas, "vehicles", j.Label, !string.IsNullOrEmpty(dok?.BerlakuSampai) ? $"Berlaku s/d {Berlaku(dok.BerlakuSampai)}" : j.Label,
+                    v.PlateNumber, ket, "master/mobil", "", $"{v.Id}:{j.Kode}");
+            }
+            Tambah(v.Attachments, "vehicles", "Lainnya", "Foto kendaraan & dokumen lainnya", v.PlateNumber, ket, "master/mobil", "", v.Id);
+        }
+        var klien = d.Klien.ToDictionary(p => p.Id);
+        foreach (var c in d.Kontrak.Where(x => WsDari(x.Workspace) == workspace))
+        {
+            klien.TryGetValue(c.ProjectId, out var k);
+            Tambah(c.Attachments, "contracts", k?.ProjectCode ?? "", c.Notes, c.ContractNo, k?.ProjectName ?? "Kontrak",
+                k is not null ? $"master/klien/{k.Id}" : "master/klien", c.StartDate, c.Id);
+        }
+        foreach (var dk in d.Dokumen.Where(x => WsDari(x.Workspace) == workspace))
+            Tambah(dk.Attachments, "dokumen", dk.Kategori, string.Join(" · ", new[] { dk.Judul, dk.Catatan }.Where(x => x != "")), dk.Judul,
+                $"Dokumen umum · {(dk.Kategori != "" ? dk.Kategori : "Umum")}", null, dk.Tanggal, dk.Id);
+        return keluar;
+    }
+
+    private Database? _versiSumber;
+    private string _wsSumber = "";
+    private List<BerkasSumber> _sumber = [];
+
+    private List<BerkasSumber> SumberBerkas
+    {
+        get
+        {
+            // Db.Data berganti objek setiap data / workspace berubah: dipakai sebagai penanda versi.
+            var data = Db.Data;
+            if (!ReferenceEquals(data, _versiSumber) || _wsSumber != Sesi.Workspace)
+            {
+                _versiSumber = data; _wsSumber = Sesi.Workspace;
+                _sumber = KumpulkanBerkas(Db.Semua, Sesi.Workspace);
+            }
+            return _sumber;
+        }
+    }
+
+    private List<BarisBerkas> Semua => SumberBerkas.Select(s =>
+    {
+        var ada = _meta.TryGetValue(s.LampiranId, out var m);
+        var keadaan = !ada ? "memuat" : m is null ? "hilang" : "ada";
+        var diunggah = m?.Dibuat ?? "";
+        var tglRecord = s.Tanggal.Length >= 10 ? s.Tanggal[..10] : s.Tanggal;
+        var iso = Format.Pecah(tglRecord, out _, out _, out _) && tglRecord.Length == 10 ? tglRecord : "";
+        return new BarisBerkas
+        {
+            S = s, JenisLabel = LabelSumber(s.Sumber), Nama = m?.Name ?? "", Ukuran = m?.Size ?? -1, Tipe = m?.Type ?? "",
+            Diunggah = diunggah, Keadaan = keadaan, TanggalTampil = iso != "" ? iso : TanggalLokal(diunggah),
+        };
+    }).ToList();
+
+    /* ── Metadata berkas (IndexedDB) ─────────────────────────────────────── */
+
+    /// <summary>
+    /// Metadata (nama, jenis, ukuran, waktu unggah) dibaca dari IndexedDB sekali per id, berkelompok. Waktu unggah belum
+    /// dikembalikan sikotis.lampiran.info, jadi dibaca lewat pembantu kecil di halaman ini.
+    /// </summary>
+    private const string PembantuJs = """
+        window.sikotisDokumen = window.sikotisDokumen || {
+          meta(ids) {
+            return new Promise((resolve) => {
+              const req = indexedDB.open('sikotis-lampiran', 1)
+              req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains('berkas')) req.result.createObjectStore('berkas', { keyPath: 'id' }) }
+              req.onerror = () => resolve(ids.map((id) => ({ id, hilang: true })))
+              req.onsuccess = () => {
+                const db = req.result
+                const store = db.transaction('berkas', 'readonly').objectStore('berkas')
+                Promise.all(ids.map((id) => new Promise((r) => {
+                  const q = store.get(id)
+                  q.onsuccess = () => { const b = q.result; r(b ? { id, name: b.name || '', type: b.type || '', size: b.size || 0, dibuat: b.created_at || '' } : { id, hilang: true }) }
+                  q.onerror = () => r({ id, hilang: true })
+                }))).then((hasil) => { db.close(); resolve(hasil) })
+              }
+            })
+          },
+          unduh(url, nama) { const a = document.createElement('a'); a.href = url; a.download = nama || 'berkas'; a.click() },
+        }; true
+        """;
+
+    protected override async Task OnAfterRenderAsync(bool pertama)
+    {
+        if (_memuatMeta) return;
+        var perlu = SumberBerkas.Select(s => s.LampiranId).Distinct().Where(id => !_meta.ContainsKey(id)).ToList();
+        if (perlu.Count == 0) return;
+        _memuatMeta = true;
+        try
+        {
+            if (!_helperTerpasang) { await JS.InvokeAsync<bool>("eval", PembantuJs); _helperTerpasang = true; }
+            var hasil = await JS.InvokeAsync<List<MetaBerkas>>("sikotisDokumen.meta", perlu);
+            foreach (var m in hasil) _meta[m.Id] = m.Hilang ? null : m;
+        }
+        catch
+        {
+            foreach (var id in perlu) _meta[id] = null;
+        }
+        finally { _memuatMeta = false; }
+        StateHasChanged();
+    }
+
+    /// <summary>ISO waktu -> tanggal lokal yyyy-mm-dd (untuk saring & urut).</summary>
+    private static string TanggalLokal(string iso) => DateTimeOffset.TryParse(iso, out var d) ? Format.KeIso(d.ToLocalTime().DateTime) : "";
+    /// <summary>Waktu ISO -> "12/10/2026 14:35" (jam lokal).</summary>
+    private static string WaktuUnggah(string iso) => DateTimeOffset.TryParse(iso, out var d) ? Format.WaktuCetak(d.ToLocalTime().DateTime) : "";
+
+    /// <summary>1536 -> "1,5 KB"; 2400000 -> "2,3 MB".</summary>
+    private static string FormatUkuran(long b)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        if (b < 0) return "—";
+        if (b < 1024) return $"{b} B";
+        if (b < 1024 * 1024) return $"{(b / 1024.0).ToString(b < 10 * 1024 ? "0.0" : "0", inv).Replace('.', ',')} KB";
+        return $"{(b / 1024.0 / 1024.0).ToString("0.0", inv).Replace('.', ',')} MB";
+    }
+
+    /// <summary>"image/jpeg" -> "Gambar"; "application/pdf" -> "PDF"; lainnya ekstensi nama berkas.</summary>
+    private static string JenisBerkas(string tipe, string nama)
+    {
+        if (tipe.StartsWith("image/")) return "Gambar";
+        if (tipe == "application/pdf") return "PDF";
+        var m = System.Text.RegularExpressions.Regex.Match(nama, @"\.([a-z0-9]{1,5})$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return m.Success ? m.Groups[1].Value.ToUpperInvariant() : "Berkas";
+    }
+
+    /* ── Filter & tabel ──────────────────────────────────────────────────── */
+
+    private static List<Opsi> OpsiJenis(List<BarisBerkas> semua)
+    {
+        var jumlah = semua.GroupBy(r => r.S.Sumber).ToDictionary(g => g.Key, g => g.Count());
+        return [new Opsi("", $"Semua jenis ({Format.Angka(semua.Count)})"), .. Sumber.Select(s => new Opsi(s, $"{LabelSumber(s)} ({Format.Angka(jumlah.GetValueOrDefault(s))})"))];
+    }
+
+    private List<ChipFilter> Chips
+    {
+        get
+        {
+            var f = _filter.Nilai;
+            var c = new List<ChipFilter>();
+            if (f.Jenis != "") c.Add(new($"Jenis: {LabelSumber(f.Jenis)}", () => _filter.Lepas((n, a) => n.Jenis = a.Jenis)));
+            if (f.Dari != "" || f.Sampai != "") c.Add(new($"Tanggal {Format.RentangTanggal(f.Dari, f.Sampai)}", () => _filter.Lepas((n, a) => { n.Dari = a.Dari; n.Sampai = a.Sampai; })));
+            return c;
+        }
+    }
+
+    private void ResetFilter() { _tabel.Reset(); _filter.LepasSemua(); }
+
+    private Model.Dokumen? DokumenUmum(BarisBerkas r) => r.S.Sumber == "dokumen" ? Db.Semua.Dokumen.FirstOrDefault(x => x.Id == r.RecordId) : null;
+
+    private List<Kolom<BarisBerkas>> Kolom =>
+    [
+        new()
+        {
+            Key = "nama", Header = "Berkas", Sortable = true,
+            Render = r => @<div class="d-flex align-items-center gap-2" style="min-width:220px;max-width:360px">
+                <LampiranThumbs Ids="@(new List<string> { r.S.LampiranId })" Ukuran="38" Class="flex-shrink-0" />
+                <div class="min-w-0 lh-tight">
+                    @if (r.Keadaan == "memuat") { <span class="text-ink-3">Memuat...</span> }
+                    else if (r.Keadaan == "hilang")
+                    {
+                        <span class="d-flex align-items-center gap-1 text-ink-3" title="Berkas tidak ditemukan di penyimpanan browser ini."><Badge Tone="critical">Hilang</Badge> berkas tidak ditemukan</span>
+                    }
+                    else { <span class="d-block text-truncate fw-medium text-ink" title="@r.Nama">@r.Nama</span> }
+                    <span class="d-block text-truncate fs-12 text-ink-3" title="@(r.S.Judul != "" ? r.S.Judul : null)">@KetBerkas(r)</span>
+                </div>
+            </div>,
+        },
+        new()
+        {
+            Key = "jenisLabel", Header = "Jenis / Sumber", Sortable = true, Width = "190px",
+            Render = r => @<div class="lh-tight">
+                <Badge Tone="@(r.S.Sumber == "dokumen" ? "brand" : "neutral")">@r.JenisLabel</Badge>
+                @if (r.S.Rincian != "") { <span class="mt-1 d-block fs-12 text-ink-3">@r.S.Rincian</span> }
+            </div>,
+        },
+        new()
+        {
+            Key = "milik", Header = "Milik", Sortable = true, Width = "200px",
+            Render = r => @<div class="lh-tight">
+                @if (r.S.Tautan is not null)
+                {
+                    <a href="@r.S.Tautan" class="tnum fw-semibold text-break text-decoration-none" @onclick:stopPropagation="true">@(r.S.Milik != "" ? r.S.Milik : "—")</a>
+                }
+                else { <span class="fw-medium text-ink">@(r.S.Milik != "" ? r.S.Milik : "—")</span> }
+                <span class="d-block fs-12 text-ink-3">@r.S.MilikKet</span>
+            </div>,
+        },
+        new()
+        {
+            Key = "tanggalTampil", Header = "Tanggal", Sortable = true, Width = "150px",
+            Render = r => @<div class="tnum lh-tight">
+                <span class="text-ink-2">@(r.TanggalTampil != "" ? Format.Tanggal(r.TanggalTampil) : "—")</span>
+                @if (r.Diunggah != "") { <span class="d-block fs-11-5 text-ink-3">@(r.S.Tanggal != "" ? $"diunggah {WaktuUnggah(r.Diunggah)}" : "tanggal unggah")</span> }
+            </div>,
+        },
+        new() { Key = "ukuran", Header = "Ukuran", Sortable = true, Align = "right", Width = "92px", Render = r => @<span class="tnum text-ink-2">@FormatUkuran(r.Ukuran)</span> },
+        new()
+        {
+            Key = "action", Header = "Action", Align = "right", Width = "120px", NoPrint = true,
+            Render = r => @<div class="d-flex justify-content-end gap-1">
+                <TombolIkon Label="@($"Unduh {(r.Nama != "" ? r.Nama : "berkas")}")" Icon="Ikon.Download" Disabled="@(r.Keadaan != "ada")" OnClick="() => Unduh(r)" />
+                @if (DokumenUmum(r) is { } dok)
+                {
+                    <TombolIkon Label="Ubah dokumen" Icon="Ikon.Pen" Disabled="@(!BolehKelola)" OnClick="() => BukaUnggah(dok)" />
+                    <TombolIkon Label="Hapus berkas" Tone="danger" Icon="Ikon.TrashCan" Disabled="@(!BolehKelola)" OnClick="() => _menghapus = r" />
+                }
+                else
+                {
+                    <TombolIkon Label="@(r.S.Tautan is not null ? $"Buka sumbernya. Ubah atau hapus berkas ini di {TempatSumber(r.S.Sumber)}." : "Record pemiliknya sudah tidak ada")"
+                                Icon="Ikon.Link" Disabled="@(r.S.Tautan is null)" OnClick="() => BukaTautan(r)" />
+                }
+            </div>,
+        },
+    ];
+
+    private static string KetBerkas(BarisBerkas r)
+    {
+        var s = string.Join(" · ", new[] { r.Keadaan == "ada" ? JenisBerkas(r.Tipe, r.Nama) : "", r.S.Judul }.Where(x => x != ""));
+        return s != "" ? s : "—";
+    }
+
+    private void BukaTautan(BarisBerkas r) { if (r.S.Tautan is not null) Ke(r.S.Tautan); }
+
+    private async Task Unduh(BarisBerkas r)
+    {
+        var info = await LampiranSvc.InfoAsync(r.S.LampiranId);
+        if (info is null) { Toast.Galat("Berkas tidak ditemukan di penyimpanan browser ini."); return; }
+        try
+        {
+            if (!_helperTerpasang) { await JS.InvokeAsync<bool>("eval", PembantuJs); _helperTerpasang = true; }
+            await JS.InvokeVoidAsync("sikotisDokumen.unduh", info.Url, info.Name);
+        }
+        catch { Toast.Galat("Berkas tidak ditemukan di penyimpanan browser ini."); }
+    }
+
+    private async Task HapusBerkas()
+    {
+        var r = _menghapus;
+        if (r is null) return;
+        var dok = Db.Semua.Dokumen.FirstOrDefault(x => x.Id == r.RecordId);
+        if (dok is not null)
+        {
+            var sisa = dok.Attachments.Where(a => a != r.S.LampiranId).ToList();
+            if (sisa.Count > 0)
+            {
+                Db.Ubah<Model.Dokumen>(dok.Id, x => x.Attachments = sisa);
+                Toast.Sukses($"Berkas {r.Nama} dihapus dari dokumen “{dok.Judul}”. {sisa.Count} berkas lain tetap tersimpan.");
+            }
+            else
+            {
+                Db.Hapus<Model.Dokumen>(dok.Id);
+                Toast.Sukses($"Dokumen “{dok.Judul}” dihapus.");
+            }
+            _menghapus = null;
+            await LampiranSvc.HapusAsync([r.S.LampiranId]);
+        }
+        _menghapus = null;
+    }
+
+    /* ── Unggah dokumen ──────────────────────────────────────────────────── */
+
+    /// <summary>Opsi trip untuk "Simpan di trip": trip workspace ini, terbaru dulu. Trip batal hanya arsip.</summary>
+    private List<Opsi> OpsiTrip => Db.Baris
+        .OrderByDescending(t => t.T.TransactionDate, StringComparer.Ordinal).ThenByDescending(t => t.T.CreatedAt, StringComparer.Ordinal)
+        .Select(t => new Opsi(t.Id, t.IdTampil,
+            t.Batal ? "Trip batal: dokumennya hanya arsip, tidak bisa ditambah"
+                : string.Join(" · ", new[] { Format.Tanggal(t.T.TransactionDate), t.RouteName != "" ? t.RouteName : string.Join(" → ", new[] { t.Muat, t.Bongkar }.Where(x => x != "")), t.PlateNumber }.Where(x => x != "")),
+            string.Join(" ", t.T.TransactionNo, string.Join(" ", t.TrList), t.DriverNames, t.ProjectCode), t.Batal))
+        .ToList();
+
+    private List<Opsi> OpsiKategori
+    {
+        get
+        {
+            // Kategori lama di luar daftar tetap bisa dipertahankan.
+            var daftar = KategoriDokumen.Semua.ToList();
+            if (_isi.Kategori != "" && !daftar.Contains(_isi.Kategori)) daftar.Add(_isi.Kategori);
+            return Opsi.Dari(daftar);
+        }
+    }
+
+    /// <summary>
+    /// Unggah dokumen. "Dokumen umum" = tidak menempel pada satu trip (SOP, surat, dokumen perusahaan) dan disimpan di Dokumen.
+    /// "Dokumen trip" = disimpan ke tab Dokumen trip itu, sama seperti menambah dokumen dari detail trip. Saat mengubah dokumen
+    /// umum, jenisnya tetap.
+    /// </summary>
+    private void BukaUnggah(Model.Dokumen? edit)
+    {
+        _edit = edit;
+        _isi = edit is not null
+            ? new IsiUnggah { Simpan = TujuanUmum, Judul = edit.Judul, Kategori = edit.Kategori != "" ? edit.Kategori : "Umum", Tanggal = edit.Tanggal, Catatan = edit.Catatan, Attachments = [.. edit.Attachments] }
+            : new IsiUnggah();
+        _tanggalSendiri = edit is not null;
+        _galat.Clear();
+        _unggah = true;
+    }
+
+    private void PilihTrip(string? id)
+    {
+        _isi.TripId = id ?? "";
+        if (id is not null && !_tanggalSendiri)
+        {
+            var tgl = Db.BarisTrip(id)?.T.TransactionDate ?? "";
+            if (tgl != "") _isi.Tanggal = tgl;
+        }
+        _galat.Remove("trip_id");
+    }
+
+    private void UbahTanggal(string v) { _tanggalSendiri = true; _isi.Tanggal = v; }
+
+    private void UbahBerkas(List<string> v) { _isi.Attachments = v; if (v.Count > 0) _galat.Remove("attachments"); }
+
+    private async Task SimpanUnggah()
+    {
+        _galat.Clear();
+        var keTrip = _isi.Simpan == TujuanTrip;
+        if (keTrip && _isi.TripId == "") _galat["trip_id"] = "Pilih trip yang memiliki dokumen ini.";
+        if (_isi.Judul.Trim() == "") _galat["judul"] = "Judul dokumen wajib diisi.";
+        if (_isi.Tanggal == "") _galat["tanggal"] = "Tanggal wajib diisi.";
+        if (_isi.Attachments.Count == 0) _galat["attachments"] = "Pilih minimal satu berkas.";
+        if (_galat.Count > 0) return;
+        var judul = _isi.Judul.Trim(); var catatan = _isi.Catatan.Trim();
+        if (keTrip)
+        {
+            var t = Db.BarisTrip(_isi.TripId);
+            Db.Buat(new CatatanTrip { TripId = _isi.TripId, NoteDate = _isi.Tanggal, Title = judul, Notes = catatan, Attachments = [.. _isi.Attachments] });
+            Toast.Sukses($"Dokumen “{judul}” tersimpan di trip {t?.IdTampil ?? ""}. Bisa dibuka juga di tab Dokumen trip itu.");
+        }
+        else if (_edit is not null)
+        {
+            var lama = _edit;
+            var dilepas = lama.Attachments.Where(a => !_isi.Attachments.Contains(a)).ToList();
+            var isi = _isi;
+            Db.Ubah<Model.Dokumen>(lama.Id, d => { d.Judul = judul; d.Kategori = isi.Kategori; d.Tanggal = isi.Tanggal; d.Catatan = catatan; d.Attachments = [.. isi.Attachments]; });
+            if (dilepas.Count > 0) await LampiranSvc.HapusAsync(dilepas);
+            Toast.Sukses($"Dokumen “{judul}” diperbarui.");
+        }
+        else
+        {
+            Db.Buat(new Model.Dokumen { Judul = judul, Kategori = _isi.Kategori, Tanggal = _isi.Tanggal, Catatan = catatan, Attachments = [.. _isi.Attachments] });
+            Toast.Sukses($"Dokumen umum “{judul}” tersimpan ({_isi.Attachments.Count} berkas).");
+        }
+        _unggah = false;
+    }
+}

@@ -1,0 +1,9 @@
+@* Tautan-aksi kecil di dalam keterangan ("Tambah alamat CIB", "Pakai Harga Rute"). *@
+<button type="button" class="btn btn-link p-0 fs-inherit fw-semibold text-decoration-underline align-baseline @Class" disabled="@Disabled" @onclick="OnClick">@ChildContent</button>
+
+@code {
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

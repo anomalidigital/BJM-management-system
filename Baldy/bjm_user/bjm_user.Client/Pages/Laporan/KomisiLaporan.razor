@@ -1,0 +1,262 @@
+@* Komisi → tab Laporan: rekap komisi per supir pada periode, dan cetak rekap / rincian / komisi satu supir. *@
+@inherits KomponenData
+@{ Susun(); }
+@if (_preview && _mode == "global")
+{
+    <ReportPreview OnClose="() => _preview = false">
+        @{
+            var per = PrintDocument.BarisPerLembar(context, 28);
+            var hal = PrintDocument.Bagi(_global, per);
+        }
+        <PrintDocument>
+            @for (var i = 0; i < hal.Count; i++)
+            {
+                var ii = i; var isi = hal[ii];
+                <PrintPage Page="@(ii + 1)" TotalPages="hal.Count" Title="Laporan Komisi Global" Subtitle="Rekap komisi seluruh supir" Periode="@PeriodeTeks"
+                           Meta="@(new List<(string, string)> { ("Jumlah supir", Format.Angka(_global.Count)), ("Jumlah ritan", Format.Angka(_totals.Ritan)), ("Total komisi", Format.Rupiah(_totals.Komisi)) })">
+                    <PrintTable Cols="@(new List<(string, string, string?)> { ("No.", "right", "8%"), ("Supir", "left", null), ("Jumlah Ritan", "right", "18%"), ("Total Komisi (Rp)", "right", "24%") })">
+                        @for (var r = 0; r < isi.Count; r++)
+                        {
+                            var rr = r; var x = isi[rr];
+                            <tr>
+                                <td class="p-sel text-end">@(ii * per + rr + 1)</td>
+                                <td class="p-sel">@x.Supir</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Ritan)</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Komisi)</td>
+                            </tr>
+                        }
+                        @if (ii == hal.Count - 1)
+                        {
+                            <tr class="total">
+                                <td class="p-sel text-end" colspan="2">TOTAL</td>
+                                <td class="p-sel text-end">@Format.Angka(_totals.Ritan)</td>
+                                <td class="p-sel text-end">@Format.Angka(_totals.Komisi)</td>
+                            </tr>
+                        }
+                    </PrintTable>
+                </PrintPage>
+            }
+        </PrintDocument>
+    </ReportPreview>
+}
+else if (_preview)
+{
+    <ReportPreview OnClose="() => _preview = false">
+        @{
+            var per = PrintDocument.BarisPerLembar(context, 24);
+            var hal = PrintDocument.Bagi(_rows, per);
+            var supir = SupirTerpilih;
+        }
+        <PrintDocument>
+            @for (var i = 0; i < hal.Count; i++)
+            {
+                var ii = i; var isi = hal[ii];
+                <PrintPage Page="@(ii + 1)" TotalPages="hal.Count" Title="@(_mode == "perSopir" ? "Laporan Komisi per Supir" : "Laporan Komisi Seluruh Supir")"
+                           Subtitle="@(_mode == "perSopir" && supir is not null ? $"{supir.DriverCode} — {supir.DriverName}" : "Rincian per transaksi")" Periode="@PeriodeTeks"
+                           Meta="@(new List<(string, string)> { ("Jumlah transaksi", Format.Angka(_totals.Transaksi)), ("Jumlah ritan", Format.Angka(_totals.Ritan)), ("Total komisi", Format.Rupiah(_totals.Komisi)) })">
+                    <PrintTable Cols="KolomRincian">
+                        @for (var r = 0; r < isi.Count; r++)
+                        {
+                            var rr = r; var t = isi[rr];
+                            <tr>
+                                <td class="p-sel text-end">@(ii * per + rr + 1)</td>
+                                <td class="p-sel">@t.IdTampil</td>
+                                <td class="p-sel">@Format.Tanggal(t.T.TransactionDate)</td>
+                                <td class="p-sel">@t.DriverName</td>
+                                <td class="p-sel">@t.PlateNumber</td>
+                                @* Kode rute Karawang bisa berupa kode acak panjang; nama rute lebih mudah dibaca. *@
+                                <td class="p-sel">@(Karawang ? (t.RouteName != "" ? t.RouteName : t.RouteCode) : t.RouteCode)</td>
+                                <td class="p-sel text-end">@Format.Angka(Hitung.Komisi(t))</td>
+                            </tr>
+                        }
+                        @if (ii == hal.Count - 1)
+                        {
+                            <tr class="total">
+                                <td class="p-sel text-end" colspan="6">TOTAL KOMISI</td>
+                                <td class="p-sel text-end">@Format.Angka(_totals.Komisi)</td>
+                            </tr>
+                        }
+                    </PrintTable>
+                </PrintPage>
+            }
+        </PrintDocument>
+    </ReportPreview>
+}
+else
+{
+    var supir = SupirTerpilih;
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-sm-4"><StatCard Label="Transaksi pada periode" Value="@Format.Angka(_totals.Transaksi)" Hint="@PeriodeTeks" /></div>
+        <div class="col-12 col-sm-4"><StatCard Label="Jumlah Ritan" Value="@Format.Angka(_totals.Ritan)" Hint="1 transaksi = 1 ritan" /></div>
+        <div class="col-12 col-sm-4"><StatCard Label="Total Komisi" Value="@Format.Rupiah(_totals.Komisi)" Hint="@(supir is not null ? supir.DriverName : "seluruh supir")" /></div>
+    </div>
+
+    <Kartu>
+        <Toolbar>
+            <Left>
+                <PanelFilter T="FilterKomisi" Filter="_filter" Chips="Chips" Galat="@Format.GalatRentang(_filter.Draf.Dari, _filter.Draf.Sampai)">
+                    <div>
+                        <p class="form-label">Periode (tanggal berangkat trip)</p>
+                        <div class="row g-2">
+                            <div class="col-6"><TanggalInput AriaLabel="Tanggal awal" Value="@_filter.Draf.Dari" ValueChanged="v => _filter.Ubah(d => d.Dari = v)" /></div>
+                            <div class="col-6"><TanggalInput AriaLabel="Tanggal akhir" Value="@_filter.Draf.Sampai" ValueChanged="v => _filter.Ubah(d => d.Sampai = v)" /></div>
+                        </div>
+                    </div>
+                    <Field Label="Supir">
+                        <ChildContent>
+                            <Pilihan Id="@context" Options="OpsiSupir" Value="@(_filter.Draf.Supir == "" ? null : _filter.Draf.Supir)" Placeholder="Seluruh supir"
+                                     SearchPlaceholder="Cari kode atau nama supir..." Cari="true" ValueChanged="v => _filter.Ubah(d => d.Supir = v ?? string.Empty)" />
+                        </ChildContent>
+                        <Hint>Kosongkan untuk seluruh supir.</Hint>
+                    </Field>
+                </PanelFilter>
+            </Left>
+            <Right>
+                @* Supir dipilih: hanya satu laporan (komisi supir itu). Seluruh supir: rekap per supir atau rincian transaksi. *@
+                @if (_filter.Nilai.Supir != "")
+                {
+                    <Tombol Size="sm" Icon="Ikon.Print" IconSize="14" OnClick="@(() => BukaCetak("perSopir"))">Cetak Komisi Supir</Tombol>
+                }
+                else
+                {
+                    <Tombol Size="sm" Icon="Ikon.Print" IconSize="14" OnClick="@(() => BukaCetak("global"))">Cetak Rekap</Tombol>
+                    <Tombol Size="sm" Icon="Ikon.Print" IconSize="14" OnClick="@(() => BukaCetak("semuaSopir"))">Cetak Rincian</Tombol>
+                }
+            </Right>
+        </Toolbar>
+        @if (_galat is not null)
+        {
+            <div class="border-bottom border-hairline px-3 py-2"><p class="invalid-feedback">@_galat</p></div>
+        }
+        @if (_global.Count == 0)
+        {
+            <p class="m-0 px-3 py-5 text-center fs-13 text-ink-3">Tidak ada transaksi pada periode tersebut.</p>
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+                <table class="table table-hover">
+                    <thead>
+                        <tr><th>Supir</th><th class="text-end">Jumlah Ritan</th><th class="text-end">Total Komisi</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in _global)
+                        {
+                            <tr @key="r.Supir">
+                                <td class="fw-medium text-ink">@r.Supir</td>
+                                <td class="tnum text-end text-ink-2">@Format.Angka(r.Ritan)</td>
+                                <td class="tnum text-end fw-semibold text-ink">@Format.Rupiah(r.Komisi)</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total @Format.Angka(_global.Count) supir</td>
+                            <td class="tnum text-end">@Format.Angka(_totals.Ritan)</td>
+                            <td class="tnum text-end">@Format.Rupiah(_totals.Komisi)</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        }
+        <p class="m-0 border-top border-hairline px-3 py-2 fs-12 text-ink-3">
+            Komisi dihitung otomatis dari tab Aturan untuk trip yang berangkat pada periode ini (trip batal tidak dihitung). Penerimanya supir utama.
+        </p>
+    </Kartu>
+}
+
+@code {
+    public sealed class FilterKomisi
+    {
+        public string Dari { get; set; } = "";
+        public string Sampai { get; set; } = "";
+        public string Supir { get; set; } = "";
+    }
+
+    private sealed record BarisGlobal(string Supir, int Ritan, long Komisi);
+
+    private KendaliFilter<FilterKomisi> _filter = default!;
+    /// <summary>Jenis cetak: perSopir (rincian satu supir), semuaSopir (rincian seluruh supir), global (rekap satu baris per supir).</summary>
+    private string _mode = "semuaSopir";
+    private string? _galat;
+    private bool _preview;
+    private List<BarisTrip> _rows = [];
+    private List<BarisGlobal> _global = [];
+    private Hitung.Ringkasan _totals = Hitung.Ringkas([]);
+
+    private Periode Bawaan => Periode.Aktif(Db.Baris.Select(t => t.T.TransactionDate));
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _filter = new KendaliFilter<FilterKomisi>(() => new FilterKomisi { Dari = Bawaan.Awal, Sampai = Bawaan.Akhir }, () => { _galat = null; StateHasChanged(); });
+    }
+
+
+    /// <summary>Trip pada periode yang berlaku (draf panel tidak ikut), dipanggil tiap render.</summary>
+    private void Susun()
+    {
+        var v = _filter.Nilai;
+        _rows = Db.Baris
+            .Where(t => Hitung.Dihitung(t) && string.CompareOrdinal(t.T.TransactionDate, v.Dari) >= 0 && string.CompareOrdinal(t.T.TransactionDate, v.Sampai) <= 0)
+            // Komisi trip diterima supir utama.
+            .Where(t => v.Supir == "" || t.T.DriverId == v.Supir)
+            .OrderBy(t => t.DriverName, StringComparer.CurrentCulture).ThenBy(t => t.T.TransactionDate, StringComparer.Ordinal)
+            .ToList();
+        _totals = Hitung.Ringkas(_rows);
+        _global = _rows.GroupBy(t => t.T.DriverId)
+            .Select(g =>
+            {
+                var a = g.First();
+                // Trip yang belum diberi supir dikumpulkan di satu baris berlabel jelas, bukan "—".
+                var label = a.T.DriverId != "" ? $"{a.DriverCode} — {a.DriverName}" : "Belum ada supir (komisi menunggu supir diisi)";
+                return new BarisGlobal(label, g.Count(), g.Sum(Hitung.Komisi));
+            })
+            .OrderByDescending(r => r.Komisi).ToList();
+    }
+
+
+    private Karyawan? SupirTerpilih => _filter.Nilai.Supir == "" ? null : Db.Data.Karyawan.FirstOrDefault(d => d.Id == _filter.Nilai.Supir);
+    private string PeriodeTeks => $"{Format.Tanggal(_filter.Nilai.Dari)} s/d {Format.Tanggal(_filter.Nilai.Sampai)}";
+
+    private List<Opsi> OpsiSupir => Db.Data.Karyawan.Select(d => new Opsi(d.Id, $"{d.DriverCode} — {d.DriverName}", $"{d.Address2}, {d.City}", d.DriverName)).ToList();
+
+    private List<ChipFilter> Chips
+    {
+        get
+        {
+            var v = _filter.Nilai; var b = Bawaan;
+            var diubah = v.Dari != b.Awal || v.Sampai != b.Akhir;
+            var c = new List<ChipFilter> { new($"Periode {Format.RentangTanggal(v.Dari, v.Sampai)}", diubah ? () => _filter.Lepas((n, a) => { n.Dari = a.Dari; n.Sampai = a.Sampai; }) : null) };
+            if (SupirTerpilih is Karyawan s) c.Add(new($"Supir: {s.DriverName}", () => _filter.Lepas((n, a) => n.Supir = a.Supir)));
+            return c;
+        }
+    }
+
+    private List<(string, string, string?)> KolomRincian => [
+        ("No.", "right", "6%"), (Karawang ? "ID Trip" : "NoTrans", "left", "13%"), ("Tanggal", "left", "11%"), ("Supir", "left", null),
+        ("No. Kendaraan", "left", "13%"), ("Rute", "left", Karawang ? "14%" : "11%"), ("Komisi (Rp)", "right", "15%"),
+    ];
+
+    /// <summary>Cetak: rekap per supir, rincian seluruh supir, atau rincian satu supir (bila disaring).</summary>
+    private void BukaCetak(string m)
+    {
+        _mode = m;
+        var v = _filter.Nilai;
+        if (m == "perSopir" && v.Supir == "")
+        {
+            _galat = "Pilih Supir wajib diisi untuk mode Cetak Komisi perSupir.";
+            Toast.Galat("Pilih supir terlebih dahulu.");
+            return;
+        }
+        if (string.CompareOrdinal(v.Dari, v.Sampai) > 0) { _galat = "Tanggal Awal tidak boleh lebih besar dari Tanggal Akhir."; return; }
+        if (_rows.Count == 0)
+        {
+            _galat = "Tidak ada transaksi pada periode tersebut.";
+            Toast.Info("Tidak ada data untuk ditampilkan.");
+            return;
+        }
+        _galat = null;
+        _preview = true;
+    }
+}

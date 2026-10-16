@@ -1,0 +1,19 @@
+@* Pembungkus area cetak: hanya isi .print-root yang ikut tercetak. *@
+<div class="print-root @Class">@ChildContent</div>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Bagi baris menjadi beberapa halaman A4.</summary>
+    public static List<List<T>> Bagi<T>(IList<T> rows, int perHalaman)
+    {
+        if (rows.Count == 0) return [[]];
+        var keluar = new List<List<T>>();
+        for (var i = 0; i < rows.Count; i += perHalaman) keluar.Add(rows.Skip(i).Take(perHalaman).ToList());
+        return keluar;
+    }
+
+    /// <summary>Jumlah baris tabel yang muat satu lembar menurut orientasi.</summary>
+    public static int BarisPerLembar(string orientasi, int potret = 24) => orientasi == "lanskap" ? Math.Max(8, (int)Math.Round(potret * 0.55)) : potret;
+}

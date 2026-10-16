@@ -1,0 +1,366 @@
+@page "/pengaturan/audit-log"
+@inherits KomponenData
+@*
+    Pengaturan -> Audit Log: siapa mengubah data apa dan kapan. Catatannya ditulis otomatis setiap kali data ditambah, diubah,
+    dihapus, atau trip dibatalkan / ditutup / kembali ke pool. Hanya Owner & Manager (Bisa("audit")). Klik baris untuk rincian
+    perubahan per isian.
+*@
+<PageTitle>Audit Log — SIKOTIS</PageTitle>
+
+@if (!Bisa("audit"))
+{
+    <PageHeader Title="Audit Log" Crumbs="@(new List<Crumb> { new("Pengaturan"), new("Audit Log") })" />
+    <Kartu>
+        <div class="d-flex flex-column align-items-center px-4 py-5 text-center">
+            <div class="mb-3 d-grid rounded-circle border border-hairline bg-sunken text-ink-3" style="width:44px;height:44px;place-items:center"><IkonSvg Def="Ikon.Lock" Size="18" /></div>
+            <p class="m-0 fs-14 fw-semibold text-ink">Anda tidak berwenang membuka Audit Log.</p>
+            <p class="m-0 mt-1 fs-13 text-ink-3" style="max-width:24rem;line-height:1.6">
+                Audit Log hanya untuk Owner dan Manager. Anda masuk sebagai @(Sesi.Pengguna is { } u ? LabelPeran(u.Role) : "tamu").
+                Minta Manager atau Owner bila perlu menelusuri perubahan data.
+            </p>
+        </div>
+    </Kartu>
+}
+else
+{
+    var semua = Semua;
+    _tabel.ExtraFilterActive = _filter.Aktif;
+    var tersaring = _tabel.Saring(semua);
+    var halaman = _tabel.Halaman(tersaring);
+    var adaWsLain = semua.Any(l => !string.IsNullOrEmpty(l.L.Workspace) && l.L.Workspace != Sesi.Workspace);
+
+    <PageHeader Title="Audit Log" Crumbs="@(new List<Crumb> { new("Pengaturan"), new("Audit Log") })">
+        <Description>Catatan siapa menambah, mengubah, atau menghapus data, dan kapan. Ditulis otomatis; tidak bisa diubah dari layar.</Description>
+    </PageHeader>
+
+    <Kartu>
+        <Toolbar>
+            <Left>
+                <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Width="18rem" Placeholder="Cari data, ringkasan, pengguna, isian..." />
+                <PanelFilter T="FilterAudit" Filter="_filter" Chips="Chips(semua)" Lebar="360" Galat="@Format.GalatRentang(_filter.Draf.Dari, _filter.Draf.Sampai)">
+                    <div>
+                        <p class="form-label">Tanggal</p>
+                        <div class="row g-2">
+                            <div class="col-6"><TanggalInput AriaLabel="Tanggal dari" Placeholder="Dari" Value="@_filter.Draf.Dari" ValueChanged="v => _filter.Ubah(d => d.Dari = v)" /></div>
+                            <div class="col-6"><TanggalInput AriaLabel="Tanggal sampai" Placeholder="Sampai" Value="@_filter.Draf.Sampai" ValueChanged="v => _filter.Ubah(d => d.Sampai = v)" /></div>
+                        </div>
+                    </div>
+                    <Field Label="Pengguna">
+                        <Pilihan Id="@context" Options="OpsiPengguna(semua)" Value="@_filter.Draf.Pengguna" ValueChanged="v => _filter.Ubah(d => d.Pengguna = v ?? string.Empty)" Clearable="false" />
+                    </Field>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <Field Label="Aksi">
+                                <Pilihan Id="@context" Options="OpsiAksi" Value="@_filter.Draf.Aksi" ValueChanged="v => _filter.Ubah(d => d.Aksi = v ?? string.Empty)" Cari="false" Clearable="false" />
+                            </Field>
+                        </div>
+                        <div class="col-6">
+                            <Field Label="Workspace">
+                                <Pilihan Id="@context" Options="OpsiWs" Value="@_filter.Draf.Ws" ValueChanged="v => _filter.Ubah(d => d.Ws = v ?? string.Empty)" Cari="false" Clearable="false" />
+                            </Field>
+                        </div>
+                    </div>
+                    <Field Label="Jenis data">
+                        <Pilihan Id="@context" Options="OpsiEntitas(semua)" Value="@_filter.Draf.Entitas" ValueChanged="v => _filter.Ubah(d => d.Entitas = v ?? string.Empty)" Clearable="false" />
+                    </Field>
+                </PanelFilter>
+            </Left>
+            <Right><span class="tnum fs-12-5 text-ink-3">@Format.Angka(_tabel.Total) dari @Format.Angka(semua.Count) catatan</span></Right>
+        </Toolbar>
+
+        <DataTable T="BarisAudit" Columns="Kolom" Rows="halaman" RowKey="l => l.L.Id" SortKey="@_tabel.SortKey" SortNaik="_tabel.Naik" OnSortChange="k => _tabel.ToggleSort(k)"
+                   IsFiltered="_tabel.IsFiltered" OnRowClick="l => _rinci = l">
+            <Empty>
+                <div class="px-4 py-5 text-center">
+                    <p class="m-0 fs-14 fw-semibold text-ink">Belum ada catatan.</p>
+                    <p class="mx-auto m-0 mt-1 fs-13 text-ink-3" style="max-width:28rem;line-height:1.6">
+                        Catatan muncul otomatis begitu ada data yang ditambah, diubah, atau dihapus, mis. mengubah data kendaraan atau menutup trip.
+                    </p>
+                </div>
+            </Empty>
+            <NotFound>
+                <div class="px-4 py-5 text-center">
+                    <p class="m-0 fs-14 fw-semibold text-ink">Catatan tidak ditemukan.</p>
+                    <p class="m-0 mt-1 fs-13 text-ink-3">Coba periksa kembali kata kunci atau filter.</p>
+                    <Tombol Size="sm" Class="mt-3" OnClick="ResetFilter">Reset filter</Tombol>
+                </div>
+            </NotFound>
+        </DataTable>
+        @if (_tabel.Total > 0)
+        {
+            <Pagination Page="_tabel.Page" PageSize="_tabel.PageSize" Total="_tabel.Total" OnPageChange="p => _tabel.SetPage(p)" />
+        }
+        <p class="m-0 border-top border-hairline px-3 py-2 fs-12 text-ink-3" style="line-height:1.6">
+            Di sistem produksi, Audit Log dicatat oleh server. Selama prototipe, catatan disimpan di browser ini saja (catatan terbaru), jadi perangkat lain tidak melihatnya.
+            @(adaWsLain ? " Catatan dari workspace lain ikut tampil; pilih Workspace untuk menyaring." : "")
+        </p>
+    </Kartu>
+
+    @if (_rinci is { } log)
+    {
+        var tujuan = Tujuan(log.L);
+        <Modal Open="true" Title="@($"{AksiAudit.Label(log.L.Aksi)}: {(log.L.Label != "" ? log.L.Label : log.EntitasLabel)}")" Subtitle="@log.L.Ringkasan" Size="lg" OnClose="() => _rinci = null">
+            <ChildContent>
+                <dl class="row g-3 mb-0">
+                    @foreach (var (label, nilai) in InfoRinci(log))
+                    {
+                        <div class="col-sm-4 min-w-0">
+                            <dt class="fs-11-5 fw-semibold text-ink-3 text-uppercase" style="letter-spacing:.04em">@label</dt>
+                            <dd class="m-0 mt-1 fs-13 fw-medium text-ink text-break">
+                                @if (label == "Aksi") { <Badge Tone="@NadaAksi(log.L.Aksi)">@AksiAudit.Label(log.L.Aksi)</Badge> } else { @nilai }
+                            </dd>
+                        </div>
+                    }
+                </dl>
+                <p class="m-0 mt-3 fs-11-5 text-ink-3">ID data: <span class="tnum">@(log.L.EntityId != "" ? log.L.EntityId : "—")</span></p>
+
+                <h3 class="mt-4 mb-2 fs-12 fw-semibold text-ink-2 text-uppercase" style="letter-spacing:.04em">Rincian perubahan</h3>
+                @if (log.L.Perubahan.Count == 0)
+                {
+                    <p class="m-0 rounded-3 border border-hairline bg-sunken px-3 py-3 fs-12-5 text-ink-3" style="line-height:1.6">
+                        @(log.L.Aksi == "buat" ? "Data baru ditambahkan; tidak ada nilai lama untuk dibandingkan."
+                            : log.L.Aksi == "hapus" ? "Data dihapus; isinya tidak dicatat per isian."
+                            : "Dicatat sebagai satu kejadian, tanpa rincian per isian. Lihat ringkasan di atas.")
+                    </p>
+                }
+                else
+                {
+                    var rujukan = PetaRujukan();
+                    <div class="overflow-x-auto rounded-3 border border-hairline">
+                        <table class="w-100 fs-12-5" style="min-width:520px">
+                            <thead class="bg-sunken">
+                                <tr class="border-bottom border-hairline text-start fs-11-5 fw-semibold text-ink-2 text-uppercase" style="letter-spacing:.04em">
+                                    <th class="px-3 py-2">Isian</th>
+                                    <th class="px-3 py-2">Dari</th>
+                                    <th class="px-3 py-2">Menjadi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (var i = 0; i < log.L.Perubahan.Count; i++)
+                                {
+                                    var p = log.L.Perubahan[i];
+                                    var labelField = AuditLabel.Field(p.Field);
+                                    <tr class="align-top" style="@(i < log.L.Perubahan.Count - 1 ? "border-bottom:1px solid var(--grid)" : null)">
+                                        <td class="px-3 py-2">
+                                            <span class="fw-medium text-ink">@(labelField ?? p.Field)</span>
+                                            @if (labelField is not null) { <span class="tnum d-block fs-11 text-ink-3">@p.Field</span> }
+                                        </td>
+                                        <td class="px-3 py-2 text-break text-ink-3">@TampilNilai(p.Field, p.Dari, rujukan)</td>
+                                        <td class="px-3 py-2 text-break fw-medium text-ink">@TampilNilai(p.Field, p.Ke, rujukan)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </ChildContent>
+            <Footer>
+                @if (tujuan is { } tj)
+                {
+                    <Tombol Icon="Ikon.ArrowRight" IconSize="14" OnClick="() => BukaDariRinci(tj)">@(tj.Ws is not null ? $"Buka data (pindah ke {WorkspaceKode.Label(tj.Ws)})" : "Buka data")</Tombol>
+                }
+                <Tombol Variant="primary" OnClick="() => _rinci = null">Tutup</Tombol>
+            </Footer>
+        </Modal>
+    }
+}
+
+@code {
+    public sealed class FilterAudit
+    {
+        public string Pengguna { get; set; } = "";
+        public string Aksi { get; set; } = "";
+        public string Entitas { get; set; } = "";
+        public string Ws { get; set; } = "";
+        public string Dari { get; set; } = "";
+        public string Sampai { get; set; } = "";
+    }
+
+    public sealed class BarisAudit
+    {
+        public required CatatanAudit L { get; init; }
+        public string Tanggal { get; init; } = "";
+        public string EntitasLabel { get; init; } = "";
+    }
+
+    public sealed record TujuanAudit(string Ke, string? Ws);
+
+    private readonly KendaliTabel<BarisAudit> _tabel = new(25, "waktu", false);
+    private KendaliFilter<FilterAudit> _filter = default!;
+    private BarisAudit? _rinci;
+
+    private List<CatatanAudit>? _sumber;
+    private int _jumlahSumber = -1;
+    private List<BarisAudit> _semua = [];
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _filter = new KendaliFilter<FilterAudit>(() => new FilterAudit(), StateHasChanged);
+        _tabel.Search = (l, q) => Util.CocokCari(q, l.L.Label, l.L.Ringkasan, l.L.Nama, l.L.Username, l.EntitasLabel, AksiAudit.Label(l.L.Aksi), l.L.EntityId,
+            string.Join(" ", l.L.Perubahan.Select(p => $"{AuditLabel.Field(p.Field) ?? p.Field} {p.Dari} {p.Ke}")));
+        _tabel.SortAccessor = k => k switch
+        {
+            "nama" => l => l.L.Nama,
+            "aksi" => l => l.L.Aksi,
+            "entitasLabel" => l => l.EntitasLabel,
+            "label" => l => l.L.Label,
+            _ => l => l.L.Waktu,
+        };
+        _tabel.ExtraFilter = l =>
+        {
+            var f = _filter.Nilai;
+            return (f.Pengguna == "" || l.L.Username == f.Pengguna) && (f.Aksi == "" || l.L.Aksi == f.Aksi) && (f.Entitas == "" || l.L.Entitas == f.Entitas)
+                && (f.Ws == "" || (l.L.Workspace ?? "") == f.Ws)
+                && (f.Dari == "" || string.CompareOrdinal(l.Tanggal, f.Dari) >= 0) && (f.Sampai == "" || string.CompareOrdinal(l.Tanggal, f.Sampai) <= 0);
+        };
+    }
+
+    private List<BarisAudit> Semua
+    {
+        get
+        {
+            var log = Db.Semua.Audit;
+            if (ReferenceEquals(log, _sumber) && log.Count == _jumlahSumber && (log.Count == 0 || _semua.Count > 0 && ReferenceEquals(_semua[0].L, log[0]))) return _semua;
+            _sumber = log; _jumlahSumber = log.Count;
+            _semua = log.Select(l => new BarisAudit { L = l, Tanggal = TanggalLokal(l.Waktu), EntitasLabel = AuditLabel.Entitas(l.Entitas) }).ToList();
+            return _semua;
+        }
+    }
+
+    private static string Waktu(string iso) => DateTimeOffset.TryParse(iso, out var d) ? Format.WaktuCetak(d.ToLocalTime().DateTime) : "—";
+    /// <summary>Tanggal lokal yyyy-mm-dd dari waktu ISO, untuk filter periode.</summary>
+    private static string TanggalLokal(string iso) => DateTimeOffset.TryParse(iso, out var d) ? Format.KeIso(d.ToLocalTime().DateTime) : "";
+    private static string LabelPeran(string p) => p != "" ? Peran.Label(p) : "—";
+
+    private static string NadaAksi(string a) => a switch
+    {
+        "buat" => "good", "ubah" => "brand", "hapus" => "critical", "batal" => "serious", "tahap_pi" => "warning", _ => "neutral",
+    };
+
+    private static List<Opsi> OpsiPengguna(List<BarisAudit> semua)
+    {
+        var m = new Dictionary<string, string>();
+        foreach (var l in semua)
+            if (!m.ContainsKey(l.L.Username))
+                m[l.L.Username] = $"{(l.L.Nama != "" ? l.L.Nama : l.L.Username != "" ? l.L.Username : "Tanpa nama")} ({LabelPeran(l.L.Peran)})";
+        return [new Opsi("", "Semua"), .. m.OrderBy(x => x.Value, StringComparer.CurrentCulture).Select(x => new Opsi(x.Key, x.Value))];
+    }
+
+    private static List<Opsi> OpsiEntitas(List<BarisAudit> semua) =>
+        [new Opsi("", "Semua"), .. semua.Select(l => l.L.Entitas).Distinct().Select(e => new Opsi(e, AuditLabel.Entitas(e))).OrderBy(o => o.Label, StringComparer.CurrentCulture)];
+
+    private static readonly List<Opsi> OpsiAksi = [new Opsi("", "Semua"), .. AksiAudit.Semua.Select(a => new Opsi(a, AksiAudit.Label(a)))];
+    private static readonly List<Opsi> OpsiWs = [new Opsi("", "Semua"), .. WorkspaceKode.Semua.Select(w => new Opsi(w, WorkspaceKode.Label(w)))];
+
+    private List<ChipFilter> Chips(List<BarisAudit> semua)
+    {
+        var f = _filter.Nilai;
+        var c = new List<ChipFilter>();
+        if (f.Dari != "" || f.Sampai != "") c.Add(new($"Tanggal {Format.RentangTanggal(f.Dari, f.Sampai)}", () => _filter.Lepas((n, a) => { n.Dari = a.Dari; n.Sampai = a.Sampai; })));
+        if (f.Pengguna != "") c.Add(new($"Pengguna: {OpsiPengguna(semua).FirstOrDefault(o => o.Value == f.Pengguna)?.Label ?? f.Pengguna}", () => _filter.Lepas((n, a) => n.Pengguna = a.Pengguna)));
+        if (f.Aksi != "") c.Add(new($"Aksi: {AksiAudit.Label(f.Aksi)}", () => _filter.Lepas((n, a) => n.Aksi = a.Aksi)));
+        if (f.Ws != "") c.Add(new($"Workspace: {WorkspaceKode.Label(f.Ws)}", () => _filter.Lepas((n, a) => n.Ws = a.Ws)));
+        if (f.Entitas != "") c.Add(new($"Data: {AuditLabel.Entitas(f.Entitas)}", () => _filter.Lepas((n, a) => n.Entitas = a.Entitas)));
+        return c;
+    }
+
+    private void ResetFilter() { _tabel.Reset(); _filter.LepasSemua(); }
+
+    /// <summary>
+    /// Tautan ke data sumber. Trip & catatan trip milik workspace lain dibuka dengan pindah workspace lebih dulu
+    /// (halaman trip hanya mencari di workspace aktif).
+    /// </summary>
+    private TujuanAudit? Tujuan(CatatanAudit l)
+    {
+        if (l.Aksi == "hapus") return null;
+        var ke = l.Entitas == "pengguna" ? "pengaturan/pengguna" : AuditLogika.Tautan(l.Entitas, l.EntityId, Db.Semua);
+        if (ke is null) return null;
+        var m = System.Text.RegularExpressions.Regex.Match(ke, @"^/transaksi/trip/([^/?]+)");
+        var t = m.Success ? Db.Semua.Trip.FirstOrDefault(x => x.Id == m.Groups[1].Value) : null;
+        var wsTrip = t is null ? null : string.IsNullOrEmpty(t.Workspace) ? WorkspaceKode.Priok : t.Workspace;
+        return new TujuanAudit(ke, wsTrip is not null && wsTrip != Sesi.Workspace ? wsTrip : null);
+    }
+
+    private async Task Buka(TujuanAudit t)
+    {
+        if (t.Ws is not null) await Sesi.GantiWorkspaceAsync(t.Ws);
+        Ke(t.Ke);
+    }
+
+    private async Task BukaDariRinci(TujuanAudit t) { _rinci = null; await Buka(t); }
+
+    private static IEnumerable<(string, string)> InfoRinci(BarisAudit log)
+    {
+        var l = log.L;
+        yield return ("Waktu", Waktu(l.Waktu));
+        yield return ("Pengguna", $"{(l.Nama != "" ? l.Nama : "—")} · {LabelPeran(l.Peran)}{(l.Username != "" ? $" ({l.Username})" : "")}");
+        yield return ("Aksi", AksiAudit.Label(l.Aksi));
+        yield return ("Jenis data", log.EntitasLabel);
+        yield return ("Data", l.Label != "" ? l.Label : "—");
+        yield return ("Workspace", string.IsNullOrEmpty(l.Workspace) ? "—" : WorkspaceKode.Label(l.Workspace));
+    }
+
+    /// <summary>Isian yang menyimpan id record lain: ditampilkan sebagai nama / plat / nomor.</summary>
+    private Dictionary<string, Dictionary<string, string>> PetaRujukan()
+    {
+        var d = Db.Semua;
+        var karyawan = d.Karyawan.GroupBy(x => x.Id).ToDictionary(g => g.Key, g => $"{g.First().DriverName} ({g.First().DriverCode})");
+        return new()
+        {
+            ["vehicle_id"] = d.Kendaraan.GroupBy(x => x.Id).ToDictionary(g => g.Key, g => g.First().PlateNumber),
+            ["driver_id"] = karyawan, ["driver_ids"] = karyawan, ["manager_id"] = karyawan, ["employee_id"] = karyawan, ["recipient_id"] = karyawan,
+            ["route_id"] = d.Rute.GroupBy(x => x.Id).ToDictionary(g => g.Key, g => g.First().RouteName),
+            ["project_id"] = d.Klien.GroupBy(x => x.Id).ToDictionary(g => g.Key, g => g.First().ProjectName),
+            ["contract_id"] = d.Kontrak.GroupBy(x => x.Id).ToDictionary(g => g.Key, g => g.First().ContractNo),
+        };
+    }
+
+    private static string TampilNilai(string field, string nilai, Dictionary<string, Dictionary<string, string>> rujukan)
+    {
+        if (nilai == "—") return nilai;
+        if (rujukan.TryGetValue(field, out var peta)) return string.Join(", ", nilai.Split(", ").Select(v => peta.GetValueOrDefault(v) ?? v));
+        return AuditLabel.Nilai(nilai) ?? nilai;
+    }
+
+    private List<Kolom<BarisAudit>> Kolom =>
+    [
+        new() { Key = "waktu", Header = "Waktu", Sortable = true, Width = "138px", Render = l => @<span class="tnum text-nowrap text-ink-2">@Waktu(l.L.Waktu)</span> },
+        new()
+        {
+            Key = "nama", Header = "Pengguna", Sortable = true, Width = "170px",
+            Render = l => @<div class="lh-tight">
+                <span class="fw-medium text-ink">@(l.L.Nama != "" ? l.L.Nama : l.L.Username != "" ? l.L.Username : "—")</span>
+                <span class="d-block fs-12 text-ink-3">@LabelPeran(l.L.Peran)@(l.L.Username != "" ? $" · {l.L.Username}" : "")</span>
+            </div>,
+        },
+        new() { Key = "aksi", Header = "Aksi", Sortable = true, Width = "128px", Render = l => @<Badge Tone="@NadaAksi(l.L.Aksi)">@AksiAudit.Label(l.L.Aksi)</Badge> },
+        new() { Key = "entitasLabel", Header = "Jenis Data", Sortable = true, Width = "150px", Render = l => @<span class="text-ink-2">@l.EntitasLabel</span> },
+        new()
+        {
+            Key = "label", Header = "Data", Sortable = true, Width = "190px",
+            Render = l => @<span>@if (Tujuan(l.L) is { } t)
+                {
+                    <button type="button" class="btn btn-link p-0 tnum text-start fw-semibold text-break text-decoration-none" @onclick="() => Buka(t)" @onclick:stopPropagation="true"
+                            title="@(t.Ws is not null ? $"Pindah ke workspace {WorkspaceKode.Label(t.Ws)} lalu buka data ini" : "Buka data ini")">
+                        @(l.L.Label != "" ? l.L.Label : "—")
+                        @if (t.Ws is not null) { <span class="d-block fs-11-5 fw-normal text-ink-3">di workspace @WorkspaceKode.Label(t.Ws)</span> }
+                    </button>
+                }
+                else { <span class="tnum fw-medium text-break text-ink">@(l.L.Label != "" ? l.L.Label : "—")</span> }</span>,
+        },
+        new()
+        {
+            Key = "ringkasan", Header = "Ringkasan",
+            Render = l => @<div class="lh-sm" style="min-width:220px;max-width:420px">
+                <span class="text-ink-2" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" title="@l.L.Ringkasan">@(l.L.Ringkasan != "" ? l.L.Ringkasan : "—")</span>
+                @if (l.L.Perubahan.Count > 0) { <span class="fs-11-5 text-ink-3">@l.L.Perubahan.Count isian berubah</span> }
+            </div>,
+        },
+        new()
+        {
+            Key = "action", Header = "", Align = "right", Width = "52px", NoPrint = true,
+            Render = l => @<TombolIkon Label="Lihat rincian perubahan" Icon="Ikon.FileLines" OnClick="() => _rinci = l" />,
+        },
+    ];
+}

@@ -1,0 +1,60 @@
+@inherits KomponenData
+@* Konfirmasi Hapus Trip: trip dan seluruh catatannya hilang, seolah tidak pernah ada. Dipakai juga dari daftar trip. *@
+@if (Trip is not null && _isi is not null)
+{
+    var pi = Trip.T.PiNumber;
+    <Modal Open="true" Size="sm" Title="@($"Hapus Trip {Trip.IdTampil}?")" OnClose="Tutup">
+        <ChildContent>
+            <p class="m-0 fs-13 text-ink-2" style="line-height:1.6">
+                Trip dihapus permanen, termasuk mutasi kasbon yang tertaut ke trip ini. Bila trip hanya batal jalan,
+                gunakan <span class="fw-semibold text-ink">Batalkan Trip</span> supaya arsipnya tetap ada.
+            </p>
+            @if (pi != "")
+            {
+                <div class="mt-3 d-flex align-items-start gap-2 rounded-3 px-3 py-2 fs-12-5" style="border:1px solid #f6e2ac;background:#fff8e6;color:#8a6100" data-peringatan-pi>
+                    <IkonSvg Def="Ikon.TriangleExclamation" Size="14" Style="margin-top:2px" />
+                    <span>Trip ini sudah ditagih lewat PI @pi@(string.IsNullOrEmpty(Trip.T.PiTahap) ? "" : $" ({TahapPi.Label(Trip.T.PiTahap)})"). Bila dihapus, trip ini ikut hilang dari PI tersebut di Tagihan.</span>
+                </div>
+            }
+            @if (DaftarIsiTrip.AdaIsi(_isi))
+            {
+                <div class="mt-3 rounded-3 px-3 py-3" style="border:1px solid #f3d5d5;background:#fdf2f2">
+                    <p class="m-0 fs-12-5 fw-semibold" style="color:#b02c2c">Ikut terhapus:</p>
+                    <DaftarIsiTrip Isi="_isi" />
+                </div>
+            }
+        </ChildContent>
+        <Footer>
+            <Tombol OnClick="Tutup">Batal</Tombol>
+            <Tombol Variant="danger" OnClick="Konfirmasi">Hapus Permanen</Tombol>
+        </Footer>
+    </Modal>
+}
+
+@code {
+    [Parameter] public BarisTrip? Trip { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<string> OnDeleted { get; set; }
+
+    private IsiTrip? _isi;
+    private string? _idTerakhir;
+
+    protected override void OnParametersSet()
+    {
+        if (Trip?.Id == _idTerakhir) return;
+        _idTerakhir = Trip?.Id;
+        _isi = Trip is null ? null : Db.IsiTrip(Trip.Id);
+    }
+
+    private Task Tutup() => OnClose.InvokeAsync();
+
+    private async Task Konfirmasi()
+    {
+        if (Trip is null) return;
+        var (id, no) = (Trip.Id, Trip.IdTampil);
+        Db.HapusTrip(id);
+        Toast.Sukses($"Trip {no} dihapus.");
+        await OnClose.InvokeAsync();
+        await OnDeleted.InvokeAsync(id);
+    }
+}

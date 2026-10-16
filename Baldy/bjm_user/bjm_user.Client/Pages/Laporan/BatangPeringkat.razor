@@ -1,0 +1,25 @@
+@* Bar peringkat horizontal satu seri (mis. Top supir). Nilai ditulis di ujung bar, jadi tanpa sumbu X. *@
+@{ var maks = Math.Max(Rows.Count == 0 ? 1 : Rows.Max(r => r.Nilai), 1); }
+<ol class="list-unstyled m-0 d-flex flex-column" style="gap:.625rem">
+    @for (var i = 0; i < Rows.Count; i++)
+    {
+        var r = Rows[i]; var no = i + 1;
+        <li class="d-grid align-items-center" style="grid-template-columns:1.35rem minmax(0,1fr) auto;gap:.625rem">
+            <span class="tnum fs-12 fw-semibold text-ink-3">@(no).</span>
+            <span class="min-w-0">
+                <span class="mb-1 d-flex align-items-baseline justify-content-between gap-2">
+                    <span class="text-truncate fs-13 fw-medium text-ink">@r.Label</span>
+                    @if (!string.IsNullOrEmpty(r.Meta)) { <span class="flex-shrink-0 fs-11-5 text-ink-3">@r.Meta</span> }
+                </span>
+                <span class="d-block w-100 overflow-hidden rounded-pill" style="height:8px;background:var(--grid)">
+                    <span class="d-block h-100 rounded-pill" style="@($"width:{LaporanLogika.Css(Math.Max(r.Nilai * 100.0 / maks, 3))}%;background:{LaporanLogika.Seri1}")"></span>
+                </span>
+            </span>
+            <span class="tnum fs-13 fw-semibold text-nowrap text-ink">@Format.Angka(r.Nilai)</span>
+        </li>
+    }
+</ol>
+
+@code {
+    [Parameter] public List<BarisPeringkat> Rows { get; set; } = [];
+}

@@ -1,0 +1,28 @@
+@* Isian nominal Rupiah: ketikan angka otomatis diformat 1.234.567; nilai 0 tampil kosong (placeholder "0"). *@
+<div class="input-group @Class">
+    <span class="input-group-text">Rp</span>
+    <input id="@Id" inputmode="numeric" class="form-control tnum text-end @(Invalid ? "is-invalid" : "")" value="@Teks" placeholder="@Placeholder"
+           disabled="@Disabled" readonly="@ReadOnly" aria-label="@AriaLabel" @oninput="Ketik" />
+</div>
+
+@code {
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public long Value { get; set; }
+    [Parameter] public EventCallback<long> ValueChanged { get; set; }
+    [Parameter] public bool Invalid { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "0";
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
+
+    private string Teks => Value == 0 ? "" : Format.Angka(Value);
+
+    private async Task Ketik(ChangeEventArgs e)
+    {
+        var v = Format.BacaUang(e.Value?.ToString());
+        if (v == Value) return;
+        Value = v;
+        await ValueChanged.InvokeAsync(v);
+    }
+}

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="bjm_user.Client/bjm_user.Client.csproj" />
+  <Project Path="bjm_user/bjm_user.csproj" />
+</Solution>

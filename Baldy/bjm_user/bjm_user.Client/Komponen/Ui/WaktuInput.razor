@@ -1,0 +1,20 @@
+@* Isian tanggal + jam (yyyy-mm-ddThh:mm). *@
+<input id="@Id" type="datetime-local" class="form-control tnum @(Invalid ? "is-invalid" : "") @Class" value="@Value" disabled="@Disabled" aria-label="@AriaLabel" @onchange="Ubah" @oninput="Ubah" />
+
+@code {
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public bool Invalid { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
+
+    private async Task Ubah(ChangeEventArgs e)
+    {
+        var v = e.Value?.ToString() ?? "";
+        if (v == Value) return;
+        Value = v;
+        await ValueChanged.InvokeAsync(v);
+    }
+}

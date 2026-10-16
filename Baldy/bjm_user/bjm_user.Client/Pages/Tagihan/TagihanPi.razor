@@ -1,0 +1,469 @@
+@inherits KomponenData
+@inject Penyimpanan Simpan
+@*
+    Tagihan Karawang (alur atasan): trip selesai dan POD-nya diterima dibuatkan PI, lalu dipantau tahapnya sampai lunas:
+    PI Tercetak -> PI Dikirim -> (PI Revisi) -> Disetujui -> Lunas. Satu PI per trip, seperti Summary Submission PI. Nilai PI
+    dibekukan saat PI dibuat; bila nilai trip berubah sesudahnya, barisnya ditandai dan nilainya bisa diperbarui. Halaman ini
+    juga mencetak ringkasan PI dan rekap dokumen (kelengkapan berkas hardcopy yang dikirim ke klien).
+*@
+
+<PageHeader Title="Tagihan" Crumbs="@(new List<Crumb> { new("Laporan"), new("Tagihan") })">
+    <Description>Pemantauan status PI dan cetak rekap dokumen.</Description>
+</PageHeader>
+
+@{
+    var semua = Semua;
+    _tabel.ExtraFilterActive = _filter.Aktif;
+    var tersaring = _tabel.Saring(semua);
+    var halaman = _tabel.Halaman(tersaring);
+    var terpilih = semua.Where(t => _pilih.Contains(t.Id)).ToList();
+    var berubahTerpilih = terpilih.Where(t => t.Selisih != 0).ToList();
+    var tahapPilihan = _tab is "siap" or "semua" ? Array.Empty<string>() : TagihanLogika.Lanjut(_tab);
+    var boleh = Bisa("tagihan");
+}
+
+<Kartu>
+    <Tabs Class="px-2" Items="TabItems(semua)" Value="@_tab" ValueChanged="GantiTab" />
+    <Toolbar>
+        <Left>
+            <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Width="20rem" Placeholder="Cari ID Trip, No. Referensi, No PI, plat, lokasi..." />
+            <PanelFilter T="FilterPi" Filter="_filter" Chips="Chips" Galat="@Format.GalatRentang(_filter.Draf.Dari, _filter.Draf.Sampai)">
+                <div>
+                    <p class="form-label">Tanggal berangkat trip</p>
+                    <div class="row g-2">
+                        <div class="col-6"><TanggalInput AriaLabel="Berangkat dari" Value="@_filter.Draf.Dari" ValueChanged="v => _filter.Ubah(d => d.Dari = v)" /></div>
+                        <div class="col-6"><TanggalInput AriaLabel="Berangkat sampai" Value="@_filter.Draf.Sampai" ValueChanged="v => _filter.Ubah(d => d.Sampai = v)" /></div>
+                    </div>
+                </div>
+                <Field Label="Klien">
+                    <Pilihan Id="@context" Options="OpsiKlien" Value="@_filter.Draf.Klien" ValueChanged="v => _filter.Ubah(d => d.Klien = v ?? string.Empty)" Cari="false" Clearable="false" />
+                </Field>
+                <Field Label="Dokumen POD">
+                    <Pilihan Id="@context" Options="OpsiPod" Value="@_filter.Draf.Pod" ValueChanged="v => _filter.Ubah(d => d.Pod = v ?? string.Empty)" Cari="false" Clearable="false" />
+                </Field>
+            </PanelFilter>
+        </Left>
+        <Right>
+            <Tombol Size="sm" Icon="Ikon.FileExport" IconSize="14" Disabled="@(_tabel.Total == 0)" OnClick="() => ExportTabel(tersaring)">Export tabel</Tombol>
+            <Tombol Size="sm" Icon="Ikon.Print" IconSize="14" Disabled="@(_tabel.Total == 0)" OnClick="() => _cetak = tersaring">Cetak ringkasan</Tombol>
+        </Right>
+    </Toolbar>
+
+    @if (terpilih.Count > 0)
+    {
+        <div class="bar-pilihan animate-in-fade">
+            <p class="m-0 fs-13 fw-semibold" style="color:var(--brand-800)">@terpilih.Count trip dipilih · @Format.Rupiah(terpilih.Sum(t => t.NilaiTotal))</p>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                @if (_tab == "siap")
+                {
+                    <Tombol Size="sm" Variant="primary" Icon="Ikon.FileInvoiceDollar" IconSize="14" Disabled="@(!boleh)" OnClick="() => _buatPi = terpilih">Buat PI</Tombol>
+                }
+                @foreach (var p in tahapPilihan)
+                {
+                    var pp = p;
+                    <Tombol Size="sm" Disabled="@(!boleh)" OnClick="() => _ubah = (terpilih, pp)">@TagihanLogika.Aksi(pp)</Tombol>
+                }
+                @if (berubahTerpilih.Count > 0)
+                {
+                    <Tombol Size="sm" Icon="Ikon.ArrowsRotate" IconSize="14" Disabled="@(!boleh)" OnClick="() => _perbarui = berubahTerpilih">Perbarui nilai PI (@berubahTerpilih.Count)</Tombol>
+                }
+                <Tombol Size="sm" Icon="Ikon.ClipboardCheck" IconSize="14" OnClick="() => _rekap = terpilih">Cetak rekap dokumen</Tombol>
+                <Tombol Size="sm" Icon="Ikon.Print" IconSize="14" OnClick="() => _cetak = terpilih">Cetak ringkasan</Tombol>
+                <Tombol Size="sm" Icon="Ikon.FileExport" IconSize="14" OnClick="() => ExportTabel(terpilih)">Export</Tombol>
+                <Tombol Size="sm" Variant="ghost" OnClick="() => _pilih.Clear()">Batalkan pilihan</Tombol>
+            </div>
+        </div>
+    }
+
+    <DataTable T="BarisPi" Columns="Kolom" Rows="halaman" RowKey="t => t.Id" SortKey="@_tabel.SortKey" SortNaik="_tabel.Naik" OnSortChange="k => _tabel.ToggleSort(k)"
+               IsFiltered="@(_tabel.IsFiltered || _filter.Nilai.Klien != "" || _tab != "semua")"
+               SelectedKeys="_pilih" OnToggleRow="TogglePilih" OnToggleAll="() => TogglePilihSemua(halaman)">
+        <Empty><EmptyState Entity="trip selesai" /></Empty>
+        <NotFound>
+            @if (!_tabel.IsFiltered && _filter.Nilai.Klien == "")
+            {
+                <p class="m-0 px-4 py-5 text-center fs-13 text-ink-3">@(_tab == "siap" ? "Semua trip yang sudah ditutup sudah dibuatkan PI." : $"Belum ada PI di tahap {TahapPi.Label(_tab)}.")</p>
+            }
+            else
+            {
+                <NotFoundState OnReset="ResetFilter" />
+            }
+        </NotFound>
+        <Footer>
+            @{ var jumlah = (Pokok: tersaring.Sum(t => t.NilaiPokok), Tambahan: tersaring.Sum(t => t.NilaiTambahan), Total: tersaring.Sum(t => t.NilaiTotal)); }
+            <tr class="fs-13">
+                @* Kolom pilih + ID Trip, No. Referensi, No. Pol, Muat → Bongkar *@
+                <td colspan="5" class="text-ink-2">Total @Format.Angka(_tabel.Total) trip@(_tabel.Total > _tabel.PageSize ? " (semua halaman)" : "")</td>
+                <td class="tnum text-end text-ink">@Format.Rupiah(jumlah.Pokok)</td>
+                <td class="tnum text-end text-ink">@Format.Rupiah(jumlah.Tambahan)</td>
+                <td class="tnum text-end text-ink">@Format.Rupiah(jumlah.Total)</td>
+                <td colspan="4"></td>
+            </tr>
+        </Footer>
+    </DataTable>
+    @if (_tabel.Total > 0)
+    {
+        <Pagination Page="_tabel.Page" PageSize="_tabel.PageSize" Total="_tabel.Total" OnPageChange="p => _tabel.SetPage(p)" />
+    }
+</Kartu>
+
+@if (_buatPi is not null)
+{
+    <ModalBuatPi Rows="_buatPi" NomorAda="NomorAda" OnClose="() => _buatPi = null" OnSimpan="SimpanBuatPi" />
+}
+@if (_ubah is { } u)
+{
+    <ModalUbahTahap Rows="u.Rows" Tahap="@u.Tahap" OnClose="() => _ubah = null" OnSimpan="SimpanTahap" />
+}
+@if (_perbarui is not null)
+{
+    <ModalPerbaruiNilai Rows="_perbarui" OnClose="() => _perbarui = null" OnSimpan="SimpanNilai" />
+}
+@if (_cetak is not null)
+{
+    <CetakRingkasan Rows="_cetak" RincianPi="t => RincianPi(t)" OnClose="() => _cetak = null" />
+}
+@if (_rekap is not null)
+{
+    <CetakRekapDokumen Rows="_rekap" NotaTrip="NotaTrip" Alamat="Db.Data.Alamat" OnClose="() => _rekap = null" />
+}
+
+@code {
+    public sealed class FilterPi
+    {
+        public string Klien { get; set; } = "";
+        public string Dari { get; set; } = "";
+        public string Sampai { get; set; } = "";
+        public string Pod { get; set; } = "";
+    }
+
+    private readonly KendaliTabel<BarisPi> _tabel = new(10, "transaction_date", false);
+    private KendaliFilter<FilterPi> _filter = default!;
+    private string _tab = "siap";
+    private readonly HashSet<string> _pilih = [];
+    private List<BarisPi>? _buatPi;
+    private (List<BarisPi> Rows, string Tahap)? _ubah;
+    private List<BarisPi>? _perbarui;
+    private List<BarisPi>? _cetak;
+    private List<BarisPi>? _rekap;
+
+    // Cache baris: disusun ulang hanya bila Db.Baris berganti (data berubah).
+    private List<BarisTrip>? _sumber;
+    private List<BarisPi> _semua = [];
+    private Dictionary<string, List<BiayaOperasional>> _notaTagih = [];
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _filter = new KendaliFilter<FilterPi>(() => new FilterPi(), StateHasChanged);
+        // No. Trip lama tetap bisa dicari walau tidak ditampilkan.
+        _tabel.Search = (t, q) => Util.CocokCari(q, t.R.IdTampil, t.T.TransactionNo, string.Join(' ', t.R.TrList), t.T.PiNumber, t.R.PlateNumber, t.R.Muat, t.R.Bongkar,
+            t.R.RouteName, t.R.ProjectCode, t.R.DriverNames, t.T.Pengirim?.Nama, t.T.Penerima?.Nama);
+        _tabel.SortAccessor = k => k switch
+        {
+            "id_tampil" => t => t.R.IdTampil,
+            "tr_list" => t => string.Join(", ", t.R.TrList),
+            "plate_number" => t => t.R.PlateNumber,
+            "bongkar" => t => t.R.Bongkar,
+            "nilai_pokok" => t => t.NilaiPokok,
+            "nilai_tambahan" => t => t.NilaiTambahan,
+            "nilai_total" => t => t.NilaiTotal,
+            "pi_tahap" => t => t.T.PiTahap ?? "",
+            _ => t => t.T.TransactionDate,
+        };
+        _tabel.TieBreak = t => t.T.TransactionNo;
+        _tabel.ExtraFilter = t =>
+        {
+            var f = _filter.Nilai;
+            return (_tab == "semua" || t.Tahap == _tab) && (f.Klien == "" || t.T.ProjectId == f.Klien)
+                && (f.Dari == "" || string.CompareOrdinal(t.T.TransactionDate, f.Dari) >= 0) && (f.Sampai == "" || string.CompareOrdinal(t.T.TransactionDate, f.Sampai) <= 0)
+                && (f.Pod == "" || (f.Pod == "menyusul" ? t.T.PodFisik == false : t.T.PodFisik == true));
+        };
+    }
+
+    /// <summary>Trip yang tampil di Tagihan: sudah ber-PI, atau bisa ditagih lewat PI.</summary>
+    private List<BarisPi> Semua
+    {
+        get
+        {
+            var baris = Db.Baris;
+            if (ReferenceEquals(baris, _sumber)) return _semua;
+            _sumber = baris;
+            // Nota biaya operasional yang ditagihkan ke klien, per trip.
+            _notaTagih = Db.Semua.Biaya.Where(TripLogika.Ditagihkan).GroupBy(e => e.TripId).ToDictionary(g => g.Key, g => g.ToList());
+            // Klien tanpa alur dokumen (CASH, order tunai) dibayar langsung, jadi tidak dibuatkan PI.
+            // Trip Dedicated ditagihkan lewat kontraknya, bukan PI per trip (TBD-20).
+            var tanpaPi = Db.Semua.Klien.Where(p => !p.RequiresDocument).Select(p => p.Id).ToHashSet();
+            _semua = baris
+                .Where(t => !string.IsNullOrEmpty(t.T.PiTahap) || (TagihanLogika.BisaDitagih(t) && !tanpaPi.Contains(t.T.ProjectId) && t.T.ServiceType != TipeKlien.Dedicated))
+                .Select(TagihanLogika.Baris).ToList();
+            return _semua;
+        }
+    }
+
+    // Trip batal hanya menagih biaya cancel, jadi nota biayanya tidak ikut.
+    private List<BiayaOperasional> NotaTrip(BarisPi t) => t.R.Batal ? [] : _notaTagih.GetValueOrDefault(t.Id) ?? [];
+
+    /// <summary>Rincian Additional Cost format Summary Submission PI: "TOL 150.000, DEX 500.000".</summary>
+    private string RincianPi(BarisPi t, string pemisah = ", ") => string.Join(pemisah, NotaTrip(t).Select(e => $"{TagihanLogika.NamaBiayaPi(e.ExpenseType)} {Format.Angka(e.Amount)}"));
+
+    private List<string> NomorAda => Db.Semua.Trip.Select(t => t.PiNumber).Where(x => !string.IsNullOrEmpty(x)).ToList();
+
+    private static List<TabItem> TabItems(List<BarisPi> semua)
+    {
+        var jumlah = semua.GroupBy(t => t.Tahap).ToDictionary(g => g.Key, g => g.Count());
+        var daftar = new List<TabItem> { new("siap", "Siap PI", jumlah.GetValueOrDefault("siap").ToString()) };
+        daftar.AddRange(TahapPi.Urut.Select(p => new TabItem(p, TahapPi.Label(p), jumlah.GetValueOrDefault(p).ToString())));
+        daftar.Add(new TabItem("semua", "Semua", semua.Count.ToString()));
+        return daftar;
+    }
+
+    private List<Opsi> OpsiKlien => [new Opsi("", "Semua"), .. Db.Semua.Klien.Select(p => new Opsi(p.Id, $"{p.ProjectCode} — {p.ProjectName}"))];
+    private static readonly List<Opsi> OpsiPod = [new("", "Semua"), new("fisik", "Fisik sudah diterima"), new("menyusul", "Fisik menyusul")];
+
+    private List<ChipFilter> Chips
+    {
+        get
+        {
+            var f = _filter.Nilai;
+            var c = new List<ChipFilter>();
+            if (f.Dari != "" || f.Sampai != "") c.Add(new($"Berangkat {Format.RentangTanggal(f.Dari, f.Sampai)}", () => _filter.Lepas((n, a) => { n.Dari = a.Dari; n.Sampai = a.Sampai; })));
+            if (f.Klien != "") c.Add(new($"Klien: {Db.Semua.Klien.FirstOrDefault(p => p.Id == f.Klien)?.ProjectCode ?? "—"}", () => _filter.Lepas((n, a) => n.Klien = a.Klien)));
+            if (f.Pod != "") c.Add(new(f.Pod == "menyusul" ? "POD fisik menyusul" : "POD fisik diterima", () => _filter.Lepas((n, a) => n.Pod = a.Pod)));
+            return c;
+        }
+    }
+
+    private void GantiTab(string t) { _tab = t; _pilih.Clear(); _tabel.SetPage(1); }
+    private void ResetFilter() { _tabel.Reset(); _filter.LepasSemua(); }
+
+    private void TogglePilih(string id) { if (!_pilih.Remove(id)) _pilih.Add(id); }
+
+    private void TogglePilihSemua(List<BarisPi> halaman)
+    {
+        var ids = halaman.Select(t => t.Id).ToList();
+        var semuaTerpilih = ids.All(_pilih.Contains);
+        _pilih.Clear();
+        if (!semuaTerpilih) _pilih.UnionWith(ids);
+    }
+
+    /// <summary>Baris terbaru (data bisa berubah selama dialog terbuka).</summary>
+    private BarisPi? Terbaru(string id) => Semua.FirstOrDefault(x => x.Id == id);
+
+    /// <summary>Buat PI: tahap PI Tercetak, dan nilai PI dibekukan dari nilai trip saat ini.</summary>
+    private void SimpanBuatPi((List<IsiPi> Isi, List<string> Bukti) data)
+    {
+        var n = 0;
+        foreach (var x in data.Isi)
+        {
+            var t = Terbaru(x.Id);
+            if (t is null) continue;
+            var nilai = TagihanLogika.NilaiSekarang(t.R);
+            var bukti = data.Bukti;
+            void Patch(Model.Trip r)
+            {
+                r.PiNumber = x.Nomor; r.PiTahap = TahapPi.Tercetak; r.PiDate = x.Tanggal; r.PiTahapDate = x.Tanggal;
+                r.PiNilai = new NilaiPi { Pokok = nilai.Pokok, Tambahan = nilai.Tambahan, Total = nilai.Total };
+                if (bukti.Count > 0) r.PiAttachments = [.. r.PiAttachments ?? [], .. bukti];
+            }
+            var baru = Database.Salin(t.T); Patch(baru);
+            string[] isian = bukti.Count > 0 ? ["pi_number", "pi_tahap", "pi_date", "pi_tahap_date", "pi_attachments"] : ["pi_number", "pi_tahap", "pi_date", "pi_tahap_date"];
+            var perubahan = TagihanLogika.PerubahanPi(t.T, baru, isian, nilai);
+            Db.DenganAudit(new IsianAudit
+            {
+                Aksi = "tahap_pi", Entitas = Koleksi.Trip, EntityId = x.Id, Label = t.R.IdTampil,
+                Ringkasan = $"PI {x.Nomor}: Siap PI → {TahapPi.Label(TahapPi.Tercetak)}", Perubahan = perubahan,
+            }, () => Db.Ubah<Model.Trip>(x.Id, Patch));
+            n++;
+        }
+        Toast.Sukses($"{n} PI dibuat dengan tahap PI Tercetak. Nilainya dibekukan.");
+        _buatPi = null; _pilih.Clear(); _tab = TahapPi.Tercetak; _tabel.SetPage(1);
+    }
+
+    private void SimpanTahap(IsiTahap isi)
+    {
+        foreach (var r in isi.Rows)
+        {
+            var t = Terbaru(r.Id) ?? r;
+            var catatan = isi.Catatan;
+            void Patch(Model.Trip x)
+            {
+                x.PiTahap = isi.Tahap; x.PiTahapDate = isi.Tanggal;
+                if (catatan != "") x.PiNote = string.Join("\n", new[] { x.PiNote, $"{TahapPi.Label(isi.Tahap)} {Format.Tanggal(isi.Tanggal)}: {catatan}" }.Where(s => !string.IsNullOrEmpty(s)));
+                if (isi.Bukti.Count > 0) x.PiAttachments = [.. x.PiAttachments ?? [], .. isi.Bukti];
+            }
+            var baru = Database.Salin(t.T); Patch(baru);
+            var isian = new List<string> { "pi_tahap", "pi_tahap_date" };
+            if (catatan != "") isian.Add("pi_note");
+            if (isi.Bukti.Count > 0) isian.Add("pi_attachments");
+            var dari = t.PunyaTahap ? TahapPi.Label(t.T.PiTahap) : "Siap PI";
+            Db.DenganAudit(new IsianAudit
+            {
+                Aksi = "tahap_pi", Entitas = Koleksi.Trip, EntityId = t.Id, Label = t.R.IdTampil,
+                Ringkasan = $"PI {(t.T.PiNumber != "" ? t.T.PiNumber : t.R.IdTampil)}: {dari} → {TahapPi.Label(isi.Tahap)}",
+                Perubahan = TagihanLogika.PerubahanPi(t.T, baru, isian, null),
+            }, () => Db.Ubah<Model.Trip>(t.Id, Patch));
+        }
+        Toast.Sukses($"{isi.Rows.Count} PI menjadi {TahapPi.Label(isi.Tahap)}.");
+        _ubah = null; _pilih.Clear();
+    }
+
+    /// <summary>Timpa nilai PI beku dengan nilai trip sekarang (mis. ada biaya tambahan yang menyusul).</summary>
+    private void SimpanNilai(List<BarisPi> rows)
+    {
+        var n = 0;
+        foreach (var r in rows)
+        {
+            var t = Terbaru(r.Id);
+            if (t?.T.PiNilai is null || t.Selisih == 0) continue;
+            var lama = t.T.PiNilai;
+            var baru = TagihanLogika.NilaiSekarang(t.R);
+            var salinan = Database.Salin(t.T); salinan.PiNilai = baru;
+            Db.DenganAudit(new IsianAudit
+            {
+                Aksi = "tahap_pi", Entitas = Koleksi.Trip, EntityId = t.Id, Label = t.R.IdTampil,
+                Ringkasan = $"PI {(t.T.PiNumber != "" ? t.T.PiNumber : t.R.IdTampil)}: nilai PI diperbarui {Format.Rupiah(lama.Total)} → {Format.Rupiah(baru.Total)}",
+                Perubahan = TagihanLogika.PerubahanPi(t.T, salinan, [], baru),
+            }, () => Db.Ubah<Model.Trip>(t.Id, x => x.PiNilai = new NilaiPi { Pokok = baru.Pokok, Tambahan = baru.Tambahan, Total = baru.Total }));
+            n++;
+        }
+        Toast.Sukses(n > 0 ? $"Nilai {n} PI diperbarui mengikuti nilai trip sekarang." : "Nilai PI sudah sama dengan nilai trip.");
+        _perbarui = null;
+    }
+
+    private void TandaiFisik(BarisPi t)
+    {
+        Db.Ubah<Model.Trip>(t.Id, x => { x.PodFisik = true; x.PodFisikAt = Format.HariIni(); });
+        Toast.Sukses($"Dokumen fisik POD {t.R.IdTampil} diterima.");
+    }
+
+    private async Task ExportTabel(List<BarisPi> rows)
+    {
+        string[] kolom = ["No.", "TR/OR", "No.Pol", "Service type shipment", "Detail Origin", "Detail Address", "Buying Trucking",
+            "Additional Cost", "Additional Cost Buying", "Total Buying", "Vendor Name", "Proforma Invoice No.", "Date submit PI",
+            "ATA (Actual Time Arrive) Date", "Tahap", "ID Trip"];
+        static string Sel(object v) => "\"" + (v.ToString() ?? "").Replace("\"", "\"\"") + "\"";
+        var alamat = Db.Data.Alamat;
+        var baris = rows.Select((t, i) => string.Join(";", new object[]
+        {
+            i + 1, string.Join(", ", t.R.TrList), t.R.PlateNumber, t.R.Batal ? "Cancel Fee" : t.T.ServiceType == TipeKlien.Dedicated ? "Dedicated" : "Call-Out",
+            TagihanLogika.TeksTitik(TagihanLogika.TitikTrip(t.R, true, alamat), t.R.Muat != "" ? t.R.Muat : t.R.AreaAsal),
+            TagihanLogika.TeksTitik(TagihanLogika.TitikTrip(t.R, false, alamat), t.R.Bongkar != "" ? t.R.Bongkar : t.R.AreaTujuan),
+            t.NilaiPokok, string.Join("; ", NotaTrip(t).Select(e => $"{TagihanLogika.NamaBiayaPi(e.ExpenseType)} {e.Amount}")), t.NilaiTambahan, t.NilaiTotal,
+            "PT. BIMA JAYA MANGGALA", t.T.PiNumber, string.IsNullOrEmpty(t.T.PiDate) ? "" : Format.Tanggal(t.T.PiDate), TagihanLogika.TanggalAta(t.R.Ata),
+            t.PunyaTahap ? TahapPi.Label(t.T.PiTahap) : "Siap PI", t.R.IdTampil,
+        }.Select(Sel)));
+        // BOM supaya Excel membaca huruf dengan benar; pemisah titik koma untuk Excel berbahasa Indonesia.
+        var isi = "﻿" + string.Join("\r\n", new[] { string.Join(";", kolom.Select(Sel)) }.Concat(baris));
+        await Simpan.UnduhAsync($"summary-pi-{Format.HariIni()}.csv", isi, "text/csv;charset=utf-8");
+        Toast.Sukses($"{rows.Count} baris diexport. Kirim berkasnya ke finance klien.");
+    }
+
+    /// <summary>Aksi menu ⋯: menu dirender komponen lain, jadi halaman ini dirender ulang sesudah aksinya jalan.</summary>
+    private AksiMenu Aksi(string label, Action kerja, bool mati = false) => new(label, () => { kerja(); StateHasChanged(); }, disabled: mati);
+
+    private List<AksiMenu> AksiBaris(BarisPi t)
+    {
+        var boleh = Bisa("tagihan");
+        var aksi = new List<AksiMenu>();
+        if (!t.PunyaTahap) aksi.Add(Aksi("Buat PI", () => _buatPi = [t], !boleh));
+        else aksi.AddRange(TagihanLogika.Lanjut(t.T.PiTahap).Select(p => Aksi(TagihanLogika.Aksi(p), () => _ubah = (new List<BarisPi> { t }, p), !boleh)));
+        if (t.Selisih != 0) aksi.Add(Aksi("Perbarui nilai PI", () => _perbarui = [t], !boleh));
+        if (t.PunyaTahap) aksi.Add(Aksi("Cetak ringkasan", () => _cetak = [t]));
+        aksi.Add(Aksi("Cetak rekap dokumen", () => _rekap = [t]));
+        // Hardcopy POD yang menyusul: dibutuhkan untuk berkas tagihan fisik.
+        if (t.T.PodFisik == false) aksi.Add(Aksi("Tandai fisik diterima", () => TandaiFisik(t), !Bisa("trip")));
+        return aksi;
+    }
+
+    private List<Kolom<BarisPi>> Kolom =>
+    [
+        new()
+        {
+            Key = "id_tampil", Header = "ID Trip", Sortable = true, Width = "128px",
+            Render = t => @<div class="lh-tight">
+                <a href="@($"transaksi/trip/{t.Id}")" class="tnum fw-semibold text-decoration-none" @onclick:stopPropagation="true">@t.R.IdTampil</a>
+                <div class="tnum fs-12 text-ink-3">@Format.Tanggal(t.T.TransactionDate)</div>
+            </div>,
+        },
+        new()
+        {
+            Key = "tr_list", Header = "No. Referensi", Sortable = true, Width = "140px",
+            Render = t => @<div class="lh-tight" title="@string.Join(", ", t.R.TrList)">
+                <div class="tnum d-flex align-items-center gap-1 text-ink-2">@(t.R.TrList.FirstOrDefault() ?? "—")@if (t.R.TrList.Count > 1) { <Badge Tone="neutral">+@(t.R.TrList.Count - 1)</Badge> }</div>
+                @if (t.R.ProjectCode != "") { <div class="fs-12 text-ink-3">@t.R.ProjectCode</div> }
+            </div>,
+        },
+        new() { Key = "plate_number", Header = "No. Pol", Sortable = true, Width = "108px", Render = t => @<span class="tnum text-ink-2">@(t.R.PlateNumber != "" ? t.R.PlateNumber : "—")</span> },
+        new()
+        {
+            Key = "bongkar", Header = "Muat → Bongkar", Sortable = true,
+            Render = t => @<div class="lh-tight">
+                <span class="text-ink-2">@(t.R.Muat != "" ? t.R.Muat : "?") → @(t.R.Bongkar != "" ? t.R.Bongkar : "?")</span>
+                <span class="tnum d-block fs-12 text-ink-3">@(t.R.Ata != "" ? $"ATA {TagihanLogika.TanggalAta(t.R.Ata)}" : "ATA belum dicatat")</span>
+            </div>,
+        },
+        new()
+        {
+            Key = "nilai_pokok", Header = "Harga", Sortable = true, Align = "right", Width = "124px",
+            Render = t => @<div class="tnum lh-tight">
+                <span class="fw-medium text-ink">@Format.Rupiah(t.NilaiPokok)</span>
+                @if (t.R.Batal) { <span class="d-block fs-11-5 text-ink-3">cancel fee</span> }
+            </div>,
+        },
+        new()
+        {
+            Key = "nilai_tambahan", Header = "Tambahan", Sortable = true, Align = "right", Width = "120px",
+            Render = t => @<span>@if (t.NilaiTambahan != 0) { <span class="tnum text-ink-2" title="@JudulTambahan(t)">@Format.Rupiah(t.NilaiTambahan)</span> } else { <span class="text-ink-3">—</span> }</span>,
+        },
+        new()
+        {
+            Key = "nilai_total", Header = "Total", Sortable = true, Align = "right", Width = "136px",
+            Render = t => @<div class="d-flex flex-column align-items-end gap-1 lh-tight">
+                <span class="tnum fw-semibold text-ink">@Format.Rupiah(t.NilaiTotal)</span>
+                @if (t.Selisih != 0)
+                {
+                    <span title="@($"Nilai PI dibekukan {Format.Rupiah(t.NilaiTotal)} saat PI dibuat. Nilai trip sekarang {Format.Rupiah(t.R.TagihanTotal)}.")">
+                        <Badge Tone="warning">Nilai trip berubah @TagihanLogika.RupiahBertanda(t.Selisih)</Badge>
+                    </span>
+                }
+            </div>,
+        },
+        new()
+        {
+            Key = "pi_tahap", Header = "PI", Sortable = true, Width = "150px",
+            Render = t => @<div class="d-flex flex-column align-items-start gap-1 lh-tight">
+                @if (t.PunyaTahap)
+                {
+                    <span class="tnum fs-12-5 text-ink">@(t.T.PiNumber != "" ? t.T.PiNumber : "—")</span>
+                    <Badge Tone="@TagihanLogika.Nada(t.T.PiTahap)">@TahapPi.Label(t.T.PiTahap)@(string.IsNullOrEmpty(t.T.PiTahapDate) ? "" : $" · {Format.Tanggal(t.T.PiTahapDate)}")</Badge>
+                }
+                else { <Badge Tone="warning">Siap dibuatkan PI</Badge> }
+            </div>,
+        },
+        new()
+        {
+            Key = "bukti", Header = "Bukti", Width = "110px",
+            Render = t => @<LampiranThumbs Ids="t.T.PiAttachments" Ukuran="28" />,
+        },
+        new()
+        {
+            Key = "pod", Header = "POD", Width = "96px",
+            Render = t => @<span>@if (t.T.PodFisik == false) { <Badge Tone="warning">Fisik menyusul</Badge> } else if (t.T.PodFisik == true) { <Badge Tone="good">Fisik</Badge> } else { <span class="text-ink-3">—</span> }</span>,
+        },
+        new()
+        {
+            Key = "action", Header = "Action", Align = "right", Width = "92px", NoPrint = true,
+            Render = t => @<div class="d-flex justify-content-end gap-1">
+                <TombolIkon Label="@($"Lihat trip {t.R.IdTampil}")" Icon="Ikon.FileLines" OnClick="@(() => Ke($"transaksi/trip/{t.Id}"))" />
+                <OverflowMenu Actions="AksiBaris(t)" />
+            </div>,
+        },
+    ];
+
+    private string JudulTambahan(BarisPi t)
+    {
+        var rincian = string.Join(", ", NotaTrip(t).Select(e => $"{JenisBiaya.Label(e.ExpenseType)} {Format.Rupiah(e.Amount)}"));
+        return t.Selisih != 0 ? $"Rincian sekarang: {(rincian != "" ? rincian : "tidak ada")}" : rincian;
+    }
+}

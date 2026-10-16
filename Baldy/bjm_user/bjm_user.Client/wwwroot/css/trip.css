@@ -1,0 +1,10 @@
+/* Halaman trip: bar simpan melayang di bawah form (dimulai setelah rel sidebar). */
+.form-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1040; border-top: 1px solid var(--hairline); background: rgba(255,255,255,.95); backdrop-filter: blur(8px); padding: .625rem 1rem; }
+@media (min-width: 992px) { .form-bar { left: var(--lebar-rel); padding: .625rem 1.5rem; } }
+.form-bar .isi { max-width: 1600px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .375rem .75rem; }
+.halaman-form { padding-bottom: 7rem; }
+@media (min-width: 576px) { .halaman-form { padding-bottom: 5rem; } }
+.kotak-backload { border: 1px solid var(--brand-100); background: color-mix(in srgb, var(--brand-50) 70%, var(--surface)); border-radius: .5rem; padding: .75rem 1rem; font-size: 12.5px; color: var(--brand-800); }
+.bar-pilihan { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; border-bottom: 1px solid var(--brand-100); background: var(--brand-50); padding: .625rem 1rem; }
+.grid-konfigurasi { display: grid; gap: 1rem; }
+@media (min-width: 768px) { .grid-konfigurasi { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 13rem); } .kotak-rute { margin-top: 22px; } }

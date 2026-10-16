@@ -1,0 +1,88 @@
+@* Dialog bergaya modal Bootstrap; buka-tutupnya diatur Blazor (tanpa JavaScript Bootstrap). Esc / klik tirai menutup. *@
+@implements IAsyncDisposable
+@inject Penyimpanan Simpan
+@inject IJSRuntime JS
+
+@if (Open)
+{
+    <div class="modal-backdrop fade show"></div>
+    <div class="modal fade show tampil" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="@IdJudul" @onmousedown="KlikTirai">
+        <div class="modal-dialog @KelasUkuran modal-dialog-scrollable" @onmousedown:stopPropagation="true" @ref="_isi">
+            <div class="modal-content">
+                <div class="modal-header align-items-start">
+                    <div class="min-w-0">
+                        <h2 class="modal-title" id="@IdJudul">@Title</h2>
+                        @if (!string.IsNullOrEmpty(Subtitle))
+                        {
+                            <p class="modal-subjudul">@Subtitle</p>
+                        }
+                    </div>
+                    <button type="button" class="btn-close" aria-label="Tutup" @onclick="Tutup"></button>
+                </div>
+                <div class="modal-body">@ChildContent</div>
+                @if (Footer is not null)
+                {
+                    <div class="modal-footer">@Footer</div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string? Subtitle { get; set; }
+    /// <summary>sm | md | lg | xl</summary>
+    [Parameter] public string Size { get; set; } = "md";
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+
+    private ElementReference _isi;
+    private DotNetObjectReference<Modal>? _ref;
+    private IJSObjectReference? _pegangan;
+    private bool _terpasang;
+    private readonly string IdJudul = "modal-" + Guid.NewGuid().ToString("N")[..8];
+
+    private string KelasUkuran => Size switch { "sm" => "modal-sm", "lg" => "modal-lg", "xl" => "modal-xl", _ => "" };
+
+    protected override async Task OnAfterRenderAsync(bool pertama)
+    {
+        if (Open && !_terpasang)
+        {
+            _terpasang = true;
+            _ref ??= DotNetObjectReference.Create(this);
+            await Simpan.KunciGulirAsync(true);
+            try { _pegangan = await JS.InvokeAsync<IJSObjectReference>("sikotis.pasangTutupLuar", _isi, _ref); } catch { /* abaikan */ }
+        }
+        else if (!Open && _terpasang)
+        {
+            await LepasAsync();
+        }
+    }
+
+    private async Task LepasAsync()
+    {
+        _terpasang = false;
+        await Simpan.KunciGulirAsync(false);
+        if (_pegangan is not null)
+        {
+            try { await JS.InvokeVoidAsync("sikotis.lepasTutupLuar", _pegangan); await _pegangan.DisposeAsync(); } catch { /* abaikan */ }
+            _pegangan = null;
+        }
+    }
+
+    [JSInvokable]
+    public Task TutupDariLuar() => Tutup();
+
+    private Task KlikTirai() => Tutup();
+
+    private Task Tutup() => OnClose.InvokeAsync();
+
+    public async ValueTask DisposeAsync()
+    {
+        await LepasAsync();
+        _ref?.Dispose();
+    }
+}

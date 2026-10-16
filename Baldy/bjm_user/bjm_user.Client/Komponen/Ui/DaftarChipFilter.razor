@@ -1,0 +1,26 @@
+@* Deretan chip filter yang berlaku; "Hapus semua" bila lebih dari satu bisa dilepas. *@
+@if (Chips.Count > 0)
+{
+    <div class="d-flex flex-wrap align-items-center gap-1 @Class" aria-label="Filter yang berlaku">
+        @foreach (var c in Chips)
+        {
+            <span class="chip-filter @(c.Lepas is not null ? "brand" : "neutral")">
+                @c.Label
+                @if (c.Lepas is not null)
+                {
+                    <button type="button" class="lepas-chip" aria-label="@($"Lepas filter {c.Label}")" @onclick="c.Lepas"><IkonSvg Def="Ikon.Xmark" Size="10" /></button>
+                }
+            </span>
+        }
+        @if (Chips.Count(c => c.Lepas is not null) > 1)
+        {
+            <button type="button" class="btn btn-link btn-sm p-0 fs-12 fw-semibold text-decoration-none" @onclick="OnLepasSemua">Hapus semua</button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public List<ChipFilter> Chips { get; set; } = [];
+    [Parameter] public EventCallback OnLepasSemua { get; set; }
+    [Parameter] public string? Class { get; set; }
+}

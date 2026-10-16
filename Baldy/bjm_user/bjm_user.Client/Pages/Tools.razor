@@ -1,0 +1,133 @@
+@page "/tools"
+@inherits KomponenData
+@inject Penyimpanan Simpan
+@* Tools: isi database, export / muat ulang / reset data, dan daftar business rule yang masih perlu dikonfirmasi. Hanya Owner & Manager. *@
+<PageTitle>Tools — SIKOTIS</PageTitle>
+
+@if (Bisa("master"))
+{
+    <PageHeader Title="Tools" Crumbs="@(new List<Crumb> { new("Administrasi"), new("Tools") })">
+        <Description>Kelola data aplikasi, uji state halaman, dan lihat daftar business rule yang masih perlu dikonfirmasi.</Description>
+    </PageHeader>
+
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <Kartu>
+                <KepalaKartu Title="Business rule yang perlu dikonfirmasi" Subtitle="Perhitungan yang menunggu keputusan, agar tidak ditetapkan sebelum waktunya.">
+                    <Actions><Badge Tone="warning">@DaftarTbd.Semua.Length item</Badge></Actions>
+                </KepalaKartu>
+                <ul class="list-unstyled m-0">
+                    @for (var i = 0; i < DaftarTbd.Semua.Length; i++)
+                    {
+                        var n = DaftarTbd.Semua[i];
+                        <li class="px-3 py-3" style="@(i > 0 ? "border-top:1px solid var(--grid)" : null)">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <Badge Tone="neutral">@n.Id</Badge>
+                                <p class="m-0 fs-13 fw-semibold text-ink">@n.Judul</p>
+                            </div>
+                            <p class="m-0 mt-2 fs-12-5 text-ink-2" style="line-height:1.6"><span class="fw-medium text-ink-3">Sekarang:</span> @n.Sekarang</p>
+                            <p class="m-0 mt-1 fs-12-5 text-ink-2" style="line-height:1.6"><span class="fw-medium text-ink-3">Perlu dijawab:</span> @n.Pertanyaan</p>
+                        </li>
+                    }
+                </ul>
+                <p class="m-0 border-top border-hairline px-3 py-2 fs-11-5 text-ink-3">
+                    Seluruh implementasinya berada di <code class="rounded bg-sunken px-1 py-0">src/lib/calculations.ts</code> —
+                    ganti isi fungsinya saja, halaman lain tidak perlu diubah.
+                </p>
+            </Kartu>
+        </div>
+
+        <div class="col-xl-4 d-flex flex-column gap-3">
+            <Kartu>
+                <KepalaKartu Title="Isi database" Subtitle="@($"Workspace {WorkspaceKode.Label(Sesi.Workspace)} · tersimpan di localStorage browser ini.")" />
+                <ul class="list-unstyled m-0">
+                    @{ var urut = 0; }
+                    @foreach (var (label, n) in Jumlah)
+                    {
+                        <li class="d-flex align-items-center justify-content-between px-3 py-2" style="@(urut++ > 0 ? "border-top:1px solid var(--grid)" : null)">
+                            <span class="fs-13 text-ink-2">@label</span>
+                            <span class="tnum fs-13 fw-semibold text-ink">@Format.Angka(n)</span>
+                        </li>
+                    }
+                </ul>
+            </Kartu>
+
+            <Kartu>
+                <KepalaKartu Title="Aksi" />
+                <div class="d-flex flex-column gap-2 p-3">
+                    <Tombol Class="w-100 justify-content-start" Icon="Ikon.Download" OnClick="ExportJson">Export data (JSON)</Tombol>
+                    <Tombol Class="w-100 justify-content-start" Icon="Ikon.ArrowsRotate" Loading="_memuat" OnClick="MuatUlang">Muat ulang data</Tombol>
+                    <Tombol Class="w-100 justify-content-start" Variant="danger" Icon="Ikon.Database" Disabled="@(!Bisa("hapus"))" OnClick="() => _konfirmasi = true">Reset data ke kondisi awal</Tombol>
+                </div>
+            </Kartu>
+
+            <Kartu>
+                <KepalaKartu Title="Tentang" />
+                <dl class="m-0 d-flex flex-column gap-2 p-3 fs-12-5">
+                    <div class="d-flex justify-content-between gap-3"><dt class="fw-normal text-ink-3">Sistem</dt><dd class="m-0 fw-medium text-ink">SIKOTIS — Sistem Komisi Otomatis</dd></div>
+                    <div class="d-flex justify-content-between gap-3"><dt class="fw-normal text-ink-3">Perusahaan</dt><dd class="m-0 fw-medium text-ink">PT Bimajaya Mustika</dd></div>
+                    <div class="d-flex justify-content-between gap-3"><dt class="fw-normal text-ink-3">Version</dt><dd class="m-0 fw-medium text-ink">0.1</dd></div>
+                    <div class="d-flex justify-content-between gap-3"><dt class="fw-normal text-ink-3">Penyimpanan</dt><dd class="m-0 fw-medium text-ink">Browser (localStorage)</dd></div>
+                </dl>
+            </Kartu>
+        </div>
+    </div>
+
+    <KonfirmasiDialog Open="_konfirmasi" Title="Reset data ke kondisi awal?" ConfirmLabel="Reset Data" Tone="danger"
+                      Message="Seluruh perubahan yang Anda buat (tambah / ubah / hapus) akan hilang dan data dikembalikan ke kondisi awal."
+                      OnCancel="() => _konfirmasi = false" OnConfirm="Reset" />
+}
+
+@code {
+    private bool _konfirmasi;
+    private bool _memuat;
+
+    protected override void OnParametersSet()
+    {
+        // Hanya Owner & Manager; peran lain diarahkan ke Dashboard.
+        if (!Bisa("master")) Ke("dashboard", true);
+    }
+
+    private IEnumerable<(string, int)> Jumlah
+    {
+        get
+        {
+            var d = Db.Data;
+            yield return ("Karyawan", d.Karyawan.Count);
+            yield return ("Route", d.Rute.Count);
+            yield return ("Mobil", d.Kendaraan.Count);
+            yield return ("Klien", d.Klien.Count);
+            yield return ("Kontrak", d.Kontrak.Count);
+            yield return ("SI / Job Order", d.JobOrders.Count);
+            yield return ("Trip", d.Trip.Count);
+            yield return ("Tagihan", d.Tagihan.Count);
+            yield return ("Termin Uang Jalan", d.Termin.Count);
+            yield return ("Biaya Operasional", d.Biaya.Count);
+            yield return ("Biaya Internal", d.BiayaInternal.Count);
+            yield return ("Catatan Lainnya", d.CatatanTrip.Count);
+            yield return ("Mutasi Kasbon", d.Kasbon.Count);
+            yield return ("Pengaturan Komisi", d.AturanKomisi.Count);
+        }
+    }
+
+    // Export selalu berisi seluruh workspace, bukan hanya yang sedang aktif.
+    private async Task ExportJson()
+    {
+        var opsi = new System.Text.Json.JsonSerializerOptions(Database.Json) { WriteIndented = true };
+        await Simpan.UnduhAsync($"sikotis-data-{Format.HariIni()}.json", System.Text.Json.JsonSerializer.Serialize(Db.Semua, opsi));
+        Toast.Sukses("Data seluruh workspace berhasil diexport.");
+    }
+
+    private async Task MuatUlang()
+    {
+        _memuat = true;
+        try { await Db.MuatUlangAsync(); } finally { _memuat = false; }
+    }
+
+    private async Task Reset()
+    {
+        _konfirmasi = false;
+        await Db.ResetKeContohAsync();
+        Toast.Sukses("Data berhasil dimuat ulang.");
+    }
+}

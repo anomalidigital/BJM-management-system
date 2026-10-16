@@ -1,0 +1,285 @@
+@inherits KomponenData
+@inject Lampiran LampiranSvc
+@*
+    Tab Perjalanan: riwayat trip dari dibuat sampai ditutup. Kejadian dicatat admin dari kabar supir (pick up, rest area, tiba,
+    bongkar, retur, pool) beserta buktinya; catatan sistem (dibuat, dicetak, ditutup, backload / rute lanjutan) ikut tampil di
+    urutan yang sama.
+
+    "Tiba di pool" juga mengisi waktu pool trip (PoolAt), sama seperti Tutup Trip: kendaraan bisa dipakai trip lain, dan tertahan
+    lagi bila catatan pool terakhir dihapus.
+*@
+@{
+    var kejadian = Kejadian;
+    var titik = Titik(kejadian);
+    var pickup = kejadian.FirstOrDefault(e => e.Jenis == "pickup");
+    var ringkas = string.Join(" · ", new[]
+    {
+        pickup is not null ? $"Pick up {Format.Waktu(pickup.Waktu)}" : "Belum pick up",
+        Trip.Ata != "" ? $"ATA {Format.Waktu(Trip.Ata)}" : "belum tiba",
+        Trip.Posisi is not null ? $"terakhir: {JenisPerjalanan.Label(Trip.Posisi.Jenis).ToLowerInvariant()}" : "",
+    }.Where(x => x != ""));
+}
+<div>
+    <KepalaTab Tombol="Catat kejadian" BisaUbah="BisaUbah" OnTambah="() => Buka(null)">
+        <Keterangan>@(Trip.Batal ? "Trip dibatalkan: riwayat di bawah hanya arsip." : $"{ringkas}. Catat kabar dari supir beserta buktinya; jam tiba (ATA) dipakai di PI.")</Keterangan>
+    </KepalaTab>
+    @if (kejadian.Count == 0)
+    {
+        <KosongTab Judul="Belum ada kejadian perjalanan." Keterangan="Mulai dari pick up barang di lokasi muat, lalu tiba dan selesai bongkar di tujuan." />
+    }
+    <ol class="list-unstyled m-0 px-3 py-3 px-sm-4 @(kejadian.Count == 0 ? "border-top border-hairline" : "")" data-riwayat>
+        @for (var i = 0; i < titik.Count; i++)
+        {
+            var t = titik[i];
+            var terakhir = i == titik.Count - 1;
+            var tanggalSaja = t.Nada == "sistem" && t.Kunci != "dibuat" && !t.Kunci.StartsWith("bl-");
+            <li class="position-relative d-flex gap-3 @(terakhir ? "" : "pb-4")" @key="t.Kunci">
+                @if (!terakhir)
+                {
+                    <span aria-hidden="true" class="position-absolute d-sm-none" style="top:32px;bottom:0;left:15px;width:1px;background:var(--hairline)"></span>
+                    <span aria-hidden="true" class="position-absolute d-none d-sm-block" style="top:32px;bottom:0;left:143px;width:1px;background:var(--hairline)"></span>
+                }
+                <span class="tnum d-none d-sm-block flex-shrink-0 pt-1 text-end fs-12 text-ink-3" style="width:112px">@(tanggalSaja ? Format.Tanggal(t.Waktu) : Format.Waktu(t.Waktu))</span>
+                <span class="position-relative flex-shrink-0 rounded-circle border place-center @KelasNada(t.Nada)" style="width:32px;height:32px;z-index:1">
+                    <IkonSvg Def="t.Ikon" Size="14" />
+                </span>
+                <div class="min-w-0 flex-grow-1 pt-1">
+                    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+                        <div class="min-w-0">
+                            <p class="m-0 fs-13 fw-semibold @(t.Nada == "sistem" ? "text-ink-2" : "text-ink")">@t.Judul</p>
+                            <p class="m-0 tnum fs-12 text-ink-3 d-sm-none">@Format.Waktu(t.Waktu)</p>
+                            @if (!string.IsNullOrEmpty(t.Lokasi)) { <p class="m-0 fs-12-5 text-ink-2">@t.Lokasi</p> }
+                            @if (!string.IsNullOrEmpty(t.Catatan)) { <p class="m-0 mt-1 fs-12-5 text-ink-3" style="white-space:pre-line">@t.Catatan</p> }
+                            @if (t.Tautan is not null) { <a href="@t.Tautan.Value.Ke" class="mt-1 d-inline-block fs-12-5 fw-medium text-decoration-none">@t.Tautan.Value.Label</a> }
+                        </div>
+                        @if (t.Event is not null)
+                        {
+                            var ev = t.Event;
+                            <div class="d-flex flex-shrink-0 gap-1">
+                                <TombolIkon Label="Ubah" Icon="Ikon.Pen" Size="13" Disabled="@(!BisaUbah)" OnClick="() => Buka(ev)" />
+                                <TombolIkon Label="Hapus" Icon="Ikon.TrashCan" Size="13" Tone="danger" Disabled="@(!BisaUbah)" OnClick="() => _menghapus = ev" />
+                            </div>
+                        }
+                    </div>
+                    @if (t.Lampiran is { Count: > 0 }) { <LampiranThumbs Ids="t.Lampiran" Ukuran="52" Class="mt-2" /> }
+                </div>
+            </li>
+        }
+    </ol>
+</div>
+
+<Modal Open="_terbuka" Title="@(_editing is not null ? "Ubah Kejadian" : "Catat Kejadian")" Subtitle="@($"Trip {Trip.IdTampil}{(Trip.PlateNumber != "" ? $" · {Trip.PlateNumber}" : "")}")" Size="md" OnClose="() => _terbuka = false">
+    <ChildContent>
+        @if (_terbuka)
+        {
+            var wajib = WajibCatatan.Contains(_jenis);
+            <div class="row gx-3 gy-3">
+                <Field Label="Kejadian" Required Class="col-12" Hint="@AturDetail.Teks(Petunjuk(_jenis))">
+                    <Pilihan Id="@context" Options="OpsiJenis" Value="@_jenis" ValueChanged="GantiJenis" Cari="false" Clearable="false" />
+                </Field>
+                <Field Label="Tanggal" Required Class="col-sm-6">
+                    <TanggalInput Id="@context" Value="@_tanggal" ValueChanged="v => _tanggal = v" />
+                </Field>
+                <Field Label="Jam" Required Class="col-sm-6">
+                    <input id="@context" type="time" class="form-control tnum" value="@_jam" @oninput="e => _jam = e.Value?.ToString() ?? string.Empty" @onchange="e => _jam = e.Value?.ToString() ?? string.Empty" />
+                </Field>
+                <Field Label="Lokasi" Class="col-12">
+                    <input id="@context" class="form-control" value="@_lokasi" placeholder="mis. Rest area KM 57" @oninput="e => _lokasi = e.Value?.ToString() ?? string.Empty" />
+                </Field>
+                <Field Label="@(wajib ? "Keterangan" : "Catatan")" Required="wajib" Class="col-12">
+                    <textarea id="@context" class="form-control" rows="3" value="@_catatan" @oninput="e => _catatan = e.Value?.ToString() ?? string.Empty"></textarea>
+                </Field>
+                <Field Label="Bukti" Class="col-12" Hint="@AturDetail.Teks("Foto barang, manifest, Berita Acara bertanda tangan, atau foto lokasi. Foto diperkecil otomatis.")">
+                    <LampiranInput Id="@context" Label="Tambah bukti" Value="_lampiran" ValueChanged="v => _lampiran = v" />
+                </Field>
+                @if (_galat is not null) { <div class="col-12"><PesanGalat Teks="@_galat" /></div> }
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="() => _terbuka = false">Batal</Tombol>
+        <Tombol Variant="primary" OnClick="Simpan">Simpan</Tombol>
+    </Footer>
+</Modal>
+
+<KonfirmasiDialog Open="_menghapus is not null" Title="Hapus catatan perjalanan?" ConfirmLabel="Hapus" Tone="danger"
+                  Message="@(_menghapus is null ? "" : $"{JenisPerjalanan.Label(_menghapus.Jenis)} {Format.Waktu(_menghapus.Waktu)} akan dihapus beserta buktinya.")"
+                  OnCancel="() => _menghapus = null" OnConfirm="Hapus" />
+
+@code {
+    [Parameter, EditorRequired] public BarisTrip Trip { get; set; } = default!;
+    [Parameter] public bool BisaUbah { get; set; }
+
+    /// <summary>Satu titik di riwayat: kejadian yang dicatat, atau catatan sistem.</summary>
+    private sealed record TitikRiwayat(string Kunci, string Waktu, string Judul, IkonDef Ikon, string Nada, string? Lokasi = null, string? Catatan = null,
+        List<string>? Lampiran = null, KejadianTrip? Event = null, (string Ke, string Label)? Tautan = null);
+
+    /// <summary>Jenis yang wajib diberi catatan (alasan).</summary>
+    private static readonly string[] WajibCatatan = ["dialihkan", "retur", "kendala"];
+
+    private bool _terbuka;
+    private KejadianTrip? _editing;
+    private string _jenis = "pickup";
+    private string _tanggal = "", _jam = "", _lokasi = "", _catatan = "";
+    private List<string> _lampiran = [];
+    private string? _galat;
+    private KejadianTrip? _menghapus;
+
+    private List<KejadianTrip> Kejadian => TripLogika.Kejadian(Db.Semua.Kejadian, Trip.Id);
+
+    private static IkonDef IkonJenis(string j) => j switch
+    {
+        "pickup" => Ikon.TruckRampBox, "istirahat" => Ikon.MugHot, "menginap" => Ikon.Bed, "kendala" => Ikon.CircleExclamation, "dialihkan" => Ikon.Route,
+        "tiba" => Ikon.LocationDot, "bongkar" => Ikon.FlagCheckered, "retur" => Ikon.RotateLeft, "pool" => Ikon.Warehouse, _ => Ikon.CircleInfo,
+    };
+
+    /// <summary>Petunjuk tiap jenis: bukti apa yang dilampirkan dan ke mana biayanya dicatat.</summary>
+    private static string Petunjuk(string j) => j switch
+    {
+        "pickup" => "Jam barang diambil. Lampirkan manifest dan foto barang saat dimuat.",
+        "istirahat" => "Berhenti di rest area atau tempat istirahat.",
+        "menginap" => "Biaya menginap dicatat di Biaya Operasional jenis Overnight; ikut ditagihkan ke klien.",
+        "kendala" => "Ban, mogok, razia, macet, atau kejadian lain di jalan.",
+        "dialihkan" => "Tulis alasan dan lokasi baru. Ubah rute lewat Edit bila tujuannya berganti.",
+        "tiba" => "Jam tiba di lokasi bongkar (ATA). Dipakai di PI dan laporan.",
+        "bongkar" => "Lampirkan Berita Acara, surat jalan, atau TR/OR klien yang sudah ditandatangani penerima, dan foto barang diterima.",
+        "retur" => "Barang ditolak atau dikembalikan ke gudang: tulis alasannya.",
+        "pool" => "Mencatat Tiba di pool membuat kendaraan bisa dipakai trip lain. Tutup trip setelah dokumen fisik diterima.",
+        _ => "",
+    };
+
+    private static string KelasNada(string nada) => nada switch
+    {
+        "penting" => "border-brand-100 bg-brand-50 text-brand",
+        "sistem" => "border-hairline bg-sunken text-ink-3",
+        _ => "border-hairline bg-surface text-ink-2",
+    };
+
+    private static List<Opsi> OpsiJenis => JenisPerjalanan.Semua.Select(j => new Opsi(j, JenisPerjalanan.Label(j))).ToList();
+
+    private List<TitikRiwayat> Titik(List<KejadianTrip> kejadian)
+    {
+        var t = Trip.T;
+        var anak = Db.Baris.Where(x => x.T.BackloadDari == Trip.Id).ToList();
+        var induk = string.IsNullOrEmpty(t.BackloadDari) ? null : Db.BarisTrip(t.BackloadDari);
+        var keluar = kejadian.Select(e => new TitikRiwayat(e.Id, e.Waktu, JenisPerjalanan.Label(e.Jenis), IkonJenis(e.Jenis),
+            e.Jenis is "tiba" or "bongkar" ? "penting" : "kejadian", e.Lokasi, e.Catatan, e.Attachments, e)).ToList();
+        keluar.Add(new TitikRiwayat("dibuat", AturDetail.Lokal(t.CreatedAt),
+            induk is not null ? $"Dibuat sebagai backload / rute lanjutan dari trip {induk.IdTampil}" : "Trip dibuat", Ikon.Check, "sistem",
+            Tautan: induk is not null ? ($"transaksi/trip/{induk.Id}", $"Buka trip {induk.IdTampil}") : null));
+        // Tanggal cetak & tutup tanpa jam: diletakkan di akhir hari itu.
+        if (!string.IsNullOrEmpty(t.PrintedAt) && t.PrintedAt.Length >= 10)
+            keluar.Add(new TitikRiwayat("cetak", $"{t.PrintedAt[..10]}T23:58", "Berita Acara dicetak", Ikon.Print, "sistem"));
+        if (!string.IsNullOrEmpty(t.ClosedAt))
+            keluar.Add(new TitikRiwayat("tutup", $"{t.ClosedAt}T23:59", "Trip ditutup", Ikon.FlagCheckered, "sistem",
+                Catatan: t.PodFisik == false ? "POD baru difoto; dokumen fisik menyusul." : "Dokumen fisik POD diterima di pool.", Lampiran: t.PodAttachments));
+        // Dokumen fisik yang menyusul setelah trip ditutup dengan foto.
+        if (t.PodFisik == true && !string.IsNullOrEmpty(t.PodFisikAt) && !string.IsNullOrEmpty(t.ClosedAt) && t.PodFisikAt != t.ClosedAt)
+            keluar.Add(new TitikRiwayat("fisik", $"{t.PodFisikAt}T23:59", "Dokumen fisik POD diterima di pool", Ikon.Check, "sistem"));
+        if (Trip.Batal && !string.IsNullOrEmpty(t.CancelledAt))
+            keluar.Add(new TitikRiwayat("batal", $"{t.CancelledAt}T23:59", "Trip dibatalkan", Ikon.Ban, "sistem", Catatan: t.CancelReason));
+        foreach (var a in anak)
+            keluar.Add(new TitikRiwayat($"bl-{a.Id}", AturDetail.Lokal(a.T.CreatedAt), $"Backload / rute lanjutan: trip {a.IdTampil}", Ikon.Route, "sistem",
+                Lokasi: $"{(a.Muat != "" ? a.Muat : "?")} → {(a.Bongkar != "" ? a.Bongkar : "?")}", Tautan: ($"transaksi/trip/{a.Id}", $"Buka trip {a.IdTampil}")));
+        // Di menit yang sama: trip dibuat lebih dulu, catatan penutup paling akhir.
+        static int Urutan(TitikRiwayat x) => x.Kunci == "dibuat" ? 0 : x.Event is not null ? 1 : x.Kunci.StartsWith("bl-") ? 3 : 2;
+        return keluar.Select((x, i) => (x, i))
+            .OrderBy(p => p.x.Waktu, StringComparer.Ordinal).ThenBy(p => Urutan(p.x)).ThenBy(p => p.i)
+            .Select(p => p.x).ToList();
+    }
+
+    private string LokasiAwal(string j) => j switch
+    {
+        "pickup" => Trip.Muat,
+        "tiba" or "bongkar" or "retur" => Trip.Bongkar,
+        "pool" => "POOL",
+        _ => "",
+    };
+
+    private void Buka(KejadianTrip? e)
+    {
+        _editing = e;
+        if (e is not null)
+        {
+            var bagian = e.Waktu.Split('T');
+            _jenis = e.Jenis; _tanggal = bagian[0]; _jam = bagian.Length > 1 ? bagian[1] : ""; _lokasi = e.Lokasi; _catatan = e.Catatan; _lampiran = e.Attachments.ToList();
+        }
+        else
+        {
+            var kejadian = Kejadian;
+            bool Ada(string j) => kejadian.Any(x => x.Jenis == j);
+            /* Kejadian yang biasanya dicatat berikutnya, jadi admin tidak perlu memilih dari awal. */
+            var j = !Ada("pickup") ? "pickup" : !Ada("tiba") ? "istirahat" : !Ada("bongkar") ? "bongkar" : "pool";
+            var bagian = Format.SekarangLokal().Split('T');
+            _jenis = j; _tanggal = bagian[0]; _jam = bagian[1]; _lokasi = LokasiAwal(j); _catatan = ""; _lampiran = [];
+        }
+        _galat = null;
+        _terbuka = true;
+    }
+
+    private void GantiJenis(string? v)
+    {
+        var j = v ?? "pickup";
+        if (_lokasi.Trim() == "" || _lokasi == LokasiAwal(_jenis)) _lokasi = LokasiAwal(j);
+        _jenis = j;
+    }
+
+    /// <summary>
+    /// Waktu "Tiba di pool" paling awal disalin ke trip (PoolAt), seperti Tutup Trip / Tandai di pool.
+    /// Tanpa catatan pool tersisa, PoolAt dikosongkan supaya kendaraan tertahan lagi.
+    /// </summary>
+    private void SelaraskanPool(IEnumerable<string> waktuPool)
+    {
+        var awal = waktuPool.OrderBy(x => x, StringComparer.Ordinal).FirstOrDefault();
+        var kini = string.IsNullOrEmpty(Trip.T.PoolAt) ? null : Trip.T.PoolAt;
+        if (kini != awal) Db.Ubah<Model.Trip>(Trip.Id, x => x.PoolAt = awal);
+    }
+
+    private void Simpan()
+    {
+        if (_tanggal == "" || _jam == "") { _galat = "Tanggal dan jam wajib diisi."; return; }
+        if (WajibCatatan.Contains(_jenis) && _catatan.Trim() == "") { _galat = $"Tulis keterangan untuk {JenisPerjalanan.Label(_jenis).ToLowerInvariant()}."; return; }
+        var (jenis, waktu, lokasi, catatan, lampiran) = (_jenis, $"{_tanggal}T{_jam}", _lokasi.Trim(), _catatan.Trim(), _lampiran.ToList());
+        var editing = _editing;
+        void Tulis()
+        {
+            if (editing is not null) Db.Ubah<KejadianTrip>(editing.Id, x => { x.Jenis = jenis; x.Waktu = waktu; x.Lokasi = lokasi; x.Catatan = catatan; x.Attachments = lampiran; });
+            else Db.Buat(new KejadianTrip { TripId = Trip.Id, Jenis = jenis, Waktu = waktu, Lokasi = lokasi, Catatan = catatan, Attachments = lampiran });
+        }
+        if (jenis == "pool" || editing?.Jenis == "pool")
+        {
+            // Catatan pool & waktu pool trip berubah bersama: satu catatan Audit Log.
+            var lain = Kejadian.Where(x => x.Jenis == "pool" && x.Id != editing?.Id).Select(x => x.Waktu).ToList();
+            List<string> waktuPool = jenis == "pool" ? [.. lain, waktu] : lain;
+            Db.DenganAudit(new IsianAudit
+            {
+                Aksi = "pool", Entitas = Koleksi.Trip, EntityId = Trip.Id, Label = Trip.IdTampil,
+                Ringkasan = editing is not null ? $"Mengubah catatan tiba di pool ({Format.Waktu(waktu)})" : $"Mobil kembali di pool ({Format.Waktu(waktu)})",
+            }, () => { Tulis(); SelaraskanPool(waktuPool); });
+        }
+        else Tulis();
+        if (editing is not null) Toast.Sukses("Catatan perjalanan diperbarui.");
+        else if (jenis == "pool" && Trip.T.VehicleId != "") Toast.Sukses($"Tiba di pool tercatat. Kendaraan {(Trip.PlateNumber != "" ? Trip.PlateNumber : "trip ini")} bisa dipakai trip lain.");
+        else Toast.Sukses($"{JenisPerjalanan.Label(jenis)} tercatat.");
+        _terbuka = false;
+    }
+
+    private async Task Hapus()
+    {
+        if (_menghapus is null) return;
+        var ev = _menghapus;
+        _menghapus = null;
+        if (ev.Jenis == "pool")
+        {
+            var sisa = Kejadian.Where(x => x.Jenis == "pool" && x.Id != ev.Id).Select(x => x.Waktu).ToList();
+            Db.DenganAudit(new IsianAudit
+            {
+                Aksi = "hapus", Entitas = Koleksi.Kejadian, EntityId = ev.Id, Label = $"{JenisPerjalanan.Label("pool")} · {Trip.IdTampil}",
+                Ringkasan = "Menghapus catatan tiba di pool",
+            }, () => { Db.Hapus<KejadianTrip>(ev.Id); SelaraskanPool(sisa); });
+        }
+        else Db.Hapus<KejadianTrip>(ev.Id);
+        Toast.Sukses("Catatan perjalanan dihapus.");
+        await LampiranSvc.HapusAsync(ev.Attachments);
+    }
+}

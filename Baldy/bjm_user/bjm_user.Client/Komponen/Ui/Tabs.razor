@@ -1,0 +1,18 @@
+@* Tab bergaris bawah (role=tab). *@
+<div role="tablist" class="nav nav-underline gulir-tanpa-bilah flex-nowrap overflow-x-auto @Class">
+    @foreach (var t in Items)
+    {
+        var aktif = t.Id == Value;
+        <button type="button" role="tab" aria-selected="@aktif" class="nav-link text-nowrap @(aktif ? "active" : "")" @onclick="() => ValueChanged.InvokeAsync(t.Id)">
+            @t.Label
+            @if (t.Badge is not null) { <span class="jumlah">@t.Badge</span> }
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter] public List<TabItem> Items { get; set; } = [];
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string? Class { get; set; }
+}

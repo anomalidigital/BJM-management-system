@@ -1,0 +1,48 @@
+@inherits KomponenData
+
+@if (Terbuka)
+{
+    <div class="tirai-mobile animate-in-fade d-lg-none no-print" @onclick="TutupMobile" aria-hidden="true"></div>
+}
+<aside class="sidebar no-print @(Terbuka ? "terbuka" : "")" aria-label="Menu utama">
+    <div class="sidebar-logo">
+        <div class="huruf">S</div>
+        <div class="min-w-0 pudar">
+            <p class="m-0 text-white fw-semibold fs-14 lh-tight text-truncate">SIKOTIS</p>
+            <p class="m-0 fs-11 lh-tight text-truncate" style="color: rgba(147,161,184,.8)">PT Bimajaya Mustika</p>
+        </div>
+    </div>
+    <nav>
+        @{ var gi = 0; }
+        @foreach (var g in Navigasi.Untuk(Sesi.Workspace))
+        {
+            var pertama = gi == 0;
+            <div class="grup @(gi > 0 && g.Judul is null ? "garis" : "")">
+                @if (g.Judul is not null)
+                {
+                    <p class="grup-judul pudar">@g.Judul</p>
+                }
+                <ul>
+                    @foreach (var it in g.Items)
+                    {
+                        <li>
+                            <NavLink href="@it.Ke" class="sidebar-item" Match="NavLinkMatch.Prefix" title="@it.Label" @onclick="TutupMobile">
+                                <IkonSvg Def="it.Ikon" Size="17" />
+                                <span class="text-truncate pudar">@it.Label</span>
+                            </NavLink>
+                        </li>
+                    }
+                </ul>
+            </div>
+            gi++;
+            _ = pertama;
+        }
+    </nav>
+    <div class="sidebar-kaki"><span class="pudar">Version 0.2</span></div>
+</aside>
+
+@code {
+    [Parameter] public bool Terbuka { get; set; }
+    [Parameter] public EventCallback OnTutup { get; set; }
+    private Task TutupMobile() => Terbuka ? OnTutup.InvokeAsync() : Task.CompletedTask;
+}

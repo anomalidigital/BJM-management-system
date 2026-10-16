@@ -1,0 +1,20 @@
+@implements IDisposable
+@inject Toast Toast
+
+<div class="toast-tumpukan no-print" aria-live="polite">
+    @foreach (var p in Toast.Daftar)
+    {
+        <div class="toast-item animate-in-toast @p.Jenis" role="status" @key="p.Id">
+            <IkonSvg Def="@(p.Jenis == "sukses" ? Ikon.CircleCheck : p.Jenis == "galat" ? Ikon.CircleExclamation : Ikon.CircleInfo)" Size="16"
+                  Class="@(p.Jenis == "sukses" ? "text-success" : p.Jenis == "galat" ? "text-danger" : "text-brand")" Style="margin-top:2px" />
+            <span class="flex-grow-1">@p.Teks</span>
+            <button type="button" class="btn-close btn-close-sm" aria-label="Tutup" @onclick="() => Toast.Tutup(p.Id)"></button>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized() => Toast.Berubah += Segarkan;
+    private void Segarkan() => InvokeAsync(StateHasChanged);
+    public void Dispose() => Toast.Berubah -= Segarkan;
+}

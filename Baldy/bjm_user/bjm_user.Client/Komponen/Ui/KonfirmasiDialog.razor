@@ -1,0 +1,23 @@
+@* Konfirmasi singkat: pesan + Batal + tombol aksi (nada primary / danger). *@
+<Modal Open="Open" Title="@Title" Size="sm" OnClose="OnCancel">
+    <ChildContent>
+        <p class="mb-0 fs-13 text-ink-2">@Message</p>
+        @ChildContent
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="OnCancel">Batal</Tombol>
+        <Tombol Variant="@(Tone == "danger" ? "danger" : "primary")" OnClick="OnConfirm" Disabled="Disabled">@ConfirmLabel</Tombol>
+    </Footer>
+</Modal>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public string ConfirmLabel { get; set; } = "Ya";
+    [Parameter] public string Tone { get; set; } = "primary";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

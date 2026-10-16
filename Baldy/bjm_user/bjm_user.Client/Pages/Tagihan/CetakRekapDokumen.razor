@@ -1,0 +1,126 @@
+@* Rekap dokumen tagihan per trip, untuk menyiapkan berkas hardcopy ke klien (catatan proses PI DHL): kelengkapan yang
+   tercatat di sistem tercentang otomatis, dokumen dari luar sistem (Approval Sheet, Invoice, Faktur Pajak, Shipment
+   Summary) dicentang manual di kertas. Tata letak blok per trip hanya pas di kertas potret (3 trip per lembar). *@
+
+<ReportPreview OnClose="OnClose" OrientasiTetap="potret">
+    @{
+        const int per = 3;
+        var hal = PrintDocument.Bagi(Rows, per);
+        var total = Rows.Sum(t => t.NilaiTotal);
+        var klien = string.Join(", ", Rows.Select(t => t.R.ProjectCode).Where(x => x != "").Distinct());
+    }
+    <PrintDocument>
+        @for (var i = 0; i < hal.Count; i++)
+        {
+            var ii = i; var isi = hal[ii];
+            <PrintPage Title="Rekap Dokumen PI" Subtitle="Kelengkapan berkas tagihan per trip" Page="@(ii + 1)" TotalPages="hal.Count"
+                       Meta="@(new List<(string, string)> { ("Jumlah trip", Format.Angka(Rows.Count)), ("Total nilai PI", Format.Rupiah(total)), ("Klien", klien != "" ? klien : "-") })">
+                <div class="d-flex flex-column gap-3">
+                    @for (var r = 0; r < isi.Count; r++)
+                    {
+                        var rr = r; var t = isi[rr];
+                        @RekapTrip(ii * per + rr + 1, t)
+                    }
+                </div>
+            </PrintPage>
+        }
+    </PrintDocument>
+</ReportPreview>
+
+@code {
+    [Parameter, EditorRequired] public List<BarisPi> Rows { get; set; } = [];
+    [Parameter, EditorRequired] public Func<BarisPi, List<BiayaOperasional>> NotaTrip { get; set; } = _ => [];
+    [Parameter] public List<Alamat> Alamat { get; set; } = [];
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private const string Garis = "1px solid #9ca3af";
+
+    /// <summary>Kotak centang di lembar cetak: tercentang = sudah ada di sistem; strip = tidak perlu.</summary>
+    private static RenderFragment Kotak(bool? ada) => @<span class="flex-shrink-0" style="display:inline-grid;place-items:center;width:14px;height:14px;border:1px solid #000">
+        @if (ada == true) { <IkonSvg Def="Ikon.Check" Size="10" /> }
+        else if (ada is null) { <span style="display:block;width:6px;height:1px;background:#000"></span> }
+    </span>;
+
+    private static RenderFragment BarisCek(bool? ada, string teks, string? ket = null) => @<li class="d-flex align-items-start gap-1">
+        @Kotak(ada)
+        <span class="min-w-0">@teks@if (ket is not null) { <span style="color:#525252"> · @ket</span> }</span>
+    </li>;
+
+    private RenderFragment RekapTrip(int no, BarisPi t)
+    {
+        var batal = t.R.Batal;
+        var nota = NotaTrip(t);
+        var asal = TagihanLogika.TitikTrip(t.R, true, Alamat);
+        var tujuan = TagihanLogika.TitikTrip(t.R, false, Alamat);
+        var podFoto = t.T.PodAttachments?.Count ?? 0;
+        var buktiPi = t.T.PiAttachments?.Count ?? 0;
+        var lampiranNota = nota.Sum(e => e.Attachments.Count);
+        var notaTanpaLampiran = nota.Count(e => e.Attachments.Count == 0);
+        var jumlahNota = nota.Sum(e => e.Amount);
+        var statusPod = t.T.PodFisik == true ? $"fisik diterima{(string.IsNullOrEmpty(t.T.PodFisikAt) ? "" : $" {Format.Tanggal(t.T.PodFisikAt)}")}"
+            : t.T.PodFisik == false ? "baru foto, fisik menyusul"
+            : batal ? "tidak ada (trip batal)" : "belum dicatat";
+        var dicetak = !string.IsNullOrEmpty(t.T.PrintedAt);
+        var asalNama = !string.IsNullOrEmpty(asal?.Nama) ? asal.Nama : t.R.Muat != "" ? t.R.Muat : "-";
+        var tujuanNama = !string.IsNullOrEmpty(tujuan?.Nama) ? tujuan.Nama : t.R.Bongkar != "" ? t.R.Bongkar : "-";
+        var ketNota = nota.Count == 0 ? "tidak ada biaya ditagihkan"
+            : $"{nota.Count} nota · {Format.Rupiah(jumlahNota)} · {lampiranNota} lampiran{(notaTanpaLampiran > 0 ? $" ({notaTanpaLampiran} nota belum ada lampiran)" : "")}";
+
+        // Satu blok tidak boleh terpotong ke halaman berikutnya saat dicetak.
+        return @<article style="border:@Garis;font-size:10px;break-inside:avoid">
+            <header class="d-flex flex-wrap align-items-center justify-content-between px-2 py-1" style="column-gap:1rem;border-bottom:@Garis;background:#f5f5f5;font-size:11px">
+                <p class="m-0 fw-bold">@no. ID Trip @t.R.IdTampil@(batal ? " (batal, cancel fee)" : "")</p>
+                <p class="m-0">No. Referensi: <b>@(t.R.TrList.Count > 0 ? string.Join(", ", t.R.TrList) : "-")</b>@(t.R.ProjectCode != "" ? $" · {t.R.ProjectCode}" : "")</p>
+            </header>
+            <table class="w-100" style="border-collapse:collapse">
+                <tbody>
+                    <tr>
+                        <th scope="row" class="px-2 text-start align-top fw-semibold text-nowrap" style="width:7rem;padding-top:1px;padding-bottom:1px">Rute</th>
+                        <td class="px-2 align-top" style="padding-top:1px;padding-bottom:1px">@(t.R.Muat != "" ? t.R.Muat : "?") → @(t.R.Bongkar != "" ? t.R.Bongkar : "?")@if (t.R.RouteName != "") { <span style="color:#525252"> (@t.R.RouteName)</span> }</td>
+                    </tr>
+                    <tr>
+                        <th scope="row" class="px-2 text-start align-top fw-semibold text-nowrap" style="width:7rem;padding-top:1px;padding-bottom:1px">Pick up → Destinasi</th>
+                        <td class="px-2 align-top" style="padding-top:1px;padding-bottom:1px">@asalNama → @tujuanNama</td>
+                    </tr>
+                    <tr>
+                        <th scope="row" class="px-2 text-start align-top fw-semibold text-nowrap" style="width:7rem;padding-top:1px;padding-bottom:1px">Mobil / Supir</th>
+                        <td class="px-2 align-top" style="padding-top:1px;padding-bottom:1px">@(t.R.PlateNumber != "" ? t.R.PlateNumber : "-") · @(t.R.DriverNames != "" ? t.R.DriverNames : "-")</td>
+                    </tr>
+                    <tr>
+                        <th scope="row" class="px-2 text-start align-top fw-semibold text-nowrap" style="width:7rem;padding-top:1px;padding-bottom:1px">PI</th>
+                        <td class="px-2 align-top" style="padding-top:1px;padding-bottom:1px">@(t.PunyaTahap ? $"{(t.T.PiNumber != "" ? t.T.PiNumber : "-")} · {Format.Tanggal(t.T.PiDate)} · {TahapPi.Label(t.T.PiTahap)}" : "Belum dibuatkan PI")</td>
+                    </tr>
+                    <tr>
+                        <th scope="row" class="px-2 text-start align-top fw-semibold text-nowrap" style="width:7rem;padding-top:1px;padding-bottom:1px">Nilai PI</th>
+                        <td class="px-2 align-top" style="padding-top:1px;padding-bottom:1px">
+                            Harga @Format.Rupiah(t.NilaiPokok) + tambahan @Format.Rupiah(t.NilaiTambahan) = <b>@Format.Rupiah(t.NilaiTotal)</b>
+                            <span style="color:#525252">@(t.PunyaTahap ? " (beku saat PI dibuat)" : " (nilai trip sekarang)")@(t.Selisih != 0 ? $" · nilai trip sekarang {Format.Rupiah(t.R.TagihanTotal)} ({TagihanLogika.RupiahBertanda(t.Selisih)})" : "")</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="row g-0 mt-1" style="border-top:@Garis">
+                <section class="col-6 px-2 py-1" style="border-right:@Garis">
+                    <h3 class="mb-1 fw-semibold" style="font-size:10px">Kelengkapan di sistem</h3>
+                    <ul class="list-unstyled m-0 d-flex flex-column gap-1">
+                        @BarisCek(dicetak ? true : batal ? null : false, "Berita Acara dicetak", dicetak ? Format.Tanggal(t.T.PrintedAt) : batal ? "trip batal" : "belum dicetak")
+                        @BarisCek(podFoto > 0 ? true : batal ? null : false, "POD foto", podFoto > 0 ? $"{podFoto} berkas" : batal ? "trip batal" : "belum diunggah")
+                        @BarisCek(t.T.PodFisik == true ? true : batal ? null : false, "POD fisik", statusPod)
+                        @BarisCek(nota.Count == 0 ? null : notaTanpaLampiran == 0, "Nota biaya ditagihkan", ketNota)
+                        @BarisCek(buktiPi > 0, "Scan / bukti PI", buktiPi > 0 ? $"{buktiPi} berkas" : t.PunyaTahap ? "belum diunggah" : "PI belum dibuat")
+                    </ul>
+                </section>
+                <section class="col-6 px-2 py-1">
+                    <h3 class="mb-1 fw-semibold" style="font-size:10px">Dokumen luar sistem (centang manual)</h3>
+                    <ul class="list-unstyled m-0 d-flex flex-column gap-1">
+                        @BarisCek(false, "Approval Sheet (portal DHL)")
+                        @BarisCek(false, "Invoice")
+                        @BarisCek(false, "Faktur Pajak (2 lembar)")
+                        @BarisCek(false, "Shipment Summary (gabungan PI)")
+                        @BarisCek(false, "Lainnya: ..............................")
+                    </ul>
+                </section>
+            </div>
+        </article>;
+    }
+}

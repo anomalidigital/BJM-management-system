@@ -1,0 +1,26 @@
+@* Tab berbentuk kartu tombol besar; kartu aktif biru penuh dengan segitiga penunjuk. *@
+<div role="tablist" aria-label="@Label" class="tab-kartu @Class">
+    @foreach (var t in Items)
+    {
+        var aktif = t.Id == Value;
+        <button type="button" role="tab" id="@($"{Awalan}-tab-{t.Id}")" aria-selected="@aktif" aria-controls="@($"{Awalan}-panel-{t.Id}")" tabindex="@(aktif ? 0 : -1)"
+                title="@t.Judul" class="kartu-tab @(aktif ? "aktif" : "")" @onclick="() => ValueChanged.InvokeAsync(t.Id)">
+            <span class="ikon-tab"><IkonSvg Def="t.Ikon" Size="16" /></span>
+            <span class="min-w-0 d-block">
+                <span class="d-block fs-13 lh-tight fw-semibold label-tab">@t.Label</span>
+                <span class="d-block fw-semibold text-nowrap nilai-tab">@t.Nilai</span>
+                @if (t.Keterangan is not null) { <span class="d-block fs-12 ket-tab">@t.Keterangan</span> }
+            </span>
+            @if (aktif) { <span aria-hidden="true" class="penunjuk"></span> }
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter] public List<KartuTab> Items { get; set; } = [];
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string Label { get; set; } = "Bagian";
+    [Parameter] public string Awalan { get; set; } = "tab-kartu";
+    [Parameter] public string? Class { get; set; }
+}

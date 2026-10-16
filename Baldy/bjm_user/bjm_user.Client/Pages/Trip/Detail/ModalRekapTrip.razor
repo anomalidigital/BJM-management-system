@@ -1,0 +1,50 @@
+@inherits KomponenData
+@* Menu ⋯ "Rekap Trip": rekap keseluruhan trip beserta daftar yang masih kurang, bisa dicetak / disimpan PDF. Dipakai juga dari daftar trip. *@
+@if (Trip is not null)
+{
+    var data = Rekap.Susun(Trip, Db.Semua);
+    if (_cetak)
+    {
+        <CetakRekapTrip Data="data" OnClose="() => _cetak = false" />
+    }
+    else
+    {
+        <Modal Open="true" Size="xl" Title="@($"Rekap Trip {Trip.T.TransactionNo}")" OnClose="Tutup"
+               Subtitle="@string.Join(" · ", new[] { Format.Tanggal(Trip.T.TransactionDate), Trip.PlateNumber, Trip.DriverNames }.Where(x => x != "" && x != "-"))">
+            <ChildContent>
+                <div class="d-flex flex-column gap-4">
+                    <DaftarCek Cek="data.Cek" OnBuka="Buka" SebelumTutup="@StatusTrip.BisaDitutup(Trip.Status)" />
+                    <RekapTripIsi Data="data" />
+                </div>
+            </ChildContent>
+            <Footer>
+                <Tombol OnClick="Tutup">Tutup</Tombol>
+                <Tombol Variant="primary" Icon="Ikon.Print" IconSize="14" OnClick="() => _cetak = true">Cetak / PDF</Tombol>
+            </Footer>
+        </Modal>
+    }
+}
+
+@code {
+    [Parameter] public BarisTrip? Trip { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private bool _cetak;
+    private string? _idTerakhir;
+
+    protected override void OnParametersSet()
+    {
+        if (Trip?.Id == _idTerakhir) return;
+        _idTerakhir = Trip?.Id;
+        _cetak = false;
+    }
+
+    private Task Tutup() => OnClose.InvokeAsync();
+
+    private async Task Buka(string tab)
+    {
+        var id = Trip!.Id;
+        await OnClose.InvokeAsync();
+        Ke(AturDetail.AlamatTab(id, tab));
+    }
+}

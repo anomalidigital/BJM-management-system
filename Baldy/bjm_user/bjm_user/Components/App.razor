@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <title>SIKOTIS</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%232a78d6'/><text y='68' x='50' text-anchor='middle' font-size='52' font-family='system-ui' font-weight='700' fill='white'>S</text></svg>" />
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["css/bootstrap.css"]" />
+    <link rel="stylesheet" href="@Assets["css/sikotis.css"]" />
+    <link rel="stylesheet" href="@Assets["css/komponen.css"]" />
+    <link rel="stylesheet" href="@Assets["css/cetak.css"]" />
+    <link rel="stylesheet" href="@Assets["css/trip.css"]" />
+    <link rel="stylesheet" href="@Assets["css/dashboard.css"]" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <ImportMap />
+    <HeadOutlet @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+</head>
+
+<body>
+    <div id="app">
+        <Routes @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+    </div>
+    <script src="@Assets["js/sikotis.js"]"></script>
+    <script src="@Assets["js/sikotis-panel.js"]"></script>
+    <script src="@Assets["js/lampiran.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>

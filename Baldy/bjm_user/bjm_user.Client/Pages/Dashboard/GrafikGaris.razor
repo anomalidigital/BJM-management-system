@@ -1,0 +1,104 @@
+@* Grafik garis pada SATU sumbu Y (padanan components/charts/LineChart.tsx), tanpa JavaScript:
+   garis & area digambar SVG yang melebar mengikuti kotak (stroke tidak ikut melar), teks sumbu, titik ujung, dan
+   keterangan arahkan-kursor ditulis HTML supaya hurufnya tidak terdistorsi. *@
+@{
+    const int padT = 12, padB = 22;   // kiri 52px & kanan 12px diatur di dashboard.css
+    var innerH = Tinggi - padT - padB;
+    var n = Labels.Count;
+    var maks = Math.Max(1, Series.Count == 0 ? 0 : Series.SelectMany(s => s.Nilai).DefaultIfEmpty(0).Max());
+    var (max, ticks) = SkalaRapi(maks);
+    double Xu(int i) => n > 1 ? i * 1000.0 / (n - 1) : 0;          // unit viewBox 0..1000
+    string Xp(int i) => Angka(n > 1 ? i * 100.0 / (n - 1) : 0) + "%";
+    double Y(double v) => innerH - v / max * innerH;                  // px dari atas area plot
+    var langkah = n > 1 ? 100.0 / (n - 1) : 100.0;
+    // Label sumbu X: sebanyak muat di layar lebar (± 62px per label) dan yang tetap tampil di layar sempit.
+    var tiapLebar = (int)Math.Ceiling(n / (double)Math.Max(3, 760 / 62));
+    var tiapSempit = tiapLebar * (int)Math.Ceiling(Math.Ceiling(n / 4.0) / tiapLebar);   // kelipatan tiapLebar
+    var akhir = n - 1;
+}
+<div class="dash-grafik" style="height:@(Tinggi)px" role="img" aria-label="@($"Grafik {string.Join(" dan ", Series.Select(s => s.Nama))}")"
+     @onmouseleave="() => _hover = null">
+    @foreach (var t in ticks)
+    {
+        <span class="dash-sumbu-y" style="top:@Angka(padT + Y(t))px">@Format.Ringkas((long)Math.Round(t))</span>
+    }
+    <div class="dash-grafik-plot" style="top:@(padT)px; height:@(innerH)px">
+        <svg width="100%" height="100%" viewBox="0 0 1000 @innerH" preserveAspectRatio="none" aria-hidden="true" class="d-block overflow-visible">
+            @foreach (var t in ticks)
+            {
+                <line x1="0" x2="1000" y1="@Angka(Y(t))" y2="@Angka(Y(t))" stroke="#eceef1" stroke-width="1" vector-effect="non-scaling-stroke" />
+            }
+            <line x1="0" x2="1000" y1="@innerH" y2="@innerH" stroke="#c3c2b7" stroke-width="1" vector-effect="non-scaling-stroke" />
+            @foreach (var s in Series)
+            {
+                var garis = string.Join(" ", s.Nilai.Select((v, i) => $"{(i == 0 ? "M" : "L")}{Angka(Xu(i))},{Angka(Y(v))}"));
+                <path d="@($"{garis} L{Angka(Xu(s.Nilai.Count - 1))},{innerH} L0,{innerH} Z")" style="fill:@s.Warna" opacity="0.1" />
+                <path d="@garis" fill="none" style="stroke:@s.Warna" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+            }
+            @if (_hover is int hv)
+            {
+                <line x1="@Angka(Xu(hv))" x2="@Angka(Xu(hv))" y1="0" y2="@innerH" stroke="#c3c2b7" stroke-width="1" vector-effect="non-scaling-stroke" />
+            }
+        </svg>
+
+        @* Titik ujung: lingkaran berwarna dengan cincin putih agar tetap terbaca. *@
+        @foreach (var s in Series.Where(s => s.Nilai.Count > 0))
+        {
+            var i = Math.Min(_hover ?? s.Nilai.Count - 1, s.Nilai.Count - 1);
+            <span class="dash-titik" style="left:@Xp(i); top:@Angka(Y(s.Nilai[i]))px; background:@s.Warna"></span>
+        }
+
+        @for (var i = 0; i < n; i++)
+        {
+            if (i != akhir && (i % tiapLebar != 0 || akhir - i < tiapLebar)) continue;
+            var sempit = i == akhir || (i % tiapSempit == 0 && akhir - i >= tiapSempit);
+            <span class="dash-sumbu-x @(sempit ? "" : "d-none d-md-block")" style="left:@Xp(i); top:@(innerH + 6)px">@Labels[i]</span>
+        }
+
+        @for (var i = 0; i < n; i++)
+        {
+            var ii = i;
+            <div class="dash-sasaran" style="left:calc(@Xp(i) - @Angka(langkah / 2)%); width:@Angka(langkah)%" @onmouseenter="() => _hover = ii"></div>
+        }
+
+        @if (_hover is int h && h < n)
+        {
+            <div class="dash-tooltip shadow-pop" style="left:clamp(40px, @Xp(h), calc(100% - 80px)); top:-@(padT)px">
+                <p class="m-0 mb-1 fs-11 fw-medium text-ink-3">@Labels[h]</p>
+                @foreach (var s in Series)
+                {
+                    <div class="d-flex align-items-center justify-content-between gap-4" style="padding:1px 0">
+                        <span class="d-flex align-items-center fs-12 text-ink-2" style="gap:.375rem">
+                            <span class="dash-bulat" style="background:@s.Warna"></span>@s.Nama
+                        </span>
+                        <span class="tnum fs-12 fw-semibold text-ink">@Format.RupiahRingkas(h < s.Nilai.Count ? s.Nilai[h] : 0)</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<string> Labels { get; set; } = [];
+    [Parameter] public List<SeriGrafik> Series { get; set; } = [];
+    [Parameter] public int Tinggi { get; set; } = 210;
+
+    private int? _hover;
+
+    private static string Angka(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>Skala sumbu Y dengan angka bulat (0 / 1.000 / 2.000 ...).</summary>
+    private static (double Max, List<double> Ticks) SkalaRapi(double max, int jumlahTick = 4)
+    {
+        if (max <= 0) return (1, [0, 1]);
+        var kasar = max / jumlahTick;
+        var mag = Math.Pow(10, Math.Floor(Math.Log10(kasar)));
+        var norm = kasar / mag;
+        var langkah = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+        var maksRapi = Math.Ceiling(max / langkah) * langkah;
+        var ticks = new List<double>();
+        for (var v = 0.0; v <= maksRapi + langkah / 2; v += langkah) ticks.Add(Math.Round(v * 1000) / 1000);
+        return (maksRapi, ticks);
+    }
+}

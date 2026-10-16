@@ -1,0 +1,267 @@
+@* Rekap Pengeluaran → Uang Jalan: pembayaran termin beserta potongan kasbon dan transfer ke supir (padanan LapUangJalanPage tertanam). *@
+@inherits KomponenData
+
+@if (Preview && Tampil == "supir")
+{
+    <ReportPreview OnClose="OnTutupPreview">
+        @{
+            var per = PrintDocument.BarisPerLembar(context, 26);
+            var hal = PrintDocument.Bagi(_perSupir, per);
+        }
+        <PrintDocument>
+            @for (var i = 0; i < hal.Count; i++)
+            {
+                var ii = i; var isi = hal[ii];
+                <PrintPage Page="@(ii + 1)" TotalPages="hal.Count" Title="Rekap Uang Jalan per Supir" Subtitle="Berdasarkan tanggal bayar termin" Periode="@PeriodeTeks" Meta="Meta">
+                    <PrintTable Cols="@(new List<(string, string, string?)> { ("No.", "right", "6%"), ("Supir", "left", null), ("Trip", "right", "9%"), ("Termin", "right", "9%"), ("Uang Jalan (Rp)", "right", null), ("Potong Kasbon (Rp)", "right", null), ("Transfer (Rp)", "right", null) })">
+                        @for (var r = 0; r < isi.Count; r++)
+                        {
+                            var rr = r; var x = isi[rr];
+                            <tr>
+                                <td class="p-sel text-end">@(ii * per + rr + 1)</td>
+                                <td class="p-sel">@NamaSupir(x.Kode, x.Nama)</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Trip)</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Termin)</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Uj)</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Kasbon)</td>
+                                <td class="p-sel text-end fw-semibold">@Format.Angka(x.Tf)</td>
+                            </tr>
+                        }
+                        @if (ii == hal.Count - 1)
+                        {
+                            <tr class="total">
+                                <td class="p-sel text-end" colspan="2">TOTAL</td>
+                                <td class="p-sel text-end">@Format.Angka(_total.Trip)</td>
+                                <td class="p-sel text-end">@Format.Angka(_total.N)</td>
+                                <td class="p-sel text-end">@Format.Angka(_total.Uj)</td>
+                                <td class="p-sel text-end">@Format.Angka(_total.Kasbon)</td>
+                                <td class="p-sel text-end">@Format.Angka(_total.Tf)</td>
+                            </tr>
+                        }
+                    </PrintTable>
+                </PrintPage>
+            }
+        </PrintDocument>
+    </ReportPreview>
+}
+else if (Preview)
+{
+    <ReportPreview OnClose="OnTutupPreview">
+        @{
+            var per = PrintDocument.BarisPerLembar(context, 24);
+            var hal = PrintDocument.Bagi(Termin, per);
+        }
+        <PrintDocument>
+            @for (var i = 0; i < hal.Count; i++)
+            {
+                var ii = i; var isi = hal[ii];
+                <PrintPage Page="@(ii + 1)" TotalPages="hal.Count" Title="Rincian Termin Uang Jalan" Subtitle="Satu baris per pembayaran, berdasarkan tanggal bayar termin" Periode="@PeriodeTeks" Meta="Meta">
+                    <PrintTable Cols="KolomRincian">
+                        @for (var r = 0; r < isi.Count; r++)
+                        {
+                            var rr = r; var p = isi[rr];
+                            <tr>
+                                <td class="p-sel text-end">@(ii * per + rr + 1)</td>
+                                <td class="p-sel">@Format.Tanggal(p.P.PaymentDate)</td>
+                                <td class="p-sel">@p.Trip.IdTampil</td>
+                                <td class="p-sel">@(p.SupirNama != "" ? p.SupirNama : "-")</td>
+                                <td class="p-sel">@(p.Trip.PlateNumber != "" ? p.Trip.PlateNumber : "-")</td>
+                                <td class="p-sel text-end">@p.P.Sequence</td>
+                                <td class="p-sel">@JenisTermin.Label(p.P.Jenis)</td>
+                                <td class="p-sel text-end">@Format.Angka(p.P.UjAmount)</td>
+                                <td class="p-sel text-end">@(p.P.KasbonDeduction != 0 ? Format.Angka(p.P.KasbonDeduction) : "-")</td>
+                                <td class="p-sel text-end fw-semibold">@Format.Angka(p.Tf)</td>
+                            </tr>
+                        }
+                        @if (ii == hal.Count - 1)
+                        {
+                            <tr class="total">
+                                <td class="p-sel text-end" colspan="7">TOTAL</td>
+                                <td class="p-sel text-end">@Format.Angka(_total.Uj)</td>
+                                <td class="p-sel text-end">@Format.Angka(_total.Kasbon)</td>
+                                <td class="p-sel text-end">@Format.Angka(_total.Tf)</td>
+                            </tr>
+                        }
+                    </PrintTable>
+                </PrintPage>
+            }
+        </PrintDocument>
+    </ReportPreview>
+}
+else
+{
+    var harian = LaporanLogika.DeretTanggal(Awal, Akhir, Termin.Select(p => (p.P.PaymentDate, p.P.UjAmount)));
+    var adaHarian = harian.Values.Any(v => v > 0);
+    <Kartu>
+        <header class="card-header d-flex flex-wrap align-items-start justify-content-between gap-3">
+            <div class="min-w-0">
+                <h2 class="card-title d-flex align-items-center gap-2"><IkonSvg Def="Ikon.Wallet" Size="15" Class="text-brand" />Uang Jalan</h2>
+                <p class="card-subtitle">@($"{Format.Angka(_total.N)} termin dibayar pada {PeriodeTeks}. Dihitung dari tanggal bayar termin.")</p>
+            </div>
+            <div class="d-flex flex-shrink-0 align-items-center gap-2">
+                <TombolSegmen Label="Tampilan tabel uang jalan" Value="@Tampil" ValueChanged="OnTampil"
+                              Pilihan="@(new List<Segmen> { new("supir", "Rekap per Supir"), new("termin", "Rincian per Termin") })" />
+            </div>
+        </header>
+
+        <div class="border-bottom border-hairline px-3 py-3">
+            <RumusAngka Suku="@(new List<SukuRumus> { new("Uang jalan dibayar", _total.Uj), new("Potong kasbon", _total.Kasbon, "−"), new("Transfer ke supir", _total.Tf, "=", true) })" />
+        </div>
+
+        <div class="row g-4 m-0 border-bottom border-hairline p-3">
+            <div class="col-12 col-lg-6 mt-0">
+                <section aria-label="Grafik uang jalan dibayar">
+                    <JudulDiagram Judul="@(harian.PerBulan ? "Uang jalan dibayar per bulan" : "Uang jalan dibayar per hari")" Keterangan="Nilai termin yang dibayar tiap tanggal, sebelum potong kasbon." />
+                    @if (adaHarian)
+                    {
+                        <GrafikGaris Labels="harian.Labels" Series="@(new List<SeriGrafik> { new("Uang jalan", LaporanLogika.Seri1, harian.Values) })" Height="190" />
+                    }
+                    else
+                    {
+                        <p class="m-0 py-5 text-center fs-12-5 text-ink-3">Belum ada uang jalan dibayar pada periode ini.</p>
+                    }
+                </section>
+            </div>
+            <div class="col-12 col-lg-6 mt-4 mt-lg-0">
+                <section aria-label="Supir dengan uang jalan terbesar">
+                    <JudulDiagram Judul="Top supir · uang jalan (Rp)" Keterangan="@(_perSupir.Count > 6 ? $"6 dari {_perSupir.Count} supir. Semuanya ada di tabel Rekap per Supir." : "Diurutkan dari uang jalan terbesar.")" />
+                    @if (_perSupir.Count > 0)
+                    {
+                        <BatangPeringkat Rows="@(_perSupir.Take(6).Select(r => new BarisPeringkat(r.Id, r.Nama, $"{r.Termin} termin", r.Uj)).ToList())" />
+                    }
+                    else
+                    {
+                        <p class="m-0 py-5 text-center fs-12-5 text-ink-3">Belum ada supir menerima uang jalan.</p>
+                    }
+                </section>
+            </div>
+        </div>
+
+        @if (Termin.Count == 0)
+        {
+            <p class="m-0 px-3 py-5 text-center fs-13 text-ink-3">Tidak ada pembayaran uang jalan pada periode tersebut.</p>
+        }
+        else if (Tampil == "supir")
+        {
+            <div class="overflow-auto" style="max-height:440px">
+                <table class="table table-hover fs-13 w-100">
+                    <thead class="sticky-top">
+                        <tr>
+                            @foreach (var (h, i) in new[] { "Supir", "Trip", "Termin", "Uang Jalan", "Potong Kasbon", "Transfer ke Supir" }.Select((h, i) => (h, i)))
+                            {
+                                <th class="px-3 @(i == 0 ? "text-start" : "text-end")">@h</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in _perSupir)
+                        {
+                            <tr @key="r.Id">
+                                <td class="px-3 fw-medium text-ink">@NamaSupir(r.Kode, r.Nama)</td>
+                                <td class="tnum px-3 text-end text-ink-2">@r.Trip</td>
+                                <td class="tnum px-3 text-end text-ink-2">@r.Termin</td>
+                                <td class="tnum px-3 text-end text-nowrap text-ink-2">@Format.Rupiah(r.Uj)</td>
+                                <td class="tnum px-3 text-end text-nowrap text-ink-2">@(r.Kasbon != 0 ? Format.Rupiah(r.Kasbon) : "—")</td>
+                                <td class="tnum px-3 text-end text-nowrap fw-semibold text-ink">@Format.Rupiah(r.Tf)</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot style="position:sticky;bottom:0">
+                        <tr class="fw-semibold text-ink">
+                            <td class="px-3 text-nowrap">Total · @Format.Angka(_perSupir.Count) supir</td>
+                            <td class="tnum px-3 text-end">@Format.Angka(_total.Trip)</td>
+                            <td class="tnum px-3 text-end">@Format.Angka(_total.N)</td>
+                            <td class="tnum px-3 text-end text-nowrap">@Format.Rupiah(_total.Uj)</td>
+                            <td class="tnum px-3 text-end text-nowrap">@Format.Rupiah(_total.Kasbon)</td>
+                            <td class="tnum px-3 text-end text-nowrap">@Format.Rupiah(_total.Tf)</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="overflow-auto" style="max-height:480px">
+                <table class="table table-hover fs-13 w-100">
+                    <thead class="sticky-top">
+                        <tr>
+                            @foreach (var (h, i) in new[] { "Tanggal", "Trip", "Supir", "Mobil", "Ke-", "Jenis", "Uang Jalan", "Potong Kasbon", "Transfer ke Supir" }.Select((h, i) => (h, i)))
+                            {
+                                <th class="px-3 @(i == 4 || i >= 6 ? "text-end" : "text-start")">@h</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in Termin)
+                        {
+                            <tr @key="p.P.Id">
+                                <td class="tnum px-3 text-nowrap text-ink-2">@Format.Tanggal(p.P.PaymentDate)</td>
+                                <td class="px-3"><a href="@Tautan(p.P.TripId)" class="tnum fw-semibold text-nowrap text-decoration-none remah" style="color:var(--brand-700)">@p.Trip.IdTampil</a></td>
+                                <td class="px-3 text-ink">@(p.SupirNama != "" ? p.SupirNama : "—")</td>
+                                <td class="tnum px-3 text-nowrap text-ink-2">@(p.Trip.PlateNumber != "" ? p.Trip.PlateNumber : "—")</td>
+                                <td class="tnum px-3 text-end text-ink-2">@p.P.Sequence</td>
+                                <td class="px-3 text-nowrap text-ink-2">@JenisTermin.Label(p.P.Jenis)</td>
+                                <td class="tnum px-3 text-end text-nowrap text-ink-2">@Format.Rupiah(p.P.UjAmount)</td>
+                                <td class="tnum px-3 text-end text-nowrap text-ink-2">@(p.P.KasbonDeduction != 0 ? Format.Rupiah(p.P.KasbonDeduction) : "—")</td>
+                                <td class="tnum px-3 text-end text-nowrap fw-semibold text-ink">@Format.Rupiah(p.Tf)</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot style="position:sticky;bottom:0">
+                        <tr class="fw-semibold text-ink">
+                            <td class="px-3 text-nowrap" colspan="6">Total · @Format.Angka(_total.N) termin, @Format.Angka(_total.Trip) trip</td>
+                            <td class="tnum px-3 text-end text-nowrap">@Format.Rupiah(_total.Uj)</td>
+                            <td class="tnum px-3 text-end text-nowrap">@Format.Rupiah(_total.Kasbon)</td>
+                            <td class="tnum px-3 text-end text-nowrap">@Format.Rupiah(_total.Tf)</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        }
+    </Kartu>
+}
+
+@code {
+    [Parameter] public List<TerminTrip> Termin { get; set; } = [];
+    [Parameter] public string Awal { get; set; } = "";
+    [Parameter] public string Akhir { get; set; } = "";
+    /// <summary>supir | termin (disimpan di alamat halaman induk).</summary>
+    [Parameter] public string Tampil { get; set; } = "supir";
+    [Parameter] public EventCallback<string> OnTampil { get; set; }
+    [Parameter] public bool Preview { get; set; }
+    [Parameter] public EventCallback OnTutupPreview { get; set; }
+    [Parameter] public Func<string, string> Tautan { get; set; } = id => $"transaksi/trip/{id}?tab=uj";
+
+    private sealed record Jumlah(long Uj, long Kasbon, long Tf, int N, int Trip);
+    private sealed record RekapSupir(string Id, string Nama, string Kode, int Termin, int Trip, long Uj, long Kasbon, long Tf);
+
+    private Jumlah _total = new(0, 0, 0, 0, 0);
+    private List<RekapSupir> _perSupir = [];
+
+    protected override void OnParametersSet()
+    {
+        _total = new(Termin.Sum(p => p.P.UjAmount), Termin.Sum(p => p.P.KasbonDeduction), Termin.Sum(p => p.Tf), Termin.Count, Termin.Select(p => p.P.TripId).Distinct().Count());
+        _perSupir = Termin.GroupBy(p => p.SupirId != "" ? p.SupirId : "tanpa")
+            .Select(g =>
+            {
+                var rows = g.ToList();
+                return new RekapSupir(g.Key, rows[0].SupirNama != "" ? rows[0].SupirNama : "Tanpa supir", rows[0].SupirKode, rows.Count,
+                    rows.Select(r => r.P.TripId).Distinct().Count(), rows.Sum(r => r.P.UjAmount), rows.Sum(r => r.P.KasbonDeduction), rows.Sum(r => r.Tf));
+            })
+            .OrderByDescending(r => r.Uj).ThenBy(r => r.Nama, StringComparer.CurrentCulture)
+            .ToList();
+    }
+
+    private string PeriodeTeks => $"{Format.Tanggal(Awal)} s/d {Format.Tanggal(Akhir)}";
+    private static string NamaSupir(string kode, string nama) => kode != "" ? $"{kode} — {nama}" : nama;
+
+    private List<(string, string)> Meta => [
+        ("Jumlah termin", Format.Angka(_total.N)), ("Total Uang Jalan", Format.Rupiah(_total.Uj)), ("Total transfer ke supir", Format.Rupiah(_total.Tf)),
+    ];
+
+    private List<(string, string, string?)> KolomRincian => [
+        ("No.", "right", "5%"), ("Tanggal", "left", "9%"), (Karawang ? "ID Trip" : "No. Trip", "left", Karawang ? "17%" : "11%"), ("Supir", "left", null),
+        ("Mobil", "left", "10%"), ("Ke-", "right", "5%"), ("Jenis", "left", "10%"),
+        ("Uang Jalan (Rp)", "right", null), ("Kasbon (Rp)", "right", null), ("Transfer (Rp)", "right", null),
+    ];
+}

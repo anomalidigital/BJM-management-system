@@ -1,0 +1,61 @@
+@page "/dashboard"
+@inherits KomponenData
+@using bjm_user.Client.Pages.PapanDashboard
+@* Dashboard "papan depo": trip bulan ini sebagai tumpukan kontainer di papan gelap, lalu yang perlu ditindak, jalannya uang,
+   layanan & klien, tren harian, ritan, dan catatan terbaru (padanan DashboardPage.tsx). *@
+<PageTitle>Dashboard — SIKOTIS</PageTitle>
+@{
+    // SI/Job Order & nomor container hanya ada di Priok; Karawang memakai No. Referensi (TR) dan No PI.
+    var cabangContainer = !Karawang;
+    var m = RingkasanPapan.Susun(Db, cabangContainer);
+    var bulan = Format.LabelBulan(m.Periode.Awal);
+    var bulanLalu = Format.LabelBulan(m.Sebelum.Awal);
+    var kini = m.Kini;
+    var lalu = m.Lalu;
+}
+<PageHeader Title="Dashboard">
+    <Description>Ringkasan operasional @bulan@(m.Periode.DariData ? ", bulan terakhir yang punya data" : "").</Description>
+    <Actions>
+        <a href="laporan/komisi" class="btn btn-outline-secondary bg-white text-ink border-hairline d-inline-flex align-items-center gap-2">Buka laporan komisi</a>
+    </Actions>
+</PageHeader>
+
+<div class="row g-3">
+    <div class="col-12 col-xl-8">
+        <HeroDepo Bulan="@bulan" BulanLalu="@bulanLalu" Jumlah="kini.Transaksi" JumlahLalu="lalu.Transaksi"
+                  DeltaTrip="Hitung.DeltaPersen(kini.Transaksi, lalu.Transaksi)" PerStatus="m.PerStatus"
+                  TanpaDraft="@(!cabangContainer && m.PerStatus[StatusTrip.Draft] == 0)" Batal="m.Batal" Hari="m.Hari"
+                  SopirBertugas="m.SopirBertugas" SopirAktif="m.SopirAktif" KaryawanAktif="m.KaryawanAktif" KaryawanTotal="m.KaryawanTotal"
+                  MobilTerpakai="m.MobilTerpakai" MobilTotal="m.MobilTotal" />
+    </div>
+    <div class="col-12 col-xl-4">
+        <PerluDitindak Items="m.Tindak" />
+    </div>
+
+    <div class="col-12 col-xl-8">
+        <JembatanUang BulanLalu="@bulanLalu" Pendapatan="kini.Pendapatan" Ditagihkan="kini.Ditagihkan" UangJalan="kini.UangJalan"
+                      BiayaPerusahaan="kini.BiayaPerusahaan" Komisi="kini.Komisi" Netto="kini.Netto"
+                      DeltaPendapatan="Hitung.DeltaPersen(kini.Pendapatan, lalu.Pendapatan)"
+                      DeltaUangJalan="Hitung.DeltaPersen(kini.UangJalan, lalu.UangJalan)"
+                      DeltaKomisi="Hitung.DeltaPersen(kini.Komisi, lalu.Komisi)"
+                      DeltaNetto="Hitung.DeltaPersen(kini.Netto, lalu.Netto)"
+                      DeltaUj="Hitung.DeltaPersen(m.Uang.Uj, m.UangLalu.Uj)"
+                      DeltaBiaya="Hitung.DeltaPersen(m.Uang.Biaya, m.UangLalu.Biaya)"
+                      Uj="m.Uang.Uj" Kasbon="m.Uang.Kasbon" Tf="m.Uang.Tf" Termin="m.Uang.Termin" Biaya="m.Uang.Biaya" />
+    </div>
+    <div class="col-12 col-xl-4">
+        <LayananKlien CalloutTrip="m.CalloutTrip" CalloutPendapatan="m.CalloutPendapatan" DedicatedTrip="m.DedicatedTrip" Kontrak="m.Kontrak" />
+    </div>
+
+    <div class="col-12 col-xl-8">
+        <TrenHarian Bulan="@bulan" Hari="m.TrenHari" Pendapatan="m.TrenPendapatan" Komisi="m.TrenKomisi" />
+    </div>
+    <div class="col-12 col-xl-4">
+        <PapanRitan Rows="m.Ritan" Bulan="@bulan" />
+    </div>
+
+    <div class="col-12">
+        <Terbaru Trip="m.TripTerbaru" Tagihan="m.TagihanTerbaru" Sijo="@(cabangContainer ? m.SijoTerbaru : null)"
+                 Pi="@(cabangContainer ? null : m.Pi)" Jumlah="m.Jumlah" />
+    </div>
+</div>

@@ -1,0 +1,54 @@
+@* Pindah tahap PI: tanggal wajib, catatan wajib untuk revisi. *@
+
+<Modal Open="true" Title="@($"{TahapPi.Label(Tahap)}: {Rows.Count} PI")" Subtitle="@Subjudul" Size="sm" OnClose="OnClose">
+    <ChildContent>
+        <div class="d-flex flex-column gap-3">
+            <Field Label="Tanggal" Required>
+                <TanggalInput Id="@context" Value="@_tanggal" ValueChanged="v => _tanggal = v" />
+            </Field>
+            <Field Label="@(Tahap == TahapPi.Revisi ? "Yang direvisi" : "Catatan")" Required="@(Tahap == TahapPi.Revisi)" Hint="HintCatatan">
+                <ChildContent>
+                    <textarea id="@context" class="form-control" rows="3" value="@_catatan" @oninput="e => _catatan = e.Value?.ToString() ?? string.Empty"></textarea>
+                </ChildContent>
+            </Field>
+            <Field Label="Bukti">
+                <Hint>@(TagihanLogika.BuktiTahap(Tahap) + (Rows.Count > 1 ? " Dilampirkan ke semua PI yang dipilih." : ""))</Hint>
+                <ChildContent><LampiranInput Id="@context" Label="Tambah bukti" Value="_bukti" ValueChanged="v => _bukti = v" /></ChildContent>
+            </Field>
+            @if (_galat is not null) { <p class="invalid-feedback fs-12 m-0" role="alert">@_galat</p> }
+        </div>
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="OnClose">Batal</Tombol>
+        <Tombol Variant="primary" OnClick="Simpan">Simpan</Tombol>
+    </Footer>
+</Modal>
+
+@code {
+    [Parameter, EditorRequired] public List<BarisPi> Rows { get; set; } = [];
+    [Parameter, EditorRequired] public string Tahap { get; set; } = TahapPi.Dikirim;
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<IsiTahap> OnSimpan { get; set; }
+
+    private string _tanggal = Format.HariIni();
+    private string _catatan = "";
+    private List<string> _bukti = [];
+    private string? _galat;
+
+    private string Subjudul => string.Join(", ", Rows.Select(t => t.T.PiNumber != "" ? t.T.PiNumber : t.R.IdTampil).Take(4)) + (Rows.Count > 4 ? ", ..." : "");
+
+    private RenderFragment? HintCatatan => Tahap switch
+    {
+        TahapPi.Disetujui => b => b.AddContent(0, "mis. dikonfirmasi lewat email finance klien."),
+        TahapPi.Lunas => b => b.AddContent(0, "mis. nomor bukti transfer."),
+        _ => null,
+    };
+
+    private async Task Simpan()
+    {
+        if (_tanggal == "") { _galat = "Tanggal wajib diisi."; return; }
+        if (Tahap == TahapPi.Revisi && _catatan.Trim() == "") { _galat = "Tulis apa yang perlu direvisi, mis. selisih harga atau biaya tambahan."; return; }
+        _galat = null;
+        await OnSimpan.InvokeAsync(new IsiTahap(Rows, Tahap, _tanggal, _catatan.Trim(), _bukti));
+    }
+}

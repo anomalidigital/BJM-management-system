@@ -1,0 +1,24 @@
+@* Peringatan di atas form ubah trip yang sudah jalan: isian inti dikunci; Manager / Owner boleh membuka kuncinya. *@
+@if (Terbuka)
+{
+    <div class="mb-3 d-flex align-items-start gap-2 rounded-3 px-3 py-2 fs-12-5" style="border:1px solid #f6e2ac;background:#fff8e6;color:#8a6100">
+        <IkonSvg Def="Ikon.LockOpen" Size="15" Style="margin-top:1px" />
+        <span>Kunci dibuka: @Isian boleh diubah. Periksa uang jalan, Berita Acara, dan tagihan trip ini setelah disimpan.</span>
+    </div>
+}
+else
+{
+    <div class="mb-3 d-flex flex-wrap align-items-center gap-3 rounded-3 border border-hairline bg-sunken px-3 py-2 fs-12-5 text-ink-2">
+        <IkonSvg Def="Ikon.Lock" Size="15" Class="text-ink-3" />
+        <span class="min-w-0 flex-grow-1">Trip sudah <span class="fw-semibold text-ink">@StatusTrip.Label(Status)</span>: @Isian dikunci.@(BolehBuka ? " Perlu diubah? Buka kuncinya." : " Perubahan perlu Manager atau Owner.")</span>
+        @if (BolehBuka) { <Tombol Size="sm" Icon="Ikon.LockOpen" IconSize="13" OnClick="OnBuka">Buka kunci</Tombol> }
+    </div>
+}
+
+@code {
+    [Parameter] public string Status { get; set; } = StatusTrip.Aktif;
+    [Parameter] public bool Terbuka { get; set; }
+    [Parameter] public bool BolehBuka { get; set; }
+    [Parameter] public EventCallback OnBuka { get; set; }
+    [Parameter] public string Isian { get; set; } = "rute, layanan & kontrak, kendaraan, gandengan, dan supir";
+}

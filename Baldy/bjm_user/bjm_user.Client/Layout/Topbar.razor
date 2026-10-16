@@ -1,0 +1,117 @@
+@inherits KomponenData
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<header class="topbar no-print">
+    <button type="button" class="btn btn-link p-1 text-ink-2 d-lg-none" aria-label="Buka menu" @onclick="OnBukaMenu"><IkonSvg Def="Ikon.Bars" Size="19" /></button>
+
+    @if (!DiFormTrip)
+    {
+        <form class="topbar-cari d-none d-sm-block" @onsubmit="Cari">
+            <IkonSvg Def="Ikon.MagnifyingGlass" Size="15" />
+            <input class="form-control" @bind="_q" placeholder="@(CariSijo ? "Lompat ke No. SI / Job Order..." : "Cari trip: ID Trip, No. Referensi, supir, plat...")"
+                   aria-label="@(CariSijo ? "Cari nomor SI atau Job Order" : "Cari trip")" />
+        </form>
+    }
+
+    <div class="ms-auto d-flex align-items-center gap-3">
+        <span class="chip-periode d-none d-md-inline-flex" title="Periode bawaan semua laporan: bulan terakhir yang punya trip. Ganti periodenya lewat Filter di tiap laporan.">
+            <IkonSvg Def="Ikon.CalendarDays" Size="14" Class="text-ink-3" />
+            Periode: @Format.LabelBulan(Periode.Aktif(Db.Baris.Select(b => b.T.TransactionDate)).Awal)
+        </span>
+
+        <div class="position-relative" @ref="_menu">
+            <button type="button" class="tombol-akun @(_buka ? "aktif" : "")" aria-haspopup="menu" aria-expanded="@_buka" @onclick="() => _buka = !_buka">
+                <span class="avatar">@Format.Inisial(Sesi.Pengguna?.Name ?? "SI")</span>
+                <span class="d-none d-sm-block text-start">
+                    <span class="d-block fs-12-5 lh-tight fw-semibold text-ink">@Sesi.Pengguna?.Name</span>
+                    <span class="d-block fs-11 lh-tight text-ink-3">@WorkspaceKode.Label(Sesi.Workspace)</span>
+                </span>
+                <IkonSvg Def="Ikon.ChevronDown" Size="14" Class="text-ink-3" />
+            </button>
+            @if (_buka)
+            {
+                <div role="menu" class="menu-akun animate-in-pop shadow-pop">
+                    <div class="border-bottom border-hairline px-3 py-3">
+                        <p class="m-0 fs-13 fw-semibold text-ink">@Sesi.Pengguna?.Name</p>
+                        <p class="m-0 fs-11-5 text-ink-3">@Sesi.Pengguna?.Username</p>
+                        <div class="mt-1">
+                            <Badge Tone="@(Sesi.Pengguna?.Role == Peran.Viewer ? "neutral" : "brand")">@Peran.Label(Sesi.Pengguna?.Role ?? "") — @Peran.Ringkas(Sesi.Pengguna?.Role ?? "")</Badge>
+                        </div>
+                    </div>
+                    <div class="border-bottom border-hairline py-1">
+                        <p class="m-0 px-3 pt-1 pb-1 fs-12 fw-semibold text-ink-3">Pindah workspace</p>
+                        @foreach (var w in WorkspaceKode.Semua)
+                        {
+                            var aktif = w == Sesi.Workspace;
+                            <button type="button" role="menuitemradio" aria-checked="@aktif" class="item @(aktif ? "aktif" : "")" @onclick="() => PilihWorkspace(w)">
+                                <span class="flex-grow-1 text-truncate">@WorkspaceKode.Label(w)</span>
+                                @if (aktif) { <IkonSvg Def="Ikon.Check" Size="15" Class="text-brand" /> }
+                            </button>
+                        }
+                    </div>
+                    @if (Bisa("master"))
+                    {
+                        <button type="button" class="item border-bottom border-hairline fw-medium" @onclick="@(() => { _buka = false; Ke("tools"); })"><IkonSvg Def="Ikon.ScrewdriverWrench" Size="15" /> Tools</button>
+                    }
+                    <button type="button" class="item fw-medium" @onclick="@(() => { _buka = false; OnLogout.InvokeAsync(); })"><IkonSvg Def="Ikon.RightFromBracket" Size="15" /> Logout</button>
+                </div>
+            }
+        </div>
+    </div>
+</header>
+
+@code {
+    [Parameter] public EventCallback OnBukaMenu { get; set; }
+    [Parameter] public EventCallback OnLogout { get; set; }
+
+    private string _q = "";
+    private bool _buka;
+    private ElementReference _menu;
+    private DotNetObjectReference<Topbar>? _ref;
+    private IJSObjectReference? _pegangan;
+    private bool _terpasang;
+
+    private bool CariSijo => Sesi.Workspace == WorkspaceKode.Priok;
+    private bool DiFormTrip => System.Text.RegularExpressions.Regex.IsMatch(Nav.ToBaseRelativePath(Nav.Uri), @"^transaksi/trip/(tambah|[^/]+/edit)/?(\?.*)?$");
+
+    private void Cari()
+    {
+        var q = _q.Trim();
+        if (q == "") return;
+        Ke(CariSijo ? $"pencarian/sijo?sijo={Uri.EscapeDataString(q)}" : $"transaksi/trip?q={Uri.EscapeDataString(q)}");
+        _q = "";
+    }
+
+    private async Task PilihWorkspace(string w)
+    {
+        _buka = false;
+        if (w == Sesi.Workspace) return;
+        await Sesi.GantiWorkspaceAsync(w);
+        Toast.Info($"Workspace {WorkspaceKode.Label(w)} aktif. Transaksi yang tampil mengikuti workspace ini.");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool pertama)
+    {
+        if (_buka && !_terpasang)
+        {
+            _terpasang = true;
+            _ref ??= DotNetObjectReference.Create(this);
+            try { _pegangan = await JS.InvokeAsync<IJSObjectReference>("sikotis.pasangTutupLuar", _menu, _ref); } catch { /* abaikan */ }
+        }
+        else if (!_buka && _terpasang) await LepasAsync();
+    }
+
+    private async Task LepasAsync()
+    {
+        _terpasang = false;
+        if (_pegangan is null) return;
+        try { await JS.InvokeVoidAsync("sikotis.lepasTutupLuar", _pegangan); await _pegangan.DisposeAsync(); } catch { /* abaikan */ }
+        _pegangan = null;
+    }
+
+    [JSInvokable]
+    public async Task TutupDariLuar() { if (_buka) { _buka = false; await InvokeAsync(StateHasChanged); } }
+
+    public async ValueTask DisposeAsync() { await LepasAsync(); _ref?.Dispose(); base.Dispose(); }
+}

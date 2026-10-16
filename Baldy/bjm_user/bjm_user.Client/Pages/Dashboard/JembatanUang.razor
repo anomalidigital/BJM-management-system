@@ -1,0 +1,101 @@
+@* Jembatan uang: bagaimana pendapatan bulan ini menjadi netto, dan berapa uang yang benar-benar keluar ke supir.
+   Tautan "Laporan netto" di judulnya adalah jalan masuk ke halaman Netto, yang tidak tampil di sidebar. *@
+@{
+    var masuk = Pendapatan + Ditagihkan;
+    var perjalanan = UangJalan + BiayaPerusahaan;
+    var skala = (double)Math.Max(Math.Max(masuk, perjalanan + Komisi), 1);
+    double P(long v) => Math.Max(0, Math.Min(1, v / skala));
+    var baris = new List<Baris>
+    {
+        new("Pendapatan", "jumlah harga trip", Pendapatan, 0, P(Pendapatan), "masuk", true, DeltaPendapatan),
+        new("Ditagihkan ke klien", "tol, solar, SPSI Banlok, overnight", Ditagihkan, P(Pendapatan), P(masuk), "masuk", false, null),
+        new("Uang jalan", "dibayar ke supir; patokan bila masih jalan", -UangJalan, P(masuk - UangJalan), P(masuk), "kurang", true, DeltaUangJalan),
+    };
+    if (BiayaPerusahaan > 0)
+        baris.Add(new("Dibayar perusahaan", "solar / tol di luar uang jalan", -BiayaPerusahaan, P(masuk - perjalanan), P(masuk - UangJalan), "kurang", false, null));
+    baris.Add(new("Komisi supir", "dari master Komisi", -Komisi, P(masuk - perjalanan - Komisi), P(masuk - perjalanan), "kurang", true, DeltaKomisi));
+    baris.Add(new("Netto", "sisa untuk perusahaan", Netto, 0, P(Netto), "hasil", true, DeltaNetto));
+
+    var keSopir = new (string Label, long Nilai, string Ket, bool AdaPersen, double? Persen)[]
+    {
+        ("Uang jalan dibayar", Uj, $"{Format.Angka(Termin)} termin", true, DeltaUj),
+        ("Potong kasbon", Kasbon, "dipotong dari uang jalan", false, null),
+        ("Transfer ke supir", Tf, "uang jalan − potong kasbon", false, null),
+        ("Biaya operasional", Biaya, "nota solar, tol, SPSI Banlok, overnight", true, DeltaBiaya),
+    };
+}
+<Panel Title="Dari pendapatan ke netto"
+       Subtitle="Biaya di jalan dibayar dari uang jalan, kecuali yang dibayar perusahaan langsung; yang ditagihkan ke klien menambah pendapatan."
+       Href="laporan/netto" Tautan="Laporan netto">
+    <div class="dash-px d-flex flex-column gap-3" style="padding-bottom:1.25rem">
+        @foreach (var b in baris)
+        {
+            <div class="dash-jembatan-baris">
+                <div style="line-height:1.25">
+                    <span class="d-block dash-fs-13-5 text-ink @(b.Jenis == "hasil" ? "fw-semibold" : "")">@b.Label</span>
+                    <span class="d-block fs-11-5 text-ink-3">@b.Keterangan</span>
+                </div>
+                <div class="dash-batang" aria-hidden="true">
+                    <div style="left:@Persen(b.Dari);width:@Persen(Math.Max(b.Sampai - b.Dari, b.Nilai != 0 ? 0.004 : 0));background:@WarnaBatang(b)"></div>
+                </div>
+                <div class="text-end">
+                    <span class="tnum d-block dash-rail dash-fs-19" style="line-height:1.25; color:@WarnaNilai(b)">
+                        @(b.Jenis == "kurang" ? $"− {Format.RupiahRingkas(-b.Nilai)}" : Format.RupiahRingkas(b.Nilai))
+                    </span>
+                    @if (b.AdaPersen) { <Selisih Persen="b.Persen" BulanLalu="@BulanLalu" Keluar="@(b.Jenis == "kurang")" /> }
+                </div>
+            </div>
+        }
+    </div>
+    <div class="mt-auto border-top border-hairline dash-px py-3">
+        <h3 class="m-0 fs-12-5 fw-medium text-ink-2">Uang yang keluar ke supir bulan ini</h3>
+        <dl class="dash-ke-sopir">
+            @foreach (var (label, nilai, ket, adaPersen, persen) in keSopir)
+            {
+                <div class="min-w-0">
+                    <dt class="fs-12 fw-normal text-ink-3">@label</dt>
+                    <dd class="m-0 tnum dash-rail dash-fs-19 text-ink" style="line-height:1.25">@Format.RupiahRingkas(nilai)</dd>
+                    @if (adaPersen) { <dd class="m-0"><Selisih Persen="persen" BulanLalu="@BulanLalu" Keluar /></dd> }
+                    <dd class="m-0 fs-11-5 text-ink-3">@ket</dd>
+                </div>
+            }
+        </dl>
+    </div>
+</Panel>
+
+@code {
+    [Parameter] public string BulanLalu { get; set; } = "";
+    [Parameter] public long Pendapatan { get; set; }
+    /// <summary>Biaya di jalan yang ditagihkan kembali ke klien (Additional Cost PI).</summary>
+    [Parameter] public long Ditagihkan { get; set; }
+    [Parameter] public long UangJalan { get; set; }
+    /// <summary>Biaya di jalan yang dibayar perusahaan langsung, di luar uang jalan.</summary>
+    [Parameter] public long BiayaPerusahaan { get; set; }
+    [Parameter] public long Komisi { get; set; }
+    [Parameter] public long Netto { get; set; }
+    [Parameter] public double? DeltaPendapatan { get; set; }
+    [Parameter] public double? DeltaUangJalan { get; set; }
+    [Parameter] public double? DeltaKomisi { get; set; }
+    [Parameter] public double? DeltaNetto { get; set; }
+    [Parameter] public double? DeltaUj { get; set; }
+    [Parameter] public double? DeltaBiaya { get; set; }
+    [Parameter] public long Uj { get; set; }
+    [Parameter] public long Kasbon { get; set; }
+    [Parameter] public long Tf { get; set; }
+    [Parameter] public int Termin { get; set; }
+    [Parameter] public long Biaya { get; set; }
+
+    /// <summary>Satu baris jembatan. Dari/Sampai = posisi batang pada lintasan, dalam proporsi pendapatan.</summary>
+    private sealed record Baris(string Label, string Keterangan, long Nilai, double Dari, double Sampai, string Jenis, bool AdaPersen, double? Persen);
+
+    private static string Persen(double v) => (v * 100).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+    private static string WarnaBatang(Baris b) => b.Jenis switch
+    {
+        "masuk" => "var(--brand-600)",
+        "kurang" => "#b9c6d6",
+        _ => b.Nilai >= 0 ? "#1f9d55" : "var(--critical)",
+    };
+
+    private static string WarnaNilai(Baris b) => b.Jenis == "kurang" ? "var(--ink-2)" : b.Jenis == "hasil" && b.Nilai < 0 ? "var(--critical)" : "var(--ink)";
+}

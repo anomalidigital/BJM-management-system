@@ -1,0 +1,277 @@
+@page "/master/alamat"
+@* Master Data -> Alamat: lokasi pick up & destinasi beserta kontaknya, dipakai di form trip (Pick Up / Destination Details) dan sebagai Area
+   di form rute. Kode area dibuat otomatis dari kota (revisi 13 Okt 2026). Ubah data hanya peran berizin master; peran lain melihat rincian. *@
+@inherits KomponenData
+<PageTitle>Alamat — SIKOTIS</PageTitle>
+
+<PageHeader Title="Alamat" Crumbs="@(new List<Crumb> { new("Master Data"), new("Alamat") })">
+    <Description>Lokasi pick up dan destinasi beserta kontaknya. Dipakai di form trip (Pick Up / Destination Details) dan sebagai Area di rute. Kode area dibuat otomatis dari kota.</Description>
+    <Actions>
+        <Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Bisa("master"))" OnClick="BukaTambah">Tambah Alamat</Tombol>
+    </Actions>
+</PageHeader>
+
+@{
+    var semua = Db.Data.Alamat;
+    _dipakai = Dipakai();
+    _kodeRute = KodeArea.Pemakaian(Db.Data.Rute);
+    var nonaktif = semua.Count(a => a.Status == "nonaktif");
+}
+<Kartu>
+    <Toolbar>
+        <Left>
+            <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Placeholder="Cari nama lokasi, kota, kode area, kontak..." />
+            <PanelFilter T="FilterAlamat" Filter="_filter" Chips="Chips">
+                <Field Label="Kode Area">
+                    <Pilihan Id="@context" Options="OpsiKode(semua)" Value="@_filter.Draf.Kode" ValueChanged="v => _filter.Ubah(d => d.Kode = v ?? string.Empty)" Clearable="false" />
+                </Field>
+                <Field Label="Dipakai trip">
+                    <Pilihan Id="@context" Options="OpsiPakai" Value="@_filter.Draf.Pakai" ValueChanged="v => _filter.Ubah(d => d.Pakai = v ?? string.Empty)" Cari="false" Clearable="false" />
+                </Field>
+                <Field Label="Status">
+                    <Pilihan Id="@context" Options="OpsiStatusFilter" Value="@_filter.Draf.Status" ValueChanged="v => _filter.Ubah(d => d.Status = v ?? string.Empty)" Cari="false" Clearable="false" />
+                </Field>
+            </PanelFilter>
+        </Left>
+        <Right>
+            <span class="fs-12-5 text-ink-3">@Format.Angka(semua.Count) alamat terdaftar@(nonaktif > 0 ? $" · {Format.Angka(nonaktif)} nonaktif" : "")</span>
+        </Right>
+    </Toolbar>
+    @{
+        _tabel.ExtraFilterActive = _filter.Aktif;
+        var tersaring = _tabel.Saring(semua);
+        var halaman = _tabel.Halaman(tersaring);
+    }
+    <DataTable T="Model.Alamat" Columns="Kolom" Rows="halaman" RowKey="a => a.Id" SortKey="@_tabel.SortKey" SortNaik="_tabel.Naik" OnSortChange="k => _tabel.ToggleSort(k)" IsFiltered="_tabel.IsFiltered">
+        <Empty><EmptyState Entity="alamat" /></Empty>
+        <NotFound><NotFoundState OnReset="ResetFilter" /></NotFound>
+    </DataTable>
+    @if (_tabel.Total > 0)
+    {
+        <Pagination Page="_tabel.Page" PageSize="_tabel.PageSize" Total="_tabel.Total" OnPageChange="p => _tabel.SetPage(p)" />
+    }
+</Kartu>
+
+<FormAlamat Open="_formOpen" Alamat="_editing" OnClose="() => _formOpen = false" />
+
+@* Hanya lihat (peran tanpa izin ubah data master): rincian alamat tanpa tombol simpan. *@
+<Modal Open="_lihat is not null" Size="lg" Title="Rincian Alamat" Subtitle="@(_lihat is null ? null : $"{_lihat.KodeArea} · {_lihat.Nama}")" OnClose="() => _lihat = null">
+    <ChildContent>
+        @if (_lihat is { } a)
+        {
+            <dl class="row g-3 m-0">
+                @Rincian("Nama Lokasi", a.Nama, true)
+                @Rincian("Kota", a.Kota, false)
+                <div class="col-sm-6 min-w-0">
+                    <dt class="fs-11-5 fw-semibold text-ink-3 text-uppercase" style="letter-spacing:.04em">Kode Area</dt>
+                    <dd class="m-0 mt-1 fs-13 text-ink tnum fw-semibold">@(a.KodeArea != "" ? a.KodeArea : "—")</dd>
+                </div>
+                @Rincian("Alamat", a.Jalan, true)
+                @Rincian("Nama Kontak", a.NamaKontak, false)
+                @Rincian("Telepon", a.Telepon, false)
+                @Rincian("Catatan", a.Catatan, true)
+                <div class="col-sm-6 min-w-0">
+                    <dt class="fs-11-5 fw-semibold text-ink-3 text-uppercase" style="letter-spacing:.04em">Status</dt>
+                    <dd class="m-0 mt-1">@if (a.Status == "aktif") { <Badge Tone="good">Aktif</Badge> } else { <Badge Tone="neutral">Nonaktif</Badge> }</dd>
+                </div>
+            </dl>
+        }
+    </ChildContent>
+    <Footer><Tombol OnClick="() => _lihat = null">Tutup</Tombol></Footer>
+</Modal>
+
+@* Belum dipakai trip mana pun: boleh dihapus. *@
+<KonfirmasiDialog Open="@(_hapus is not null && TripHapus == 0)" Title="Hapus Data?" Message="Data yang sudah dihapus mungkin tidak dapat dikembalikan." ConfirmLabel="Hapus" Tone="danger"
+                  OnCancel="() => _hapus = null" OnConfirm="HapusSekarang">
+    <p class="m-0 mt-2 fs-13 fw-medium text-ink">@_hapus?.KodeArea · @_hapus?.Nama</p>
+</KonfirmasiDialog>
+
+@* Sudah dipakai trip: tidak dihapus, tawarkan nonaktifkan. *@
+<Modal Open="@(_hapus is not null && TripHapus > 0)" Size="sm" Title="Alamat tidak bisa dihapus" OnClose="() => _hapus = null">
+    <ChildContent>
+        <div class="d-flex flex-column gap-2 fs-13 text-ink-2" style="line-height:1.6">
+            <p class="m-0">
+                <span class="fw-medium text-ink">@_hapus?.KodeArea · @_hapus?.Nama</span> sudah dipakai
+                @Format.Angka(TripHapus) trip. Alamatnya tidak dihapus supaya asal salinan alamat di trip tersebut tetap tercatat.
+            </p>
+            <p class="m-0">
+                @(_hapus?.Status == "aktif"
+                    ? "Nonaktifkan saja: alamat tidak ditawarkan lagi untuk trip baru, dan bisa diaktifkan kembali kapan saja."
+                    : "Alamat ini sudah nonaktif, jadi tidak ditawarkan lagi untuk trip baru.")
+            </p>
+        </div>
+    </ChildContent>
+    <Footer>
+        @if (_hapus?.Status == "aktif")
+        {
+            <Tombol OnClick="() => _hapus = null">Batal</Tombol>
+            <Tombol Variant="primary" Icon="Ikon.Ban" IconSize="14" OnClick="NonaktifkanDariHapus">Nonaktifkan</Tombol>
+        }
+        else
+        {
+            <Tombol OnClick="() => _hapus = null">Tutup</Tombol>
+        }
+    </Footer>
+</Modal>
+
+@code {
+    public sealed class FilterAlamat { public string Kode { get; set; } = ""; public string Status { get; set; } = ""; public string Pakai { get; set; } = ""; }
+
+    private static readonly List<Opsi> OpsiPakai = [new("", "Semua"), new("ya", "Sudah dipakai"), new("tidak", "Belum pernah dipakai")];
+    private static readonly List<Opsi> OpsiStatusFilter = [new("", "Semua"), new("aktif", "Aktif"), new("nonaktif", "Nonaktif")];
+
+    private readonly KendaliTabel<Model.Alamat> _tabel = new(10, "nama");
+    private KendaliFilter<FilterAlamat> _filter = default!;
+    private bool _formOpen;
+    private Model.Alamat? _editing;
+    private Model.Alamat? _lihat;
+    private Model.Alamat? _hapus;
+    private Dictionary<string, int> _dipakai = [];
+    private Dictionary<string, PakaiKode> _kodeRute = [];
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _filter = new KendaliFilter<FilterAlamat>(() => new FilterAlamat(), StateHasChanged);
+        _tabel.Search = (a, q) => Util.CocokCari(q, a.KodeArea, a.Nama, a.Jalan, a.Kota, a.NamaKontak, a.Telepon, a.Catatan);
+        _tabel.SortAccessor = k => k switch { "kode_area" => a => a.KodeArea, "status" => a => a.Status, _ => a => a.Nama };
+        _tabel.TieBreak = a => a.KodeArea;
+        _tabel.ExtraFilter = a =>
+        {
+            var f = _filter.Nilai;
+            return (f.Kode == "" || a.KodeArea == f.Kode) && (f.Status == "" || a.Status == f.Status)
+                && (f.Pakai == "" || (f.Pakai == "ya") == (_dipakai.GetValueOrDefault(a.Id) > 0));
+        };
+    }
+
+    /// <summary>Jumlah trip (kedua workspace) yang menyalin alamat ini sebagai pick up atau destinasi.</summary>
+    private Dictionary<string, int> Dipakai()
+    {
+        var m = new Dictionary<string, int>();
+        foreach (var t in Db.Semua.Trip)
+            foreach (var id in new[] { t.Pengirim?.AlamatId, t.Penerima?.AlamatId }.Where(x => !string.IsNullOrEmpty(x)).Distinct())
+                m[id!] = m.GetValueOrDefault(id!) + 1;
+        return m;
+    }
+
+    private int TripHapus => _hapus is null ? 0 : _dipakai.GetValueOrDefault(_hapus.Id);
+
+    private static List<Opsi> OpsiKode(List<Model.Alamat> semua) =>
+        [new("", "Semua"), .. semua.Select(a => a.KodeArea).Where(k => k != "").Distinct().OrderBy(k => k, StringComparer.Ordinal).Select(k => new Opsi(k, k))];
+
+    private List<ChipFilter> Chips
+    {
+        get
+        {
+            var f = _filter.Nilai;
+            var l = new List<ChipFilter>();
+            if (f.Kode != "") l.Add(new($"Kode area: {f.Kode}", () => _filter.Lepas((n, a) => n.Kode = a.Kode)));
+            if (f.Pakai != "") l.Add(new(f.Pakai == "ya" ? "Sudah dipakai trip" : "Belum pernah dipakai", () => _filter.Lepas((n, a) => n.Pakai = a.Pakai)));
+            if (f.Status != "") l.Add(new($"Status: {(f.Status == "aktif" ? "Aktif" : "Nonaktif")}", () => _filter.Lepas((n, a) => n.Status = a.Status)));
+            return l;
+        }
+    }
+
+    private List<Kolom<Model.Alamat>> Kolom =>
+    [
+        new() { Key = "nama", Header = "Nama Lokasi", Sortable = true, Render = SelNama },
+        new() { Key = "kode_area", Header = "Kode Area", Sortable = true, Width = "128px", Render = SelKode },
+        new() { Key = "alamat", Header = "Alamat", Render = SelAlamat },
+        new() { Key = "kontak", Header = "Kontak", Render = SelKontak },
+        // Trip lama tidak menyimpan alamat, jadi jumlah rute di area ini ikut ditampilkan (analisis UX 14 Okt 2026).
+        new() { Key = "dipakai", Header = "Dipakai", Align = "right", Width = "104px", Render = SelDipakai },
+        new() { Key = "status", Header = "Status", Sortable = true, Width = "100px", Render = SelStatus },
+        new() { Key = "action", Header = "Action", Align = "right", Width = Bisa("master") ? "112px" : "64px", NoPrint = true, Render = SelAksi },
+    ];
+
+    private static RenderFragment SelNama(Model.Alamat a) => @<span class="d-block lh-tight" style="min-width:180px">
+        <span class="fw-medium text-ink">@a.Nama</span>
+        @if (a.Kota != "") { <span class="mt-1 d-block fs-12 text-ink-3">@a.Kota</span> }
+    </span>;
+
+    private RenderFragment SelKode(Model.Alamat a) => @<span class="d-block lh-tight">
+        <span class="tnum fw-semibold text-ink">@(a.KodeArea != "" ? a.KodeArea : "—")</span>
+        @if (a.KodeArea != "" && !_kodeRute.ContainsKey(a.KodeArea))
+        {
+            <span class="mt-1 d-block fs-11 text-ink-3" title="Belum ada rute dengan kode area ini.">belum ada rute</span>
+        }
+    </span>;
+
+    private static RenderFragment SelAlamat(Model.Alamat a) => @<span class="d-block text-wrap text-ink-2" style="max-width:340px;min-width:200px;line-height:1.4">
+        @(a.Jalan != "" ? a.Jalan : "—")
+        @if (a.Catatan != "") { <span class="mt-1 d-block fs-11-5 text-ink-3">@a.Catatan</span> }
+    </span>;
+
+    private static RenderFragment SelKontak(Model.Alamat a)
+    {
+        var kontak = string.Join(" · ", new[] { a.NamaKontak, a.Telepon }.Where(x => x != ""));
+        if (kontak == "") return @<span class="text-ink-3">—</span>;
+        return @<span class="d-block text-wrap text-ink-2" style="min-width:120px;line-height:1.4">@kontak</span>;
+    }
+
+    private RenderFragment SelDipakai(Model.Alamat a)
+    {
+        var rute = _kodeRute.GetValueOrDefault(a.KodeArea.Trim().ToUpperInvariant())?.Rute ?? 0;
+        return @<span class="d-block lh-tight">
+            <span class="tnum text-ink-2">@Format.Angka(_dipakai.GetValueOrDefault(a.Id)) trip</span>
+            @if (rute > 0)
+            {
+                <span class="tnum mt-1 d-block fs-11 text-ink-3" title="@($"Rute yang area pick up / destinasinya {a.KodeArea}")">@Format.Angka(rute) rute</span>
+            }
+        </span>;
+    }
+
+    private static RenderFragment SelStatus(Model.Alamat a)
+    {
+        if (a.Status == "aktif") return @<Badge Tone="good">Aktif</Badge>;
+        return @<Badge Tone="neutral">Nonaktif</Badge>;
+    }
+
+    private RenderFragment SelAksi(Model.Alamat a)
+    {
+        if (!Bisa("master"))
+            return @<span class="d-inline-flex justify-content-end gap-1"><TombolIkon Label="Lihat rincian" Icon="Ikon.Eye" OnClick="() => _lihat = a" /></span>;
+        return @<span class="d-inline-flex justify-content-end gap-1">
+            <TombolIkon Label="Ubah" Icon="Ikon.Pen" OnClick="() => BukaUbah(a)" />
+            @if (a.Status == "aktif")
+            {
+                <TombolIkon Label="Nonaktifkan" Icon="Ikon.Ban" OnClick="@(() => UbahStatus(a, "nonaktif"))" />
+            }
+            else
+            {
+                <TombolIkon Label="Aktifkan" Icon="Ikon.CircleCheck" OnClick="@(() => UbahStatus(a, "aktif"))" />
+            }
+            <TombolIkon Label="Hapus" Tone="danger" Icon="Ikon.TrashCan" OnClick="() => _hapus = a" />
+        </span>;
+    }
+
+    private static RenderFragment Rincian(string label, string nilai, bool lebar) => @<div class="@(lebar ? "col-12" : "col-sm-6") min-w-0">
+        <dt class="fs-11-5 fw-semibold text-ink-3 text-uppercase" style="letter-spacing:.04em">@label</dt>
+        <dd class="m-0 mt-1 fs-13 text-ink text-break" style="white-space:pre-line">@(nilai != "" ? nilai : "—")</dd>
+    </div>;
+
+    private void BukaTambah() { _editing = null; _formOpen = true; }
+    private void BukaUbah(Model.Alamat a) { _editing = a; _formOpen = true; }
+
+    private void UbahStatus(Model.Alamat a, string status)
+    {
+        Db.Ubah<Model.Alamat>(a.Id, x => x.Status = status);
+        Toast.Sukses(status == "nonaktif" ? $"{a.Nama} dinonaktifkan: tidak ditawarkan lagi untuk trip baru." : $"{a.Nama} diaktifkan kembali.");
+    }
+
+    private void NonaktifkanDariHapus()
+    {
+        if (_hapus is not null) UbahStatus(_hapus, "nonaktif");
+        _hapus = null;
+    }
+
+    private void HapusSekarang()
+    {
+        if (_hapus is null) return;
+        Db.Hapus<Model.Alamat>(_hapus.Id);
+        Toast.Sukses("Data berhasil dihapus.");
+        _hapus = null;
+    }
+
+    private void ResetFilter() { _tabel.Reset(); _filter.LepasSemua(); }
+}

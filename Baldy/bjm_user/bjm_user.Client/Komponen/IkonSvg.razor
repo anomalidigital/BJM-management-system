@@ -1,0 +1,10 @@
+@* Ikon SVG inline (Font Awesome Free). Pakai: <IkonSvg Def="Ikon.Truck" Size="15" /> *@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 @Def.Lebar @Def.Tinggi" width="@Size" height="@Size" fill="currentColor"
+     aria-hidden="true" focusable="false" class="ikon @Class" style="@Style"><path d="@Def.Path" /></svg>
+
+@code {
+    [Parameter, EditorRequired] public IkonDef Def { get; set; } = Ikon.CircleInfo;
+    [Parameter] public int Size { get; set; } = 15;
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? Style { get; set; }
+}

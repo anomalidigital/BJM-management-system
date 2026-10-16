@@ -1,0 +1,81 @@
+@* Layar Preview Laporan: pengaturan di kiri (opsional), lembar A4 di kanan, satu tombol Cetak / PDF. Ditutup lewat X atau Esc. *@
+@implements IAsyncDisposable
+@inject Penyimpanan Simpan
+@inject IJSRuntime JS
+
+<div class="print-shell position-fixed top-0 start-0 end-0 bottom-0 d-flex flex-column" style="z-index:1120;background:var(--page)" tabindex="-1" @ref="_akar">
+    <header class="no-print d-flex flex-shrink-0 flex-wrap align-items-center justify-content-between gap-3 border-bottom border-hairline bg-surface px-3 px-lg-4 py-2">
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-link p-1 text-ink-3" aria-label="Tutup preview" title="Tutup preview (Esc)" @onclick="OnClose"><IkonSvg Def="Ikon.Xmark" Size="18" /></button>
+            <div>
+                <p class="m-0 fs-14 lh-tight fw-semibold text-ink">Preview Laporan</p>
+                <p class="m-0 fs-11-5 lh-tight text-ink-3">Tampilan di bawah sama persis dengan hasil cetak / PDF.</p>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            @if (OrientasiTetap is null)
+            {
+                <TombolSegmen Label="Orientasi kertas" Value="@Orientasi" ValueChanged="GantiOrientasi" Pilihan="@(new List<Segmen> { new("potret", "Potret"), new("lanskap", "Lanskap") })" />
+            }
+            <Tombol Variant="primary" Icon="Ikon.Print" OnClick="Cetak">Cetak / PDF</Tombol>
+        </div>
+    </header>
+    <div class="d-flex flex-grow-1" style="min-height:0">
+        @if (Settings is not null)
+        {
+            <aside class="no-print d-none d-lg-block flex-shrink-0 overflow-y-auto border-end border-hairline bg-surface p-3" style="width:16rem">@Settings</aside>
+        }
+        <div class="print-scroll flex-grow-1 overflow-auto p-3 p-lg-4" data-orientasi="@Orientasi" style="min-width:0">
+            <div class="d-flex flex-column gap-4 print-gap">@ChildContent?.Invoke(Orientasi)</div>
+            <p class="no-print mx-auto mt-4 text-center fs-11-5 text-ink-3" style="max-width:210mm; line-height:1.6">
+                Untuk menyimpan sebagai PDF: klik <span class="fw-medium text-ink-2">Cetak / PDF</span>, lalu pilih tujuan <span class="fw-medium text-ink-2">Save as PDF</span> pada dialog cetak browser.
+            </p>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnPrint { get; set; }
+    [Parameter] public RenderFragment? Settings { get; set; }
+    /// <summary>Isi laporan; menerima orientasi ("potret" / "lanskap") supaya tabel menyesuaikan.</summary>
+    [Parameter] public RenderFragment<string>? ChildContent { get; set; }
+    [Parameter] public string OrientasiAwal { get; set; } = "potret";
+    /// <summary>Kunci orientasi (dokumen resmi yang hanya benar di satu orientasi).</summary>
+    [Parameter] public string? OrientasiTetap { get; set; }
+
+    private string _dipilih = "potret";
+    private string Orientasi => OrientasiTetap ?? _dipilih;
+    private ElementReference _akar;
+    private DotNetObjectReference<ReportPreview>? _ref;
+    private IJSObjectReference? _pegangan;
+
+    protected override void OnInitialized() => _dipilih = OrientasiAwal;
+
+    protected override async Task OnAfterRenderAsync(bool pertama)
+    {
+        if (pertama)
+        {
+            await Simpan.AturHalamanCetakAsync(Orientasi);
+            _ref = DotNetObjectReference.Create(this);
+            try { _pegangan = await JS.InvokeAsync<IJSObjectReference>("sikotis.pasangEsc", _ref); } catch { /* abaikan */ }
+        }
+    }
+
+    private async Task GantiOrientasi(string o) { _dipilih = o; await Simpan.AturHalamanCetakAsync(Orientasi); }
+
+    private async Task Cetak()
+    {
+        if (OnPrint.HasDelegate) await OnPrint.InvokeAsync();
+        await Simpan.CetakAsync();
+    }
+
+    [JSInvokable] public Task TutupDariLuar() => OnClose.InvokeAsync();
+
+    public async ValueTask DisposeAsync()
+    {
+        await Simpan.HapusHalamanCetakAsync();
+        if (_pegangan is not null) { try { await JS.InvokeVoidAsync("sikotis.lepasTutupLuar", _pegangan); await _pegangan.DisposeAsync(); } catch { /* abaikan */ } }
+        _ref?.Dispose();
+    }
+}

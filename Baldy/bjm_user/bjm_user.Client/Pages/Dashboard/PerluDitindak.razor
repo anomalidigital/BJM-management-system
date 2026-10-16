@@ -1,0 +1,41 @@
+@* Antrian tindakan: jawaban pertama atas pertanyaan admin, "apa yang harus dikerjakan sekarang?" Sama untuk semua peran. *@
+<Panel Title="Perlu ditindak" Subtitle="@(Items.Count > 0 ? "Tekan salah satu untuk membuka datanya." : null)">
+    @if (Items.Count == 0)
+    {
+        <div class="d-flex flex-grow-1 flex-column align-items-center justify-content-center text-center px-4" style="padding-bottom:2rem">
+            <p class="m-0 fs-17 dash-rail text-ink">Semua beres</p>
+            <p class="m-0 mt-1 fs-12-5 text-ink-3">Tidak ada trip, Surat Jalan, atau tagihan yang tertahan.</p>
+        </div>
+    }
+    else
+    {
+        <ul class="list-unstyled m-0 px-2 pb-2">
+            @foreach (var a in Items)
+            {
+                <li @key="a.Id">
+                    <a href="@a.Ke" class="dash-tindak" data-tindak="@a.Id">
+                        <span class="dash-penanda" style="background:@Penanda(a.Nada)" aria-hidden="true"></span>
+                        <span class="min-w-0 flex-grow-1">
+                            <span class="d-block dash-fs-13-5 text-ink" style="line-height:1.375">@a.Label</span>
+                            @if (!string.IsNullOrEmpty(a.Keterangan)) { <span class="d-block fs-12 text-ink-3" style="margin-top:2px; line-height:1.375">@a.Keterangan</span> }
+                        </span>
+                        <span class="tnum dash-rail dash-fs-24 lh-1 text-ink">@Format.Angka(a.Jumlah)</span>
+                        <IkonSvg Def="Ikon.ChevronRight" Size="12" Class="dash-panah" />
+                    </a>
+                </li>
+            }
+        </ul>
+    }
+</Panel>
+
+@code {
+    [Parameter] public List<ItemTindak> Items { get; set; } = [];
+
+    /// <summary>masalah = merah, perhatian = kuning sinyal, info = abu baja.</summary>
+    private static string Penanda(string nada) => nada switch
+    {
+        "masalah" => "var(--critical)",
+        "perhatian" => "var(--signal)",
+        _ => "#c5cfdc",
+    };
+}

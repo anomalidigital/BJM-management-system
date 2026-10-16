@@ -1,0 +1,8 @@
+@* Kotak keterangan: info (biru) | peringatan (kuning) | galat (merah). *@
+<div class="@(Jenis == "peringatan" ? "kotak-peringatan" : Jenis == "galat" ? "kotak-galat" : "kotak-info") @Class" role="@(Jenis == "galat" ? "alert" : null)">@ChildContent</div>
+
+@code {
+    [Parameter] public string Jenis { get; set; } = "info";
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

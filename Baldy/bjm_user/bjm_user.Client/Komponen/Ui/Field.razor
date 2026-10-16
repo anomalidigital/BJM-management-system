@@ -1,0 +1,29 @@
+@* Pembungkus label + isian + pesan galat / petunjuk (Bootstrap .form-label / .form-text / .invalid-feedback).
+   Pakai: <Field Label="Klien" Required Error="@galat"> <input id="@context" class="form-control" ... /> </Field> *@
+<div class="@Class">
+    @if (Label is not null)
+    {
+        <label class="form-label" for="@Id">@Label@if (Required) { <span class="wajib">*</span> }</label>
+    }
+    @ChildContent?.Invoke(Id)
+    @if (!string.IsNullOrEmpty(Error))
+    {
+        <p class="invalid-feedback">@Error</p>
+    }
+    else if (Hint is not null)
+    {
+        <p class="form-text">@Hint</p>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public RenderFragment? Hint { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public RenderFragment<string>? ChildContent { get; set; }
+
+    protected override void OnInitialized() => Id ??= "f-" + Guid.NewGuid().ToString("N")[..8];
+}

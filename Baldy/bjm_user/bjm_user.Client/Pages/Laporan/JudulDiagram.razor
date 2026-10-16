@@ -1,0 +1,10 @@
+@* Judul kecil di atas diagram laporan. *@
+<div class="mb-3">
+    <h3 class="m-0 fs-13 fw-semibold text-ink">@Judul</h3>
+    @if (Keterangan is not null) { <p class="m-0 mt-1 fs-12 text-ink-3">@Keterangan</p> }
+</div>
+
+@code {
+    [Parameter] public string Judul { get; set; } = "";
+    [Parameter] public string? Keterangan { get; set; }
+}

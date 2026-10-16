@@ -1,0 +1,43 @@
+@* Konfirmasi menimpa nilai PI beku dengan nilai trip sekarang. *@
+
+<Modal Open="true" Title="@(Rows.Count > 1 ? $"Perbarui nilai {Rows.Count} PI" : "Perbarui nilai PI")" Size="md" OnClose="OnClose"
+       Subtitle="Nilai PI dibekukan saat PI dibuat. Nilai di bawah ini akan diganti dengan nilai trip sekarang.">
+    <ChildContent>
+        <div class="d-flex flex-column gap-3">
+            <ul class="list-unstyled m-0 overflow-y-auto rounded-3 border border-hairline" style="max-height:18rem">
+                @for (var i = 0; i < Rows.Count; i++)
+                {
+                    var ii = i; var t = Rows[ii]; var baru = TagihanLogika.NilaiSekarang(t.R);
+                    <li class="px-3 py-2 fs-12-5" style="@(ii > 0 ? "border-top:1px solid var(--grid)" : null)">
+                        <p class="m-0 tnum fw-semibold text-ink">PI @(t.T.PiNumber != "" ? t.T.PiNumber : "—") · @t.R.IdTampil</p>
+                        <p class="m-0 mt-1 tnum text-ink-2">
+                            @Format.Rupiah(t.NilaiTotal) → <span class="fw-semibold text-ink">@Format.Rupiah(baru.Total)</span>
+                            <span class="ms-1 text-ink-3">(@TagihanLogika.RupiahBertanda(t.Selisih))</span>
+                        </p>
+                        <p class="m-0 tnum fs-12 text-ink-3">Harga @Format.Rupiah(baru.Pokok) · tambahan @Format.Rupiah(baru.Tambahan)</p>
+                    </li>
+                }
+            </ul>
+            @if (SudahDikirim > 0)
+            {
+                <KotakInfo Jenis="peringatan" Class="d-flex align-items-start gap-2 fs-12-5">
+                    <IkonSvg Def="Ikon.TriangleExclamation" Size="14" Class="mt-1 flex-shrink-0" />
+                    <span>@(SudahDikirim > 1 ? $"{SudahDikirim} PI" : "PI ini") sudah dikirim ke klien. Setelah nilainya diperbarui, kirim ulang PI-nya
+                    atau tandai PI Revisi supaya klien tahu ada perubahan.</span>
+                </KotakInfo>
+            }
+        </div>
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="OnClose">Batal</Tombol>
+        <Tombol Variant="primary" Icon="Ikon.ArrowsRotate" IconSize="14" OnClick="() => OnSimpan.InvokeAsync(Rows)">Perbarui nilai PI</Tombol>
+    </Footer>
+</Modal>
+
+@code {
+    [Parameter, EditorRequired] public List<BarisPi> Rows { get; set; } = [];
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<List<BarisPi>> OnSimpan { get; set; }
+
+    private int SudahDikirim => Rows.Count(t => t.PunyaTahap && t.T.PiTahap != TahapPi.Tercetak);
+}

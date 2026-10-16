@@ -1,0 +1,25 @@
+@page "/transaksi/tagihan"
+@inherits KomponenData
+@* Laporan -> Tagihan. Karawang menagih per trip lewat PI; Priok per SI/JO seperti sistem lama. *@
+<PageTitle>Tagihan — SIKOTIS</PageTitle>
+
+@if (Karawang)
+{
+    <TagihanPi />
+}
+else
+{
+    <PageHeader Title="Tagihan" Crumbs="@(new List<Crumb> { new("Laporan"), new("Tagihan") })" />
+
+    <Kartu>
+        <Tabs Class="px-2" Value="@_tab" ValueChanged="v => _tab = v"
+              Items="@(new List<TabItem> { new("proses", "Proses Data"), new("browsing", "Browsing Data", Db.Data.Tagihan.Count.ToString()), new("pencarian", "Pencarian Data") })" />
+        @if (_tab == "proses") { <ProsesDataTab /> }
+        else if (_tab == "browsing") { <BrowsingDataTab /> }
+        else { <PencarianDataTab /> }
+    </Kartu>
+}
+
+@code {
+    private string _tab = "proses";
+}

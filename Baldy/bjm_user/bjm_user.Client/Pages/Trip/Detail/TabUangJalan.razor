@@ -1,0 +1,455 @@
+@inherits KomponenData
+@*
+    Tab Uang Jalan. Uang jalan = seluruh uang untuk supir selama perjalanan (uang jalan, uang dorong, uang pulang, tambahan);
+    termin dicatat saat uang benar-benar dibayar.
+
+    Patokan Uang Jalan Rute hanya membatasi termin jenis "Uang jalan": total di atas patokan perlu Manager / Owner (Bisa("override"))
+    dan alasan, yang disimpan di termin (OverrideNote, OverrideBy = username). Termin "Tambahan" selalu perlu persetujuan + alasan.
+    Uang dorong & uang pulang belum punya patokan, jadi cukup Bisa("trip"). Potong kasbon mengurangi kasbon supir penerima termin itu.
+
+    ?tambah=uang_dorong | uang_pulang di URL membuka form termin jenis itu (dipakai pilihan "Uang Dorong" di Biaya Operasional),
+    lalu parameternya dihapus.
+*@
+@{
+    var payments = Pembayaran;
+    var batal = Trip.Batal;
+    var patokan = Trip.Ujroute;
+    var ujDibayar = payments.Where(p => JenisDari(p) == JenisTermin.Uj).Sum(p => p.UjAmount);
+    var sisa = patokan - ujDibayar;
+    var luarPatokan = JenisTermin.Semua.Where(j => j != JenisTermin.Uj)
+        .Select(j => (Jenis: j, Nilai: payments.Where(p => JenisDari(p) == j).Sum(p => p.UjAmount))).Where(x => x.Nilai > 0).ToList();
+    var penyelesaian = Trip.T.CancelSettlement.GroupBy(x => x.UjPaymentId).ToDictionary(g => g.Key, g => g.First());
+    var adaAlasan = payments.Any(p => !string.IsNullOrEmpty(p.OverrideNote));
+    var totalUj = payments.Sum(p => p.UjAmount);
+    var totalKasbon = payments.Sum(p => p.KasbonDeduction);
+}
+<div>
+    <KepalaTab Tombol="Tambah Termin" BisaUbah="BisaUbah" OnTambah="() => Buka(null)">
+        <Keterangan>
+            @if (batal)
+            {
+                @("Trip dibatalkan: termin di bawah hanya arsip dan tidak dihitung di laporan.")
+            }
+            else if (patokan > 0)
+            {
+                <text>Patokan Uang Jalan Rute <span class="fw-semibold text-ink-2">@(Trip.RouteName != "" ? Trip.RouteName : Trip.RouteCode)</span>: @Format.Rupiah(patokan) ·
+                uang jalan dibayar @Format.Rupiah(ujDibayar) ·
+                @if (sisa >= 0) { <text>sisa <span class="tnum fw-semibold text-ink-2">@Format.Rupiah(sisa)</span></text> }
+                else { <span class="fw-semibold" style="color:#8a6100">melebihi patokan @Format.Rupiah(-sisa)</span> }
+                @if (luarPatokan.Count > 0) { <text> · di luar patokan: @string.Join(", ", luarPatokan.Select(x => $"{JenisTermin.Label(x.Jenis).ToLowerInvariant()} {Format.Rupiah(x.Nilai)}"))</text> }
+                . Catat termin saat uang benar-benar dibayar; di atas patokan perlu persetujuan Manager / Owner.</text>
+            }
+            else
+            {
+                @("Rute trip ini belum punya patokan Uang Jalan Rute. Catat termin saat uang dibayar; potong kasbon mengurangi kasbon supir penerima.")
+            }
+        </Keterangan>
+    </KepalaTab>
+
+    @if (payments.Count == 0)
+    {
+        <KosongTab Judul="Belum ada uang jalan yang dibayar."
+                   Keterangan="@(patokan > 0 ? $"Patokan Uang Jalan Rute: {Format.Rupiah(patokan)}. Termin pertama akan terisi nilai itu." : "Tambahkan termin saat uang jalan dibayar.")" />
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle text-nowrap">
+                <thead>
+                    <tr>
+                        <th>Termin</th><th>Tanggal</th><th>Supir</th><th class="text-end">Uang Jalan</th><th class="text-end">Potong Kasbon</th><th class="text-end">Transfer</th>
+                        @if (batal) { <th>Setelah batal</th> }
+                        <th>Catatan</th>
+                        @if (adaAlasan) { <th>Alasan &amp; persetujuan</th> }
+                        <th>Bukti</th><th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in payments)
+                    {
+                        var pp = p;
+                        var d = Db.Cari<Karyawan>(pp.DriverId);
+                        var selesai = penyelesaian.GetValueOrDefault(pp.Id);
+                        <tr class="@(batal ? "text-ink-3" : "")">
+                            <td>
+                                <span class="d-flex flex-wrap align-items-center gap-1">
+                                    <Badge Tone="neutral">Termin @pp.Sequence</Badge>
+                                    @if (!string.IsNullOrEmpty(pp.Jenis) && pp.Jenis != JenisTermin.Uj) { <Badge Tone="brand">@JenisTermin.Label(pp.Jenis)</Badge> }
+                                </span>
+                            </td>
+                            <td class="tnum text-ink-2">@Format.Tanggal(pp.PaymentDate)</td>
+                            <td>
+                                @if (d is not null) { <a href="@($"master/karyawan/{d.Id}")" class="fw-medium text-ink text-decoration-none">@d.DriverName</a> }
+                                else { <span class="text-ink-3">—</span> }
+                            </td>
+                            <td class="tnum text-end fw-medium @AturDetail.Coret(batal)">@Format.Rupiah(pp.UjAmount)</td>
+                            <td class="tnum text-end text-ink-2 @AturDetail.Coret(batal)">@(pp.KasbonDeduction > 0 ? Format.Rupiah(pp.KasbonDeduction) : "—")</td>
+                            <td class="tnum text-end fw-semibold @(batal ? "" : "text-ink") @AturDetail.Coret(batal)">@Format.Rupiah(pp.Tf)</td>
+                            @if (batal)
+                            {
+                                <td>
+                                    @if (selesai is not null) { <Badge Tone="@(selesai.Cara == "kasbon" ? "warning" : "good")">@(selesai.Cara == "kasbon" ? "Jadi kasbon supir" : "Dikembalikan tunai")</Badge> }
+                                    else { <span class="text-ink-3">—</span> }
+                                </td>
+                            }
+                            <td class="text-ink-3 text-wrap" style="max-width:16rem">@(pp.Notes != "" ? pp.Notes : "—")</td>
+                            @if (adaAlasan)
+                            {
+                                <td class="text-wrap" style="max-width:16rem">
+                                    @if (!string.IsNullOrEmpty(pp.OverrideNote))
+                                    {
+                                        <p class="m-0 text-ink-2">@pp.OverrideNote</p>
+                                        @if (!string.IsNullOrEmpty(pp.OverrideBy)) { <p class="m-0 fs-11-5 text-ink-3">Disetujui @NamaPengguna(pp.OverrideBy)</p> }
+                                    }
+                                    else { <span class="text-ink-3">—</span> }
+                                </td>
+                            }
+                            <td><LampiranThumbs Ids="pp.Attachments" Ukuran="30" /></td>
+                            <td class="text-end">
+                                <span class="d-inline-flex justify-content-end gap-1">
+                                    <TombolIkon Label="Ubah" Icon="Ikon.Pen" Disabled="@(!BisaUbah)" OnClick="() => Buka(pp)" />
+                                    <TombolIkon Label="Hapus" Icon="Ikon.TrashCan" Tone="danger" Disabled="@(!BisaUbah)" OnClick="() => _menghapus = pp" />
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td class="fs-12 text-ink-2" colspan="3">Total @payments.Count termin@(batal ? " (arsip)" : "")</td>
+                        <td class="tnum text-end">@Format.Rupiah(totalUj)</td>
+                        <td class="tnum text-end">@Format.Rupiah(totalKasbon)</td>
+                        <td class="tnum text-end text-ink">@Format.Rupiah(totalUj - totalKasbon)</td>
+                        <td colspan="@((batal ? 1 : 0) + (adaAlasan ? 1 : 0) + 3)"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    }
+</div>
+
+<Modal Open="_terbuka" Title="@(_editing is not null ? $"Ubah Termin {_editing.Sequence}" : "Tambah Termin Uang Jalan")" Subtitle="@($"Trip {Trip.IdTampil}")" Size="md" OnClose="() => _terbuka = false">
+    <ChildContent>
+        @if (_terbuka)
+        {
+            var jenis = Jenis;
+            <div class="row gx-3 gy-3">
+                <Field Label="Jenis" Required Class="col-12" Hint="@AturDetail.Teks(PetunjukJenis(jenis))">
+                    <Pilihan Id="@context" Options="OpsiJenis" Value="@jenis" ValueChanged="GantiJenis" Cari="false" Clearable="false" />
+                </Field>
+                <Field Label="Tanggal" Required Class="col-sm-6">
+                    <TanggalInput Id="@context" Value="@_form.PaymentDate" ValueChanged="v => _form.PaymentDate = v" />
+                </Field>
+                <Field Label="Supir penerima" Class="col-sm-6" Hint="@AturDetail.Teks("Kasbon yang dipotong milik supir ini.")">
+                    <Pilihan Id="@context" Options="OpsiSopir" Value="@(_form.DriverId == "" ? null : _form.DriverId)" Placeholder="Pilih supir..." ValueChanged="v => _form.DriverId = v ?? string.Empty" />
+                </Field>
+                <Field Label="Uang Jalan" Required Class="col-sm-6">
+                    <ChildContent><UangInput Id="@context" Value="_form.UjAmount" ValueChanged="v => _form.UjAmount = v" /></ChildContent>
+                    <Hint>
+                        @if (jenis != JenisTermin.Uj)
+                        {
+                            @(jenis == JenisTermin.Tambahan ? "Di luar patokan Uang Jalan Rute." : "Belum ada patokan untuk jenis ini; isi sesuai uang yang dibayar.")
+                        }
+                        else if (Patokan > 0 && SisaSebelumIni > 0 && _form.UjAmount != SisaSebelumIni)
+                        {
+                            <text>Sisa patokan Uang Jalan Rute @Format.Rupiah(SisaSebelumIni) · <PakaiNilai Label="Pakai" OnClick="() => _form.UjAmount = SisaSebelumIni" /></text>
+                        }
+                        else
+                        {
+                            @(Patokan > 0 ? $"Patokan Uang Jalan Rute {Format.Rupiah(Patokan)}." : "Rute ini belum punya patokan Uang Jalan Rute.")
+                        }
+                    </Hint>
+                </Field>
+                <Field Label="Potong Kasbon" Class="col-sm-6" Error="@(PotongLebih ? $"Melebihi kasbon {NamaSopir} ({Format.Rupiah(Math.Max(0, Saldo))}). Kosongkan, atau catat kasbonnya dulu." : null)">
+                    <ChildContent><UangInput Id="@context" Value="_form.KasbonDeduction" Invalid="PotongLebih" Disabled="TanpaKasbon" ValueChanged="v => _form.KasbonDeduction = v" /></ChildContent>
+                    <Hint>
+                        @if (_form.DriverId == "")
+                        {
+                            @("Pilih supir untuk melihat kasbonnya.")
+                        }
+                        else if (Saldo <= 0)
+                        {
+                            <text>@NamaSopir tidak punya kasbon, jadi tidak ada yang dipotong. Kasbon baru dicatat di <a href="@($"master/karyawan/{_form.DriverId}")" target="_blank" class="fw-medium">halaman @NamaSopir</a>.</text>
+                        }
+                        else
+                        {
+                            <text>Kasbon @NamaSopir: <span class="tnum fw-semibold text-ink-2">@Format.Rupiah(Saldo)</span></text>
+                            @if (MaksPotong > 0 && _form.KasbonDeduction != MaksPotong)
+                            {
+                                <text> · <PakaiNilai Label="@($"Potong {Format.Rupiah(MaksPotong)}")" OnClick="() => _form.KasbonDeduction = MaksPotong" /></text>
+                            }
+                        }
+                    </Hint>
+                </Field>
+                <div class="col-12">
+                    <div class="rounded-3 border border-brand-100 bg-brand-50 px-3 py-2">
+                        <p class="m-0 d-flex align-items-center justify-content-between gap-3">
+                            <span class="fs-12-5 fw-medium" style="color:var(--brand-800)">Transfer ke supir</span>
+                            <span class="tnum fw-semibold" style="font-size:16px;color:var(--brand-800)" data-transfer>@Format.Rupiah(_form.UjAmount - _form.KasbonDeduction)</span>
+                        </p>
+                        <p class="m-0 mt-1 fs-11-5" style="color:var(--brand-700)">
+                            Dihitung otomatis: Uang Jalan − Potong Kasbon@(_form.KasbonDeduction > 0 && _form.DriverId != "" && !PotongLebih ? $" · sisa kasbon {NamaSopir} menjadi {Format.Rupiah(Saldo - _form.KasbonDeduction)}" : "")
+                        </p>
+                        @if (LewatPatokan && BisaSetujui)
+                        {
+                            <p class="m-0 mt-1 fs-11-5 fw-medium" style="color:#8a6100">Total uang jalan trip menjadi @Format.Rupiah(TotalSetelah), melebihi patokan Uang Jalan Rute @Format.Rupiah(Patokan).</p>
+                        }
+                    </div>
+                </div>
+
+                @if (TampilAlasan)
+                {
+                    if (BisaSetujui)
+                    {
+                        <Field Label="@(jenis == JenisTermin.Tambahan ? "Alasan uang tambahan" : "Alasan di atas patokan")" Required="WajibAlasan" Class="col-12"
+                               Hint="@AturDetail.Teks(ButuhSetuju || _alasan.Trim() != (_editing?.OverrideNote ?? "") ? $"Tercatat disetujui oleh {Sesi.Pengguna?.Name ?? "Anda"}." : !string.IsNullOrEmpty(_editing?.OverrideBy) ? $"Disetujui {NamaPengguna(_editing.OverrideBy)}." : null)">
+                            <textarea id="@context" class="form-control" rows="2" placeholder="mis. macet total dua hari di jalur Cikampek" value="@_alasan" @oninput="e => _alasan = e.Value?.ToString() ?? string.Empty"></textarea>
+                        </Field>
+                    }
+                    else if (ButuhSetuju)
+                    {
+                        <div class="col-12">
+                            <KotakInfo Jenis="peringatan" Class="d-flex align-items-start gap-2 fs-12-5">
+                                <IkonSvg Def="Ikon.TriangleExclamation" Size="14" Style="margin-top:3px" />
+                                <div class="min-w-0 flex-grow-1">
+                                    @if (jenis == JenisTermin.Tambahan)
+                                    {
+                                        @("Uang tambahan di luar patokan perlu persetujuan Manager atau Owner beserta alasannya. Minta Manager / Owner mencatat termin ini.")
+                                    }
+                                    else
+                                    {
+                                        @($"Total uang jalan menjadi {Format.Rupiah(TotalSetelah)}, melebihi patokan Uang Jalan Rute {Format.Rupiah(Patokan)}. Uang jalan di atas patokan perlu persetujuan Manager atau Owner: {(SisaSebelumIni > 0 ? $"isi paling banyak sisa patokan {Format.Rupiah(SisaSebelumIni)}, atau minta" : "minta")} Manager / Owner mencatat termin ini beserta alasannya.")
+                                    }
+                                </div>
+                            </KotakInfo>
+                        </div>
+                    }
+                    else if (!string.IsNullOrEmpty(_editing?.OverrideNote))
+                    {
+                        <div class="col-12">
+                            <div class="rounded-3 border border-hairline bg-sunken px-3 py-2 fs-12-5">
+                                <p class="m-0 text-ink-3">Alasan di atas patokan</p>
+                                <p class="m-0 mt-1 fw-medium text-ink">@_editing.OverrideNote</p>
+                                <p class="m-0 mt-2 d-flex align-items-center gap-2 fs-12 text-ink-3">
+                                    <IkonSvg Def="Ikon.Lock" Size="12" />
+                                    @(!string.IsNullOrEmpty(_editing.OverrideBy) ? $"Disetujui {NamaPengguna(_editing.OverrideBy)}; " : "")ubah oleh Manager / Owner.
+                                </p>
+                            </div>
+                        </div>
+                    }
+                }
+
+                <Field Label="Catatan" Class="col-sm-6">
+                    <input id="@context" class="form-control" value="@_form.Notes" @oninput="e => _form.Notes = e.Value?.ToString() ?? string.Empty" />
+                </Field>
+                <Field Label="Bukti transfer / foto" Class="col-sm-6">
+                    <LampiranInput Id="@context" Value="_form.Attachments" ValueChanged="v => _form.Attachments = v" />
+                </Field>
+                @if (_galat is not null) { <div class="col-12"><PesanGalat Teks="@_galat" /></div> }
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="() => _terbuka = false">Batal</Tombol>
+        <Tombol Variant="primary" OnClick="Simpan">Simpan</Tombol>
+    </Footer>
+</Modal>
+
+<KonfirmasiDialog Open="_menghapus is not null" Title="Hapus termin?" ConfirmLabel="Hapus" Tone="danger"
+                  Message="@(_menghapus is null ? "" : $"Termin {_menghapus.Sequence} senilai {Format.Rupiah(_menghapus.UjAmount)} akan dihapus.")"
+                  OnCancel="() => _menghapus = null" OnConfirm="Hapus">
+    @if (_menghapus is { KasbonDeduction: > 0 } m)
+    {
+        <p class="m-0 mt-2 fs-13 text-ink-2">Potongan kasbon @Format.Rupiah(m.KasbonDeduction) dikembalikan ke kasbon @(Db.Cari<Karyawan>(m.DriverId)?.DriverName ?? "supirnya").</p>
+    }
+</KonfirmasiDialog>
+
+@code {
+    [Parameter, EditorRequired] public BarisTrip Trip { get; set; } = default!;
+    [Parameter] public bool BisaUbah { get; set; }
+    /// <summary>Permintaan dari tempat lain (?tambah=uang_dorong | uang_pulang): buka form termin jenis itu.</summary>
+    [Parameter] public string? Tambah { get; set; }
+
+    private bool _terbuka;
+    private TerminUj? _editing;
+    private IsianTermin _form = new();
+    /// <summary>Alasan uang jalan di atas patokan / uang tambahan.</summary>
+    private string _alasan = "";
+    private string? _galat;
+    private TerminUj? _menghapus;
+    private string? _mintaDipakai;
+    private bool _hapusMinta;
+
+    private static string JenisDari(TerminUj p) => string.IsNullOrEmpty(p.Jenis) ? JenisTermin.Uj : p.Jenis;
+
+    /// <summary>Dibaca dari seluruh data supaya arsip trip batal tetap terlihat.</summary>
+    private List<TerminUj> Pembayaran => Db.Semua.Termin.Where(p => p.TripId == Trip.Id).OrderBy(p => p.Sequence).ToList();
+
+    /// <summary>Boleh menyetujui uang jalan di atas patokan & uang tambahan (Manager / Owner).</summary>
+    private bool BisaSetujui => Bisa("override");
+    private long Patokan => Trip.Ujroute;
+    private string Jenis => string.IsNullOrEmpty(_form.Jenis) ? JenisTermin.Uj : _form.Jenis;
+    private string? JenisLama => _editing is null ? null : JenisDari(_editing);
+    private long Sisa => Patokan - Pembayaran.Where(p => JenisDari(p) == JenisTermin.Uj).Sum(p => p.UjAmount);
+    /// <summary>Uang jalan termin lain (tanpa termin yang sedang diubah).</summary>
+    private long UjLain => Pembayaran.Where(p => JenisDari(p) == JenisTermin.Uj && p.Id != _editing?.Id).Sum(p => p.UjAmount);
+    private long SisaSebelumIni => Patokan - UjLain;
+    /// <summary>Total uang jalan setelah termin ini disimpan, untuk dibandingkan dengan patokan.</summary>
+    private long TotalSetelah => UjLain + (Jenis == JenisTermin.Uj ? _form.UjAmount : 0);
+    private bool LewatPatokan => Jenis == JenisTermin.Uj && Patokan > 0 && TotalSetelah > Patokan;
+    /// <summary>Termin ini butuh persetujuan Manager / Owner + alasan.</summary>
+    private bool PerluSetuju => Jenis == JenisTermin.Tambahan || LewatPatokan;
+    /// <summary>Simpanan ini menambah uang: termin baru, jenisnya berganti, atau nominalnya naik.</summary>
+    private bool Naik => _editing is null || JenisLama != Jenis || _form.UjAmount > _editing.UjAmount;
+    /// <summary>Persetujuan baru diperlukan. Mengubah tanggal / bukti termin yang sudah disetujui tidak perlu.</summary>
+    private bool ButuhSetuju => PerluSetuju && Naik;
+    private bool TampilAlasan => PerluSetuju || !string.IsNullOrEmpty(_editing?.OverrideNote);
+    private bool WajibAlasan => PerluSetuju && (Naik || !string.IsNullOrEmpty(_editing?.OverrideNote));
+
+    /// <summary>Saldo supir terpilih tanpa potongan termin yang sedang diubah.</summary>
+    private long Saldo => _form.DriverId == "" ? 0 : Kasbon.Saldo(Db.Semua.Kasbon, _form.DriverId, _editing?.Id ?? "");
+    private long MaksPotong => Math.Max(0, Math.Min(Saldo, _form.UjAmount));
+    private string NamaSopir => Db.Cari<Karyawan>(_form.DriverId)?.DriverName ?? "";
+    /// <summary>Potongan melebihi kasbon yang masih ada: tidak bisa disimpan.</summary>
+    private bool PotongLebih => _form.DriverId != "" && _form.KasbonDeduction > Math.Max(0, Saldo);
+    /// <summary>Supir tanpa kasbon: tidak ada yang bisa dipotong, jadi kolomnya dikunci.</summary>
+    private bool TanpaKasbon => _form.DriverId != "" && Saldo <= 0 && _form.KasbonDeduction == 0;
+
+    private string NamaPengguna(string? username) =>
+        string.IsNullOrEmpty(username) ? "" : Sesi.Akun.FirstOrDefault(p => p.Username == username)?.Name ?? username;
+
+    private static string PetunjukJenis(string j) => j switch
+    {
+        JenisTermin.UangDorong => "Uang untuk lanjut membawa muatan balik; catat di trip backload / rute lanjutannya. Nominalnya belum diatur, jadi tidak dibatasi patokan.",
+        JenisTermin.UangPulang => "Supir pulang kosong tanpa backload. Nominalnya belum diatur, jadi tidak dibatasi patokan.",
+        JenisTermin.Tambahan => "Kekurangan uang jalan di luar patokan, mis. perjalanan lebih lama. Selalu perlu persetujuan Manager / Owner beserta alasannya.",
+        _ => "Uang perjalanan dari patokan Uang Jalan Rute: tol, solar, SPSI Banlok, overnight, ASDP dibayar supir dari sini. Di atas patokan perlu persetujuan Manager / Owner beserta alasannya.",
+    };
+
+    /// <summary>Admin tidak bisa memilih Tambahan (selalu perlu persetujuan), kecuali termin itu memang Tambahan.</summary>
+    private List<Opsi> OpsiJenis => JenisTermin.Semua
+        .Select(j => new Opsi(j, JenisTermin.Label(j), disabled: j == JenisTermin.Tambahan && !BisaSetujui && JenisLama != JenisTermin.Tambahan)).ToList();
+
+    /// <summary>Penerima termin: supir trip ini; bila trip belum punya supir, seluruh supir aktif.</summary>
+    private List<Opsi> OpsiSopir
+    {
+        get
+        {
+            var ids = Trip.DriverIds.Count > 0
+                ? Trip.DriverIds.ToList()
+                : Db.Semua.Karyawan.Where(d => d.Role == PeranKaryawan.Sopir && d.Status == "aktif").Select(d => d.Id).ToList();
+            if (!string.IsNullOrEmpty(_editing?.DriverId) && !ids.Contains(_editing.DriverId)) ids.Add(_editing.DriverId);
+            var saldo = Db.SaldoKasbon;
+            return ids.Select(id =>
+            {
+                var d = Db.Cari<Karyawan>(id);
+                return new Opsi(id, d is not null ? $"{d.DriverCode} — {d.DriverName}" : id, $"Kasbon {Format.Rupiah(saldo.GetValueOrDefault(id))}");
+            }).ToList();
+        }
+    }
+
+    /// <summary>Isian awal nominal termin baru: sisa patokan untuk uang jalan; jenis lain belum berpatokan.</summary>
+    private long NominalAwal(string j) => j == JenisTermin.Uj ? Math.Max(0, Sisa) : 0;
+
+    protected override void OnParametersSet()
+    {
+        if (Tambah is JenisTermin.UangDorong or JenisTermin.UangPulang)
+        {
+            if (_mintaDipakai != Tambah)
+            {
+                _mintaDipakai = Tambah;
+                if (BisaUbah) Buka(null, Tambah);
+                _hapusMinta = true;
+            }
+        }
+        else _mintaDipakai = null;
+    }
+
+    protected override void OnAfterRender(bool pertama)
+    {
+        if (!_hapusMinta) return;
+        _hapusMinta = false;
+        Nav.NavigateTo(Nav.GetUriWithQueryParameter("tambah", (string?)null), replace: true);
+    }
+
+    private void Buka(TerminUj? p, string jenisAwal = JenisTermin.Uj)
+    {
+        _editing = p;
+        _form = p is not null
+            ? new IsianTermin
+            {
+                PaymentDate = p.PaymentDate, DriverId = p.DriverId, Jenis = JenisDari(p), UjAmount = p.UjAmount, KasbonDeduction = p.KasbonDeduction,
+                Notes = p.Notes, Attachments = p.Attachments.ToList(),
+            }
+            : new IsianTermin
+            {
+                PaymentDate = Trip.T.TransactionDate, DriverId = Trip.DriverIds.FirstOrDefault() ?? "", Jenis = jenisAwal,
+                // Uang jalan baru langsung diisi sisa dari patokan; tetap bisa diubah.
+                UjAmount = NominalAwal(jenisAwal), KasbonDeduction = 0, Notes = "", Attachments = [],
+            };
+        _alasan = p?.OverrideNote ?? "";
+        _galat = null;
+        _terbuka = true;
+    }
+
+    private void GantiJenis(string? v)
+    {
+        var j = string.IsNullOrEmpty(v) ? JenisTermin.Uj : v;
+        // Nominal yang masih isian otomatis ikut jenis baru; nominal ketikan sendiri tidak diubah.
+        var otomatis = _editing is null && _form.UjAmount == NominalAwal(Jenis);
+        if (otomatis) _form.UjAmount = NominalAwal(j);
+        _form.Jenis = j;
+        _galat = null;
+    }
+
+    private void Simpan()
+    {
+        var jenis = Jenis;
+        if (_form.PaymentDate == "") { _galat = "Tanggal wajib diisi."; return; }
+        if (_form.UjAmount <= 0) { _galat = "Uang jalan harus lebih dari 0."; return; }
+        if (_form.KasbonDeduction > _form.UjAmount) { _galat = "Potong kasbon tidak boleh melebihi uang jalan."; return; }
+        if (ButuhSetuju && !BisaSetujui)
+        {
+            _galat = $"Belum bisa disimpan: {(jenis == JenisTermin.Tambahan ? "uang tambahan" : "uang jalan di atas patokan")} perlu persetujuan Manager atau Owner.";
+            return;
+        }
+        var ket = _alasan.Trim();
+        if (BisaSetujui && WajibAlasan && ket == "")
+        {
+            _galat = jenis == JenisTermin.Tambahan ? "Tulis alasan uang tambahan ini." : "Tulis alasan uang jalan di atas patokan.";
+            return;
+        }
+        if (_form.KasbonDeduction > 0 && _form.DriverId == "") { _galat = "Pilih supir yang kasbonnya dipotong."; return; }
+        if (_form.KasbonDeduction > Saldo)
+        {
+            _galat = $"Kasbon {(NamaSopir != "" ? NamaSopir : "supir ini")} tinggal {Format.Rupiah(Math.Max(0, Saldo))}. Potongan tidak boleh melebihinya.";
+            return;
+        }
+        // Persetujuan tercatat atas nama yang menyimpan; tanpa perubahan, persetujuan lama dipertahankan.
+        string? catatan = _editing?.OverrideNote, oleh = _editing?.OverrideBy;
+        if (BisaSetujui && TampilAlasan)
+        {
+            var baru = ButuhSetuju || ket != (_editing?.OverrideNote ?? "");
+            if (ket != "") { catatan = ket; oleh = baru ? Sesi.Pengguna?.Username ?? "" : _editing?.OverrideBy; }
+            else { catatan = null; oleh = null; }
+        }
+        var isi = new IsianTermin
+        {
+            PaymentDate = _form.PaymentDate, DriverId = _form.DriverId, Jenis = jenis, UjAmount = _form.UjAmount, KasbonDeduction = _form.KasbonDeduction,
+            Notes = _form.Notes, Attachments = _form.Attachments.ToList(), OverrideNote = catatan, OverrideBy = oleh,
+        };
+        var ubah = _editing is not null;
+        Db.SimpanTermin(Trip.Id, isi, _editing);
+        Toast.Sukses(ubah ? "Termin berhasil diperbarui." : "Termin uang jalan berhasil ditambahkan.");
+        _terbuka = false;
+    }
+
+    private void Hapus()
+    {
+        if (_menghapus is null) return;
+        var p = _menghapus;
+        Db.HapusTermin(p);
+        Toast.Sukses(p.KasbonDeduction > 0 ? $"Termin dihapus. Potongan kasbon {Format.Rupiah(p.KasbonDeduction)} dikembalikan." : "Termin berhasil dihapus.");
+        _menghapus = null;
+    }
+}

@@ -1,0 +1,10 @@
+@* Peringatan kecil yang tidak memblokir simpan (kuning). *@
+<div class="d-flex align-items-start gap-2 rounded-3 px-3 py-2 fs-12-5 @Class" style="border:1px solid #f6e2ac;background:#fff8e6;color:#8a6100">
+    <IkonSvg Def="Ikon.TriangleExclamation" Size="14" Style="margin-top:1px" />
+    <div class="min-w-0 flex-grow-1">@ChildContent</div>
+</div>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

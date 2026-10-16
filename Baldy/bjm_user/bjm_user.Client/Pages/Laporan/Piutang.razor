@@ -1,0 +1,704 @@
+@page "/laporan/piutang-karyawan"
+@inherits KomponenData
+@inject Penyimpanan Simpan
+@*
+    Laporan → Piutang Karyawan (revisi atasan 13 Okt 2026): transaksi piutang karyawan dicatat di sini, jenisnya hanya Piutang
+    dan Lunas. Angka dari sisi karyawan: piutang minus (merah), pelunasan plus (hijau), saldo minus = masih punya piutang.
+    Potongan uang jalan di trip tercatat otomatis sebagai Lunas. Tab Per Karyawan = rekap periode, tab Transaksi = daftar
+    mutasinya. Periode, status, jenis, dan tab disimpan di alamat halaman.
+*@
+<PageTitle>Piutang Karyawan — SIKOTIS</PageTitle>
+@{ Susun(); }
+
+@if (_preview)
+{
+    <ReportPreview OnClose="() => _preview = false" OrientasiAwal="potret">
+        @{
+            var per = PrintDocument.BarisPerLembar(context, 28);
+            var hal = PrintDocument.Bagi(_rows, per);
+            var saldo = _rows.Where(r => r.Akhir < 0).Sum(r => r.Akhir);
+        }
+        <PrintDocument>
+            @for (var i = 0; i < hal.Count; i++)
+            {
+                var ii = i; var isi = hal[ii];
+                <PrintPage Page="@(ii + 1)" TotalPages="hal.Count" Title="Rekap Piutang Karyawan" Subtitle="Piutang minus, pelunasan plus; saldo minus = masih punya piutang" Periode="@PeriodeTeks"
+                           Meta="@(new List<(string, string)> { ("Jumlah karyawan", Format.Angka(_rows.Count)), ($"Saldo piutang per {Format.Tanggal(AkhirBerlaku)}", NilaiPiutang.Teks(saldo)), ("Ditampilkan", LabelStatus(StatusBerlaku)) })">
+                    <PrintTable Cols="@(new List<(string, string, string?)> { ("No.", "right", "5%"), ("Kode", "left", "9%"), ("Nama", "left", null), ("Peran", "left", "9%"), ("Saldo Awal", "right", "12%"), ("Piutang", "right", "12%"), ("Lunas", "right", "12%"), ("Saldo Akhir", "right", "12%") })">
+                        @for (var r = 0; r < isi.Count; r++)
+                        {
+                            var rr = r; var x = isi[rr];
+                            <tr>
+                                <td class="p-sel text-end">@(ii * per + rr + 1)</td>
+                                <td class="p-sel">@x.Kode</td>
+                                <td class="p-sel">@x.Nama</td>
+                                <td class="p-sel">@x.Peran</td>
+                                <td class="p-sel text-end">@AngkaCetak(x.Awal)</td>
+                                <td class="p-sel text-end">@AngkaCetak(x.Piutang)</td>
+                                <td class="p-sel text-end">@AngkaCetak(x.Lunas)</td>
+                                <td class="p-sel text-end fw-semibold">@AngkaCetak(x.Akhir)</td>
+                            </tr>
+                        }
+                        @if (ii == hal.Count - 1)
+                        {
+                            <tr class="total">
+                                <td class="p-sel text-end" colspan="4">TOTAL</td>
+                                <td class="p-sel text-end">@AngkaCetak(_total.Awal)</td>
+                                <td class="p-sel text-end">@AngkaCetak(_total.Piutang)</td>
+                                <td class="p-sel text-end">@AngkaCetak(_total.Lunas)</td>
+                                <td class="p-sel text-end">@AngkaCetak(_total.Akhir)</td>
+                            </tr>
+                        }
+                    </PrintTable>
+                    @if (ii == hal.Count - 1)
+                    {
+                        <p class="m-0 mt-2" style="font-size:9.5px;color:#525252">Saldo Akhir = Saldo Awal + Piutang + Lunas. Angka dalam Rupiah.</p>
+                    }
+                </PrintPage>
+            }
+        </PrintDocument>
+    </ReportPreview>
+}
+else
+{
+    <PageHeader Title="Piutang Karyawan" Crumbs="@(new List<Crumb> { new("Laporan"), new("Piutang Karyawan") })">
+        <Description>Piutang (kasbon) karyawan ke perusahaan. Piutang tercatat minus, pelunasan plus; potongan uang jalan dari trip tercatat otomatis sebagai Lunas.</Description>
+        <Actions>
+            <Tombol Icon="Ikon.Print" OnClick="BukaCetak">Cetak</Tombol>
+            <Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Bisa("master"))" OnClick="BukaTambah">Tambah Transaksi</Tombol>
+        </Actions>
+    </PageHeader>
+    @if (_galat is not null)
+    {
+        <div class="no-print mb-3"><p class="invalid-feedback">@_galat</p></div>
+    }
+
+    <div class="row row-cols-2 row-cols-xl-4 g-3 mb-4">
+        @foreach (var (label, nilai, ket) in KartuRingkas)
+        {
+            <div class="col">
+                <div class="kartu shadow-card h-100 p-3">
+                    <p class="m-0 fs-12-5 fw-medium text-ink-3">@label</p>
+                    <p class="m-0 mt-2 lh-tight fw-semibold" style="font-size:19px;letter-spacing:-.01em">@nilai</p>
+                    <p class="m-0 mt-2 fs-11-5 text-ink-3" style="line-height:1.35">@ket</p>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (_ringkas.LebihBayar > 0)
+    {
+        <div class="kotak-peringatan mb-4 d-flex align-items-start gap-2" role="note" style="font-size:12.5px;line-height:1.6">
+            <IkonSvg Def="Ikon.TriangleExclamation" Size="15" Class="flex-shrink-0" Style="margin-top:3px" />
+            <p class="m-0">
+                <span class="fw-semibold">Temuan data: </span>
+                @Format.Angka(_ringkas.LebihBayar) karyawan saldonya sempat plus (lebih bayar) menurut urutan tanggal (tanda “Cek tanggal”).
+                Biasanya potongan uang jalan atau pelunasan tercatat dengan tanggal lebih awal dari kasbonnya.
+            </p>
+        </div>
+    }
+
+    <Kartu>
+        <Tabs Class="px-2" Items="@(new List<TabItem> { new("karyawan", "Per Karyawan", _semua.Count.ToString()), new("transaksi", "Transaksi", _mutasi.Count.ToString()) })"
+              Value="@TabAktif" ValueChanged="GantiTab" />
+        <Toolbar>
+            <Left>
+                @if (TabAktif == "karyawan")
+                {
+                    <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Width="16rem" Placeholder="Cari kode atau nama karyawan..." />
+                }
+                else
+                {
+                    <SearchInput Value="@_tabelMutasi.Query" ValueChanged="v => _tabelMutasi.SetQuery(v)" Width="16rem" Placeholder="Cari karyawan, keterangan, trip..." />
+                }
+                <PanelFilter T="FilterPiutang" Filter="_filter" Chips="Chips" Galat="@Format.GalatRentang(_filter.Draf.Awal, _filter.Draf.Akhir)" Lebar="360">
+                    <div>
+                        <p class="form-label">Periode</p>
+                        <div class="row g-2">
+                            <div class="col-6"><TanggalInput AriaLabel="Tanggal awal" Value="@_filter.Draf.Awal" ValueChanged="UbahAwal" /></div>
+                            <div class="col-6"><TanggalInput AriaLabel="Tanggal akhir" Value="@_filter.Draf.Akhir" ValueChanged="UbahAkhir" /></div>
+                        </div>
+                        <div class="mt-2 d-flex flex-wrap gap-2">
+                            <Tombol Size="sm" Variant="ghost" OnClick="() => AturPeriode(BulanDari(0))">Bulan ini</Tombol>
+                            <Tombol Size="sm" Variant="ghost" OnClick="() => AturPeriode(BulanDari(-1))">Bulan lalu</Tombol>
+                            <Tombol Size="sm" Variant="ghost" OnClick="() => AturPeriode(SejakAwal)">Semua waktu</Tombol>
+                        </div>
+                    </div>
+                    <Field Label="Status (tab Per Karyawan)">
+                        <Pilihan Id="@context" Options="OpsiStatus" Value="@_filter.Draf.Status" ValueChanged="v => _filter.Ubah(d => d.Status = v ?? StatusSemua)" Cari="false" Clearable="false" />
+                    </Field>
+                    <Field Label="Jenis (tab Transaksi)">
+                        <Pilihan Id="@context" Options="OpsiJenis" Value="@_filter.Draf.Jenis" ValueChanged="v => _filter.Ubah(d => d.Jenis = v ?? string.Empty)" Cari="false" Clearable="false" />
+                    </Field>
+                </PanelFilter>
+            </Left>
+            <Right>
+                @if (TabAktif == "karyawan")
+                {
+                    <Tombol Size="sm" Icon="Ikon.FileExport" IconSize="14" Disabled="@(_rows.Count == 0)" OnClick="ExportCsv">Export CSV</Tombol>
+                }
+            </Right>
+        </Toolbar>
+
+        @if (TabAktif == "karyawan")
+        {
+            <DataTable T="BarisPiutang" Columns="KolomKaryawan" Rows="_tabel.Halaman(_rows)" RowKey="r => r.Id" IsFiltered="_tabel.IsFiltered"
+                       SortKey="@_tabel.SortKey" SortNaik="_tabel.Naik" OnSortChange="k => _tabel.ToggleSort(k)" OnRowClick="KlikKaryawan">
+                <Footer>
+                    <tr class="fs-13">
+                        <td colspan="3" class="px-3 py-2 text-ink-2">@TeksTotalKaryawan</td>
+                        <td class="px-3 py-2 text-end"><NilaiPiutang Nilai="_total.Awal" /></td>
+                        <td class="px-3 py-2 text-end"><NilaiPiutang Nilai="_total.Piutang" /></td>
+                        <td class="px-3 py-2 text-end"><NilaiPiutang Nilai="_total.Lunas" /></td>
+                        <td class="px-3 py-2 text-end"><NilaiPiutang Nilai="_total.Akhir" Tebal /></td>
+                    </tr>
+                </Footer>
+                <Empty><p class="m-0 px-4 py-5 text-center fs-13 text-ink-3">Belum ada piutang karyawan pada @PeriodeTeks.</p></Empty>
+                <NotFound><NotFoundState OnReset="() => { _tabel.Reset(); _filter.Lepas((n, a) => n.Status = a.Status); }" /></NotFound>
+            </DataTable>
+            @if (_tabel.Total > 0)
+            {
+                <Pagination Page="_tabel.Page" PageSize="_tabel.PageSize" Total="_tabel.Total" OnPageChange="p => _tabel.SetPage(p)" />
+            }
+            <p class="m-0 border-top border-hairline px-3 py-2 fs-12 text-ink-3" style="line-height:1.6">
+                Saldo Akhir = Saldo Awal + Piutang + Lunas (piutang bertanda minus, pelunasan plus). Saldo minus = karyawan masih punya piutang.
+                Klik baris untuk membuka transaksi karyawannya.
+            </p>
+        }
+        else
+        {
+            var halaman = _tabelMutasi.Halaman(_mutasiTersaring);
+            <DataTable T="BarisMutasi" Columns="KolomMutasi" Rows="halaman" RowKey="e => e.E.Id" IsFiltered="_tabelMutasi.IsFiltered"
+                       SortKey="@_tabelMutasi.SortKey" SortNaik="_tabelMutasi.Naik" OnSortChange="k => _tabelMutasi.ToggleSort(k)">
+                <Footer>
+                    @if (_tabelMutasi.Total > 0)
+                    {
+                        <tr class="fs-13">
+                            <td colspan="4" class="px-3 py-2 text-ink-2">Total @Format.Angka(_tabelMutasi.Total) transaksi</td>
+                            <td class="px-3 py-2 text-end"><NilaiPiutang Nilai="@_mutasiTersaring.Where(e => e.Nilai < 0).Sum(e => e.Nilai)" /></td>
+                            <td class="px-3 py-2 text-end"><NilaiPiutang Nilai="@_mutasiTersaring.Where(e => e.Nilai > 0).Sum(e => e.Nilai)" /></td>
+                            <td colspan="2"></td>
+                        </tr>
+                    }
+                </Footer>
+                <Empty><p class="m-0 px-4 py-5 text-center fs-13 text-ink-3">Belum ada transaksi pada @PeriodeTeks.</p></Empty>
+                <NotFound><NotFoundState OnReset="() => { _tabelMutasi.Reset(); _filter.Lepas((n, a) => n.Jenis = a.Jenis); }" /></NotFound>
+            </DataTable>
+            @if (_tabelMutasi.Total > 0)
+            {
+                <Pagination Page="_tabelMutasi.Page" PageSize="_tabelMutasi.PageSize" Total="_tabelMutasi.Total" OnPageChange="p => _tabelMutasi.SetPage(p)" />
+            }
+        }
+    </Kartu>
+}
+
+<Modal Open="_form is not null" Title="@(_editing is not null ? "Ubah Transaksi" : "Tambah Transaksi")" Subtitle="Piutang menambah utang karyawan (minus). Lunas mencatat pelunasan (plus)."
+       Size="md" OnClose="() => _form = null">
+    <ChildContent>
+        @if (_form is not null)
+        {
+            var f = _form;
+            <div class="d-flex flex-column gap-3">
+                <Field Label="Karyawan" Required Error="@_galatForm.GetValueOrDefault("karyawan")">
+                    <Pilihan Id="@context" Options="OpsiKaryawan" Value="@(f.Karyawan == "" ? null : f.Karyawan)" Invalid="@_galatForm.ContainsKey("karyawan")" Disabled="@(_editing is not null)"
+                             Placeholder="Pilih karyawan..." SearchPlaceholder="Ketik kode atau nama..." Cari="true" ValueChanged="PilihKaryawanForm" />
+                </Field>
+                <Field Label="Jenis" Required>
+                    <div class="row g-2">
+                        <div class="col-12 col-sm-6">
+                            <Radio Name="jenis-piutang" Label="Piutang" Description="Karyawan menambah utang, mis. kasbon. Tercatat minus." Checked="@(f.Jenis == "piutang")" OnChange="() => f.Jenis = JenisPiutang" />
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <Radio Name="jenis-piutang" Label="Lunas" Description="Karyawan membayar / mencicil piutangnya. Tercatat plus." Checked="@(f.Jenis == "lunas")" OnChange="() => f.Jenis = JenisLunas" />
+                        </div>
+                    </div>
+                </Field>
+                <div class="row g-3">
+                    <div class="col-12 col-sm-6">
+                        <Field Label="Jumlah" Required Error="@_galatForm.GetValueOrDefault("jumlah")">
+                            <UangInput Id="@context" Value="f.Jumlah" Invalid="@_galatForm.ContainsKey("jumlah")" ValueChanged="UbahJumlahForm" />
+                        </Field>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                        <Field Label="Tanggal" Required Error="@_galatForm.GetValueOrDefault("tanggal")">
+                            <TanggalInput Id="@context" Value="@f.Tanggal" ValueChanged="v => f.Tanggal = v" />
+                        </Field>
+                    </div>
+                </div>
+                <Field Label="Catatan">
+                    <ChildContent>
+                        <input id="@context" class="form-control" value="@f.Catatan" @oninput="e => f.Catatan = e.Value?.ToString() ?? string.Empty" />
+                    </ChildContent>
+                    <Hint>mis. kasbon keperluan keluarga, cicilan ke-2, dibayar tunai di kantor.</Hint>
+                </Field>
+                <Field Label="Bukti">
+                    <ChildContent>
+                        <LampiranInput Id="@context" Value="f.Bukti" ValueChanged="v => f.Bukti = v" />
+                    </ChildContent>
+                    <Hint>Foto kuitansi, bukti transfer, dan sejenisnya.</Hint>
+                </Field>
+                @if (f.Karyawan != "")
+                {
+                    <div class="rounded-2 border border-hairline bg-sunken px-3 py-3 fs-12-5">
+                        <p class="m-0 d-flex align-items-center justify-content-between gap-3 text-ink-2"><span>Saldo sekarang</span><NilaiPiutang Nilai="SaldoSebelum" /></p>
+                        <p class="m-0 mt-1 d-flex align-items-center justify-content-between gap-3 fw-semibold text-ink"><span>Setelah transaksi</span><NilaiPiutang Nilai="SaldoSesudah" Tebal /></p>
+                    </div>
+                }
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="() => _form = null">Batal</Tombol>
+        <Tombol Variant="primary" OnClick="SimpanForm">Simpan</Tombol>
+    </Footer>
+</Modal>
+
+<KonfirmasiDialog Open="_menghapus is not null" Title="Hapus transaksi?" ConfirmLabel="Hapus" Tone="danger" OnCancel="() => _menghapus = null" OnConfirm="HapusMutasi"
+                  Message="@PesanHapus" />
+
+@code {
+    public sealed class FilterPiutang
+    {
+        public string Awal { get; set; } = "";
+        public string Akhir { get; set; } = "";
+        public string Status { get; set; } = StatusSemua;
+        public string Jenis { get; set; } = "";
+    }
+
+    /// <summary>Satu baris per karyawan; seluruh angka dari sisi karyawan (piutang minus, pelunasan plus).</summary>
+    public sealed class BarisPiutang
+    {
+        public string Id { get; init; } = "";
+        public string Kode { get; init; } = "";
+        public string Nama { get; init; } = "";
+        public string Peran { get; init; } = "";
+        /// <summary>false = karyawan sudah dihapus, tetapi mutasinya masih tersimpan.</summary>
+        public bool Terdaftar { get; init; }
+        public bool Nonaktif { get; init; }
+        /// <summary>Saldo dari seluruh mutasi sebelum tanggal awal periode.</summary>
+        public long Awal { get; init; }
+        public long Piutang { get; init; }
+        public long Lunas { get; init; }
+        public long Akhir { get; init; }
+        public int Mutasi { get; init; }
+        /// <summary>Tanggal pertama saldo menjadi plus (lebih bayar) bila mutasi diurutkan per hari.</summary>
+        public string LebihBayar { get; init; } = "";
+    }
+
+    public sealed class BarisMutasi
+    {
+        public required MutasiKasbon E { get; init; }
+        public string Nama { get; init; } = "";
+        public string Kode { get; init; } = "";
+        public long Nilai { get; init; }
+        public string Jenis { get; init; } = "";
+    }
+
+    private sealed class FormTransaksi
+    {
+        public string Karyawan { get; set; } = "";
+        public string Jenis { get; set; } = JenisPiutang;
+        public long Jumlah { get; set; }
+        public string Tanggal { get; set; } = Format.HariIni();
+        public string Catatan { get; set; } = "";
+        public List<string> Bukti { get; set; } = [];
+    }
+
+    private const string StatusSemua = "semua", StatusAda = "ada", StatusTidak = "tidak";
+    private const string JenisPiutang = "piutang", JenisLunas = "lunas";
+
+    private static string LabelStatus(string s) => s switch { StatusAda => "Masih punya piutang", StatusTidak => "Tidak punya piutang", _ => "Semua" };
+    private static string LabelJenisPiutang(string j) => j == JenisPiutang ? "Piutang" : "Lunas";
+
+    [SupplyParameterFromQuery(Name = "awal")] public string? QAwal { get; set; }
+    [SupplyParameterFromQuery(Name = "akhir")] public string? QAkhir { get; set; }
+    [SupplyParameterFromQuery(Name = "status")] public string? QStatus { get; set; }
+    [SupplyParameterFromQuery(Name = "tab")] public string? QTab { get; set; }
+    [SupplyParameterFromQuery(Name = "jenis")] public string? QJenis { get; set; }
+    [SupplyParameterFromQuery(Name = "tambah")] public string? QTambah { get; set; }
+    [SupplyParameterFromQuery(Name = "karyawan")] public string? QKaryawan { get; set; }
+
+    private KendaliFilter<FilterPiutang> _filter = default!;
+    private readonly KendaliTabel<BarisPiutang> _tabel = new(25);
+    private readonly KendaliTabel<BarisMutasi> _tabelMutasi = new(25, "entry_date", naik: false);
+    private bool _preview;
+    private string? _galat;
+
+    private List<BarisPiutang> _semua = [];
+    private List<BarisPiutang> _rows = [];
+    private List<BarisMutasi> _mutasi = [];
+    private List<BarisMutasi> _mutasiTersaring = [];
+    private (long Saldo, int Berpiutang, long Piutang, long Lunas, int LebihBayar) _ringkas;
+    private (long Awal, long Piutang, long Lunas, long Akhir) _total;
+
+    private FormTransaksi? _form;
+    private MutasiKasbon? _editing;
+    private MutasiKasbon? _menghapus;
+    private readonly Dictionary<string, string> _galatForm = [];
+
+    /// <summary>Periode bawaan sama dengan "Periode" di topbar dan laporan lain: bulan terakhir yang punya trip.</summary>
+    private Periode Bawaan => Periode.Aktif(Db.Baris.Select(t => t.T.TransactionDate));
+    private string AwalBerlaku => LaporanLogika.Iso(QAwal) ? QAwal! : Bawaan.Awal;
+    private string AkhirBerlaku => LaporanLogika.Iso(QAkhir) ? QAkhir! : Bawaan.Akhir;
+    private string StatusBerlaku => QStatus is StatusAda or StatusTidak ? QStatus : StatusSemua;
+    private string JenisBerlaku => QJenis is JenisPiutang or JenisLunas ? QJenis : "";
+    private string TabAktif => QTab == "transaksi" ? "transaksi" : "karyawan";
+    private bool PeriodeSalah => string.CompareOrdinal(AwalBerlaku, AkhirBerlaku) > 0;
+    private string PeriodeTeks => $"{Format.Tanggal(AwalBerlaku)} s/d {Format.Tanggal(AkhirBerlaku)}";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _filter = new KendaliFilter<FilterPiutang>(() => new FilterPiutang { Awal = Bawaan.Awal, Akhir = Bawaan.Akhir }, FilterBerubah);
+        _tabel.Search = (r, q) => Util.CocokCari(q, r.Kode, r.Nama, r.Peran);
+        _tabel.SortAccessor = k => k switch
+        {
+            "kode" => r => r.Kode, "nama" => r => r.Nama, "peran" => r => r.Peran, "awal" => r => r.Awal,
+            "piutang" => r => r.Piutang, "lunas" => r => r.Lunas, _ => r => r.Akhir,
+        };
+        _tabel.ExtraFilter = r => CocokStatus(r, StatusBerlaku);
+        _tabelMutasi.Search = (e, q) => Util.CocokCari(q, e.Nama, e.Kode, e.E.Notes, JenisKasbon.Label(e.E.Kind), Db.Cari<Trip>(e.E.TripId)?.TransactionNo);
+        _tabelMutasi.SortAccessor = k => k switch { "nama" => e => e.Nama, "jenis" => e => e.Jenis, _ => e => e.E.EntryDate };
+        _tabelMutasi.TieBreak = e => e.E.CreatedAt;
+        _tabelMutasi.ExtraFilter = e => JenisBerlaku == "" || e.Jenis == JenisBerlaku;
+    }
+
+    protected override void OnParametersSet()
+    {
+        var n = _filter.Nilai;
+        if (n.Awal != AwalBerlaku || n.Akhir != AkhirBerlaku || n.Status != StatusBerlaku || n.Jenis != JenisBerlaku)
+            _filter.Atur(f => { f.Awal = AwalBerlaku; f.Akhir = AkhirBerlaku; f.Status = StatusBerlaku; f.Jenis = JenisBerlaku; });
+        // Dari halaman karyawan: ?karyawan=<id>&tambah=1 langsung membuka form untuk karyawan itu.
+        if (QTambah == "1")
+        {
+            var id = QKaryawan ?? "";
+            _editing = null; _galatForm.Clear();
+            _form = new FormTransaksi { Karyawan = Db.Semua.Karyawan.Any(d => d.Id == id) ? id : "" };
+            UbahUrl(new() { ["tambah"] = null, ["karyawan"] = null });
+        }
+    }
+
+    private void FilterBerubah()
+    {
+        var v = _filter.Nilai;
+        if (v.Awal != AwalBerlaku || v.Akhir != AkhirBerlaku || v.Status != StatusBerlaku || v.Jenis != JenisBerlaku)
+        {
+            _galat = null;
+            var b = Bawaan;
+            var bawaan = v.Awal == b.Awal && v.Akhir == b.Akhir;
+            UbahUrl(new()
+            {
+                ["awal"] = bawaan ? null : v.Awal, ["akhir"] = bawaan ? null : v.Akhir,
+                ["status"] = v.Status != StatusSemua ? v.Status : null, ["jenis"] = v.Jenis != "" ? v.Jenis : null,
+            });
+        }
+        StateHasChanged();
+    }
+
+    private void UbahUrl(Dictionary<string, object?> ubah) => Nav.NavigateTo(Nav.GetUriWithQueryParameters(ubah), replace: true);
+    private void GantiTab(string t) => UbahUrl(new() { ["tab"] = t == "transaksi" ? "transaksi" : null });
+
+    private void UbahAwal(string v) { if (v != "") _filter.Ubah(d => d.Awal = v); }
+    private void UbahAkhir(string v) { if (v != "") _filter.Ubah(d => d.Akhir = v); }
+    private void AturPeriode((string Awal, string Akhir) p) => _filter.Ubah(d => { d.Awal = p.Awal; d.Akhir = p.Akhir; });
+
+    private static (string Awal, string Akhir) BulanDari(int geser)
+    {
+        var acuan = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1).AddMonths(geser);
+        return (Format.AwalBulan(acuan), Format.AkhirBulan(acuan));
+    }
+
+    /// <summary>Sejak mutasi pertama sampai yang terakhir (paling sedikit bulan ini).</summary>
+    private (string Awal, string Akhir) SejakAwal
+    {
+        get
+        {
+            var t = Db.Semua.Kasbon.Select(e => e.EntryDate).Where(LaporanLogika.Iso).OrderBy(d => d, StringComparer.Ordinal).ToList();
+            var ini = BulanDari(0);
+            var pertama = t.FirstOrDefault() ?? ""; var terakhir = t.LastOrDefault() ?? "";
+            return (pertama != "" && string.CompareOrdinal(pertama, ini.Awal) < 0 ? pertama : ini.Awal, string.CompareOrdinal(terakhir, ini.Akhir) > 0 ? terakhir : ini.Akhir);
+        }
+    }
+
+    private static bool CocokStatus(BarisPiutang r, string s) => s == StatusSemua || (s == StatusAda ? r.Akhir < 0 : r.Akhir >= 0);
+
+    /// <summary>Tanggal pertama saldo karyawan menjadi plus (lebih bayar) bila mutasi diurutkan per hari.</summary>
+    private static string CekLebihBayar(List<MutasiKasbon> list)
+    {
+        var perHari = new Dictionary<string, long>();
+        foreach (var e in list) perHari[e.EntryDate] = perHari.GetValueOrDefault(e.EntryDate) + Kasbon.SisiKaryawan(e.Amount);
+        long saldo = 0;
+        foreach (var tanggal in perHari.Keys.OrderBy(k => k, StringComparer.Ordinal))
+        {
+            saldo += perHari[tanggal];
+            if (saldo > 0) return tanggal;
+        }
+        return "";
+    }
+
+    /// <summary>Rekap per karyawan untuk periode awal..akhir; karyawan tanpa saldo & tanpa mutasi tidak ikut.</summary>
+    private static List<BarisPiutang> SusunPiutang(List<Karyawan> drivers, List<MutasiKasbon> entries, string awal, string akhir)
+    {
+        var orang = drivers.GroupBy(d => d.Id).ToDictionary(g => g.Key, g => g.First());
+        var keluar = new List<BarisPiutang>();
+        foreach (var g in entries.GroupBy(e => e.EmployeeId))
+        {
+            var list = g.ToList();
+            long sAwal = 0, piutang = 0, lunas = 0; var mutasi = 0;
+            foreach (var e in list)
+            {
+                var n = Kasbon.SisiKaryawan(e.Amount);
+                if (string.CompareOrdinal(e.EntryDate, awal) < 0) sAwal += n;
+                else if (string.CompareOrdinal(e.EntryDate, akhir) <= 0)
+                {
+                    mutasi++;
+                    if (n < 0) piutang += n; else lunas += n;
+                }
+            }
+            if (sAwal == 0 && mutasi == 0) continue;
+            orang.TryGetValue(g.Key, out var d);
+            keluar.Add(new BarisPiutang
+            {
+                Id = g.Key, Kode = d?.DriverCode ?? "—", Nama = d?.DriverName ?? "Karyawan sudah dihapus",
+                Peran = d is not null ? PeranKaryawan.Label(d.Role) : "—", Terdaftar = d is not null, Nonaktif = d?.Status == "nonaktif",
+                Awal = sAwal, Piutang = piutang, Lunas = lunas, Akhir = sAwal + piutang + lunas, Mutasi = mutasi, LebihBayar = CekLebihBayar(list),
+            });
+        }
+        // Piutang terbesar (paling minus) dulu, lalu kode karyawan.
+        return keluar.OrderBy(r => r.Akhir).ThenBy(r => r.Kode, Comparer<string>.Create(Util.BandingAlami)).ToList();
+    }
+
+    /// <summary>Disusun di awal tiap render dari data & alamat yang berlaku.</summary>
+    private void Susun()
+    {
+        var awal = AwalBerlaku; var akhir = AkhirBerlaku; var salah = PeriodeSalah;
+        _semua = salah ? [] : SusunPiutang(Db.Semua.Karyawan, Db.Semua.Kasbon, awal, akhir);
+        _tabel.ExtraFilterActive = StatusBerlaku != StatusSemua;
+        _rows = _tabel.Saring(_semua);
+        var orangMap = Db.Semua.Karyawan.GroupBy(d => d.Id).ToDictionary(g => g.Key, g => g.First());
+        _mutasi = salah ? [] : Db.Semua.Kasbon
+            .Where(e => string.CompareOrdinal(e.EntryDate, awal) >= 0 && string.CompareOrdinal(e.EntryDate, akhir) <= 0)
+            .Select(e =>
+            {
+                orangMap.TryGetValue(e.EmployeeId, out var o);
+                return new BarisMutasi { E = e, Nama = o?.DriverName ?? "Karyawan sudah dihapus", Kode = o?.DriverCode ?? "—", Nilai = Kasbon.SisiKaryawan(e.Amount), Jenis = Kasbon.JenisPiutang(e) };
+            }).ToList();
+        _tabelMutasi.ExtraFilterActive = JenisBerlaku != "";
+        _mutasiTersaring = _tabelMutasi.Saring(_mutasi);
+        _ringkas = (_semua.Sum(r => Math.Min(0, r.Akhir)), _semua.Count(r => r.Akhir < 0), _semua.Sum(r => r.Piutang), _semua.Sum(r => r.Lunas), _semua.Count(r => r.LebihBayar != ""));
+        _total = (_rows.Sum(r => r.Awal), _rows.Sum(r => r.Piutang), _rows.Sum(r => r.Lunas), _rows.Sum(r => r.Akhir));
+    }
+
+    private List<ChipFilter> Chips
+    {
+        get
+        {
+            var b = Bawaan;
+            var bawaan = AwalBerlaku == b.Awal && AkhirBerlaku == b.Akhir;
+            var c = new List<ChipFilter> { new($"Periode {Format.RentangTanggal(AwalBerlaku, AkhirBerlaku)}", bawaan ? null : () => _filter.Lepas((n, a) => { n.Awal = a.Awal; n.Akhir = a.Akhir; })) };
+            if (StatusBerlaku != StatusSemua) c.Add(new(LabelStatus(StatusBerlaku), () => _filter.Lepas((n, a) => n.Status = a.Status)));
+            if (JenisBerlaku != "") c.Add(new(JenisBerlaku == JenisPiutang ? "Piutang saja" : "Lunas saja", () => _filter.Lepas((n, a) => n.Jenis = a.Jenis)));
+            return c;
+        }
+    }
+
+    private static readonly List<Opsi> OpsiStatus = [new(StatusSemua, LabelStatus(StatusSemua)), new(StatusAda, LabelStatus(StatusAda)), new(StatusTidak, LabelStatus(StatusTidak))];
+    private static readonly List<Opsi> OpsiJenis = [new("", "Piutang & Lunas"), new(JenisPiutang, "Piutang saja"), new(JenisLunas, "Lunas saja")];
+
+    private List<Opsi> OpsiKaryawan => Db.Semua.Karyawan
+        .Where(d => d.Status == "aktif" || d.Id == _form?.Karyawan)
+        .Select(d => new Opsi(d.Id, $"{d.DriverCode} — {d.DriverName}", $"{PeranKaryawan.Label(d.Role)} · saldo {NilaiPiutang.Teks(Kasbon.SisiKaryawan(Db.SaldoKasbon.GetValueOrDefault(d.Id)))}", d.DriverName))
+        .ToList();
+
+    private IEnumerable<(string Label, RenderFragment Nilai, string Ket)> KartuRingkas
+    {
+        get
+        {
+            yield return ("Saldo Piutang", @<NilaiPiutang Nilai="_ringkas.Saldo" />, $"sisa piutang seluruh karyawan per {Format.Tanggal(AkhirBerlaku)}");
+            yield return ("Karyawan Berpiutang", @<span class="text-ink">@Format.Angka(_ringkas.Berpiutang)</span>, $"dari {Format.Angka(_semua.Count)} karyawan ber-transaksi di periode ini");
+            yield return ("Piutang Periode", @<NilaiPiutang Nilai="_ringkas.Piutang" />, "kasbon & pembatalan trip");
+            yield return ("Pelunasan Periode", @<NilaiPiutang Nilai="_ringkas.Lunas" />, "potong uang jalan & dibayar langsung");
+        }
+    }
+
+    private static string AngkaCetak(long n) => n != 0 ? NilaiPiutang.Teks(n).Replace("Rp\u00A0", "").Replace("Rp ", "") : "-";
+
+    private string TeksTotalKaryawan => $"Total · {Format.Angka(_rows.Count)} karyawan{(_rows.Count > _tabel.PageSize ? " (semua halaman)" : "")}";
+
+    private void KlikKaryawan(BarisPiutang r) { if (r.Terdaftar) Ke($"master/karyawan/{r.Id}"); }
+
+    private List<Kolom<BarisPiutang>> KolomKaryawan =>
+    [
+        new() { Key = "kode", Header = "Kode", Sortable = true, Width = "96px", Render = r => @<span class="tnum fw-semibold text-ink">@r.Kode</span> },
+        new() { Key = "nama", Header = "Nama", Sortable = true, Render = r => @<div class="lh-tight">
+                @if (r.Terdaftar)
+                {
+                    <a href="@($"master/karyawan/{r.Id}")" class="fw-semibold text-decoration-none remah" style="color:var(--brand-700)" @onclick:stopPropagation="true">@r.Nama</a>
+                }
+                else
+                {
+                    <span class="fw-medium text-ink-3">@r.Nama</span>
+                }
+                @if (r.Nonaktif || r.LebihBayar != "")
+                {
+                    <div class="mt-1 d-flex flex-wrap gap-1">
+                        @if (r.Nonaktif) { <Badge Tone="neutral">Nonaktif</Badge> }
+                        @if (r.LebihBayar != "")
+                        {
+                            <Badge Tone="warning" Title="@($"Saldo sempat plus (lebih bayar) sejak {Format.Tanggal(r.LebihBayar)} menurut urutan tanggal. Biasanya tanggal pelunasan lebih awal dari kasbonnya.")"><IkonSvg Def="Ikon.TriangleExclamation" Size="11" />Cek tanggal</Badge>
+                        }
+                    </div>
+                }
+            </div> },
+        new() { Key = "peran", Header = "Peran", Sortable = true, Width = "96px", Render = r => @<span class="text-ink-2">@r.Peran</span> },
+        new() { Key = "awal", Header = "Saldo Awal", Sortable = true, Align = "right", Width = "130px", Render = r => @<NilaiPiutang Nilai="r.Awal" /> },
+        new() { Key = "piutang", Header = "Piutang", Sortable = true, Align = "right", Width = "130px", Render = r => @<span>@if (r.Piutang != 0) { <NilaiPiutang Nilai="r.Piutang" /> } else { <span class="text-ink-3">—</span> }</span> },
+        new() { Key = "lunas", Header = "Lunas", Sortable = true, Align = "right", Width = "130px", Render = r => @<span>@if (r.Lunas != 0) { <NilaiPiutang Nilai="r.Lunas" /> } else { <span class="text-ink-3">—</span> }</span> },
+        new() { Key = "akhir", Header = "Saldo Akhir", Sortable = true, Align = "right", Width = "140px", Render = r => @<NilaiPiutang Nilai="r.Akhir" Tebal /> },
+    ];
+
+    private bool BisaUbahMutasi(MutasiKasbon e) => Bisa("master") && e.UjPaymentId == "" && e.TripId == "";
+
+    private static string TautanTrip(MutasiKasbon e) => $"transaksi/trip/{e.TripId}{(e.Kind == JenisKasbon.Trip ? "?tab=uj" : "")}";
+
+    private List<Kolom<BarisMutasi>> KolomMutasi =>
+    [
+        new() { Key = "entry_date", Header = "Tanggal", Sortable = true, Width = "100px", Render = e => @<span class="tnum text-ink-2">@Format.Tanggal(e.E.EntryDate)</span> },
+        new() { Key = "nama", Header = "Karyawan", Sortable = true, Render = e => @<span class="d-block lh-tight">
+                <a href="@($"master/karyawan/{e.E.EmployeeId}")" class="fw-medium text-ink text-decoration-none remah">@e.Nama</a>
+                <span class="tnum d-block fs-11-5 text-ink-3">@e.Kode</span>
+            </span> },
+        new() { Key = "jenis", Header = "Jenis", Sortable = true, Width = "96px", Render = e => @<Badge Tone="@(e.Jenis == JenisPiutang ? "critical" : "good")">@LabelJenisPiutang(e.Jenis)</Badge> },
+        new() { Key = "notes", Header = "Keterangan", Render = e => KetMutasi(e) },
+        new() { Key = "piutang", Header = "Piutang", Align = "right", Width = "128px", Render = e => @<span>@if (e.Nilai < 0) { <NilaiPiutang Nilai="e.Nilai" /> }</span> },
+        new() { Key = "lunas", Header = "Lunas", Align = "right", Width = "128px", Render = e => @<span>@if (e.Nilai > 0) { <NilaiPiutang Nilai="e.Nilai" /> }</span> },
+        new() { Key = "attachments", Header = "Bukti", Width = "96px", Render = e => @<LampiranThumbs Ids="e.E.Attachments" Ukuran="28" /> },
+        new() { Key = "action", Header = "Action", Align = "right", Width = "96px", NoPrint = true, Render = e => AksiMutasi(e) },
+    ];
+
+    private RenderFragment KetMutasi(BarisMutasi e)
+    {
+        var t = e.E.TripId != "" ? Db.Cari<Trip>(e.E.TripId) : null;
+        return @<span class="d-block lh-sm" style="max-width:360px">
+            <span class="text-ink-2">@JenisKasbon.Label(e.E.Kind)</span>
+            @if (t is not null)
+            {
+                <span> · </span><a href="@TautanTrip(e.E)" class="tnum fw-medium text-decoration-none remah" style="color:var(--brand-700)">Trip @t.TransactionNo</a>
+            }
+            @if (e.E.Notes != "") { <span class="d-block fs-12 text-ink-3">@e.E.Notes</span> }
+        </span>;
+    }
+
+    private RenderFragment AksiMutasi(BarisMutasi e) =>
+        @<div class="d-flex justify-content-end gap-1">
+            @if (e.E.TripId != "")
+            {
+                <TombolIkon Label="@(e.E.Kind == JenisKasbon.Trip ? "Otomatis dari termin uang jalan trip" : "Otomatis dari pembatalan trip")" Icon="Ikon.Link" Size="13" OnClick="() => Ke(TautanTrip(e.E))" />
+            }
+            else
+            {
+                <TombolIkon Label="Ubah" Icon="Ikon.Pen" Disabled="@(!BisaUbahMutasi(e.E))" OnClick="() => BukaUbah(e.E)" />
+                <TombolIkon Label="Hapus" Tone="danger" Icon="Ikon.TrashCan" Disabled="@(!BisaUbahMutasi(e.E))" OnClick="() => _menghapus = e.E" />
+            }
+        </div>;
+
+    /* ── Tambah / Ubah transaksi ── */
+
+    private void PilihKaryawanForm(string? v) { if (_form is null) return; _form.Karyawan = v ?? ""; _galatForm.Remove("karyawan"); }
+    private void UbahJumlahForm(long v) { if (_form is null) return; _form.Jumlah = v; _galatForm.Remove("jumlah"); }
+
+    private void BukaTambah() { _editing = null; _galatForm.Clear(); _form = new FormTransaksi(); }
+
+    private void BukaUbah(MutasiKasbon e)
+    {
+        _editing = e; _galatForm.Clear();
+        _form = new FormTransaksi { Karyawan = e.EmployeeId, Jenis = Kasbon.JenisPiutang(e), Jumlah = Math.Abs(e.Amount), Tanggal = e.EntryDate, Catatan = e.Notes, Bukti = [.. e.Attachments] };
+    }
+
+    /// <summary>Saldo karyawan terpilih (sisi karyawan) tanpa transaksi yang sedang diubah, dan sesudah disimpan.</summary>
+    private long SaldoSebelum => _form is null || _form.Karyawan == "" ? 0
+        : Kasbon.SisiKaryawan(Db.SaldoKasbon.GetValueOrDefault(_form.Karyawan)) - (_editing is not null ? Kasbon.SisiKaryawan(_editing.Amount) : 0);
+    private long SaldoSesudah => _form is null ? 0 : SaldoSebelum + (_form.Jenis == JenisPiutang ? -_form.Jumlah : _form.Jumlah);
+
+    private void SimpanForm()
+    {
+        if (_form is null) return;
+        var f = _form;
+        _galatForm.Clear();
+        if (f.Karyawan == "") _galatForm["karyawan"] = "Pilih karyawan.";
+        if (f.Jumlah <= 0) _galatForm["jumlah"] = "Jumlah harus lebih dari 0.";
+        if (f.Tanggal == "") _galatForm["tanggal"] = "Tanggal wajib diisi.";
+        // Pelunasan tidak boleh melebihi piutang: saldo karyawan tidak boleh menjadi plus.
+        if (!_galatForm.ContainsKey("jumlah") && f.Jenis == JenisLunas && SaldoSesudah > 0)
+            _galatForm["jumlah"] = SaldoSebelum < 0 ? $"Pelunasan melebihi sisa piutang ({Format.Rupiah(-SaldoSebelum)})." : "Karyawan ini tidak punya piutang untuk dilunasi.";
+        if (_galatForm.Count > 0) return;
+
+        // Sumber: Piutang = kasbon, Lunas = pelunasan langsung. Jenis lama (penyesuaian) tetap jenisnya.
+        var kind = _editing?.Kind == JenisKasbon.Manual ? JenisKasbon.Manual : f.Jenis == JenisPiutang ? JenisKasbon.Admin : JenisKasbon.Lunas;
+        var amount = f.Jenis == JenisPiutang ? f.Jumlah : -f.Jumlah;
+        var nama = Db.Semua.Karyawan.FirstOrDefault(d => d.Id == f.Karyawan)?.DriverName ?? "karyawan";
+        if (_editing is not null)
+        {
+            Db.Ubah<MutasiKasbon>(_editing.Id, e => { e.EmployeeId = f.Karyawan; e.EntryDate = f.Tanggal; e.Kind = kind; e.Amount = amount; e.Notes = f.Catatan.Trim(); e.Attachments = [.. f.Bukti]; });
+            Toast.Sukses("Transaksi berhasil diperbarui.");
+        }
+        else
+        {
+            Db.Buat(new MutasiKasbon { EmployeeId = f.Karyawan, EntryDate = f.Tanggal, Kind = kind, Amount = amount, Notes = f.Catatan.Trim(), Attachments = [.. f.Bukti], TripId = "", UjPaymentId = "" });
+            Toast.Sukses($"{LabelJenisPiutang(f.Jenis)} {Format.Rupiah(f.Jumlah)} untuk {nama} tersimpan.");
+        }
+        _form = null;
+    }
+
+    private string PesanHapus => _menghapus is null ? "" : $"{LabelJenisPiutang(Kasbon.JenisPiutang(_menghapus))} senilai {Format.Rupiah(Math.Abs(_menghapus.Amount))} akan dihapus dan saldo karyawan ikut menyesuaikan.";
+
+    private void HapusMutasi()
+    {
+        if (_menghapus is null) return;
+        var s = Kasbon.SisiKaryawan(Db.SaldoKasbon.GetValueOrDefault(_menghapus.EmployeeId)) - Kasbon.SisiKaryawan(_menghapus.Amount);
+        if (s > 0)
+        {
+            Toast.Galat($"Tidak bisa dihapus: piutang ini sudah dilunasi, saldo karyawan akan menjadi lebih bayar {Format.Rupiah(s)}.");
+            _menghapus = null;
+            return;
+        }
+        // Berkas bukti dibersihkan otomatis saat aplikasi dimuat (sudah tidak dirujuk record mana pun).
+        Db.Hapus<MutasiKasbon>(_menghapus.Id);
+        Toast.Sukses("Transaksi berhasil dihapus.");
+        _menghapus = null;
+    }
+
+    /* ── Cetak & export ── */
+
+    private bool CekSiap()
+    {
+        if (PeriodeSalah) { _galat = "Tanggal awal tidak boleh lebih besar dari tanggal akhir."; return false; }
+        if (_rows.Count == 0)
+        {
+            _galat = "Tidak ada karyawan yang cocok dengan periode dan filter ini.";
+            Toast.Info("Tidak ada data untuk ditampilkan.");
+            return false;
+        }
+        _galat = null;
+        return true;
+    }
+
+    private void BukaCetak() { if (CekSiap()) _preview = true; }
+
+    private async Task ExportCsv()
+    {
+        if (!CekSiap()) return;
+        static string Sel(object v) => $"\"{v.ToString()!.Replace("\"", "\"\"")}\"";
+        var kolom = new[] { "No.", "Kode", "Nama", "Peran", "Saldo Awal", "Piutang", "Lunas", "Saldo Akhir", "Keterangan" };
+        var baris = _rows.Select((r, i) => string.Join(';', new object[]
+        {
+            i + 1, r.Kode, r.Nama, r.Peran, r.Awal, r.Piutang, r.Lunas, r.Akhir,
+            string.Join("; ", new[] { !r.Terdaftar ? "Karyawan sudah dihapus" : "", r.Nonaktif ? "Nonaktif" : "", r.LebihBayar != "" ? $"Pernah lebih bayar sejak {Format.Tanggal(r.LebihBayar)}" : "" }.Where(x => x != "")),
+        }.Select(Sel)));
+        var jumlah = string.Join(';', new object[] { "", "", $"Total {_rows.Count} karyawan", "", _total.Awal, _total.Piutang, _total.Lunas, _total.Akhir, "" }.Select(Sel));
+        // BOM supaya Excel membaca huruf dengan benar; pemisah titik koma untuk Excel berbahasa Indonesia.
+        var isi = "﻿" + string.Join("\r\n", new[] { string.Join(';', kolom.Select(Sel)) }.Concat(baris).Append(jumlah));
+        await Simpan.UnduhAsync($"piutang-karyawan-{AwalBerlaku}-sd-{AkhirBerlaku}.csv", isi, "text/csv;charset=utf-8");
+        Toast.Sukses($"{_rows.Count} karyawan diexport ({PeriodeTeks}).");
+    }
+}

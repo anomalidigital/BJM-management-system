@@ -1,0 +1,42 @@
+@* Tombol Bootstrap dengan ikon & keadaan memuat. Varian: primary | secondary | ghost | danger | outlineDanger | subtle *@
+<button type="@Type" class="btn @KelasVarian @(Size == "sm" ? "btn-sm" : "") d-inline-flex align-items-center gap-2 @Class"
+        disabled="@(Disabled || Loading)" title="@Title" aria-label="@AriaLabel" style="@Style" @attributes="Lainnya"
+        @onclick="OnClick" @onclick:stopPropagation="StopPropagation">
+    @if (Loading)
+    {
+        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+    }
+    else if (Icon is not null)
+    {
+        <IkonSvg Def="Icon" Size="@IconSize" />
+    }
+    @ChildContent
+</button>
+
+@code {
+    [Parameter] public string Variant { get; set; } = "secondary";
+    [Parameter] public string Size { get; set; } = "md";
+    [Parameter] public string Type { get; set; } = "button";
+    [Parameter] public IkonDef? Icon { get; set; }
+    [Parameter] public int IconSize { get; set; } = 15;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? Style { get; set; }
+    [Parameter] public bool StopPropagation { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? Lainnya { get; set; }
+
+    private string KelasVarian => Variant switch
+    {
+        "primary" => "btn-primary",
+        "danger" => "btn-danger",
+        "outlineDanger" => "btn-outline-danger",
+        "ghost" => "btn-link text-decoration-none text-ink-2",
+        "subtle" => "btn-light border",
+        _ => "btn-outline-secondary bg-white text-ink border-hairline",
+    };
+}

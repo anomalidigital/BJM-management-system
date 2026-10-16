@@ -1,0 +1,67 @@
+@* Isian komisi dengan pemilih satuan menempel di kiri kolom angka: Rp untuk nominal tetap, % untuk bagian dari target. *@
+<div class="input-group" role="group" aria-label="Satuan komisi">
+    @foreach (var u in new[] { "rp", "persen" })
+    {
+        var uu = u;
+        <button type="button" aria-pressed="@(Unit == uu ? "true" : "false")" class="btn fs-12 fw-semibold px-2 @(Unit == uu ? "btn-primary" : "btn-outline-secondary")"
+                @onclick="() => GantiSatuan(uu)">@(uu == "rp" ? "Rp" : "%")</button>
+    }
+    <input id="@Id" inputmode="decimal" class="form-control tnum text-end @(Invalid ? "is-invalid" : "")" value="@Teks" @oninput="Ketik" />
+</div>
+@if (Persen)
+{
+    <p class="m-0 mt-1 fs-12 text-ink-3">
+        @if (Target > 0)
+        {
+            <span>Setara <span class="tnum fw-semibold text-ink-2">@Format.Rupiah((long)Math.Round(Value / 100 * Target, MidpointRounding.AwayFromZero))</span> dari target awal @Format.Rupiah(Target)</span>
+        }
+        else
+        {
+            <text>Isi target awal dulu supaya nilai persennya bisa dihitung.</text>
+        }
+    </p>
+}
+
+@code {
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public double Value { get; set; }
+    /// <summary>rp | persen</summary>
+    [Parameter] public string Unit { get; set; } = "rp";
+    /// <summary>Dasar konversi Rp ↔ persen (target awal tingkat ini).</summary>
+    [Parameter] public long Target { get; set; }
+    [Parameter] public bool Invalid { get; set; }
+    /// <summary>Nilai dan satuan baru sekaligus.</summary>
+    [Parameter] public EventCallback<(double Nilai, string Satuan)> OnUbah { get; set; }
+
+    private bool Persen => Unit == "persen";
+
+    /// <summary>10.5 → "10,5" mengikuti penulisan angka Indonesia.</summary>
+    public static string TulisAngka(double v) => v.ToString("0.##########", System.Globalization.CultureInfo.InvariantCulture).Replace('.', ',');
+
+    private string Teks => Persen ? TulisAngka(Value) : Value == 0 ? "" : Format.Angka((long)Math.Round(Value));
+
+    /// <summary>"10,5%" → 10.5; selain angka & pemisah desimal dibuang.</summary>
+    public static double BacaDesimal(string? mentah)
+    {
+        var s = new string((mentah ?? "").Replace(',', '.').Where(c => char.IsDigit(c) || c == '.').ToArray());
+        return double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) && double.IsFinite(v) ? v : 0;
+    }
+
+    private Task Ketik(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString();
+        var v = Persen ? Math.Min(BacaDesimal(raw), 100) : Format.BacaUang(raw);
+        return OnUbah.InvokeAsync((v, Unit));
+    }
+
+    /// <summary>Ganti satuan ikut mengonversi angkanya lewat target, jadi nilai yang sudah diisi tidak hilang (TBD-16).</summary>
+    private Task GantiSatuan(string next)
+    {
+        if (next == Unit) return Task.CompletedTask;
+        if (Target == 0 || Value == 0) return OnUbah.InvokeAsync((0, next));
+        var v = next == "persen"
+            ? Math.Min(Math.Round(Value / Target * 10000, MidpointRounding.AwayFromZero) / 100, 100)
+            : Math.Round(Value / 100 * Target, MidpointRounding.AwayFromZero);
+        return OnUbah.InvokeAsync((v, next));
+    }
+}

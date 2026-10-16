@@ -1,0 +1,11 @@
+@* Baris: pencarian + Filter di kiri, tombol aksi di kanan. *@
+<div class="no-print d-flex flex-wrap align-items-center justify-content-between gap-3 border-bottom border-hairline px-3 py-2 @Class">
+    <div class="d-flex flex-wrap align-items-center gap-2">@Left</div>
+    <div class="d-flex flex-wrap align-items-center gap-2">@Right</div>
+</div>
+
+@code {
+    [Parameter] public RenderFragment? Left { get; set; }
+    [Parameter] public RenderFragment? Right { get; set; }
+    [Parameter] public string? Class { get; set; }
+}

@@ -1,0 +1,35 @@
+@* Peringkat supir menurut jumlah ritan bulan ini. Nomor urut memang peringkat. *@
+@{ var tertinggi = Math.Max(1, Rows.Count == 0 ? 0 : Rows.Max(r => r.Ritan)); }
+<Panel Title="Ritan supir" Subtitle="@($"Supir dengan trip terbanyak, {Bulan}.")" Href="laporan/ritan" Tautan="Cek ritan">
+    @if (Rows.Count == 0)
+    {
+        <p class="m-0 dash-px fs-13 text-ink-3" style="padding-bottom:1.5rem">Belum ada trip bulan ini.</p>
+    }
+    else
+    {
+        <ol class="list-unstyled m-0 dash-px d-flex flex-column gap-3" style="padding-bottom:1.25rem">
+            @for (var i = 0; i < Rows.Count; i++)
+            {
+                var r = Rows[i];
+                <li @key="r.Id" class="dash-ritan-baris">
+                    <span class="tnum dash-rail fs-15 text-ink-3">@(i + 1)</span>
+                    <div class="min-w-0">
+                        <div class="d-flex align-items-baseline justify-content-between gap-2">
+                            <span class="text-truncate dash-fs-13-5 fw-medium text-ink">@r.Nama</span>
+                            @if (r.Keterangan != "") { <span class="tnum flex-shrink-0 fs-11-5 text-ink-3">@r.Keterangan</span> }
+                        </div>
+                        <div class="dash-pita mt-1" aria-hidden="true">
+                            <div style="width:@(((double)r.Ritan / tertinggi * 100).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture))%;background:var(--nav-700)"></div>
+                        </div>
+                    </div>
+                    <span class="tnum dash-rail dash-fs-20 lh-1 text-ink">@Format.Angka(r.Ritan)<span class="fs-11-5 fw-medium text-ink-3" style="margin-left:2px">rit</span></span>
+                </li>
+            }
+        </ol>
+    }
+</Panel>
+
+@code {
+    [Parameter] public List<BarisRitan> Rows { get; set; } = [];
+    [Parameter] public string Bulan { get; set; } = "";
+}

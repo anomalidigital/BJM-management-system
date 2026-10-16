@@ -1,0 +1,336 @@
+@*
+    Komisi → tab Aturan (dulu menu Master Data → Aturan Komisi). Satu pengaturan = satu peran (supir / manager) dengan
+    beberapa tingkat target. Hanya Owner (izin "komisi") yang boleh menambah, mengubah, menghapus, dan mengaktifkan /
+    menonaktifkan aturan; peran lain hanya melihat (tombolnya mati).
+*@
+@inherits KomponenData
+
+<p class="mb-3 px-1 fs-13 text-ink-2" style="max-width:48rem;line-height:1.6">
+    Aturan komisi menentukan besar komisi supir dan manager. Komisi setiap trip dihitung otomatis: sistem memakai
+    aturan aktif yang cocok dengan peran, layanan, dan jenis kendaraan trip itu, lalu memilih tingkat sesuai nilai
+    dasarnya (biasanya harga trip). Hasilnya langsung tampil di detail trip dan laporan komisi.
+</p>
+
+<Kartu>
+    <Toolbar>
+        <Left>
+            <PanelFilter T="FilterAturan" Filter="_filter" Chips="Chips">
+                <Field Label="Aturan untuk">
+                    <Pilihan Id="@context" Options="OpsiPeranFilter" Value="@_filter.Draf.Peran" ValueChanged="v => _filter.Ubah(d => d.Peran = v ?? string.Empty)" Cari="false" Clearable="false" />
+                </Field>
+            </PanelFilter>
+        </Left>
+        <Right>
+            <span class="fs-12-5 text-ink-3">@Db.Data.AturanKomisi.Count pengaturan komisi</span>
+            <Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Boleh)" OnClick="BukaTambah">Tambah Komisi</Tombol>
+        </Right>
+    </Toolbar>
+    <DataTable T="AturanKomisi" Columns="Kolom" Rows="Baris" RowKey="s => s.Id" IsFiltered="@(_filter.Nilai.Peran != "")" SkeletonCols="7">
+        <Empty><EmptyState Entity="aturan komisi" /></Empty>
+        <NotFound><NotFoundState OnReset="_filter.LepasSemua" /></NotFound>
+    </DataTable>
+</Kartu>
+
+<Modal Open="_form is not null" Title="@(_editing is not null ? "Ubah Komisi" : "Pengaturan Komisi")" Size="lg" OnClose="() => _form = null"
+       Subtitle="Komisi tiap trip dihitung otomatis dari aturan yang paling cocok dengan peran, layanan, dan kendaraannya.">
+    <ChildContent>
+        @if (_form is not null)
+        {
+            var f = _form;
+            var coba = Logika.Komisi.Terapkan(f, _coba);
+            @* Ringkas tanpa scroll (Baldy 14 Okt 2026): penjelasan dipadatkan, tiap tingkat satu baris. *@
+            <div class="d-flex flex-column" style="gap:.875rem">
+                <div class="row g-3 align-items-start">
+                    <div class="col-12 col-sm-auto" style="min-width:170px;max-width:100%">
+                        <Field Label="Untuk" Required>
+                            <Pilihan Id="@context" Options="OpsiPeran" Value="@f.Role" ValueChanged="v => f.Role = v ?? PeranKaryawan.Sopir" Cari="false" Clearable="false" AriaLabel="Aturan untuk peran" />
+                        </Field>
+                    </div>
+                    <div class="col">
+                        <Field Label="Nama" Required Error="@_galatNama">
+                            <input id="@context" class="form-control @(_galatNama is not null ? "is-invalid" : "")" value="@f.Name" placeholder="Komisi Supir" @oninput="e => f.Name = e.Value?.ToString() ?? string.Empty" />
+                        </Field>
+                    </div>
+                    <div class="col-12 col-sm-auto mt-sm-4 pt-sm-3">
+                        <Checkbox Label="Aktif" Title="Aturan aktif dipakai untuk menghitung komisi trip" Checked="f.IsActive" CheckedChanged="v => f.IsActive = v" />
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-12 col-sm-4">
+                        <Field Label="Layanan">
+                            <Pilihan Id="@context" Options="OpsiLayanan" Value="@f.ServiceType" ValueChanged="v => f.ServiceType = v ?? TipeKlien.Callout" Cari="false" Clearable="false" />
+                        </Field>
+                    </div>
+                    <div class="col-12 col-sm-4">
+                        <Field Label="Dasar hitung">
+                            <Pilihan Id="@context" Options="OpsiDasar" Value="@f.Basis" ValueChanged="v => f.Basis = v ?? DasarKomisi.Nilai" Cari="false" Clearable="false" />
+                        </Field>
+                    </div>
+                    <div class="col-12 col-sm-4">
+                        <Field Label="Potongan dasar (%)">
+                            <input id="@context" inputmode="decimal" class="form-control tnum text-end" value="@NilaiKomisi.TulisAngka(f.BaseDeductionPct)"
+                                   @oninput="e => f.BaseDeductionPct = Math.Min(NilaiKomisi.BacaDesimal(e.Value?.ToString()), 100)" />
+                        </Field>
+                    </div>
+                    <div class="col-12 mt-2">
+                        <p class="form-text m-0">@PenjelasanDasar(f.Basis) Potongan dasar dikurangkan dulu sebelum dicari tingkatnya, mis. 5 untuk (nilai − 5%).</p>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="form-label">
+                        Jenis kendaraan
+                        <span class="fw-normal text-ink-3">· @(f.Configurations.Count > 0 ? $"berlaku untuk {string.Join(", ", f.Configurations)}" : "tidak ada yang dipilih = semua kendaraan")</span>
+                    </p>
+                    <div class="d-flex flex-wrap" style="gap:.375rem">
+                        @foreach (var k in KonfigurasiKendaraan.Semua)
+                        {
+                            var kk = k; var aktif = f.Configurations.Contains(kk);
+                            <button type="button" aria-pressed="@(aktif ? "true" : "false")" class="btn btn-sm fs-12 fw-semibold px-2 py-1 @(aktif ? "btn-outline-primary active" : "btn-outline-secondary bg-white text-ink-3 border-hairline")"
+                                    @onclick="() => ToggleKendaraan(kk)">@kk</button>
+                        }
+                    </div>
+                </div>
+
+                <div>
+                    <div aria-hidden="true" class="form-label d-none d-sm-grid" style="@KolomTingkat">
+                        <span>#</span>
+                        <span>Target Awal<span class="wajib">*</span></span>
+                        <span>Target Akhir <span class="fw-normal text-ink-3">(0 = tanpa batas)</span></span>
+                        <span>Komisi<span class="wajib">*</span></span>
+                        <span></span>
+                    </div>
+                    <div class="d-flex flex-column gap-2">
+                        @for (var i = 0; i < f.Tiers.Count; i++)
+                        {
+                            var ii = i; var t = f.Tiers[ii]; var no = ii + 1;
+                            var galat = _galatTingkat.GetValueOrDefault(ii);
+                            <div>
+                                <div class="d-grid align-items-start" style="@KolomTingkat">
+                                    <span class="fs-12-5 fw-semibold text-ink-3" style="padding-top:.625rem">@no</span>
+                                    <div>
+                                        <label for="@($"{_idForm}-awal-{ii}")" class="visually-hidden">Target Awal tingkat @no</label>
+                                        <UangInput Id="@($"{_idForm}-awal-{ii}")" Value="t.TargetAwal" ValueChanged="v => t.TargetAwal = v" />
+                                    </div>
+                                    <div>
+                                        <label for="@($"{_idForm}-akhir-{ii}")" class="visually-hidden">Target Akhir tingkat @no</label>
+                                        <UangInput Id="@($"{_idForm}-akhir-{ii}")" Value="t.TargetAkhir" ValueChanged="v => t.TargetAkhir = v" />
+                                    </div>
+                                    <div>
+                                        <label for="@($"{_idForm}-komisi-{ii}")" class="visually-hidden">Komisi tingkat @no</label>
+                                        <NilaiKomisi Id="@($"{_idForm}-komisi-{ii}")" Value="t.Commission" Unit="@t.CommissionUnit" Target="@(t.TargetAwal != 0 ? t.TargetAwal : t.TargetAkhir)"
+                                                     Invalid="@(galat is not null)" OnUbah="x => { t.Commission = x.Nilai; t.CommissionUnit = x.Satuan; }" />
+                                    </div>
+                                    @if (f.Tiers.Count > 1)
+                                    {
+                                        <button type="button" class="btn btn-link p-0 text-ink-3 d-grid place-center" style="height:37px;width:32px" aria-label="@($"Hapus tingkat {no}")" title="Hapus tingkat"
+                                                @onclick="() => f.Tiers.RemoveAt(ii)"><IkonSvg Def="Ikon.Xmark" Size="14" /></button>
+                                    }
+                                    else
+                                    {
+                                        <span></span>
+                                    }
+                                </div>
+                                @if (galat is not null) { <p class="m-0 mt-1 fs-12 fw-medium" style="color:var(--critical)">@galat</p> }
+                            </div>
+                        }
+                    </div>
+                    <Tombol Size="sm" Variant="ghost" Icon="Ikon.Plus" IconSize="13" Class="mt-2" OnClick="TambahTingkat">Tambah tingkat</Tombol>
+                </div>
+
+                <div class="d-flex flex-wrap align-items-center rounded-2 border border-brand-100 px-3 py-2" style="column-gap:.75rem;row-gap:.5rem;background:color-mix(in srgb, var(--brand-50) 60%, transparent)">
+                    <label for="@($"{_idForm}-coba")" class="fs-12 fw-semibold m-0" style="color:var(--brand-800)">Coba hitung</label>
+                    <div style="width:170px"><UangInput Id="@($"{_idForm}-coba")" Value="_coba" ValueChanged="v => _coba = v" /></div>
+                    <p class="m-0 min-w-0 flex-fill fs-12-5" style="color:var(--brand-800)">
+                        @if (coba.Tingkat is not null)
+                        {
+                            <span>Masuk tingkat <span class="tnum fw-semibold">@Logika.Komisi.TulisRentang(coba.Tingkat)</span> → komisi <span class="tnum fw-semibold">@Format.Rupiah(coba.Nilai)</span></span>
+                        }
+                        else
+                        {
+                            <span>Tidak masuk tingkat mana pun, jadi tidak dapat komisi.</span>
+                        }
+                        @if (f.BaseDeductionPct > 0 && coba.Dasar > 0) { <span> (dasar setelah potongan @Format.Rupiah(coba.Dasar))</span> }
+                    </p>
+                </div>
+
+                <Field Label="Catatan">
+                    <textarea id="@context" rows="2" class="form-control" style="resize:vertical" placeholder="Keterangan tambahan, mis. syarat komisi atau masa berlaku."
+                              value="@f.Notes" @oninput="e => f.Notes = e.Value?.ToString() ?? string.Empty"></textarea>
+                </Field>
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="() => _form = null">Batal</Tombol>
+        <Tombol Variant="primary" OnClick="Simpan">Simpan</Tombol>
+    </Footer>
+</Modal>
+
+<KonfirmasiDialog Open="_deleting is not null" Title="Hapus Data?" Message="Data yang sudah dihapus mungkin tidak dapat dikembalikan." ConfirmLabel="Hapus" Tone="danger"
+                  OnCancel="() => _deleting = null" OnConfirm="Hapus">
+    <span class="mt-2 d-block fs-13 fw-medium text-ink">@_deleting?.Name</span>
+</KonfirmasiDialog>
+
+@code {
+    public sealed class FilterAturan { public string Peran { get; set; } = ""; }
+
+    private const string KolomTingkat = "grid-template-columns:28px 1fr 1fr 1.35fr 32px;column-gap:.625rem;row-gap:.375rem";
+
+    private KendaliFilter<FilterAturan> _filter = default!;
+    private AturanKomisi? _form;
+    private AturanKomisi? _editing;
+    private AturanKomisi? _deleting;
+    private string? _galatNama;
+    private Dictionary<int, string> _galatTingkat = [];
+    private long _coba = 15_000_000;
+    private readonly string _idForm = "komisi-" + Guid.NewGuid().ToString("N")[..6];
+
+    private bool Boleh => Bisa("komisi");
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _filter = new KendaliFilter<FilterAturan>(() => new FilterAturan(), StateHasChanged);
+    }
+
+    /// <summary>Nama peran di layar memakai istilah "Supir"; kode datanya tetap sopir.</summary>
+    private static string LabelPeran(string? r) => PeranKaryawan.Label(string.IsNullOrEmpty(r) ? PeranKaryawan.Sopir : r);
+    private static string LabelLayanan(string? l) => l == "semua" ? "Semua layanan" : TipeKlien.Label(string.IsNullOrEmpty(l) ? TipeKlien.Callout : l);
+    private static string TulisKomisi(double nilai, string unit) => unit == "persen" ? $"{NilaiKomisi.TulisAngka(nilai)}%" : Format.Rupiah(nilai);
+
+    /// <summary>Penjelasan dasar hitung, ditampilkan di bawah pilihan.</summary>
+    private static string PenjelasanDasar(string d) => d switch
+    {
+        DasarKomisi.Uj => "Uang jalan rute (Uang Jalan Rute); bila kosong memakai total uang jalan yang dibayar.",
+        DasarKomisi.Kontrak => "Nilai kontrak Dedicated, dihitung per kontrak (bukan per trip).",
+        _ => "Harga yang diisi di trip; bila kosong memakai Harga Rute.",
+    };
+
+    private List<Opsi> OpsiPeranFilter => [new("", "Semua peran"), .. PeranKaryawan.Semua.Select(r => new Opsi(r, LabelPeran(r)))];
+    private static List<Opsi> OpsiPeran => PeranKaryawan.Semua.Select(r => new Opsi(r, LabelPeran(r))).ToList();
+    private static List<Opsi> OpsiLayanan => [.. TipeKlien.Semua.Select(l => new Opsi(l, LabelLayanan(l))), new("semua", LabelLayanan("semua"))];
+    private static List<Opsi> OpsiDasar => DasarKomisi.Semua.Select(d => new Opsi(d, DasarKomisi.Label(d))).ToList();
+
+    private List<AturanKomisi> Baris => Db.Data.AturanKomisi.Where(s => _filter.Nilai.Peran == "" || (string.IsNullOrEmpty(s.Role) ? PeranKaryawan.Sopir : s.Role) == _filter.Nilai.Peran).ToList();
+
+    private List<ChipFilter> Chips => _filter.Nilai.Peran == "" ? [] : [new($"Untuk: {LabelPeran(_filter.Nilai.Peran)}", () => _filter.Lepas((n, a) => n.Peran = a.Peran))];
+
+    private List<Kolom<AturanKomisi>> Kolom =>
+    [
+        new() { Key = "name", Header = "Nama", Render = s => @<div class="lh-tight">
+                <span class="fw-medium text-ink">@s.Name</span>
+                <span class="mt-1 d-block fs-12 text-ink-3">@DasarKomisi.Label(s.Basis)@(s.BaseDeductionPct != 0 ? $" · potong {NilaiKomisi.TulisAngka(s.BaseDeductionPct)}%" : "")</span>
+            </div> },
+        new() { Key = "role", Header = "Untuk", Width = "110px", Render = s => @<Badge Tone="@(s.Role == PeranKaryawan.Manager ? "brand" : "neutral")">@LabelPeran(s.Role)</Badge> },
+        new() { Key = "configurations", Header = "Berlaku", Width = "190px", Render = s => @<div class="lh-tight">
+                <span class="fs-12-5 text-ink-2">@LabelLayanan(s.ServiceType)</span>
+                <span class="mt-1 d-block fs-12 text-ink-3">@(s.Configurations.Count > 0 ? string.Join(", ", s.Configurations) : "Semua kendaraan")</span>
+            </div> },
+        new() { Key = "tiers", Header = "Target", Width = "280px", Render = s => @<ul class="list-unstyled m-0 tnum fs-12-5 d-flex flex-column gap-1">
+                @foreach (var t in s.Tiers) { <li class="text-ink-2">@Logika.Komisi.TulisRentang(t)</li> }
+            </ul> },
+        new() { Key = "commission", Header = "Komisi", Align = "right", Width = "160px", Render = s => @<ul class="list-unstyled m-0 tnum fs-12-5 d-flex flex-column gap-1">
+                @foreach (var t in s.Tiers) { <li class="fw-semibold text-ink">@TulisKomisi(t.Commission, t.CommissionUnit)</li> }
+            </ul> },
+        new() { Key = "is_active", Header = "Status", Width = "100px", Render = s => @<Badge Tone="@(s.IsActive ? "good" : "neutral")">@(s.IsActive ? "Aktif" : "Nonaktif")</Badge> },
+        new() { Key = "action", Header = "Action", Align = "right", Width = "92px", NoPrint = true, Render = s => @<div class="d-flex justify-content-end gap-1">
+                <TombolIkon Label="Ubah" Icon="Ikon.Pen" Disabled="@(!Boleh)" OnClick="() => BukaUbah(s)" />
+                <TombolIkon Label="Hapus" Tone="danger" Icon="Ikon.TrashCan" Disabled="@(!Boleh)" OnClick="() => _deleting = s" />
+            </div> },
+    ];
+
+    private static TingkatKomisi TingkatKosong() => new() { TargetAwal = 0, TargetAkhir = 0, Commission = 0, CommissionUnit = "rp" };
+
+    private void BukaTambah()
+    {
+        if (!Boleh) return;
+        _editing = null;
+        _form = new AturanKomisi { Name = "", Role = PeranKaryawan.Sopir, ServiceType = TipeKlien.Callout, Configurations = [], Basis = DasarKomisi.Nilai, BaseDeductionPct = 0, IsActive = true, Tiers = [TingkatKosong()], Notes = "" };
+        _galatNama = null; _galatTingkat = [];
+    }
+
+    private void BukaUbah(AturanKomisi s)
+    {
+        if (!Boleh) return;
+        _editing = s;
+        _form = new AturanKomisi
+        {
+            Name = s.Name, Role = string.IsNullOrEmpty(s.Role) ? PeranKaryawan.Sopir : s.Role, Notes = s.Notes,
+            ServiceType = string.IsNullOrEmpty(s.ServiceType) ? TipeKlien.Callout : s.ServiceType, Configurations = [.. s.Configurations],
+            Basis = string.IsNullOrEmpty(s.Basis) ? DasarKomisi.Nilai : s.Basis, BaseDeductionPct = s.BaseDeductionPct, IsActive = s.IsActive,
+            Tiers = s.Tiers.Count > 0 ? s.Tiers.Select(t => t.Salin()).ToList() : [TingkatKosong()],
+        };
+        _galatNama = null; _galatTingkat = [];
+    }
+
+    /// <summary>Tingkat baru melanjutkan dari target akhir tingkat terakhir.</summary>
+    private void TambahTingkat()
+    {
+        if (_form is null) return;
+        var akhir = _form.Tiers.LastOrDefault();
+        var mulai = akhir is null ? 0 : akhir.TargetAkhir != 0 ? akhir.TargetAkhir : akhir.TargetAwal;
+        _form.Tiers.Add(new TingkatKomisi { TargetAwal = mulai, TargetAkhir = 0, Commission = 0, CommissionUnit = akhir?.CommissionUnit ?? "rp" });
+    }
+
+    private void ToggleKendaraan(string k)
+    {
+        if (_form is null) return;
+        if (_form.Configurations.Contains(k)) _form.Configurations.Remove(k); else _form.Configurations.Add(k);
+    }
+
+    private void Simpan()
+    {
+        if (_form is null || !Boleh) return;
+        var f = _form;
+        var tingkat = new Dictionary<int, string>();
+        for (var i = 0; i < f.Tiers.Count; i++)
+        {
+            var t = f.Tiers[i];
+            if (t.TargetAkhir > 0 && t.TargetAkhir <= t.TargetAwal) tingkat[i] = "Target akhir harus lebih besar dari target awal.";
+            else if (t.Commission <= 0) tingkat[i] = "Komisi harus lebih dari 0.";
+        }
+        // Tingkat tidak boleh saling tumpang tindih.
+        var urut = f.Tiers.Select((t, i) => (t, i)).OrderBy(x => x.t.TargetAwal).ToList();
+        for (var k = 1; k < urut.Count; k++)
+        {
+            var sebelum = urut[k - 1];
+            if (sebelum.t.TargetAkhir == 0 || urut[k].t.TargetAwal < sebelum.t.TargetAkhir)
+                tingkat.TryAdd(urut[k].i, $"Rentang bertumpuk dengan tingkat {sebelum.i + 1}.");
+        }
+        _galatNama = f.Name.Trim() == "" ? "Nama wajib diisi." : null;
+        _galatTingkat = tingkat;
+        if (_galatNama is not null || tingkat.Count > 0) { Toast.Galat("Periksa kembali isian yang ditandai merah."); return; }
+
+        var tiers = urut.Select(x => x.t.Salin()).ToList();
+        var nama = f.Name.Trim(); var catatan = f.Notes.Trim();
+        if (_editing is not null)
+        {
+            Db.Ubah<AturanKomisi>(_editing.Id, s =>
+            {
+                s.Name = nama; s.Role = f.Role; s.ServiceType = f.ServiceType; s.Configurations = [.. f.Configurations]; s.Basis = f.Basis;
+                s.BaseDeductionPct = f.BaseDeductionPct; s.IsActive = f.IsActive; s.Tiers = tiers; s.Notes = catatan;
+            });
+            Toast.Sukses("Komisi berhasil diperbarui.");
+        }
+        else
+        {
+            Db.Buat(new AturanKomisi
+            {
+                Name = nama, Role = f.Role, ServiceType = f.ServiceType, Configurations = [.. f.Configurations], Basis = f.Basis,
+                BaseDeductionPct = f.BaseDeductionPct, IsActive = f.IsActive, Tiers = tiers, Notes = catatan,
+            });
+            Toast.Sukses("Komisi berhasil disimpan.");
+        }
+        _form = null;
+    }
+
+    private void Hapus()
+    {
+        if (_deleting is null || !Boleh) return;
+        Db.Hapus<AturanKomisi>(_deleting.Id);
+        Toast.Sukses("Komisi berhasil dihapus.");
+        _deleting = null;
+    }
+}

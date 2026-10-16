@@ -1,0 +1,219 @@
+@page "/laporan/pengeluaran"
+@inherits KomponenData
+@*
+    Laporan → Pengeluaran ("Rekap Pengeluaran", catatan atasan 12 Okt 2026). Seluruh filter (periode, jenis biaya) di satu
+    tombol Filter di kepala halaman (revisi 13 Okt 2026). Periode berlaku untuk ketiga bagian; tiap bagian memakai
+    tanggalnya sendiri (berangkat trip / bayar termin / tanggal nota). Tab, periode, dan pilihan tabel disimpan di alamat
+    halaman supaya kembali dari detail trip membuka tampilan yang sama.
+*@
+<PageTitle>Rekap Pengeluaran — SIKOTIS</PageTitle>
+@{ Susun(); }
+
+<PageHeader Title="Rekap Pengeluaran" Crumbs="@(new List<Crumb> { new("Laporan"), new("Pengeluaran") })">
+    <Description>Semua biaya terkait pengeluaran karena trip, dapat ditagihkan ke klien / perihal internal (terkait catatan kasbon/piutang, biaya lainnya).</Description>
+    <Actions>
+        <PanelFilter T="FilterPengeluaran" Filter="_filter" Chips="Chips" TampilChips="false" Galat="@Format.GalatRentang(_filter.Draf.Awal, _filter.Draf.Akhir)" Lebar="360">
+            <div>
+                <p class="form-label">Periode</p>
+                <div class="row g-2">
+                    <div class="col-6"><TanggalInput AriaLabel="Tanggal awal" Value="@_filter.Draf.Awal" ValueChanged="UbahAwal" /></div>
+                    <div class="col-6"><TanggalInput AriaLabel="Tanggal akhir" Value="@_filter.Draf.Akhir" ValueChanged="UbahAkhir" /></div>
+                </div>
+                <div class="mt-2 d-flex gap-2">
+                    <Tombol Size="sm" Variant="ghost" OnClick="() => AturBulan(0)">Bulan ini</Tombol>
+                    <Tombol Size="sm" Variant="ghost" OnClick="() => AturBulan(-1)">Bulan lalu</Tombol>
+                </div>
+            </div>
+            <Field Label="Jenis biaya (bagian Biaya Operasional)">
+                <Pilihan Id="@context" Options="OpsiJenis" Value="@_filter.Draf.Jenis" ValueChanged="v => _filter.Ubah(d => d.Jenis = v ?? string.Empty)" Cari="false" Clearable="false" />
+            </Field>
+        </PanelFilter>
+        <Tombol Variant="primary" Icon="Ikon.Print" Title="Cetak bagian yang sedang dibuka (ditampilkan dulu sebelum dicetak)" OnClick="BukaPreview">Cetak</Tombol>
+    </Actions>
+</PageHeader>
+<DaftarChipFilter Chips="Chips" OnLepasSemua="_filter.LepasSemua" Class="no-print mb-3" />
+@if ((GalatPeriode ?? _galat) is string g)
+{
+    <div class="no-print mb-3"><p class="invalid-feedback">@g</p></div>
+}
+
+<TabKartu Awalan="pengeluaran" Label="Bagian Rekap Pengeluaran" Items="KartuTab" Value="@TabAktif" ValueChanged="GantiTab" Class="no-print mb-3" />
+<div role="tabpanel" id="@($"pengeluaran-panel-{TabAktif}")" aria-labelledby="@($"pengeluaran-tab-{TabAktif}")" style="animation:inFade .16s ease-out" @key="TabAktif">
+    @if (TabAktif == "trip")
+    {
+        <PengeluaranPerTrip Rows="_trips" Awal="@AwalBerlaku" Akhir="@AkhirBerlaku" Preview="_preview" OnTutupPreview="TutupPreview" Tautan="TautanDari(TabAktif)" />
+    }
+    else if (TabAktif == "uj")
+    {
+        <PengeluaranUangJalan Termin="_termin" Awal="@AwalBerlaku" Akhir="@AkhirBerlaku" Tampil="@TampilUj" OnTampil="GantiTampil" Preview="_preview" OnTutupPreview="TutupPreview" Tautan="TautanDari(TabAktif)" />
+    }
+    else
+    {
+        <PengeluaranBiaya Nota="_nota" Dorong="_dorong" Awal="@AwalBerlaku" Akhir="@AkhirBerlaku" Jenis="@JenisBerlaku" Preview="_preview" OnTutupPreview="TutupPreview" Tautan="TautanDari(TabAktif)" />
+    }
+</div>
+
+@code {
+    public sealed class FilterPengeluaran
+    {
+        public string Awal { get; set; } = "";
+        public string Akhir { get; set; } = "";
+        public string Jenis { get; set; } = "";
+    }
+
+    private static readonly string[] TabIds = ["trip", "uj", "biaya"];
+
+    [SupplyParameterFromQuery(Name = "tab")] public string? QTab { get; set; }
+    [SupplyParameterFromQuery(Name = "tampil")] public string? QTampil { get; set; }
+    [SupplyParameterFromQuery(Name = "jenis")] public string? QJenis { get; set; }
+    [SupplyParameterFromQuery(Name = "awal")] public string? QAwal { get; set; }
+    [SupplyParameterFromQuery(Name = "akhir")] public string? QAkhir { get; set; }
+
+    private KendaliFilter<FilterPengeluaran> _filter = default!;
+    private bool _preview;
+    private string? _galat;
+    private List<BarisPengeluaran> _trips = [];
+    private List<TerminTrip> _termin = [];
+    private List<NotaTrip> _nota = [];
+    private List<(TerminUj P, BarisTrip Trip)> _dorong = [];
+
+    /// <summary>Periode bawaan sama dengan "Periode" di topbar dan laporan lain: bulan terakhir yang punya trip.</summary>
+    private Periode Bawaan => Periode.Aktif(Db.Baris.Select(t => t.T.TransactionDate));
+
+    private string TabAktif => TabIds.Contains(QTab) ? QTab! : "trip";
+    private string TampilUj => QTampil == "termin" ? "termin" : "supir";
+    private string JenisBerlaku => QJenis ?? "";
+    private string AwalBerlaku => LaporanLogika.Iso(QAwal) ? QAwal! : Bawaan.Awal;
+    private string AkhirBerlaku => LaporanLogika.Iso(QAkhir) ? QAkhir! : Bawaan.Akhir;
+
+    /// <summary>Periode terbalik langsung diberi tahu, tidak menunggu tombol Cetak.</summary>
+    private string? GalatPeriode => string.CompareOrdinal(AwalBerlaku, AkhirBerlaku) > 0 ? "Tanggal Awal tidak boleh lebih besar dari Tanggal Akhir." : null;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _filter = new KendaliFilter<FilterPengeluaran>(() => new FilterPengeluaran { Awal = Bawaan.Awal, Akhir = Bawaan.Akhir }, FilterBerubah);
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Filter yang berlaku selalu mengikuti alamat halaman.
+        var n = _filter.Nilai;
+        if (n.Awal != AwalBerlaku || n.Akhir != AkhirBerlaku || n.Jenis != JenisBerlaku)
+            _filter.Atur(f => { f.Awal = AwalBerlaku; f.Akhir = AkhirBerlaku; f.Jenis = JenisBerlaku; });
+    }
+
+    /// <summary>Isian panel diubah / diterapkan / dilepas: yang berlaku ditulis ke alamat halaman.</summary>
+    private void FilterBerubah()
+    {
+        var v = _filter.Nilai;
+        if (v.Awal != AwalBerlaku || v.Akhir != AkhirBerlaku || v.Jenis != JenisBerlaku)
+        {
+            _galat = null;
+            var bawaan = Bawaan;
+            var periodeBawaan = v.Awal == bawaan.Awal && v.Akhir == bawaan.Akhir;
+            UbahUrl(new Dictionary<string, object?>
+            {
+                ["awal"] = periodeBawaan ? null : v.Awal,
+                ["akhir"] = periodeBawaan ? null : v.Akhir,
+                ["jenis"] = v.Jenis != "" ? v.Jenis : null,
+            });
+        }
+        StateHasChanged();
+    }
+
+    private void UbahUrl(Dictionary<string, object?> ubah) => Nav.NavigateTo(Nav.GetUriWithQueryParameters(ubah), replace: true);
+
+    private void GantiTab(string t) { _galat = null; UbahUrl(new() { ["tab"] = t }); }
+    private void GantiTampil(string t) => UbahUrl(new() { ["tampil"] = t == "termin" ? t : null });
+
+    private void UbahAwal(string v) { if (v != "") _filter.Ubah(d => d.Awal = v); }
+    private void UbahAkhir(string v) { if (v != "") _filter.Ubah(d => d.Akhir = v); }
+
+    private void AturBulan(int geser)
+    {
+        var acuan = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1).AddMonths(geser);
+        _filter.Ubah(d => { d.Awal = Format.AwalBulan(acuan); d.Akhir = Format.AkhirBulan(acuan); });
+    }
+
+
+    /// <summary>Data periode untuk ketiga bagian, disusun di awal tiap render (Db.Baris sudah tersimpan sementara).</summary>
+    private void Susun()
+    {
+        var awal = AwalBerlaku; var akhir = AkhirBerlaku;
+        var tripById = Db.Baris.ToDictionary(t => t.Id);
+        _trips = LaporanLogika.TripPeriode(Db.Baris, awal, akhir);
+        _termin = LaporanLogika.TerminPeriode(Db.Data.Termin, tripById, Db.Data.Karyawan, awal, akhir);
+        _nota = LaporanLogika.NotaPeriode(Db.Data.Biaya, tripById, awal, akhir);
+        _dorong = LaporanLogika.UangDorongPeriode(Db.Data.Termin, tripById, awal, akhir);
+    }
+
+
+    private List<ChipFilter> Chips
+    {
+        get
+        {
+            var periodeBawaan = AwalBerlaku == Bawaan.Awal && AkhirBerlaku == Bawaan.Akhir;
+            var c = new List<ChipFilter> { new($"Periode {Format.RentangTanggal(AwalBerlaku, AkhirBerlaku)}", periodeBawaan ? null : () => _filter.Lepas((n, a) => { n.Awal = a.Awal; n.Akhir = a.Akhir; })) };
+            if (JenisBerlaku != "") c.Add(new($"Jenis biaya: {JenisBiaya.Label(JenisBerlaku)}", () => _filter.Lepas((n, a) => n.Jenis = a.Jenis)));
+            return c;
+        }
+    }
+
+    /// <summary>Jenis biaya yang ada di periode ini (pilihan filter bagian Biaya Operasional).</summary>
+    private List<Opsi> OpsiJenis
+    {
+        get
+        {
+            var daftar = _nota.Select(e => e.E.ExpenseType).Distinct().OrderBy(JenisBiaya.Label, StringComparer.CurrentCultureIgnoreCase);
+            return [new Opsi("", "Semua jenis"), .. daftar.Select(t => new Opsi(t, JenisBiaya.Label(t)))];
+        }
+    }
+
+    /// <summary>Tab detail trip yang dibuka dari tiap tab: Per Trip & Uang Jalan → Uang Jalan, Biaya → Biaya Operasional.</summary>
+    private Func<string, string> TautanDari(string dari) => tripId =>
+    {
+        var tab = dari == "biaya" ? "biaya" : "uj";
+        return $"transaksi/trip/{tripId}?dari=pengeluaran&dari_tab={dari}&awal={Uri.EscapeDataString(AwalBerlaku)}&akhir={Uri.EscapeDataString(AkhirBerlaku)}&tab={tab}";
+    };
+
+    private List<KartuTab> KartuTab
+    {
+        get
+        {
+            var keluar = _trips.Sum(t => t.Keluar); var uj = _termin.Sum(p => p.P.UjAmount); var biaya = _nota.Sum(e => e.E.Amount);
+            return [
+                new("trip", "Per Trip", Ikon.TruckFast, Format.RupiahRingkas(keluar), $"{Format.Angka(_trips.Count)} trip berangkat", $"Total keluar {Format.Rupiah(keluar)}"),
+                new("uj", "Uang Jalan", Ikon.Wallet, Format.RupiahRingkas(uj), $"{Format.Angka(_termin.Count)} termin dibayar", $"Uang jalan dibayar {Format.Rupiah(uj)}"),
+                new("biaya", "Biaya Operasional", Ikon.Receipt, Format.RupiahRingkas(biaya), $"{Format.Angka(_nota.Count)} nota biaya", $"Biaya operasional {Format.Rupiah(biaya)}"),
+            ];
+        }
+    }
+
+    private void BukaPreview()
+    {
+        if (GalatPeriode is string gp) { _galat = gp; return; }
+        var jenis = JenisBerlaku;
+        var n = TabAktif switch
+        {
+            "trip" => _trips.Count,
+            "uj" => _termin.Count,
+            _ => jenis != "" ? _nota.Count(e => e.E.ExpenseType == jenis) : _nota.Count,
+        };
+        if (n == 0)
+        {
+            _galat = TabAktif switch
+            {
+                "trip" => "Tidak ada trip pada periode tersebut.",
+                "uj" => "Tidak ada pembayaran uang jalan pada periode tersebut.",
+                _ => jenis != "" ? $"Tidak ada biaya jenis {JenisBiaya.Label(jenis)} pada periode tersebut." : "Tidak ada biaya pada periode tersebut.",
+            };
+            Toast.Info("Tidak ada data untuk ditampilkan.");
+            return;
+        }
+        _galat = null;
+        _preview = true;
+    }
+
+    private void TutupPreview() => _preview = false;
+}

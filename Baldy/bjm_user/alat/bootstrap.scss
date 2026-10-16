@@ -1,0 +1,114 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// Bootstrap 5 bertema SIKOTIS. Variabelnya sama dengan versi React (src/styles/bootstrap.scss).
+// Hasil kompilasi: bjm_user.Client/wwwroot/css/bootstrap.css  (npm run css)
+//
+// Gaya khusus SIKOTIS (tombol ghost/subtle, chip filter, panel filter, sidebar, dst.) TIDAK ditulis
+// di sini, tapi di bjm_user.Client/wwwroot/css/sikotis.css sebagai CSS biasa, supaya bisa diubah tanpa Node.
+// Warna brand ikut workspace lewat variabel --color-brand-* (lihat sikotis.css).
+// ═══════════════════════════════════════════════════════════════════════════
+
+@import "bootstrap/scss/functions";
+
+$primary:   #2a78d6;
+$secondary: #52514e;
+$success:   #0ca30c;
+$info:      #2a78d6;
+$warning:   #fab219;
+$danger:    #d03b3b;
+$light:     #f8f9fa;
+$dark:      #0b0b0b;
+
+$body-bg: #f4f5f7;
+$body-color: #0b0b0b;
+$border-color: #e4e5e9;
+$body-secondary-color: #898781;
+$font-family-sans-serif: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+$font-size-base: .8125rem; // 13px: ukuran isian, tombol, dan tabel
+$font-size-sm: .75rem;
+$line-height-base: 1.5;
+$border-radius: .375rem;
+$border-radius-sm: .3125rem;
+$border-radius-lg: .75rem;
+
+// Warna brand SIKOTIS (#2a78d6) berkontras 4,4:1 dengan putih; tanpa ini Bootstrap memilih teks hitam.
+$min-contrast-ratio: 3;
+
+$enable-shadows: false;
+$enable-gradients: false;
+$enable-dark-mode: false;
+
+// Isian & tombol: tinggi 36 px (kecil 32 px).
+$input-btn-padding-y: .4375rem;
+$input-btn-padding-x: .75rem;
+$input-btn-padding-y-sm: .3125rem;
+$input-btn-padding-x-sm: .625rem;
+$input-btn-font-size-sm: .8125rem;
+$input-btn-focus-width: .2rem;
+$btn-font-weight: 500;
+$input-border-color: $border-color;
+$input-placeholder-color: rgba(137, 135, 129, .75);
+$input-disabled-bg: #f8f9fa;
+$form-label-font-size: .75rem;
+$form-label-font-weight: 600;
+$form-label-color: #52514e;
+$form-label-margin-bottom: .375rem;
+$form-text-margin-top: .25rem;
+$form-text-font-size: .75rem;
+$form-text-color: #898781;
+$form-feedback-font-size: .75rem;
+$form-check-input-width: 1.05em;
+
+$card-border-color: $border-color;
+$card-border-radius: .75rem;
+$card-cap-bg: transparent;
+$card-cap-padding-y: .75rem;
+$card-cap-padding-x: 1rem;
+$card-spacer-y: 1rem;
+$card-spacer-x: 1rem;
+
+$table-cell-padding-y: .625rem;
+$table-cell-padding-x: .75rem;
+$table-cell-padding-y-sm: .375rem;
+$table-cell-padding-x-sm: .75rem;
+$table-cell-vertical-align: middle;
+$table-border-color: #eceef1;
+$table-th-font-weight: 600;
+
+$dropdown-font-size: .8125rem;
+$dropdown-border-color: $border-color;
+$dropdown-border-radius: .5rem;
+$dropdown-padding-y: .25rem;
+$dropdown-item-padding-y: .375rem;
+$dropdown-item-padding-x: .75rem;
+$dropdown-link-hover-bg: #f8f9fa;
+$dropdown-box-shadow: 0 10px 32px -8px rgba(11, 11, 11, .18), 0 2px 8px rgba(11, 11, 11, .06);
+
+$nav-link-font-size: .8125rem;
+$nav-link-font-weight: 500;
+$nav-link-padding-y: .625rem;
+$nav-link-padding-x: .875rem;
+
+$pagination-font-size: .78125rem;
+$pagination-padding-y-sm: .1875rem;
+$pagination-padding-x-sm: .5rem;
+$pagination-border-color: $border-color;
+
+$badge-font-size: .71875rem; // 11.5px
+$badge-font-weight: 600;
+$badge-padding-y: .125rem;
+$badge-padding-x: .5rem;
+$badge-border-radius: 50rem;
+
+$modal-content-border-radius: .75rem;
+$modal-content-border-color: $border-color;
+$modal-header-padding-y: .875rem;
+$modal-header-padding-x: 1.25rem;
+$modal-inner-padding: 1.25rem;
+$modal-footer-bg: #f8f9fa;
+$modal-footer-border-color: $border-color;
+
+$alert-padding-y: .625rem;
+$alert-padding-x: .875rem;
+$alert-border-radius: .5rem;
+
+@import "bootstrap/scss/bootstrap";

@@ -1,0 +1,26 @@
+@* Deretan thumbnail yang bisa diklik untuk dilihat penuh. *@
+@if (Ids is null || Ids.Count == 0)
+{
+    <span class="text-ink-3">—</span>
+}
+else
+{
+    <div class="d-flex flex-wrap align-items-center gap-1 @Class">
+        @for (var i = 0; i < Ids.Count; i++)
+        {
+            var idx = i;
+            <UbinLampiran Id="@Ids[i]" Ukuran="Ukuran" OnBuka="() => _buka = idx" />
+        }
+    </div>
+    @if (_buka is int b)
+    {
+        <PenampilLampiran Ids="Ids" Awal="b" OnTutup="() => _buka = null" />
+    }
+}
+
+@code {
+    [Parameter] public List<string>? Ids { get; set; }
+    [Parameter] public int Ukuran { get; set; } = 36;
+    [Parameter] public string? Class { get; set; }
+    private int? _buka;
+}

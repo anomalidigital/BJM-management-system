@@ -1,0 +1,14 @@
+<header class="card-header d-flex flex-wrap align-items-start justify-content-between gap-3 @Class">
+    <div class="min-w-0">
+        <h2 class="card-title">@Title</h2>
+        @if (Subtitle is not null) { <p class="card-subtitle">@Subtitle</p> }
+    </div>
+    @if (Actions is not null) { <div class="d-flex flex-shrink-0 align-items-center gap-2">@Actions</div> }
+</header>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public string? Class { get; set; }
+}

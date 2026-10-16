@@ -1,0 +1,8 @@
+@* Kartu Bootstrap (.card) dengan bayangan tipis. Isi: <KepalaKartu> + <IsiKartu> atau markup bebas. *@
+<section class="card shadow-card @Class" style="@Style">@ChildContent</section>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? Style { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

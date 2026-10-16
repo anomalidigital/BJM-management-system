@@ -1,0 +1,19 @@
+@page "/transaksi/trip/tambah"
+@page "/transaksi/trip/{Id}/edit"
+@inherits KomponenData
+@* Karawang memakai form alat berat (satu trip = satu mobil, TR, backload); Priok form container. *@
+<PageTitle>@(Id is null ? "Tambah Trip" : "Ubah Trip") — SIKOTIS</PageTitle>
+
+@if (Karawang)
+{
+    <FormTripKarawang @key="@($"{Id ?? "baru"}-{Backload ?? ""}")" TripId="@Id" BackloadDari="@(Id is null ? Backload : null)" />
+}
+else
+{
+    <FormTripPriok @key="@(Id ?? "baru")" TripId="@Id" />
+}
+
+@code {
+    [Parameter] public string? Id { get; set; }
+    [SupplyParameterFromQuery(Name = "backload")] public string? Backload { get; set; }
+}

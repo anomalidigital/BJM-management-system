@@ -1,0 +1,313 @@
+@page "/laporan/ritan"
+@inherits KomponenData
+@*
+    Cek Ritan Bulan Ini: satu baris satu trip pada bulan berjalan (bulan terakhir yang punya trip); trip batal tidak dihitung.
+    Tanggal Bon, Bon Pribadi, dan SI/JO adalah kolom Ritan sistem lama Priok; Karawang memakai rute & TR.
+*@
+<PageTitle>Cek Ritan — SIKOTIS</PageTitle>
+@{ Susun(); }
+
+@if (_preview)
+{
+    <ReportPreview OnClose="() => _preview = false">
+        @{
+            var per = PrintDocument.BarisPerLembar(context, 24);
+            var hal = PrintDocument.Bagi(_tersaring, per);
+            var meta = new List<(string, string)> { ("Jumlah ritan", Format.Angka(_tabel.Total)) };
+            if (!Karawang) meta.Add(("Total Bon Pribadi", Format.Rupiah(_totalBon)));
+            meta.Add(("Bulan", Format.LabelBulan(_periode.Awal)));
+        }
+        <PrintDocument>
+            @for (var i = 0; i < hal.Count; i++)
+            {
+                var ii = i; var isi = hal[ii];
+                <PrintPage Page="@(ii + 1)" TotalPages="hal.Count" Title="Ritan Sopir - Bulan Berjalan" Subtitle="Transportation Management System - Driver Reports"
+                           Periode="@($"{Format.Tanggal(_periode.Awal)} s/d {Format.Tanggal(_periode.Akhir)}")" Meta="meta">
+                    @if (Karawang)
+                    {
+                        <PrintTable Cols="@(new List<(string, string, string?)> { ("No.", "right", "5%"), ("NoTrans", "left", "12%"), ("Tanggal", "left", "10%"), ("Mobil", "left", "12%"), ("Rute", "left", null), ("TR", "left", "16%"), ("Sopir", "left", "16%") })">
+                            @for (var r = 0; r < isi.Count; r++)
+                            {
+                                var rr = r; var t = isi[rr];
+                                <tr>
+                                    <td class="p-sel text-end">@(ii * per + rr + 1)</td>
+                                    <td class="p-sel">@t.T.TransactionNo</td>
+                                    <td class="p-sel">@Format.Tanggal(t.T.TransactionDate)</td>
+                                    <td class="p-sel">@t.PlateNumber</td>
+                                    <td class="p-sel">@(t.RouteName != "" ? t.RouteName : "-")</td>
+                                    <td class="p-sel">@(t.TrList.Count > 0 ? string.Join(", ", t.TrList) : "-")</td>
+                                    <td class="p-sel">@t.DriverNames</td>
+                                </tr>
+                            }
+                        </PrintTable>
+                    }
+                    else
+                    {
+                        <PrintTable Cols="@(new List<(string, string, string?)> { ("No.", "right", "5%"), ("NoTrans", "left", "12%"), ("Mobil", "left", "13%"), ("No. Rute", "left", "11%"), ("Tanggal Bon", "left", "10%"), ("Bon Pribadi", "right", "13%"), ("SI - JOB ORDER", "left", "12%"), ("Sopir", "left", null) })">
+                            @for (var r = 0; r < isi.Count; r++)
+                            {
+                                var rr = r; var t = isi[rr];
+                                <tr>
+                                    <td class="p-sel text-end">@(ii * per + rr + 1)</td>
+                                    <td class="p-sel">@t.T.TransactionNo</td>
+                                    <td class="p-sel">@t.PlateNumber</td>
+                                    <td class="p-sel">@t.RouteCode</td>
+                                    <td class="p-sel">@(string.IsNullOrEmpty(t.T.BonDate) ? "-" : Format.Tanggal(t.T.BonDate))</td>
+                                    <td class="p-sel text-end">@(t.T.PersonalBon != 0 ? Format.Angka(t.T.PersonalBon) : "-")</td>
+                                    <td class="p-sel">@t.Sijo</td>
+                                    <td class="p-sel">@t.DriverName</td>
+                                </tr>
+                            }
+                            @if (ii == hal.Count - 1)
+                            {
+                                <tr class="total">
+                                    <td class="p-sel text-end" colspan="5">TOTAL BON PRIBADI</td>
+                                    <td class="p-sel text-end">@Format.Angka(_totalBon)</td>
+                                    <td class="p-sel" colspan="2"></td>
+                                </tr>
+                            }
+                        </PrintTable>
+                    }
+                </PrintPage>
+            }
+        </PrintDocument>
+    </ReportPreview>
+}
+else
+{
+    <PageHeader Title="Cek Ritan Bulan Ini" Crumbs="@(new List<Crumb> { new("Laporan"), new("Ritan") })">
+        <Description>@Deskripsi</Description>
+        <Actions>
+            <Tombol Icon="Ikon.Print" OnClick="() => _preview = true">Cetak</Tombol>
+            @if (!Karawang)
+            {
+                if (_editMode)
+                {
+                    <Tombol Icon="Ikon.Xmark" IconSize="14" OnClick="BatalSunting">Batal</Tombol>
+                    <Tombol Variant="primary" Icon="Ikon.FloppyDisk" OnClick="SimpanDraf">Simpan</Tombol>
+                }
+                else
+                {
+                    <Tombol Variant="primary" Icon="Ikon.Pen" Disabled="@(!Bisa("trip"))" OnClick="() => _editMode = true">Sunting</Tombol>
+                }
+            }
+            <Tombol Variant="ghost" OnClick="@(() => Ke("dashboard"))">Tutup</Tombol>
+        </Actions>
+    </PageHeader>
+
+    <Kartu>
+        <Toolbar>
+            <Left>
+                <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Width="18rem" Placeholder="Cari No. Transaksi, mobil, rute..." />
+                <PanelFilter T="FilterRitan" Filter="_filter" Chips="Chips">
+                    <Field Label="Supir">
+                        <Pilihan Id="@context" Options="OpsiSupir" Value="@_filter.Draf.Driver" ValueChanged="v => _filter.Ubah(d => d.Driver = v ?? string.Empty)" Clearable="false" AriaLabel="Filter supir" />
+                    </Field>
+                    <Field Label="Kota">
+                        <Pilihan Id="@context" Options="OpsiKota" Value="@_filter.Draf.City" ValueChanged="v => _filter.Ubah(d => d.City = v ?? string.Empty)" Clearable="false" AriaLabel="Filter kota" />
+                    </Field>
+                </PanelFilter>
+            </Left>
+            <Right>
+                <span class="tnum fs-12-5 text-ink-2">
+                    @if (Karawang)
+                    {
+                        <span>Jumlah ritan: <span class="fw-semibold text-ink">@Format.Angka(_tabel.Total)</span></span>
+                    }
+                    else
+                    {
+                        <span>Total Bon Pribadi: <span class="fw-semibold text-ink">@Format.Rupiah(_totalBon)</span></span>
+                    }
+                </span>
+            </Right>
+        </Toolbar>
+
+        @if (_editMode)
+        {
+            <p class="m-0 border-bottom border-brand-100 bg-brand-50 px-3 py-2 fs-12-5 fw-medium" style="color:var(--brand-800)">
+                Mode sunting aktif — ubah Tanggal Bon dan Bon Pribadi, lalu klik Simpan.
+                @if (_drafts.Count > 0) { <span class="ms-1">(@_drafts.Count baris diubah)</span> }
+            </p>
+        }
+
+        @if (_selected.Count > 0 && !_editMode)
+        {
+            <div class="bar-pilihan animate-in-fade">
+                <p class="m-0 fs-13 fw-semibold" style="color:var(--brand-800)">@_selected.Count baris dipilih</p>
+                <div class="d-flex align-items-center gap-2">
+                    <Tombol Size="sm" Variant="danger" Icon="Ikon.TrashCan" IconSize="14" Disabled="@(!Bisa("hapus"))" OnClick="() => _konfirmasiHapus = true">Hapus</Tombol>
+                    <Tombol Size="sm" Variant="ghost" OnClick="() => _selected.Clear()">Batalkan</Tombol>
+                </div>
+            </div>
+        }
+
+        <DataTable T="BarisTrip" Columns="@(Karawang ? KolomKarawang : KolomPriok)" Rows="_tabel.Halaman(_tersaring)" RowKey="t => t.Id"
+                   IsFiltered="@(_tabel.IsFiltered || _filter.Aktif)" SortKey="@_tabel.SortKey" SortNaik="_tabel.Naik" OnSortChange="k => _tabel.ToggleSort(k)"
+                   SelectedKeys="@(_editMode ? null : _selected)" OnToggleRow="ToggleRow" OnToggleAll="ToggleAll" MaxHeight="560px">
+            <Empty><EmptyState Entity="ritan bulan ini" /></Empty>
+            <NotFound><NotFoundState OnReset="() => { _tabel.Reset(); _filter.LepasSemua(); }" /></NotFound>
+        </DataTable>
+
+        @if (_tabel.Total > 0)
+        {
+            <Pagination Page="_tabel.Page" PageSize="_tabel.PageSize" Total="_tabel.Total" OnPageChange="p => _tabel.SetPage(p)" />
+        }
+    </Kartu>
+}
+
+<KonfirmasiDialog Open="_konfirmasiHapus" Title="Hapus Data?" ConfirmLabel="Hapus" Tone="danger" OnCancel="() => _konfirmasiHapus = false" OnConfirm="Hapus"
+                  Message="@($"{_selected.Count} data ritan akan dihapus. Data yang sudah dihapus mungkin tidak dapat dikembalikan.")" />
+
+@code {
+    public sealed class FilterRitan
+    {
+        public string Driver { get; set; } = "";
+        public string City { get; set; } = "";
+    }
+
+    private sealed record Draf(string? BonDate, long PersonalBon);
+
+    private KendaliFilter<FilterRitan> _filter = default!;
+    private readonly KendaliTabel<BarisTrip> _tabel = new(15, "transaction_no", naik: false);
+    private bool _editMode;
+    private readonly Dictionary<string, Draf> _drafts = [];
+    private readonly HashSet<string> _selected = [];
+    private bool _konfirmasiHapus;
+    private bool _preview;
+
+    private Periode _periode = Periode.Aktif([]);
+    private Dictionary<string, string> _kotaSupir = [];
+    private List<BarisTrip> _tersaring = [];
+    private long _totalBon;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _filter = new KendaliFilter<FilterRitan>(() => new FilterRitan(), StateHasChanged);
+        _tabel.Search = (t, q) => Util.CocokCari(q, t.T.TransactionNo, t.PlateNumber, t.RouteCode, t.RouteName, t.Sijo, string.Join(' ', t.TrList), t.DriverName, t.DriverCode);
+        _tabel.SortAccessor = k => k switch
+        {
+            "transaction_date" => t => t.T.TransactionDate, "plate_number" => t => t.PlateNumber, "route_name" => t => t.RouteName,
+            "tr_list" => t => string.Join(", ", t.TrList), "driver_names" => t => t.DriverNames, "route_code" => t => t.RouteCode,
+            "bon_date" => t => DrafDari(t).BonDate ?? "", "personal_bon" => t => DrafDari(t).PersonalBon, "sijo" => t => t.Sijo,
+            "driver_name" => t => t.DriverName, _ => t => t.T.TransactionNo,
+        };
+        // Sopir tambahan ikut menempuh ritan yang sama.
+        _tabel.ExtraFilter = t => (_filter.Nilai.Driver == "" || t.DriverIds.Contains(_filter.Nilai.Driver))
+            && (_filter.Nilai.City == "" || _kotaSupir.GetValueOrDefault(t.T.DriverId) == _filter.Nilai.City);
+    }
+
+    private void Susun()
+    {
+        _periode = Periode.Aktif(Db.Baris.Select(t => t.T.TransactionDate));
+        _kotaSupir = Db.Data.Karyawan.GroupBy(d => d.Id).ToDictionary(g => g.Key, g => g.First().City);
+        // Trip batal bukan ritan.
+        var bulanIni = Db.Baris.Where(t => !t.Batal && string.CompareOrdinal(t.T.TransactionDate, _periode.Awal) >= 0 && string.CompareOrdinal(t.T.TransactionDate, _periode.Akhir) <= 0);
+        _tabel.ExtraFilterActive = _filter.Aktif;
+        _tersaring = _tabel.Saring(bulanIni);
+        _totalBon = _tersaring.Sum(t => DrafDari(t).PersonalBon);
+    }
+
+    private string Deskripsi => Karawang
+        ? $"Ritan sopir bulan berjalan ({Format.LabelBulan(_periode.Awal)}): satu baris satu trip. Trip batal tidak dihitung."
+        : $"Ritan Sopir — bulan berjalan ({Format.LabelBulan(_periode.Awal)}). Gunakan Sunting untuk mengubah Tanggal Bon dan Bon Pribadi langsung di tabel.";
+
+    private List<Opsi> OpsiSupir => [new("", "Semua Supir"), .. Db.Data.Karyawan.Select(d => new Opsi(d.Id, $"{d.DriverCode} — {d.DriverName}"))];
+    private List<Opsi> OpsiKota => [new("", "Semua Kota"), .. Db.Data.Karyawan.Select(d => d.City).Distinct().OrderBy(c => c, StringComparer.Ordinal).Select(c => new Opsi(c, c))];
+
+    private List<ChipFilter> Chips
+    {
+        get
+        {
+            var c = new List<ChipFilter>();
+            var v = _filter.Nilai;
+            if (v.Driver != "") c.Add(new($"Supir: {Db.Data.Karyawan.FirstOrDefault(x => x.Id == v.Driver)?.DriverName ?? "—"}", () => _filter.Lepas((n, a) => n.Driver = a.Driver)));
+            if (v.City != "") c.Add(new($"Kota: {v.City}", () => _filter.Lepas((n, a) => n.City = a.City)));
+            return c;
+        }
+    }
+
+    private Draf DrafDari(BarisTrip t) => _drafts.TryGetValue(t.Id, out var d) ? d : new Draf(t.T.BonDate, t.T.PersonalBon);
+
+    private void AturDraf(BarisTrip t, Func<Draf, Draf> ubah) => _drafts[t.Id] = ubah(DrafDari(t));
+
+    private void SimpanDraf()
+    {
+        var n = _drafts.Count;
+        foreach (var (id, d) in _drafts.ToList()) Db.Ubah<Trip>(id, t => { t.BonDate = d.BonDate; t.PersonalBon = d.PersonalBon; });
+        _drafts.Clear();
+        _editMode = false;
+        Toast.Sukses(n > 0 ? $"{n} baris berhasil diperbarui." : "Tidak ada perubahan untuk disimpan.");
+    }
+
+    private void BatalSunting() { _drafts.Clear(); _editMode = false; }
+
+    private void Hapus()
+    {
+        // Hapus lewat HapusTrip supaya uang jalan, biaya, kasbon, dan catatan trip ikut terhapus.
+        var ids = _selected.ToList();
+        foreach (var id in ids) Db.HapusTrip(id);
+        _selected.Clear(); _konfirmasiHapus = false;
+        Toast.Sukses($"{ids.Count} data ritan berhasil dihapus.");
+    }
+
+    private void ToggleRow(string id) { if (!_selected.Remove(id)) _selected.Add(id); }
+
+    private void ToggleAll()
+    {
+        var ids = _tabel.Halaman(_tersaring).Select(t => t.Id).ToList();
+        if (ids.All(_selected.Contains)) _selected.Clear();
+        else { _selected.Clear(); _selected.UnionWith(ids); }
+    }
+
+    private List<Kolom<BarisTrip>> KolomKarawang =>
+    [
+        new() { Key = "transaction_no", Header = "NoTrans", Sortable = true, Width = "116px", Render = t => @<a href="@($"transaksi/trip/{t.Id}")" class="tnum fw-semibold text-decoration-none remah" style="color:var(--brand-700)" @onclick:stopPropagation="true">@t.T.TransactionNo</a> },
+        new() { Key = "transaction_date", Header = "Tanggal", Sortable = true, Width = "104px", Render = t => @<span class="tnum text-ink-2">@Format.Tanggal(t.T.TransactionDate)</span> },
+        new() { Key = "plate_number", Header = "Mobil", Sortable = true, Width = "128px", Render = t => @<span class="tnum text-ink-2">@(t.PlateNumber != "" ? t.PlateNumber : "—")</span> },
+        new() { Key = "route_name", Header = "Rute", Sortable = true, Render = t => @<span class="text-ink-2">@(t.RouteName != "" ? t.RouteName : "—")</span> },
+        new() { Key = "tr_list", Header = "TR", Sortable = true, Width = "150px", Render = t => @<span class="tnum text-ink-2">@(t.TrList.Count > 0 ? string.Join(", ", t.TrList) : "—")</span> },
+        new() { Key = "driver_names", Header = "Sopir", Sortable = true, Render = t => @<span class="fw-medium">@(t.DriverNames != "" ? t.DriverNames : "—")</span> },
+    ];
+
+    private List<Kolom<BarisTrip>> KolomPriok =>
+    [
+        new() { Key = "transaction_no", Header = "NoTrans", Sortable = true, Width = "116px", Render = t => @<span class="tnum fw-semibold text-ink">@t.T.TransactionNo</span> },
+        new() { Key = "plate_number", Header = "Mobil", Sortable = true, Width = "128px", Render = t => @<span class="tnum text-ink-2">@(t.PlateNumber != "" ? t.PlateNumber : "—")</span> },
+        new() { Key = "route_code", Header = "No. Rute", Sortable = true, Width = "112px", Render = t => @<span class="tnum text-ink-2">@(t.RouteCode != "" ? t.RouteCode : "—")</span> },
+        new() { Key = "bon_date", Header = "Tanggal Bon", Sortable = true, Width = "150px", Render = t => SelTanggalBon(t) },
+        new() { Key = "personal_bon", Header = "Bon Pribadi", Sortable = true, Align = "right", Width = "158px", Render = t => SelBonPribadi(t) },
+        new() { Key = "sijo", Header = "SI - JOB ORDER", Sortable = true, Width = "136px", Render = t => @<a href="@($"pencarian/sijo?sijo={Uri.EscapeDataString(t.Sijo)}")" class="tnum fw-medium text-decoration-none remah" style="color:var(--brand-700)" @onclick:stopPropagation="true">@(t.Sijo != "" ? t.Sijo : "—")</a> },
+        new() { Key = "driver_name", Header = "Sopir", Sortable = true, Render = t => @<span class="fw-medium">@(t.DriverName != "" ? t.DriverName : "—")</span> },
+    ];
+
+    private RenderFragment SelTanggalBon(BarisTrip t)
+    {
+        var d = DrafDari(t);
+        return @<span>
+            @if (_editMode)
+            {
+                <TanggalInput Value="@(d.BonDate ?? "")" Class="form-control-sm" AriaLabel="@($"Tanggal Bon {t.T.TransactionNo}")" ValueChanged="v => AturDraf(t, x => x with { BonDate = v == string.Empty ? null : v })" />
+            }
+            else
+            {
+                <span class="tnum text-ink-2">@(string.IsNullOrEmpty(d.BonDate) ? "—" : Format.Tanggal(d.BonDate))</span>
+            }
+        </span>;
+    }
+
+    private RenderFragment SelBonPribadi(BarisTrip t)
+    {
+        var d = DrafDari(t);
+        return @<span>
+            @if (_editMode)
+            {
+                <UangInput Value="d.PersonalBon" Class="input-group-sm" AriaLabel="@($"Bon Pribadi {t.T.TransactionNo}")" ValueChanged="v => AturDraf(t, x => x with { PersonalBon = v })" />
+            }
+            else
+            {
+                <span class="tnum fw-medium text-ink">@(d.PersonalBon != 0 ? Format.Rupiah(d.PersonalBon) : "—")</span>
+            }
+        </span>;
+    }
+}

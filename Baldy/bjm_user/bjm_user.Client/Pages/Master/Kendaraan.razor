@@ -1,0 +1,304 @@
+@page "/master/mobil"
+@* Master Data -> Kendaraan. Revisi 13 Okt 2026: surat penting (STNK, KIR, Pajak, Asuransi) punya tempat upload sendiri beserta masa
+   berlakunya, terpisah dari foto & dokumen lainnya. *@
+@inherits KomponenData
+<PageTitle>Kendaraan — SIKOTIS</PageTitle>
+
+<PageHeader Title="Kendaraan" Crumbs="@(new List<Crumb> { new("Master Data"), new("Kendaraan") })">
+    <Description>Master kendaraan beserta konfigurasi dan surat pentingnya (STNK, KIR, Pajak, Asuransi).</Description>
+    <Actions>
+        <Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Bisa("master"))" OnClick="BukaTambah">Tambah Kendaraan</Tombol>
+    </Actions>
+</PageHeader>
+
+<Kartu>
+    <Toolbar>
+        <Left>
+            <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Placeholder="Cari nomor kendaraan atau jenis..." />
+            <PanelFilter T="FilterKendaraan" Filter="_filter" Chips="Chips">
+                <div class="row g-3">
+                    <Field Label="Konfigurasi" Class="col-6">
+                        <Pilihan Id="@context" Options="OpsiKonfigurasiFilter" Value="@_filter.Draf.Config" ValueChanged="v => _filter.Ubah(d => d.Config = v ?? string.Empty)" Cari="false" Clearable="false" />
+                    </Field>
+                    <Field Label="Status" Class="col-6">
+                        <Pilihan Id="@context" Options="OpsiStatusFilter" Value="@_filter.Draf.Status" ValueChanged="v => _filter.Ubah(d => d.Status = v ?? string.Empty)" Cari="false" Clearable="false" />
+                    </Field>
+                </div>
+                <Field Label="Surat penting">
+                    <Pilihan Id="@context" Options="OpsiSurat" Value="@_filter.Draf.Dok" ValueChanged="v => _filter.Ubah(d => d.Dok = v ?? string.Empty)" Cari="false" Clearable="false" />
+                </Field>
+            </PanelFilter>
+        </Left>
+        <Right><span class="fs-12-5 text-ink-3">@Db.Data.Kendaraan.Count mobil terdaftar</span></Right>
+    </Toolbar>
+    @{
+        _jumlahTrip = JumlahTrip();
+        _tabel.ExtraFilterActive = _filter.Aktif;
+        var tersaring = _tabel.Saring(Db.Data.Kendaraan);
+        var halaman = _tabel.Halaman(tersaring);
+    }
+    <DataTable T="Model.Kendaraan" Columns="Kolom" Rows="halaman" RowKey="v => v.Id" SortKey="@_tabel.SortKey" SortNaik="_tabel.Naik" OnSortChange="k => _tabel.ToggleSort(k)" IsFiltered="_tabel.IsFiltered">
+        <Empty><EmptyState Entity="kendaraan" /></Empty>
+        <NotFound><NotFoundState OnReset="ResetFilter" /></NotFound>
+    </DataTable>
+    @if (_tabel.Total > 0)
+    {
+        <Pagination Page="_tabel.Page" PageSize="_tabel.PageSize" Total="_tabel.Total" OnPageChange="p => _tabel.SetPage(p)" />
+    }
+</Kartu>
+
+<Modal Open="_formOpen" Size="lg" Title="@(_editing is not null ? "Ubah Kendaraan" : "Tambah Kendaraan")" Subtitle="@(_editing?.PlateNumber ?? "Tanda * wajib diisi.")" OnClose="() => _formOpen = false">
+    <ChildContent>
+        @if (_formOpen)
+        {
+            var tripAktif = _editing is not null ? TripMenahan(_editing.Id) : [];
+            @* Ringkas tanpa scroll (Baldy 14 Okt 2026): data kendaraan sebaris, surat sebaris di bawah. *@
+            <div class="row g-3">
+                <Field Label="No. Kendaraan" Required Error="@G("plat")" Class="col-sm-6 col-md-3">
+                    <input id="@context" class="form-control @(G("plat") is not null ? "is-invalid" : "")" value="@_f.PlateNumber" placeholder="B 9015 UWW"
+                           @oninput="e => { _f.PlateNumber = e.Value?.ToString() ?? string.Empty; _galat.Remove(PlatKunci); }" />
+                </Field>
+                <Field Label="Jenis Kendaraan" Required="JenisWajib" Error="@G("jenis")" Class="col-sm-6 col-md-3">
+                    <Pilihan Id="@context" Options="OpsiJenis" Value="@_f.VehicleType" Placeholder="Pilih jenis..." Invalid="@(G("jenis") is not null)" Cari="false" Clearable="false"
+                             ValueChanged="v => { _f.VehicleType = v ?? string.Empty; _galat.Remove(JenisKunci); }" />
+                </Field>
+                <Field Label="Konfigurasi" Class="col-sm-6 col-md-3">
+                    <Pilihan Id="@context" Options="OpsiKonfigurasi" Value="@_f.Configuration" ValueChanged="v => _f.Configuration = v ?? string.Empty" Cari="false" Clearable="false" />
+                </Field>
+                <Field Label="Status" Class="col-sm-6 col-md-3">
+                    <Pilihan Id="@context" Options="OpsiStatus" Value="@_f.Status" ValueChanged="v => _f.Status = v ?? StatusAktif" Cari="false" Clearable="false" />
+                </Field>
+                @if (tripAktif.Count > 0 && _f.Status != "aktif")
+                {
+                    <div class="col-12">
+                        <KotakInfo Jenis="peringatan" Class="fs-12-5 py-2 px-3">
+                            <span class="d-flex align-items-start gap-2">
+                                <IkonSvg Def="Ikon.TriangleExclamation" Size="13" Style="margin-top:2px" />
+                                <span>
+                                    Kendaraan ini masih dipakai trip @string.Join(", ", tripAktif.Select(t => t.TransactionNo)) yang belum selesai / belum kembali ke pool.
+                                    Status @LabelStatus(_f.Status) tetap bisa disimpan; trip tersebut tidak ikut berubah.
+                                </span>
+                            </span>
+                        </KotakInfo>
+                    </div>
+                }
+                <fieldset class="col-12 min-w-0">
+                    <legend class="form-label">Surat &amp; dokumen <span class="fw-normal text-ink-3">· klik kotak untuk upload; foto diperkecil otomatis, PDF juga bisa</span></legend>
+                    <DokumenPentingInput Jenis="DokumenPentingJenis.Kendaraan" Value="_dokumen" ValueChanged="v => _dokumen = v"
+                                         LainnyaLabel="@("Foto & lainnya")" Lainnya="_f.Attachments" LainnyaChanged="v => _f.Attachments = v" />
+                </fieldset>
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="() => _formOpen = false">Batal</Tombol>
+        <Tombol Variant="primary" OnClick="Simpan">@(_editing is not null ? "Simpan Perubahan" : "Simpan")</Tombol>
+    </Footer>
+</Modal>
+
+<KonfirmasiDialog Open="_hapus is not null" Title="Hapus Data?" Message="Data yang sudah dihapus mungkin tidak dapat dikembalikan." ConfirmLabel="Hapus" Tone="danger"
+                  OnCancel="() => _hapus = null" OnConfirm="HapusSekarang">
+    <p class="m-0 mt-2 fs-13 fw-medium text-ink">@_hapus?.PlateNumber</p>
+</KonfirmasiDialog>
+
+@code {
+    public sealed class FilterKendaraan { public string Config { get; set; } = ""; public string Status { get; set; } = ""; public string Dok { get; set; } = ""; }
+
+    private const string StatusAktif = "aktif", PlatKunci = "plat", JenisKunci = "jenis";
+    private static readonly string[] Jenis = ["Tronton 6x2", "Trailer 20 FT", "Trailer 40 FT", "Head Truck", "Wingbox"];
+
+    private static readonly List<Opsi> OpsiJenis = Jenis.Select(t => new Opsi(t, t)).ToList();
+    private static readonly List<Opsi> OpsiKonfigurasiDasar = KonfigurasiKendaraan.Semua.Select(c => new Opsi(c, KonfigurasiKendaraan.Label(c))).ToList();
+    private static readonly List<Opsi> OpsiKonfigurasi = [new("", "Standar"), .. OpsiKonfigurasiDasar];
+    private static readonly List<Opsi> OpsiKonfigurasiFilter = [new("", "Semua"), .. OpsiKonfigurasiDasar];
+    private static readonly List<Opsi> OpsiStatus = [new("aktif", "Aktif"), new("servis", "Servis"), new("nonaktif", "Nonaktif")];
+    private static readonly List<Opsi> OpsiStatusFilter = [new("", "Semua"), .. OpsiStatus];
+    private static readonly List<Opsi> OpsiSurat = [new("", "Semua"), new("kurang", "Belum lengkap"), new("habis", "Habis / segera habis")];
+
+    private readonly KendaliTabel<Model.Kendaraan> _tabel = new(10, "plate_number");
+    private KendaliFilter<FilterKendaraan> _filter = default!;
+    private Model.Kendaraan? _editing;
+    private bool _formOpen;
+    private Model.Kendaraan _f = new();
+    private Dictionary<string, DokumenPenting> _dokumen = [];
+    private readonly Dictionary<string, string> _galat = [];
+    private Model.Kendaraan? _hapus;
+    private Dictionary<string, int> _jumlahTrip = [];
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _filter = new KendaliFilter<FilterKendaraan>(() => new FilterKendaraan(), StateHasChanged);
+        _tabel.Search = (v, q) => Util.CocokCari(q, v.PlateNumber, v.VehicleType, v.Configuration);
+        _tabel.SortAccessor = k => k switch
+        {
+            "vehicle_type" => v => v.VehicleType, "configuration" => v => v.Configuration, "status" => v => v.Status, _ => v => v.PlateNumber,
+        };
+        _tabel.ExtraFilter = v =>
+        {
+            var f = _filter.Nilai;
+            var r = DokumenPentingInput.Ringkas(DokumenPentingJenis.Kendaraan, v.Dokumen);
+            return (f.Config == "" || v.Configuration == f.Config) && (f.Status == "" || v.Status == f.Status)
+                && (f.Dok == "" || (f.Dok == "kurang" ? r.Ada.Count < r.Total : r.Habis.Count + r.Segera.Count > 0));
+        };
+    }
+
+    private static string LabelStatus(string s) => s switch { "aktif" => "Aktif", "servis" => "Servis", "nonaktif" => "Nonaktif", _ => s };
+
+    /// <summary>Jumlah trip per kendaraan di workspace aktif (kolom Jumlah Trip).</summary>
+    private Dictionary<string, int> JumlahTrip()
+    {
+        var m = new Dictionary<string, int>();
+        // Sebagian trip tidak mencantumkan nomor polisi; jangan dihitung ke kunci kosong.
+        foreach (var t in Db.Baris) if (t.T.VehicleId != "") m[t.T.VehicleId] = m.GetValueOrDefault(t.T.VehicleId) + 1;
+        return m;
+    }
+
+    /// <summary>Jumlah trip (kedua workspace) yang memakai kendaraan ini.</summary>
+    private int DipakaiTrip(string id) => Db.Semua.Trip.Count(t => t.VehicleId == id);
+
+    /// <summary>Trip (kedua workspace) yang masih menahan kendaraan ini: belum batal, belum kembali ke pool, belum dilanjutkan backload.</summary>
+    private List<Trip> TripMenahan(string id)
+    {
+        var semua = Db.Semua;
+        return semua.Trip.Where(t => t.VehicleId == id && TripLogika.MenahanKendaraan(t,
+            semua.Kejadian.Any(e => e.TripId == t.Id && e.Jenis == "pool"),
+            semua.Trip.Any(x => x.BackloadDari == t.Id && x.Status != StatusTrip.Batal))).ToList();
+    }
+
+    private List<ChipFilter> Chips
+    {
+        get
+        {
+            var f = _filter.Nilai;
+            var l = new List<ChipFilter>();
+            if (f.Config != "") l.Add(new($"Konfigurasi: {KonfigurasiKendaraan.Label(f.Config)}", () => _filter.Lepas((n, a) => n.Config = a.Config)));
+            if (f.Status != "") l.Add(new($"Status: {LabelStatus(f.Status)}", () => _filter.Lepas((n, a) => n.Status = a.Status)));
+            if (f.Dok != "") l.Add(new(f.Dok == "kurang" ? "Surat belum lengkap" : "Surat habis / segera habis", () => _filter.Lepas((n, a) => n.Dok = a.Dok)));
+            return l;
+        }
+    }
+
+    private List<Kolom<Model.Kendaraan>> Kolom =>
+    [
+        new() { Key = "plate_number", Header = "No. Kendaraan", Sortable = true, Width = "140px", Render = v => @<span class="tnum fw-semibold text-ink">@v.PlateNumber</span> },
+        new() { Key = "foto", Header = "Foto", Width = "120px", Render = v => @<LampiranThumbs Ids="v.Attachments" Ukuran="30" /> },
+        new() { Key = "vehicle_type", Header = "Jenis Kendaraan", Sortable = true, Render = v => @<span class="text-ink-2">@v.VehicleType</span> },
+        new() { Key = "configuration", Header = "Konfigurasi", Sortable = true, Width = "130px", Render = SelKonfigurasi },
+        new() { Key = "dokumen", Header = "Surat", Width = "170px", Render = SelSurat },
+        new() { Key = "trip", Header = "Jumlah Trip", Align = "right", Width = "110px", Render = v => @<span class="tnum text-ink-2">@Format.Angka(_jumlahTrip.GetValueOrDefault(v.Id))</span> },
+        new() { Key = "status", Header = "Status", Sortable = true, Width = "110px", Render = SelStatus },
+        new() { Key = "action", Header = "Action", Align = "right", Width = "92px", NoPrint = true, Render = SelAksi },
+    ];
+
+    private static RenderFragment SelKonfigurasi(Model.Kendaraan v)
+    {
+        if (v.Configuration == "") return @<span class="text-ink-3">—</span>;
+        return @<Badge Tone="brand">@KonfigurasiKendaraan.Label(v.Configuration)</Badge>;
+    }
+
+    private static RenderFragment SelSurat(Model.Kendaraan v)
+    {
+        var r = DokumenPentingInput.Ringkas(DokumenPentingJenis.Kendaraan, v.Dokumen);
+        return @<span class="d-block lh-tight">
+            <span class="@(r.Ada.Count > 0 ? "text-ink-2" : "text-ink-3")">@(r.Ada.Count > 0 ? string.Join(", ", r.Ada) : "Belum ada")</span>
+            @if (r.Habis.Count > 0 || r.Segera.Count > 0)
+            {
+                <span class="mt-1 d-block fs-11-5 fw-medium" style="color:var(--critical)">@string.Join(", ", r.Habis.Concat(r.Segera)) @(r.Habis.Count > 0 ? "habis" : "segera habis")</span>
+            }
+        </span>;
+    }
+
+    private static RenderFragment SelStatus(Model.Kendaraan v) => v.Status switch
+    {
+        "aktif" => @<Badge Tone="good">Aktif</Badge>,
+        "servis" => @<Badge Tone="warning">Servis</Badge>,
+        _ => @<Badge Tone="neutral">Nonaktif</Badge>,
+    };
+
+    private RenderFragment SelAksi(Model.Kendaraan v)
+    {
+        var bisa = Bisa("master");
+        var dipakai = DipakaiTrip(v.Id);
+        return @<span class="d-inline-flex justify-content-end gap-1">
+            <TombolIkon Label="Ubah" Icon="Ikon.Pen" Disabled="@(!bisa)" OnClick="() => BukaUbah(v)" />
+            <TombolIkon Label="Hapus" Tone="danger" Icon="Ikon.TrashCan" Disabled="@(!bisa || dipakai > 0)" Title="@(bisa && dipakai > 0 ? $"Dipakai {dipakai} trip" : null)" OnClick="() => _hapus = v" />
+        </span>;
+    }
+
+    private string? G(string k) => _galat.GetValueOrDefault(k);
+
+    /// <summary>Data kendaraan asli belum punya jenis; jangan paksa diisi hanya untuk menambah foto.</summary>
+    private bool JenisWajib => _editing is null || _editing.VehicleType != "";
+
+    private void BukaTambah()
+    {
+        _editing = null;
+        _f = new Model.Kendaraan { Status = "aktif" };
+        _dokumen = [];
+        _galat.Clear();
+        _formOpen = true;
+    }
+
+    private void BukaUbah(Model.Kendaraan v)
+    {
+        _editing = v;
+        _f = Database.Salin(v);
+        _dokumen = v.Dokumen is null ? [] : new Dictionary<string, DokumenPenting>(Database.Salin(v.Dokumen));
+        _galat.Clear();
+        _formOpen = true;
+    }
+
+    private bool Validasi()
+    {
+        _galat.Clear();
+        var plat = _f.PlateNumber.Trim();
+        if (plat == "") _galat["plat"] = "No. Kendaraan wajib diisi.";
+        else if (Db.Data.Kendaraan.Any(v => v.PlateNumber.Equals(plat, StringComparison.OrdinalIgnoreCase) && v.Id != _editing?.Id)) _galat["plat"] = "No. Kendaraan sudah terdaftar.";
+        if (JenisWajib && _f.VehicleType.Trim() == "") _galat["jenis"] = "Jenis kendaraan wajib diisi.";
+        return _galat.Count == 0;
+    }
+
+    /// <summary>Dokumen penting tersimpan tanpa slot kosong (tidak ada berkas & tanggal).</summary>
+    private static Dictionary<string, DokumenPenting>? RapikanDokumen(Dictionary<string, DokumenPenting> d)
+    {
+        var isi = d.Where(x => x.Value.Berkas.Count > 0 || !string.IsNullOrEmpty(x.Value.BerlakuSampai))
+            .ToDictionary(x => x.Key, x => new DokumenPenting { Berkas = x.Value.Berkas, BerlakuSampai = string.IsNullOrEmpty(x.Value.BerlakuSampai) ? null : x.Value.BerlakuSampai });
+        return isi.Count > 0 ? isi : null;
+    }
+
+    private void Simpan()
+    {
+        if (!Validasi()) return;
+        var f = _f;
+        var dok = RapikanDokumen(_dokumen);
+        void Isi(Model.Kendaraan v)
+        {
+            v.PlateNumber = f.PlateNumber.Trim().ToUpperInvariant(); v.VehicleType = f.VehicleType; v.Configuration = f.Configuration;
+            v.Status = f.Status; v.Dokumen = dok; v.Attachments = f.Attachments;
+        }
+        if (_editing is not null)
+        {
+            Db.Ubah<Model.Kendaraan>(_editing.Id, Isi);
+            Toast.Sukses("Data berhasil diperbarui.");
+        }
+        else
+        {
+            var baru = new Model.Kendaraan();
+            Isi(baru);
+            Db.Buat(baru);
+            Toast.Sukses("Data berhasil disimpan.");
+        }
+        _formOpen = false;
+    }
+
+    private void HapusSekarang()
+    {
+        if (_hapus is null) return;
+        Db.Hapus<Model.Kendaraan>(_hapus.Id);
+        Toast.Sukses("Data berhasil dihapus.");
+        _hapus = null;
+    }
+
+    private void ResetFilter() { _tabel.Reset(); _filter.LepasSemua(); }
+}

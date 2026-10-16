@@ -1,0 +1,64 @@
+@* Pilih karyawan terdaftar, atau ketik nama sendiri; nama ketikan bisa langsung disimpan sebagai karyawan baru. *@
+@inherits KomponenData
+
+<div class="d-flex flex-column gap-2">
+    <Pilihan Id="@Id" Options="Opsi" Value="@(_manual ? Manual : (string.IsNullOrEmpty(ValueId) ? null : ValueId))" Placeholder="@Placeholder" ValueChanged="Pilih" />
+    @if (_manual)
+    {
+        <div class="d-flex gap-2">
+            <input class="form-control" value="@ValueNama" placeholder="Ketik nama" @oninput="e => Kirim(string.Empty, e.Value?.ToString() ?? string.Empty)" />
+            <Tombol Icon="Ikon.UserPlus" IconSize="14" Disabled="@(!Sesi.BisaMaster || Nama == "")"
+                    Title="@(Kembar is not null ? "Nama ini sudah terdaftar" : $"Simpan ke Data Karyawan sebagai {PeranKaryawan.Label(Peran)}")" OnClick="SimpanBaru">
+                @(Kembar is not null ? "Pilih yang terdaftar" : "Simpan sebagai karyawan")
+            </Tombol>
+        </div>
+    }
+</div>
+
+@code {
+    private const string Manual = "__manual__";
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public List<Karyawan> Karyawan { get; set; } = [];
+    [Parameter] public string ValueId { get; set; } = "";
+    [Parameter] public string ValueNama { get; set; } = "";
+    [Parameter] public EventCallback<(string Id, string Nama)> OnChange { get; set; }
+    [Parameter] public string Peran { get; set; } = PeranKaryawan.Sopir;
+    [Parameter] public string Placeholder { get; set; } = "Pilih karyawan...";
+
+    private bool _manual;
+
+    protected override void OnInitialized() { base.OnInitialized(); _manual = ValueId == "" && ValueNama != ""; }
+
+    private List<Opsi> Opsi => Karyawan.Select(k => new Opsi(k.Id, k.DriverName, k.DriverCode, k.City))
+        .Append(new Opsi(Manual, "Isi nama sendiri", "belum terdaftar di Supir / Karyawan")).ToList();
+
+    private string Nama => ValueNama.Trim();
+    private Karyawan? Kembar => Nama == "" ? null : Db.Semua.Karyawan.FirstOrDefault(d => string.Equals(d.DriverName.Trim(), Nama, StringComparison.OrdinalIgnoreCase));
+
+    private Task Kirim(string id, string nama) => OnChange.InvokeAsync((id, nama));
+
+    private async Task Pilih(string? v)
+    {
+        if (v == Manual) { _manual = true; await Kirim("", ValueId != "" ? "" : ValueNama); return; }
+        _manual = false;
+        var k = Karyawan.FirstOrDefault(x => x.Id == v);
+        await Kirim(k?.Id ?? "", k?.DriverName ?? "");
+    }
+
+    private async Task SimpanBaru()
+    {
+        if (Nama == "") return;
+        var kembar = Kembar;
+        if (kembar is not null)
+        {
+            _manual = false;
+            await Kirim(kembar.Id, kembar.DriverName);
+            Toast.Info($"{kembar.DriverName} sudah terdaftar ({kembar.DriverCode}), langsung dipilih.");
+            return;
+        }
+        var baru = Db.Buat(new Karyawan { DriverCode = Kode.KodeKaryawanBerikut(Db.Semua.Karyawan, Peran), DriverName = Nama, Role = Peran, Status = "aktif" });
+        _manual = false;
+        await Kirim(baru.Id, baru.DriverName);
+        Toast.Sukses($"{baru.DriverName} disimpan sebagai {PeranKaryawan.Label(Peran).ToLowerInvariant()} baru ({baru.DriverCode}).");
+    }
+}

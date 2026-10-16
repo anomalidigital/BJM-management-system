@@ -1,0 +1,384 @@
+@page "/transaksi/trip"
+@inherits KomponenData
+@* Trip / Job Order. Kolom mock atasan 13 Okt 2026: Berangkat · ID Trip · No Referensi · Supir · No. Kendaraan · Rute · No PI ·
+   Uang Jalan · Status · Action. Seluruh filter di satu tombol Filter. Menu ⋯: Cetak Berita Acara, Rekap Trip, Tutup Trip,
+   Ada Backload / Lanjutan (satu-satunya pintu backload), Tandai mobil di pool, Batalkan, Hapus. *@
+<PageTitle>Trip / Job Order — SIKOTIS</PageTitle>
+
+<PageHeader Title="Trip / Job Order">
+    <Description>@(Karawang ? "Satu trip = satu mobil, dengan Berita Acara, perjalanan, uang jalan, biaya, dan PI-nya sendiri." : "Setiap trip memuat dokumen Surat Jalan beserta catatan uang jalan, biaya, dan lampirannya.")</Description>
+    <Actions><Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Bisa("trip"))" OnClick="@(() => Ke("transaksi/trip/tambah"))">Tambah Trip</Tombol></Actions>
+</PageHeader>
+
+@{
+    _tabel.ExtraFilterActive = JumlahFilter > 0;
+    var tersaring = _tabel.Saring(Db.Baris);
+    var halaman = _tabel.Halaman(tersaring);
+    var terpilih = Db.Baris.Where(t => _pilih.Contains(t.Id)).ToList();
+    var bisaSelesai = terpilih.Where(t => t.Status != StatusTrip.Batal && t.Status != StatusTrip.Selesai && (!Karawang || t.DriverIds.Count > 0)).ToList();
+}
+<Kartu>
+    <Toolbar>
+        <Left>
+            <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Width="20rem"
+                         Placeholder="@(Karawang ? "Cari ID Trip, No. Referensi, supir, plat, rute..." : "Cari No. Trip, ID Perjalanan, supir, rute, S/JO...")" />
+            <PanelFilter T="FilterTrip" Filter="_filter" Chips="Chips" Galat="@Format.GalatRentang(_filter.Draf.Dari, _filter.Draf.Sampai)" Lebar="380">
+                <div>
+                    <p class="form-label">Tanggal berangkat</p>
+                    <div class="row g-2">
+                        <div class="col-6"><TanggalInput AriaLabel="Berangkat dari" Value="@_filter.Draf.Dari" ValueChanged="v => _filter.Ubah(d => d.Dari = v)" /></div>
+                        <div class="col-6"><TanggalInput AriaLabel="Berangkat sampai" Value="@_filter.Draf.Sampai" ValueChanged="v => _filter.Ubah(d => d.Sampai = v)" /></div>
+                    </div>
+                    <div class="mt-1 d-flex gap-1">
+                        <Tombol Size="sm" Variant="ghost" OnClick="BulanIni">Bulan ini</Tombol>
+                        <Tombol Size="sm" Variant="ghost" OnClick="BulanLalu">Bulan lalu</Tombol>
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-6">
+                        <Field Label="Status"><Pilihan Id="@context" Options="OpsiStatus" Value="@_filter.Draf.Status" Clearable="false" Cari="false" ValueChanged="v => _filter.Ubah(d => d.Status = v ?? string.Empty)" /></Field>
+                    </div>
+                    <div class="col-6">
+                        <Field Label="@($"Cetak {NamaDokumen}")">
+                            <Pilihan Id="@context" Options="@(new List<Opsi> { new("", "Semua"), new("tercetak", "Sudah dicetak"), new("belum", "Belum dicetak") })" Value="@_filter.Draf.Cetak" Clearable="false" Cari="false" ValueChanged="v => _filter.Ubah(d => d.Cetak = v ?? string.Empty)" />
+                        </Field>
+                    </div>
+                </div>
+                <Field Label="Supir"><Pilihan Id="@context" Options="OpsiSupir" Value="@_filter.Draf.Supir" Clearable="false" ValueChanged="v => _filter.Ubah(d => d.Supir = v ?? string.Empty)" /></Field>
+                <div class="row g-3">
+                    <div class="col-6">
+                        <Field Label="Klien"><Pilihan Id="@context" Options="OpsiKlien" Value="@_filter.Draf.Klien" Clearable="false" Cari="false" ValueChanged="v => _filter.Ubah(d => d.Klien = v ?? string.Empty)" /></Field>
+                    </div>
+                    <div class="col-6">
+                        <Field Label="Tipe Layanan">
+                            <Pilihan Id="@context" Options="@(new List<Opsi> { new("", "Semua"), new(TipeKlien.Callout, "Callout"), new(TipeKlien.Dedicated, "Dedicated") })" Value="@_filter.Draf.Layanan" Clearable="false" Cari="false" ValueChanged="v => _filter.Ubah(d => d.Layanan = v ?? string.Empty)" />
+                        </Field>
+                    </div>
+                </div>
+                @if (Karawang)
+                {
+                    <Checkbox Label="Hanya mobil yang belum kembali ke pool" Checked="_filter.Draf.Pool" CheckedChanged="v => _filter.Ubah(d => d.Pool = v)" />
+                }
+            </PanelFilter>
+        </Left>
+        <Right>
+            @if (JumlahFilter > 0 || _tabel.IsFiltered) { <span class="fs-12-5 text-ink-3">@_tabel.Total trip cocok</span> }
+        </Right>
+    </Toolbar>
+
+    @if (_pilih.Count > 0)
+    {
+        <div class="bar-pilihan animate-in-fade">
+            <p class="m-0 fs-13 fw-semibold" style="color:var(--brand-800)">@_pilih.Count trip dipilih</p>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <Tombol Size="sm" Icon="Ikon.Print" IconSize="14" OnClick="() => Cetak(terpilih)">Cetak @NamaDokumen</Tombol>
+                <Tombol Size="sm" Icon="Ikon.CheckDouble" IconSize="14" Disabled="@(!Bisa("trip") || bisaSelesai.Count == 0)" OnClick="BukaTutupMassal">@(Karawang ? "Tutup Trip" : "Tandai Selesai")</Tombol>
+                <Tombol Size="sm" Variant="ghost" OnClick="() => _pilih.Clear()">Batalkan pilihan</Tombol>
+            </div>
+        </div>
+    }
+
+    <DataTable T="BarisTrip" Columns="Kolom" Rows="halaman" RowKey="t => t.Id" IsFiltered="@(_tabel.IsFiltered || JumlahFilter > 0)"
+               SortKey="@_tabel.SortKey" SortNaik="_tabel.Naik" OnSortChange="k => _tabel.ToggleSort(k)"
+               SelectedKeys="_pilih" OnToggleRow="TogglePilih" OnToggleAll="() => ToggleSemua(halaman)">
+        <Empty><EmptyState Entity="trip" /></Empty>
+        <NotFound><NotFoundState OnReset="ResetFilter" /></NotFound>
+    </DataTable>
+    @if (_tabel.Total > 0)
+    {
+        <Pagination Page="_tabel.Page" PageSize="_tabel.PageSize" Total="_tabel.Total" OnPageChange="p => _tabel.SetPage(p)" />
+    }
+</Kartu>
+
+<SuratJalanPrintFlow Notes="@(_cetak ?? [])" Open="@(_cetak is not null)" OnClose="() => _cetak = null" />
+
+@if (Karawang)
+{
+    <Modal Open="_tutupMassal" Title="Tutup trip terpilih?" Size="sm" OnClose="() => _tutupMassal = false">
+        <ChildContent>
+            <div class="d-flex flex-column gap-3 fs-13 text-ink-2" style="line-height:1.6">
+                <p class="m-0">
+                    @bisaSelesai.Count trip akan ditutup dengan dokumen fisik POD diterima.
+                    @if (bisaSelesai.Count < terpilih.Count) { <span> Trip yang sudah selesai, dibatalkan, atau belum punya supir dilewati.</span> }
+                </p>
+                <p class="m-0 fs-12-5 text-ink-3">Ingin memeriksa rekapnya dulu? Tutup satu per satu lewat menu ⋯ Tutup Trip.</p>
+                <div class="rounded-3 border border-hairline bg-sunken px-3 py-2">
+                    <Checkbox Label="Mobil sudah kembali ke pool" @bind-Checked="_massalDiPool" />
+                    <p class="m-0 mt-1 ps-4 fs-12 text-ink-3">@(_massalDiPool ? "Mobilnya langsung bisa dipakai trip lain." : "Mobilnya tetap tertahan sampai ditandai sudah di pool lewat menu ⋯ tiap trip.")</p>
+                </div>
+            </div>
+        </ChildContent>
+        <Footer>
+            <Tombol OnClick="() => _tutupMassal = false">Batal</Tombol>
+            <Tombol Variant="primary" OnClick="() => TutupMassal(bisaSelesai)">Tutup Trip</Tombol>
+        </Footer>
+    </Modal>
+}
+else
+{
+    <KonfirmasiDialog Open="_tutupMassal" Title="Tandai Selesai?" ConfirmLabel="Tandai Selesai"
+                      Message="@($"{bisaSelesai.Count} trip akan ditandai Selesai.{(bisaSelesai.Count < terpilih.Count ? " Trip yang sudah selesai atau dibatalkan dilewati." : "")}")"
+                      OnCancel="() => _tutupMassal = false" OnConfirm="() => TutupMassal(bisaSelesai)" />
+}
+
+<ModalRekapTrip Trip="_rekap" OnClose="() => _rekap = null" />
+<ModalBatalTrip Trip="_batal" OnClose="() => _batal = null" />
+<ModalTutupTrip Trip="_tutup" OnClose="() => _tutup = null" />
+<ModalHapusTrip Trip="_hapus" OnClose="() => _hapus = null" OnDeleted="id => _pilih.Remove(id)" />
+
+@code {
+    public sealed class FilterTrip
+    {
+        public string Dari { get; set; } = "";
+        public string Sampai { get; set; } = "";
+        public string Status { get; set; } = "";
+        public string Cetak { get; set; } = "";
+        public string Supir { get; set; } = "";
+        public string Klien { get; set; } = "";
+        public string Layanan { get; set; } = "";
+        public bool Pool { get; set; }
+    }
+
+    [SupplyParameterFromQuery(Name = "q")] public string? Q { get; set; }
+    [SupplyParameterFromQuery(Name = "pool")] public string? PoolQ { get; set; }
+    [SupplyParameterFromQuery(Name = "cetak")] public string? CetakQ { get; set; }
+
+    private readonly KendaliTabel<BarisTrip> _tabel = new(10, "transaction_date", naik: false);
+    private KendaliFilter<FilterTrip> _filter = default!;
+    private readonly HashSet<string> _pilih = [];
+    private List<BarisTrip>? _cetak;
+    private bool _tutupMassal;
+    private bool _massalDiPool = true;
+    private BarisTrip? _rekap, _batal, _tutup, _hapus;
+    private string? _qTerpakai;
+
+    private string NamaDokumen => Karawang ? "Berita Acara" : "Surat Jalan";
+    private static bool BelumDiPool(BarisTrip t) => t.Status == StatusTrip.Selesai && t.MenahanKendaraan;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _filter = new KendaliFilter<FilterTrip>(() => new FilterTrip(), StateHasChanged, new FilterTrip { Pool = Karawang && PoolQ == "belum" });
+        _tabel.Search = (t, q) => Util.CocokCari(q, t.T.TransactionNo, t.IdPerjalanan, t.T.SjNo, t.Sijo, t.T.RecipientName, t.DriverCode, t.DriverNames,
+            t.PlateNumber, t.PlateNumber.Replace(" ", ""), t.RouteCode, t.RouteName, t.T.DestinationDetail, string.Join(' ', t.T.TripIds),
+            AturanTrip.CariTr(t.TrList), t.T.PiNumber, t.ContractNo, t.ClientName, t.ProjectCode, t.ProjectName, t.Muat, t.Bongkar, t.AreaAsal, t.AreaTujuan,
+            t.T.Pengirim?.Nama, t.T.Penerima?.Nama, string.Join(' ', (t.T.Muatan ?? []).Select(m => m.Keterangan)));
+        _tabel.SortAccessor = k => k switch
+        {
+            "transaction_no" => t => t.T.TransactionNo,
+            "tr_list" => t => t.TrList.FirstOrDefault() ?? "",
+            "driver_names" => t => t.DriverNames,
+            "plate_number" => t => t.PlateNumber,
+            "route_code" => t => t.RouteCode,
+            "pi_number" => t => t.T.PiNumber,
+            "sijo" => t => t.Sijo,
+            "uj_total" => t => t.UjTotal,
+            "status" => t => t.Status,
+            _ => t => t.T.TransactionDate,
+        };
+        _tabel.TieBreak = t => t.T.TransactionNo;
+        _tabel.ExtraFilter = t =>
+        {
+            var f = _filter.Nilai;
+            return (f.Dari == "" || string.CompareOrdinal(t.T.TransactionDate, f.Dari) >= 0)
+                && (f.Sampai == "" || string.CompareOrdinal(t.T.TransactionDate, f.Sampai) <= 0)
+                && (f.Status == "" || t.Status == f.Status)
+                && (f.Cetak == "" || (f.Cetak == "tercetak" ? !string.IsNullOrEmpty(t.T.PrintedAt) : string.IsNullOrEmpty(t.T.PrintedAt)))
+                && (f.Supir == "" || t.DriverIds.Contains(f.Supir))
+                && (f.Klien == "" || t.T.ProjectId == f.Klien)
+                && (f.Layanan == "" || (string.IsNullOrEmpty(t.T.ServiceType) ? TipeKlien.Callout : t.T.ServiceType) == f.Layanan)
+                && (!f.Pool || BelumDiPool(t));
+        };
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Kotak cari di topbar (?q=) mengisi pencarian; "Simpan & Cetak" lama (?cetak=id,id) membuka cetak.
+        if (!string.IsNullOrEmpty(Q) && Q != _qTerpakai) { _qTerpakai = Q; _tabel.SetQuery(Q); }
+        if (!string.IsNullOrEmpty(CetakQ))
+        {
+            var ids = CetakQ.Split(',').ToHashSet();
+            var rows = Db.Baris.Where(t => ids.Contains(t.Id)).ToList();
+            if (rows.Count > 0) _cetak = rows;
+            Nav.NavigateTo(Nav.GetUriWithQueryParameter("cetak", (string?)null), replace: true);
+        }
+    }
+
+    private int JumlahFilter
+    {
+        get
+        {
+            var f = _filter.Nilai;
+            return new[] { f.Dari != "" || f.Sampai != "", f.Status != "", f.Cetak != "", f.Supir != "", f.Klien != "", f.Layanan != "", f.Pool }.Count(x => x);
+        }
+    }
+
+    private List<Opsi> OpsiStatus => new List<Opsi> { new("", "Semua") }
+        .Concat(AturanTrip.PilihanStatus(Karawang, Db.Baris.Any(t => t.Status == StatusTrip.Draft)).Select(s => new Opsi(s, StatusTrip.Label(s)))).ToList();
+
+    /// <summary>Seluruh supir yang pernah tercatat di trip, termasuk pendamping.</summary>
+    private List<(string Id, string Nama)> DaftarSupir
+    {
+        get
+        {
+            var nama = Db.Data.Karyawan.ToDictionary(d => d.Id, d => d.DriverName);
+            return Db.Baris.SelectMany(t => t.DriverIds).Distinct().Where(nama.ContainsKey).Select(id => (id, nama[id])).OrderBy(x => x.Item2, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+    }
+
+    private List<Opsi> OpsiSupir => new List<Opsi> { new("", "Semua") }.Concat(DaftarSupir.Select(s => new Opsi(s.Id, s.Nama))).ToList();
+    private List<Opsi> OpsiKlien => new List<Opsi> { new("", "Semua") }.Concat(Db.Data.Klien.Select(p => new Opsi(p.Id, p.ProjectCode, p.ProjectName))).ToList();
+
+    private List<ChipFilter> Chips
+    {
+        get
+        {
+            var f = _filter.Nilai;
+            var c = new List<ChipFilter>();
+            if (f.Dari != "" || f.Sampai != "") c.Add(new($"Berangkat {Format.RentangTanggal(f.Dari, f.Sampai)}", () => _filter.Lepas((n, a) => { n.Dari = a.Dari; n.Sampai = a.Sampai; })));
+            if (f.Status != "") c.Add(new($"Status: {StatusTrip.Label(f.Status)}", () => _filter.Lepas((n, a) => n.Status = a.Status)));
+            if (f.Cetak != "") c.Add(new(f.Cetak == "tercetak" ? $"{NamaDokumen} sudah dicetak" : $"{NamaDokumen} belum dicetak", () => _filter.Lepas((n, a) => n.Cetak = a.Cetak)));
+            if (f.Supir != "") c.Add(new($"Supir: {DaftarSupir.FirstOrDefault(s => s.Id == f.Supir).Nama ?? "—"}", () => _filter.Lepas((n, a) => n.Supir = a.Supir)));
+            if (f.Klien != "") c.Add(new($"Klien: {Db.Cari<Klien>(f.Klien)?.ProjectCode ?? "—"}", () => _filter.Lepas((n, a) => n.Klien = a.Klien)));
+            if (f.Layanan != "") c.Add(new($"Layanan: {TipeKlien.Label(f.Layanan)}", () => _filter.Lepas((n, a) => n.Layanan = a.Layanan)));
+            if (f.Pool) c.Add(new("Mobil belum di pool", () => _filter.Lepas((n, a) => n.Pool = a.Pool)));
+            return c;
+        }
+    }
+
+    private void BulanIni() => _filter.Ubah(d => { d.Dari = Format.AwalBulan(); d.Sampai = Format.AkhirBulan(); });
+    private void BulanLalu() { var a = DateTime.Now.AddMonths(-1); _filter.Ubah(d => { d.Dari = Format.AwalBulan(a); d.Sampai = Format.AkhirBulan(a); }); }
+
+    private void ResetFilter()
+    {
+        _tabel.Reset();
+        _filter.LepasSemua();
+        if (!string.IsNullOrEmpty(Q)) Nav.NavigateTo("transaksi/trip", replace: true);
+    }
+
+    private void TogglePilih(string id) { if (!_pilih.Remove(id)) _pilih.Add(id); }
+    private void ToggleSemua(List<BarisTrip> halaman)
+    {
+        var ids = halaman.Select(t => t.Id).ToList();
+        if (ids.All(_pilih.Contains)) _pilih.Clear(); else { _pilih.Clear(); _pilih.UnionWith(ids); }
+    }
+
+    private void Cetak(List<BarisTrip> rows) { if (rows.Count > 0) _cetak = rows; }
+
+    private void BukaTutupMassal() { _massalDiPool = true; _tutupMassal = true; }
+
+    private void TutupMassal(List<BarisTrip> rows)
+    {
+        if (Karawang)
+        {
+            foreach (var t in rows) Db.TutupTrip(t.Id, new OpsiTutup { PodFisik = true, PodFoto = t.T.PodAttachments ?? [], DiPool = _massalDiPool && t.MenahanKendaraan });
+            Toast.Sukses($"{rows.Count} trip ditutup{(_massalDiPool ? "." : ". Mobilnya belum tercatat di pool: tandai dari menu ⋯ tiap trip setelah kembali.")}");
+        }
+        else
+        {
+            foreach (var t in rows) Db.Ubah<Model.Trip>(t.Id, x => x.Status = StatusTrip.Selesai);
+            Toast.Sukses($"{rows.Count} trip ditandai Selesai.");
+        }
+        _pilih.Clear(); _tutupMassal = false;
+    }
+
+    private void TandaiPool(BarisTrip t)
+    {
+        Db.TandaiDiPool(t.Id);
+        Toast.Sukses($"Mobil {(t.PlateNumber != "" ? t.PlateNumber : $"Trip {t.IdTampil}")} tercatat kembali di pool dan bisa dipakai trip lain.");
+    }
+
+    private List<AksiMenu> AksiBaris(BarisTrip t)
+    {
+        var batal = t.Batal;
+        var a = new List<AksiMenu> { new($"Cetak {NamaDokumen}", () => _cetak = [t], Ikon.Print) };
+        if (Karawang) a.Add(new("Rekap Trip", () => _rekap = t, Ikon.ClipboardCheck));
+        if (Karawang && StatusTrip.BisaDitutup(t.Status)) a.Add(new("Tutup Trip", () => _tutup = t, Ikon.FlagCheckered, disabled: !Bisa("trip")));
+        if (Karawang) a.Add(new("Ada Backload / Lanjutan", () => Ke($"transaksi/trip/tambah?backload={t.Id}"), Ikon.Route, disabled: !Bisa("trip") || batal || t.T.VehicleId == ""));
+        if (Karawang && BelumDiPool(t)) a.Add(new("Tandai mobil di pool", () => TandaiPool(t), Ikon.Warehouse, disabled: !Bisa("trip")));
+        // Trip yang sudah ditagih (punya PI) tidak dibatalkan: PI-nya akan tertinggal tanpa trip yang berlaku.
+        a.Add(new AksiMenu
+        {
+            Label = "Batalkan Trip", Icon = Ikon.Ban, Tone = "danger", Disabled = !Bisa("batal") || batal || t.T.PiNumber != "",
+            Alasan = t.T.PiNumber != "" && !batal ? $"Sudah ditagih lewat PI {t.T.PiNumber}" : null,
+            OnSelect = () => { _batal = t; return Task.CompletedTask; },
+        });
+        a.Add(new("Hapus Trip", () => _hapus = t, Ikon.TrashCan, "danger", !Bisa("hapus")));
+        return a;
+    }
+
+    private List<Kolom<BarisTrip>> Kolom => Karawang ? KolomKarawang : KolomPriok;
+
+    private Kolom<BarisTrip> KolBerangkat => new() { Key = "transaction_date", Header = "Berangkat", Sortable = true, Width = "96px", CellClass = "tnum text-ink-2", Teks = t => Format.Tanggal(t.T.TransactionDate) };
+    private Kolom<BarisTrip> KolId => new()
+    {
+        Key = "transaction_no", Header = "ID Trip", Sortable = true, Width = "124px",
+        Render = t => @<div class="lh-tight">
+            <a href="@($"transaksi/trip/{t.Id}")" class="tnum fw-semibold text-nowrap text-decoration-none" @onclick:stopPropagation="true">@t.T.TransactionNo</a>
+            @if (t.T.ServiceType == TipeKlien.Dedicated) { <div class="mt-1"><Badge Tone="brand">Dedicated@(t.ContractNo != "" ? $" · {t.ContractNo}" : "")</Badge></div> }
+            @if (!Karawang && t.T.SjNo != "") { <div class="tnum fs-12 text-ink-3" title="Nomor Surat Jalan">@t.T.SjNo</div> }
+        </div>,
+    };
+    private Kolom<BarisTrip> KolSupir => new() { Key = "driver_names", Header = "Supir", Sortable = true, CellClass = "fw-medium", Teks = t => t.DriverNames != "" ? t.DriverNames : "—" };
+    private Kolom<BarisTrip> KolPlat => new() { Key = "plate_number", Header = "No. Kendaraan", Sortable = true, Width = "118px", CellClass = "tnum text-ink-2", Teks = t => t.PlateNumber != "" ? t.PlateNumber : "—" };
+    private Kolom<BarisTrip> KolRute => new()
+    {
+        Key = "route_code", Header = "Rute", Sortable = true, Width = "176px",
+        Render = t => @<span>@if (t.RouteCode != "" || t.RouteName != "") { <div class="lh-tight"><div class="tnum fw-medium">@(t.RouteCode != "" ? t.RouteCode : "—")</div>@if (t.RouteName != "") { <div class="fs-12 text-ink-3">@t.RouteName</div> }</div> } else { <span class="text-ink-3">—</span> }</span>,
+    };
+    private Kolom<BarisTrip> KolUj => new()
+    {
+        Key = "uj_total", Header = "Uang Jalan", Sortable = true, Align = "right", Width = "152px",
+        Render = t => @<div class="tnum lh-tight">
+            @if (t.TerminCount > 0) { <span><span class="fw-medium text-ink">@Format.Rupiah(t.UjTotal)</span><span class="ms-1 fs-11-5 text-ink-3">@(t.TerminCount)×</span></span> } else { <span class="text-ink-3">—</span> }
+            @if (t.Ujroute > 0 && !t.Batal) { <span class="d-block fs-11-5 text-ink-3">patokan @Format.Rupiah(t.Ujroute)</span> }
+        </div>,
+    };
+    private Kolom<BarisTrip> KolStatus => new()
+    {
+        Key = "status", Header = "Status", Sortable = true, Width = "108px",
+        Render = t => @<div class="d-flex flex-column align-items-start gap-1">
+            <Badge Tone="@StatusTrip.Nada(t.Status)">@StatusTrip.Label(t.Status)</Badge>
+            @if (Karawang && BelumDiPool(t)) { <span class="fw-medium text-nowrap" style="font-size:11px;color:#8a6100" title="Mobil belum tercatat kembali di pool">Belum di pool</span> }
+            @if (!string.IsNullOrEmpty(t.T.PrintedAt)) { <span class="text-ink-3" style="font-size:11px">Tercetak</span> }
+        </div>,
+    };
+    private Kolom<BarisTrip> KolAksi => new()
+    {
+        Key = "action", Header = "Action", Align = "right", Width = "112px", NoPrint = true,
+        Render = t => @<div class="d-flex justify-content-end gap-1">
+            <TombolIkon Label="@($"Lihat detail trip {t.IdTampil}")" Icon="Ikon.FileLines" OnClick="@(() => Ke($"transaksi/trip/{t.Id}"))" />
+            <TombolIkon Label="Edit" Icon="Ikon.Pen" Disabled="@(!Bisa("trip") || t.Batal)" OnClick="@(() => Ke($"transaksi/trip/{t.Id}/edit"))" />
+            <OverflowMenu Actions="@AksiBaris(t)" />
+        </div>,
+    };
+
+    private List<Kolom<BarisTrip>> KolomKarawang =>
+    [
+        KolBerangkat, KolId,
+        new()
+        {
+            Key = "tr_list", Header = "No Referensi", Sortable = true, Width = "140px",
+            Render = t => @<div class="lh-tight" title="@string.Join(", ", t.TrList)">
+                <div class="tnum d-flex align-items-center gap-1 text-ink-2">@(t.TrList.FirstOrDefault() ?? "—")@if (t.TrList.Count > 1) { <Badge>+@(t.TrList.Count - 1)</Badge> }</div>
+                @if (t.ProjectCode != "") { <div class="fs-12 text-ink-3">@t.ProjectCode</div> }
+            </div>,
+        },
+        KolSupir, KolPlat, KolRute,
+        new() { Key = "pi_number", Header = "No PI", Sortable = true, Width = "92px", Render = t => @<span class="@(t.T.PiNumber != "" ? "tnum text-ink-2" : "text-ink-3")">@(t.T.PiNumber != "" ? t.T.PiNumber : "—")</span> },
+        KolUj, KolStatus, KolAksi,
+    ];
+
+    private List<Kolom<BarisTrip>> KolomPriok =>
+    [
+        KolBerangkat, KolId,
+        new()
+        {
+            Key = "trip_ids", Header = "ID Perjalanan/Trip", Width = "160px",
+            Render = t => @<span>@if (t.T.TripIds.Count == 0) { <span class="text-ink-3">—</span> } else { <span class="tnum d-inline-flex align-items-center gap-1 text-ink-2" title="@string.Join(", ", t.T.TripIds)">@t.T.TripIds[0]@if (t.T.TripIds.Count > 1) { <Badge>+@(t.T.TripIds.Count - 1)</Badge> }</span> }</span>,
+        },
+        KolSupir, KolPlat, KolRute,
+        new() { Key = "sijo", Header = "S / JO", Sortable = true, Width = "96px", Render = t => @<span>@if (t.Sijo != "") { <a href="@($"pencarian/sijo?sijo={t.Sijo}")" class="tnum text-decoration-none" @onclick:stopPropagation="true">@t.Sijo</a> } else { <span class="text-ink-3">—</span> }</span> },
+        KolUj, KolStatus, KolAksi,
+    ];
+}

@@ -1,0 +1,392 @@
+@inherits KomponenData
+@inject Lampiran LampiranSvc
+@*
+    Tab Biaya Operasional: nota biaya di jalan (tol, solar, SPSI Banlok, overnight, ...). Dibayar supir dari uang jalan (tidak
+    menambah biaya perusahaan) atau dibayar perusahaan langsung (biaya di luar uang jalan). Tidak pernah memotong transfer ke
+    supir; yang ditagihkan ke klien masuk PI.
+
+    Izin dihitung di sini: Admin boleh mencatat & mengubah nota (Bisa("nota")); menghapus nota dan mengubah "Ditagihkan ke klien" /
+    "Dibayar oleh" dari bawaannya hanya Manager / Owner (Bisa("biaya")).
+
+    Karawang: uang dorong tetap termin Uang Jalan. Pilihan semu "Uang Dorong" mengarahkan ke tab Uang Jalan, dan terminnya tampil di
+    sini baca-saja (tidak dijumlah, tidak ditagihkan).
+*@
+@{
+    var expenses = Biaya;
+    var dorong = Dorong;
+    var batal = Trip.Batal;
+    var totalDorong = dorong.Sum(p => p.UjAmount);
+    var total = expenses.Sum(e => e.Amount);
+    var dariUj = expenses.Where(e => !TripLogika.DibayarPerusahaan(e)).Sum(e => e.Amount);
+    var olehPerusahaan = total - dariUj;
+    var keKlien = expenses.Where(TripLogika.Ditagihkan).Sum(e => e.Amount);
+    var jumlahKolom = KarawangTrip ? 8 : 7;
+}
+<div>
+    <KepalaTab Tombol="Tambah Biaya" BisaUbah="BisaNota" OnTambah="() => Buka(null)">
+        <Keterangan>
+            @if (batal)
+            {
+                @("Trip dibatalkan: biaya di bawah hanya arsip dan tidak dihitung di laporan.")
+            }
+            else if (KarawangTrip)
+            {
+                <text>Dari uang jalan @Format.Rupiah(Trip.UjTotal) terpakai <span class="tnum fw-semibold text-ink-2">@Format.Rupiah(dariUj)</span>@if (olehPerusahaan > 0) {<text>; dibayar perusahaan langsung <span class="tnum fw-semibold text-ink-2">@Format.Rupiah(olehPerusahaan)</span></text>}.
+                Tidak memotong transfer ke supir. @AturDetail.JenisDitagihkan() ditagihkan ke klien di PI; uang dorong &amp; uang pulang dicatat di tab Uang Jalan.@(BisaNota && !BisaAtur ? " Hapus nota dan status ditagihkan / dibayar oleh diatur Manager / Owner." : "")</text>
+            }
+            else
+            {
+                @("Tambahkan hanya biaya yang benar-benar terjadi. Tol yang dibayar dicatat di sini dengan jenis Tol; Uang Tol di rute hanya patokan.")
+            }
+        </Keterangan>
+    </KepalaTab>
+
+    @if (expenses.Count == 0 && dorong.Count == 0)
+    {
+        <KosongTab Judul="Belum ada biaya operasional." Keterangan="Trip ini belum mencatat tol, solar, overnight, atau biaya lain." />
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle text-nowrap">
+                <thead>
+                    <tr>
+                        <th>Jenis Biaya</th><th>Tanggal</th><th class="text-end">Nominal</th><th>Dibayar</th>
+                        @if (KarawangTrip) { <th>Ditagihkan</th> }
+                        <th>Catatan</th><th>Bukti</th><th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (expenses.Count == 0)
+                    {
+                        <tr><td colspan="@jumlahKolom" class="py-3 text-center text-ink-3">Belum ada nota biaya operasional.</td></tr>
+                    }
+                    @foreach (var e in expenses)
+                    {
+                        var ee = e;
+                        <tr>
+                            <td><Badge Tone="brand">@JenisBiaya.Label(ee.ExpenseType)</Badge></td>
+                            <td class="tnum text-ink-2">@Format.Tanggal(ee.ExpenseDate)</td>
+                            <td class="tnum text-end fw-semibold @(batal ? "text-ink-3" : "text-ink") @AturDetail.Coret(batal)">@Format.Rupiah(ee.Amount)</td>
+                            <td class="fs-12-5 text-ink-2">@if (TripLogika.DibayarPerusahaan(ee)) { <Badge Tone="warning">Perusahaan</Badge> } else { @("Supir, dari uang jalan") }</td>
+                            @if (KarawangTrip) { <td>@if (TripLogika.Ditagihkan(ee)) { <Badge Tone="good">Ke klien</Badge> } else { <span class="text-ink-3">—</span> }</td> }
+                            <td class="text-ink-3 text-wrap" style="max-width:18rem">@(ee.Notes != "" ? ee.Notes : "—")</td>
+                            <td><LampiranThumbs Ids="ee.Attachments" Ukuran="30" /></td>
+                            <td class="text-end">
+                                <span class="d-inline-flex justify-content-end gap-1">
+                                    <TombolIkon Label="Ubah" Icon="Ikon.Pen" Disabled="@(!BisaNota)" OnClick="() => Buka(ee)" />
+                                    <TombolIkon Label="Hapus" Icon="Ikon.TrashCan" Tone="danger" Disabled="@(!BisaAtur)" OnClick="() => _menghapus = ee" />
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                @* Total nota; baris uang dorong sengaja di bawahnya karena tidak ikut dijumlah. *@
+                <tbody class="bg-sunken fw-semibold" style="border-top:2px solid var(--hairline)">
+                    <tr>
+                        <td class="fs-12 text-ink-2 bg-sunken" colspan="2">Total @expenses.Count biaya@(batal ? " (arsip)" : "")</td>
+                        <td class="tnum text-end text-ink bg-sunken">@Format.Rupiah(total)</td>
+                        <td class="tnum fs-12 text-ink-2 bg-sunken">@(olehPerusahaan > 0 ? $"{Format.Rupiah(olehPerusahaan)} perusahaan" : "")</td>
+                        @if (KarawangTrip) { <td class="tnum fs-12 text-ink-2 bg-sunken">@Format.Rupiah(keKlien) ke klien</td> }
+                        <td class="bg-sunken" colspan="3"></td>
+                    </tr>
+                </tbody>
+                @if (dorong.Count > 0)
+                {
+                    <tbody>
+                        <tr>
+                            <td colspan="@jumlahKolom" class="pt-3 pb-1 fs-11-5 fw-semibold text-ink-3 text-uppercase" style="letter-spacing:.04em">Dari Uang Jalan · tidak ikut total, tidak ditagihkan</td>
+                        </tr>
+                        @foreach (var p in dorong)
+                        {
+                            var pp = p;
+                            <tr class="text-ink-3">
+                                <td><span class="d-flex flex-wrap align-items-center gap-1"><Badge Tone="neutral">Uang Dorong</Badge><Badge Tone="brand">dari Uang Jalan</Badge></span></td>
+                                <td class="tnum">@Format.Tanggal(pp.PaymentDate)</td>
+                                <td class="tnum text-end @AturDetail.Coret(batal)">@Format.Rupiah(pp.UjAmount)</td>
+                                <td class="fs-12-5">Termin @pp.Sequence uang jalan</td>
+                                @if (KarawangTrip) { <td>—</td> }
+                                <td class="text-wrap" style="max-width:18rem">@(pp.Notes != "" ? pp.Notes : "—")</td>
+                                <td><LampiranThumbs Ids="pp.Attachments" Ukuran="30" /></td>
+                                <td class="text-end"><TombolIkon Label="Buka di tab Uang Jalan" Icon="Ikon.ArrowRight" OnClick="KeTabUangJalan" /></td>
+                            </tr>
+                        }
+                        <tr>
+                            <td colspan="@jumlahKolom" class="pt-1 pb-3 fs-12 text-ink-3">Uang dorong @Format.Rupiah(totalDorong) sudah tercatat sebagai termin Uang Jalan; ubah atau hapus di tab itu.</td>
+                        </tr>
+                    </tbody>
+                }
+            </table>
+        </div>
+    }
+</div>
+
+<Modal Open="_terbuka" Title="@(_editing is not null ? "Ubah Biaya Operasional" : "Tambah Biaya Operasional")" Subtitle="@($"Trip {Trip.IdTampil}")" Size="md" OnClose="() => _terbuka = false">
+    <ChildContent>
+        @if (_terbuka)
+        {
+            <div class="row gx-3 gy-3">
+                <Field Label="Jenis Biaya" Required Class="col-12" Hint="@AturDetail.Teks(Petunjuk)">
+                    <Pilihan Id="@context" Options="OpsiJenis" Value="@_jenis" ValueChanged="UbahJenis" Cari="false" Clearable="false" />
+                </Field>
+
+                @if (JenisDorong)
+                {
+                    <div class="col-12">
+                        <KotakInfo Class="d-flex align-items-start gap-2">
+                            <IkonSvg Def="Ikon.CircleInfo" Size="14" Style="margin-top:3px" />
+                            <div class="min-w-0 flex-grow-1">Uang dorong dicatat sebagai termin Uang Jalan supaya transfer &amp; potong kasbon supir benar.</div>
+                        </KotakInfo>
+                    </div>
+                }
+                else
+                {
+                    <Field Label="Nominal" Required Class="col-sm-6" Hint="HintNominal">
+                        <UangInput Id="@context" Value="_nominal" ValueChanged="v => _nominal = v" />
+                    </Field>
+                    <Field Label="Tanggal" Required Class="col-sm-6">
+                        <TanggalInput Id="@context" Value="@_tanggal" ValueChanged="v => _tanggal = v" />
+                    </Field>
+                    <Field Label="Catatan" Class="col-12">
+                        <input id="@context" class="form-control" value="@_catatan" @oninput="e => _catatan = e.Value?.ToString() ?? string.Empty" />
+                    </Field>
+
+                    @if (BisaAtur)
+                    {
+                        <div class="col-12">
+                            <p class="form-label mb-2">Dibayar oleh</p>
+                            <div class="row g-2">
+                                <div class="col-sm-6">
+                                    <Radio Name="dibayar-biaya" Checked="@(_dibayar == PembayarBiaya.Sopir)" OnChange="() => _dibayar = PembayarBiaya.Sopir" Class="h-100"
+                                           Label="@PembayarBiaya.Label(PembayarBiaya.Sopir)" Description="Sudah termasuk uang jalan; tidak menambah biaya dan tidak memotong transfer." />
+                                </div>
+                                <div class="col-sm-6">
+                                    <Radio Name="dibayar-biaya" Checked="@(_dibayar == PembayarBiaya.Perusahaan)" OnChange="() => _dibayar = PembayarBiaya.Perusahaan" Class="h-100"
+                                           Label="@PembayarBiaya.Label(PembayarBiaya.Perusahaan)" Description="Voucher solar, kartu e-toll, atau transfer perusahaan: biaya di luar uang jalan." />
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        @* Admin: tampil ringkas baca-saja. Nilai lama (atau bawaan jenis) disimpan apa adanya. *@
+                        <div class="col-12">
+                            <div class="rounded-3 border border-hairline bg-sunken px-3 py-2" data-ringkas-biaya>
+                                <dl class="m-0 d-flex flex-column gap-1 fs-12-5">
+                                    <div class="d-flex flex-wrap align-items-baseline justify-content-between column-gap-3">
+                                        <dt class="fw-normal text-ink-3">Dibayar oleh</dt>
+                                        <dd class="m-0 fw-medium text-ink">@PembayarBiaya.Label(BayarDipakai)</dd>
+                                    </div>
+                                    @if (KarawangTrip)
+                                    {
+                                        <div class="d-flex flex-wrap align-items-baseline justify-content-between column-gap-3">
+                                            <dt class="fw-normal text-ink-3">Ditagihkan ke klien</dt>
+                                            <dd class="m-0 fw-medium text-ink">@(TagihDipakai ? "Ya, Additional Cost di PI" : "Tidak")</dd>
+                                        </div>
+                                    }
+                                </dl>
+                                <p class="m-0 mt-2 d-flex align-items-start gap-2 fs-12 text-ink-3">
+                                    <IkonSvg Def="Ikon.Lock" Size="12" Style="margin-top:3px" />
+                                    <span>@(BukanBawaan ? "Sudah diubah dari bawaan jenis biaya; ubah oleh Manager / Owner." : "Bawaan jenis biaya; ubah oleh Manager / Owner.")</span>
+                                </p>
+                            </div>
+                        </div>
+                    }
+
+                    <Field Label="Bukti / foto nota" Class="@(BisaAtur && KarawangTrip ? "col-sm-6" : "col-12")">
+                        <LampiranInput Id="@context" Value="_lampiran" ValueChanged="v => _lampiran = v" />
+                    </Field>
+                    @if (BisaAtur && KarawangTrip)
+                    {
+                        <div class="col-sm-6 d-flex align-items-center">
+                            <Checkbox Checked="_ditagihkan" CheckedChanged="v => _ditagihkan = v" Label="Ditagihkan ke klien (Additional Cost di PI)" />
+                        </div>
+                    }
+                }
+                @if (_galat is not null) { <div class="col-12"><PesanGalat Teks="@_galat" /></div> }
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="() => _terbuka = false">Batal</Tombol>
+        @if (JenisDorong)
+        {
+            <Tombol Variant="primary" Icon="Ikon.ArrowRight" IconSize="14" Disabled="@(!Bisa("trip"))" OnClick="KeUangJalan">Catat di tab Uang Jalan</Tombol>
+        }
+        else
+        {
+            <Tombol Variant="primary" OnClick="Simpan">Simpan</Tombol>
+        }
+    </Footer>
+</Modal>
+
+<KonfirmasiDialog Open="_menghapus is not null" Title="Hapus biaya?" ConfirmLabel="Hapus" Tone="danger"
+                  Message="@($"{JenisBiaya.Label(_menghapus?.ExpenseType ?? "")} senilai {Format.Rupiah(_menghapus?.Amount ?? 0)} akan dihapus beserta buktinya.")"
+                  OnCancel="() => _menghapus = null" OnConfirm="Hapus" />
+
+@code {
+    [Parameter, EditorRequired] public BarisTrip Trip { get; set; } = default!;
+
+    /// <summary>Pilihan semu "Uang Dorong": bukan nota biaya, dicatat sebagai termin Uang Jalan supaya transfer & potong kasbon benar.</summary>
+    private const string UangDorong = "__uang_dorong__";
+
+    private bool _terbuka;
+    private BiayaOperasional? _editing;
+    private string _jenis = JenisBiaya.Semua[0];
+    private long _nominal;
+    private string _tanggal = "";
+    private string _catatan = "";
+    private List<string> _lampiran = [];
+    private bool _ditagihkan;
+    private string _dibayar = PembayarBiaya.Sopir;
+    private string? _galat;
+    private BiayaOperasional? _menghapus;
+
+    /// <summary>Karawang menagihkan biaya di luar tanggungan ke klien lewat PI.</summary>
+    private bool KarawangTrip => AturDetail.Karawang(Trip);
+    /// <summary>Catat & ubah nota (Admin boleh).</summary>
+    private bool BisaNota => Bisa("nota") && !Trip.Batal;
+    /// <summary>Hapus nota & ubah status ditagihkan / dibayar oleh (Manager & Owner).</summary>
+    private bool BisaAtur => Bisa("biaya") && !Trip.Batal;
+
+    private static bool TagihBawaan(string jenis) => JenisBiaya.Ditagihkan.Contains(jenis);
+
+    /// <summary>Dibaca dari seluruh data supaya arsip trip batal tetap terlihat.</summary>
+    private List<BiayaOperasional> Biaya => Db.Semua.Biaya.Where(e => e.TripId == Trip.Id).OrderBy(e => e.ExpenseDate, StringComparer.Ordinal).ToList();
+
+    /// <summary>Termin uang dorong trip Karawang: tampil baca-saja, tidak dijumlah dan tidak ditagihkan.</summary>
+    private List<TerminUj> Dorong => !KarawangTrip ? [] : Db.Semua.Termin
+        .Where(p => p.TripId == Trip.Id && p.Jenis == JenisTermin.UangDorong)
+        .OrderBy(p => p.PaymentDate, StringComparer.Ordinal).ThenBy(p => p.Sequence).ToList();
+
+    private bool JenisDorong => _jenis == UangDorong;
+
+    private RenderFragment? HintNominal => _jenis == "Tol" && Trip.Toll > 0 && _nominal != Trip.Toll
+        ? @<text>Patokan tol rute @Format.Rupiah(Trip.Toll) · <PakaiNilai Label="Pakai" OnClick="() => _nominal = Trip.Toll" /></text>
+        : null;
+
+    /// <summary>Jenis lama yang sudah tidak ditawarkan tetap tampil saat nota itu dibuka; Uang Dorong hanya untuk nota baru Karawang.</summary>
+    private List<Opsi> OpsiJenis
+    {
+        get
+        {
+            var daftar = JenisBiaya.Semua.ToList();
+            if (_editing is not null && !daftar.Contains(_editing.ExpenseType)) daftar.Add(_editing.ExpenseType);
+            var opsi = daftar.Select(j => new Opsi(j, JenisBiaya.Label(j))).ToList();
+            if (_editing is null && KarawangTrip) opsi.Add(new Opsi(UangDorong, "Uang Dorong", "Dicatat di tab Uang Jalan"));
+            return opsi;
+        }
+    }
+
+    /// <summary>Nilai yang akan disimpan. Manager / Owner memakai isian form; Admin: nilai nota lama, atau bawaan jenis bila jenisnya diganti.</summary>
+    private bool TagihDipakai => BisaAtur
+        ? _ditagihkan
+        : _editing is not null && _editing.ExpenseType == _jenis ? TripLogika.Ditagihkan(_editing) : TagihBawaan(_jenis);
+    private string BayarDipakai => BisaAtur ? _dibayar : _editing?.Dibayar ?? PembayarBiaya.Sopir;
+    /// <summary>Nilainya sudah diubah dari bawaan jenis biaya (oleh Manager / Owner, atau data lama).</summary>
+    private bool BukanBawaan => (KarawangTrip && TagihDipakai != TagihBawaan(_jenis)) || BayarDipakai != PembayarBiaya.Sopir;
+
+    private static string? PetunjukJenisBiaya(string jenis) => jenis switch
+    {
+        "Tol" => "Tol yang benar-benar dibayar; Uang Tol di rute hanya patokan.",
+        "DEX" => "Solar (Pertamina Dex / Dexlite).",
+        "SPSI" => "SPSI Banlok: ongkos buruh bongkar / muat serikat pekerja setempat.",
+        "Nginap" => "Overnight: biaya supir menginap di jalan.",
+        "Escort" => "Pengawalan kendaraan di jalan.",
+        "ASDP" => "Penyeberangan kapal ferry (PT ASDP).",
+        "Double Driver" => "Uang supir kedua (pendamping).",
+        "Reimbus" => "Penggantian ke supir untuk biaya yang ditalangi di luar uang jalan.",
+        _ => null,
+    };
+
+    private string? Petunjuk
+    {
+        get
+        {
+            if (JenisDorong) return null;
+            var teks = string.Join(" ", new[]
+            {
+                PetunjukJenisBiaya(_jenis), KarawangTrip ? (TagihBawaan(_jenis) ? "Bawaan: ditagihkan ke klien." : "Bawaan: tidak ditagihkan ke klien.") : null,
+            }.Where(x => !string.IsNullOrEmpty(x)));
+            return teks == "" ? null : teks;
+        }
+    }
+
+    private void Buka(BiayaOperasional? e)
+    {
+        _editing = e;
+        if (e is not null)
+        {
+            _jenis = e.ExpenseType; _nominal = e.Amount; _tanggal = e.ExpenseDate; _catatan = e.Notes; _lampiran = e.Attachments.ToList();
+            _ditagihkan = TripLogika.Ditagihkan(e); _dibayar = e.Dibayar ?? PembayarBiaya.Sopir;
+        }
+        else
+        {
+            _jenis = JenisBiaya.Semua[0]; _nominal = 0; _tanggal = Trip.T.TransactionDate; _catatan = ""; _lampiran = [];
+            _ditagihkan = TagihBawaan(_jenis); _dibayar = PembayarBiaya.Sopir;
+        }
+        _galat = null;
+        _terbuka = true;
+    }
+
+    private void UbahJenis(string? v)
+    {
+        var jenis = v ?? JenisBiaya.Semua[0];
+        // Status tagih ikut bawaan jenis baru; Manager / Owner tetap bisa mengubahnya sesudahnya.
+        if (jenis != UangDorong) _ditagihkan = TagihBawaan(jenis);
+        _jenis = jenis;
+        _galat = null;
+    }
+
+    private void Simpan()
+    {
+        if (JenisDorong) return;
+        if (_nominal <= 0) { _galat = "Nominal harus lebih dari 0."; return; }
+        if (_tanggal == "") { _galat = "Tanggal wajib diisi."; return; }
+        var tagih = TagihDipakai;
+        var bayar = BayarDipakai;
+        // Disimpan hanya bila berbeda dari bawaan, supaya tetap mengikuti aturan jenis biaya bila nanti diubah.
+        bool? ditagihkan = KarawangTrip && tagih != TagihBawaan(_jenis) ? tagih : null;
+        string? dibayar = bayar == PembayarBiaya.Perusahaan ? bayar : null;
+        if (_editing is not null)
+        {
+            var (jenis, nominal, tanggal, catatan, lampiran) = (_jenis, _nominal, _tanggal, _catatan, _lampiran.ToList());
+            Db.Ubah<BiayaOperasional>(_editing.Id, x =>
+            {
+                x.ExpenseType = jenis; x.Amount = nominal; x.ExpenseDate = tanggal; x.Notes = catatan; x.Attachments = lampiran;
+                x.Ditagihkan = ditagihkan; x.Dibayar = dibayar;
+            });
+            Toast.Sukses("Biaya berhasil diperbarui.");
+        }
+        else
+        {
+            Db.Buat(new BiayaOperasional
+            {
+                TripId = Trip.Id, ExpenseType = _jenis, Amount = _nominal, ExpenseDate = _tanggal, Notes = _catatan, Attachments = _lampiran.ToList(),
+                Ditagihkan = ditagihkan, Dibayar = dibayar,
+            });
+            Toast.Sukses("Biaya berhasil ditambahkan.");
+        }
+        _terbuka = false;
+    }
+
+    private async Task Hapus()
+    {
+        if (_menghapus is null || !BisaAtur) return;
+        var e = _menghapus;
+        _menghapus = null;
+        Db.Hapus<BiayaOperasional>(e.Id);
+        Toast.Sukses("Biaya berhasil dihapus.");
+        await LampiranSvc.HapusAsync(e.Attachments);
+    }
+
+    /// <summary>Pilihan "Uang Dorong": pindah ke tab Uang Jalan dengan form termin uang dorong terbuka.</summary>
+    private void KeUangJalan()
+    {
+        _terbuka = false;
+        Nav.NavigateTo(Nav.GetUriWithQueryParameters(new Dictionary<string, object?> { ["tab"] = AturDetail.Uj, ["tambah"] = JenisTermin.UangDorong }), replace: true);
+    }
+
+    private void KeTabUangJalan() =>
+        Nav.NavigateTo(Nav.GetUriWithQueryParameters(new Dictionary<string, object?> { ["tab"] = AturDetail.Uj, ["tambah"] = null }), replace: true);
+}

@@ -1,0 +1,345 @@
+@page "/master/karyawan/{Id}"
+@* Master -> Supir / Karyawan -> {nama} (revisi atasan 13 Okt 2026): kartu Saldo, Piutang, Pelunasan (nilai dari sisi karyawan: piutang minus
+   merah, pelunasan plus); tab Transaksi = daftar piutang & pelunasan dengan filter tanggal (saldo awal ikut dihitung supaya saldo berjalan
+   benar). Transaksinya dicatat di menu Piutang Karyawan. Biaya operasional tampil di Overview sebagai keterangan trip yang dibawa. *@
+@inherits KomponenData
+<PageTitle>@(Orang?.DriverName ?? "Karyawan") — SIKOTIS</PageTitle>
+
+@if (Orang is not { } orang)
+{
+    <PageHeader Title="Karyawan tidak ditemukan" Crumbs="@(new List<Crumb> { new("Master Data"), new("Supir / Karyawan", "master/karyawan") })" />
+    <Kartu>
+        <div class="px-4 py-5 text-center">
+            <p class="m-0 fs-14 fw-semibold text-ink">Data tidak ditemukan.</p>
+            <p class="m-0 mt-1 fs-13 text-ink-3">Karyawan mungkin sudah dihapus.</p>
+            <Tombol Class="mt-3" OnClick="@(() => Ke("master/karyawan"))">Kembali ke daftar</Tombol>
+        </div>
+    </Kartu>
+}
+else
+{
+    var buku = Buku;
+    var tripSaya = TripSaya;
+    var adaRentang = _filter.Nilai.Dari != "" || _filter.Nilai.Sampai != "";
+    var teksRentang = TeksRentang;
+    <PageHeader Title="@orang.DriverName" Crumbs="@(new List<Crumb> { new("Master Data"), new("Supir / Karyawan", "master/karyawan"), new(orang.DriverName) })">
+        <Description>@orang.DriverCode · @PeranKaryawan.Label(orang.Role) · @(orang.City != "" ? orang.City : "kota belum diisi")</Description>
+        <Actions><Tombol Icon="Ikon.ArrowLeft" OnClick="@(() => Ke("master/karyawan"))">Kembali</Tombol></Actions>
+    </PageHeader>
+
+    <div class="row g-3 mb-4">
+        @foreach (var (label, nilai, ket) in KartuRingkas(buku, teksRentang))
+        {
+            <div class="col-sm-4">
+                <div class="kartu shadow-card p-3 h-100">
+                    <p class="m-0 fs-12-5 fw-medium text-ink-3">@label</p>
+                    <p class="m-0 mt-2 lh-1 fw-semibold" style="font-size:19px;letter-spacing:-.01em"><NilaiPiutang Nilai="nilai" /></p>
+                    <p class="m-0 mt-2 fs-11-5 text-ink-3">@ket</p>
+                </div>
+            </div>
+        }
+    </div>
+
+    <Kartu>
+        <Tabs Items="@(new List<TabItem> { new("overview", "Overview"), new("transaksi", "Transaksi", Semua.Count.ToString()) })" Value="@_tab" ValueChanged="v => _tab = v" Class="px-2" />
+
+        @if (_tab == "overview")
+        {
+            var utama = UtamaDi(tripSaya);
+            var terakhir = tripSaya.Take(8).ToList();
+            var biayaUtama = tripSaya.Where(t => utama.Contains(t.Id) && t.Status != StatusTrip.Batal).Sum(t => BiayaTrip(t.Id));
+            <div class="row g-3 p-3">
+                <div class="col-lg-6 d-flex flex-column gap-3">
+                    <div class="rounded-3 border border-hairline">
+                        <KepalaKartu Title="Profil" />
+                        <dl class="row g-3 m-0 p-3">
+                            <InfoItem Class="col-sm-6" Label="Kode" Value="@orang.DriverCode" Mono />
+                            <InfoItem Class="col-sm-6" Label="Peran" Value="@PeranKaryawan.Label(orang.Role)" />
+                            <InfoItem Class="col-sm-6" Label="Telepon" Value="@(orang.Phone != "" ? orang.Phone : "—")" Mono />
+                            <InfoItem Class="col-sm-6" Label="Status" Value="@(orang.Status == "aktif" ? "Aktif" : "Nonaktif")" />
+                            <InfoItem Class="col-sm-6" Label="Alamat" Value="@AlamatOrang(orang)" />
+                            <InfoItem Class="col-sm-6" Label="Kota" Value="@(orang.City != "" ? orang.City : "—")" />
+                        </dl>
+                    </div>
+                    <div class="rounded-3 border border-hairline">
+                        <KepalaKartu Title="Dokumen" Subtitle="KTP, SIM, KK, NPWP, dan dokumen lainnya. Diubah lewat Ubah di Supir / Karyawan." />
+                        <div class="p-3">
+                            <DokumenPentingRingkas Jenis="DokumenPentingJenis.Karyawan" Dokumen="orang.Dokumen" Lainnya="orang.Attachments" Kosong="Belum ada dokumen. Tambahkan lewat Ubah di Supir / Karyawan." />
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="rounded-3 border border-hairline">
+                        <KepalaKartu Title="Trip & biaya operasional" Subtitle="@($"{tripSaya.Count} trip tercatat. Biaya operasional dicatat di trip masing-masing, bukan di sini.")" />
+                        @if (tripSaya.Count == 0)
+                        {
+                            <p class="m-0 px-3 py-5 text-center fs-13 text-ink-3">Belum pernah membawa trip.</p>
+                        }
+                        else
+                        {
+                            <div class="overflow-x-auto">
+                                <table class="table table-sm table-hover m-0">
+                                    <thead><tr><th>Trip</th><th class="text-end">Uang Jalan</th><th class="text-end">Biaya Operasional</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var t in terakhir)
+                                        {
+                                            var tt = t;
+                                            var biaya = BiayaTrip(tt.Id);
+                                            <tr class="cursor-pointer" @onclick="@(() => Ke($"transaksi/trip/{tt.Id}"))">
+                                                <td>
+                                                    <span class="tnum d-block fw-semibold text-brand">@tt.TransactionNo</span>
+                                                    <span class="d-block text-truncate fs-12 text-ink-3" style="max-width:260px">
+                                                        @Format.Tanggal(tt.TransactionDate) · @NamaRute(tt)@(!utama.Contains(tt.Id) ? " · pendamping" : "")@(tt.Status == StatusTrip.Batal ? " · dibatalkan" : "")
+                                                    </span>
+                                                </td>
+                                                <td class="tnum text-end text-ink-2">@Format.Rupiah(UjTrip(tt.Id))</td>
+                                                <td class="tnum text-end @(utama.Contains(tt.Id) && tt.Status != StatusTrip.Batal ? "text-ink" : "text-ink-3")">@(biaya != 0 ? Format.Rupiah(biaya) : "—")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colspan="2" class="fs-12 text-ink-2">Total biaya operasional sebagai supir utama (@tripSaya.Count trip)</td>
+                                            <td class="tnum text-end">@Format.Rupiah(biayaUtama)</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                            @if (tripSaya.Count > terakhir.Count)
+                            {
+                                <p class="m-0 border-top border-hairline px-3 py-2 fs-12 text-ink-3">
+                                    Menampilkan @terakhir.Count trip terakhir. Lihat semuanya di
+                                    <a href="@($"transaksi/trip?q={Uri.EscapeDataString(orang.DriverName)}")" class="fw-medium">Trip / Job Order</a>.
+                                </p>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (_tab == "transaksi")
+        {
+            <div>
+                <Toolbar>
+                    <Left>
+                        <PanelFilter T="FilterTransaksi" Filter="_filter" Chips="Chips" Galat="@Format.GalatRentang(_filter.Draf.Dari, _filter.Draf.Sampai)">
+                            <div>
+                                <p class="form-label">Tanggal</p>
+                                <div class="row g-2">
+                                    <div class="col-6"><TanggalInput Value="@_filter.Draf.Dari" ValueChanged="v => _filter.Ubah(d => d.Dari = v)" AriaLabel="Dari tanggal" /></div>
+                                    <div class="col-6"><TanggalInput Value="@_filter.Draf.Sampai" ValueChanged="v => _filter.Ubah(d => d.Sampai = v)" AriaLabel="Sampai tanggal" /></div>
+                                </div>
+                                <div class="mt-2 d-flex gap-1">
+                                    <Tombol Size="sm" Variant="ghost" OnClick="BulanIni">Bulan ini</Tombol>
+                                    <Tombol Size="sm" Variant="ghost" OnClick="BulanLalu">Bulan lalu</Tombol>
+                                    <Tombol Size="sm" Variant="ghost" OnClick="SemuaWaktu">Semua</Tombol>
+                                </div>
+                            </div>
+                            <Field Label="Jenis">
+                                <Pilihan Id="@context" Options="OpsiJenis" Value="@_filter.Draf.Jenis" ValueChanged="v => _filter.Ubah(d => d.Jenis = v ?? string.Empty)" Cari="false" Clearable="false" />
+                            </Field>
+                        </PanelFilter>
+                        @if (!adaRentang) { <span class="fs-12-5 text-ink-3">Seluruh waktu</span> }
+                    </Left>
+                    <Right>
+                        <a href="@($"laporan/piutang-karyawan?karyawan={orang.Id}&tambah=1")" class="d-inline-flex align-items-center gap-1 fs-12-5 fw-semibold text-decoration-none">
+                            Catat piutang / pelunasan di Piutang Karyawan <IkonSvg Def="Ikon.ArrowRight" Size="11" />
+                        </a>
+                    </Right>
+                </Toolbar>
+                @if (Semua.Count == 0)
+                {
+                    <div class="px-4 py-5 text-center">
+                        <p class="m-0 fs-14 fw-semibold text-ink">Belum ada transaksi piutang.</p>
+                        <p class="m-0 mt-1 fs-13 text-ink-3">Piutang dan pelunasan @orang.DriverName dicatat di menu Piutang Karyawan; potongan uang jalan tercatat otomatis dari trip.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="overflow-x-auto">
+                        <table class="table m-0" style="min-width:max-content">
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th><th>Jenis</th><th>Keterangan</th>
+                                    <th class="text-end">Piutang</th><th class="text-end">Lunas</th><th class="text-end">Saldo</th><th>Bukti</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (_filter.Nilai.Dari != "")
+                                {
+                                    <tr>
+                                        <td class="tnum text-ink-3">@Format.Tanggal(_filter.Nilai.Dari)</td>
+                                        <td colspan="4" class="fs-12-5 text-ink-3">Saldo awal (seluruh transaksi sebelum @Format.Tanggal(_filter.Nilai.Dari))</td>
+                                        <td class="text-end"><NilaiPiutang Nilai="buku.SaldoAwal" Tebal /></td>
+                                        <td></td>
+                                    </tr>
+                                }
+                                @if (buku.Isi.Count == 0)
+                                {
+                                    <tr><td colspan="7" class="py-4 text-center fs-13 text-ink-3">Tidak ada transaksi pada @teksRentang.</td></tr>
+                                }
+                                @foreach (var e in buku.Isi)
+                                {
+                                    var j = Kasbon.JenisPiutang(e.M);
+                                    <tr class="align-top" @key="e.M.Id">
+                                        <td class="tnum text-ink-2">@Format.Tanggal(e.M.EntryDate)</td>
+                                        <td><Badge Tone="@(j == "piutang" ? "critical" : "good")">@(j == "piutang" ? "Piutang" : "Lunas")</Badge></td>
+                                        <td style="max-width:380px">@Keterangan(e.M)</td>
+                                        <td class="text-end">@if (e.Nilai < 0) { <NilaiPiutang Nilai="e.Nilai" /> }</td>
+                                        <td class="text-end">@if (e.Nilai > 0) { <NilaiPiutang Nilai="e.Nilai" /> }</td>
+                                        <td class="text-end"><NilaiPiutang Nilai="e.Saldo" Tebal /></td>
+                                        <td><LampiranThumbs Ids="e.M.Attachments" Ukuran="30" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" class="fs-12 text-ink-2">Total @buku.Isi.Count transaksi · @teksRentang</td>
+                                    <td class="text-end"><NilaiPiutang Nilai="buku.Piutang" /></td>
+                                    <td class="text-end"><NilaiPiutang Nilai="buku.Lunas" /></td>
+                                    <td class="text-end"><NilaiPiutang Nilai="buku.SaldoAkhir" Tebal /></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                }
+                <p class="m-0 border-top border-hairline px-3 py-2 fs-12 text-ink-3" style="line-height:1.6">
+                    Piutang (minus) = utang karyawan bertambah, mis. kasbon. Lunas (plus) = pelunasan: dipotong dari uang jalan trip atau dibayar langsung.
+                    Saldo minus berarti karyawan masih punya piutang.
+                </p>
+            </div>
+        }
+    </Kartu>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    public sealed class FilterTransaksi { public string Dari { get; set; } = ""; public string Sampai { get; set; } = ""; public string Jenis { get; set; } = ""; }
+
+    public sealed record BarisMutasi(MutasiKasbon M, long Nilai, long Saldo);
+    public sealed record BukuPiutang(long SaldoAwal, List<BarisMutasi> Isi, long Piutang, long Lunas, long SaldoAkhir);
+
+    private static readonly List<Opsi> OpsiJenis = [new("", "Piutang & Lunas"), new("piutang", "Piutang saja"), new("lunas", "Lunas saja")];
+
+    private string _tab = "overview";
+    private KendaliFilter<FilterTransaksi> _filter = default!;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _filter = new KendaliFilter<FilterTransaksi>(() => new FilterTransaksi(), StateHasChanged);
+    }
+
+    private Model.Karyawan? Orang => Db.Cari<Model.Karyawan>(Id);
+
+    /// <summary>Trip yang pernah dibawa karyawan ini (lintas workspace), terbaru dulu.</summary>
+    private List<Trip> TripSaya => Db.Semua.Trip
+        .Where(t => (t.DriverIds.Count > 0 ? t.DriverIds : [t.DriverId]).Contains(Id))
+        .OrderByDescending(t => t.TransactionDate, StringComparer.Ordinal).ToList();
+
+    /// <summary>Trip tempat karyawan ini menjadi supir utama (biaya operasionalnya dihitung untuknya).</summary>
+    private HashSet<string> UtamaDi(List<Trip> trip) => trip.Where(t => (t.DriverIds.FirstOrDefault() ?? t.DriverId) == Id).Select(t => t.Id).ToHashSet();
+
+    private long UjTrip(string tripId) => Db.Semua.Termin.Where(p => p.TripId == tripId).Sum(p => p.UjAmount);
+    private long BiayaTrip(string tripId) => Db.Semua.Biaya.Where(e => e.TripId == tripId).Sum(e => e.Amount);
+    private string NamaRute(Trip t) => Db.Cari<Model.Rute>(t.RouteId)?.RouteName ?? (t.DestinationDetail != "" ? t.DestinationDetail : "—");
+
+    private static string AlamatOrang(Model.Karyawan k)
+    {
+        var a = string.Join(", ", new[] { k.Address1, k.Address2 }.Where(x => !string.IsNullOrEmpty(x)));
+        return a == "" ? "—" : a;
+    }
+
+    /// <summary>Seluruh mutasi karyawan ini, urut waktu.</summary>
+    private List<MutasiKasbon> Semua => Db.Data.Kasbon.Where(e => e.EmployeeId == Id)
+        .OrderBy(e => e.EntryDate, StringComparer.Ordinal).ThenBy(e => e.CreatedAt, StringComparer.Ordinal).ToList();
+
+    /// <summary>Mutasi dalam rentang tanggal, saldo awal (sebelum rentang), dan saldo berjalan; semua dari sisi karyawan.</summary>
+    private BukuPiutang Buku
+    {
+        get
+        {
+            var f = _filter.Nilai;
+            var semua = Semua;
+            long saldoAwal = 0, saldo = 0;
+            var mulai = false;
+            var isi = new List<BarisMutasi>();
+            // Mutasi urut tanggal: semua yang sebelum rentang selesai dihitung dulu sebagai saldo awal.
+            foreach (var e in semua)
+            {
+                var nilai = Kasbon.SisiKaryawan(e.Amount);
+                if (f.Dari != "" && string.CompareOrdinal(e.EntryDate, f.Dari) < 0) { saldoAwal += nilai; continue; }
+                if (f.Sampai != "" && string.CompareOrdinal(e.EntryDate, f.Sampai) > 0) continue;
+                if (!mulai) { saldo = saldoAwal; mulai = true; }
+                saldo += nilai;
+                if (f.Jenis != "" && Kasbon.JenisPiutang(e) != f.Jenis) continue;
+                isi.Add(new BarisMutasi(e, nilai, saldo));
+            }
+            var piutang = isi.Where(e => e.Nilai < 0).Sum(e => e.Nilai);
+            var lunas = isi.Where(e => e.Nilai > 0).Sum(e => e.Nilai);
+            // Saldo akhir rentang: semua mutasi sampai tanggal akhir (tanpa saringan jenis).
+            var akhir = semua.Where(e => f.Sampai == "" || string.CompareOrdinal(e.EntryDate, f.Sampai) <= 0).Sum(e => Kasbon.SisiKaryawan(e.Amount));
+            return new BukuPiutang(saldoAwal, isi, piutang, lunas, akhir);
+        }
+    }
+
+    private string TeksRentang
+    {
+        get
+        {
+            var f = _filter.Nilai;
+            return f.Dari != "" || f.Sampai != "" ? $"{(f.Dari != "" ? Format.Tanggal(f.Dari) : "awal")} s/d {(f.Sampai != "" ? Format.Tanggal(f.Sampai) : "hari ini")}" : "seluruh waktu";
+        }
+    }
+
+    private IEnumerable<(string, long, string)> KartuRingkas(BukuPiutang b, string teksRentang)
+    {
+        var sampai = _filter.Nilai.Sampai;
+        yield return ("Saldo", b.SaldoAkhir, b.SaldoAkhir < 0 ? $"sisa piutang{(sampai != "" ? $" per {Format.Tanggal(sampai)}" : "")}" : b.SaldoAkhir > 0 ? "lebih bayar" : "tidak ada piutang");
+        yield return ("Piutang", b.Piutang, $"kasbon & pembatalan trip · {teksRentang}");
+        yield return ("Pelunasan", b.Lunas, $"potong uang jalan & dibayar langsung · {teksRentang}");
+    }
+
+    private List<ChipFilter> Chips
+    {
+        get
+        {
+            var f = _filter.Nilai;
+            var l = new List<ChipFilter>();
+            if (f.Dari != "" || f.Sampai != "") l.Add(new($"Tanggal {Format.RentangTanggal(f.Dari, f.Sampai)}", () => _filter.Lepas((n, a) => { n.Dari = a.Dari; n.Sampai = a.Sampai; })));
+            if (f.Jenis != "") l.Add(new(f.Jenis == "piutang" ? "Piutang saja" : "Lunas saja", () => _filter.Lepas((n, a) => n.Jenis = a.Jenis)));
+            return l;
+        }
+    }
+
+    private void BulanIni() => _filter.Ubah(d => { d.Dari = Format.AwalBulan(); d.Sampai = Format.AkhirBulan(); });
+
+    private void BulanLalu()
+    {
+        var lalu = DateTime.Now.AddMonths(-1);
+        _filter.Ubah(d => { d.Dari = Format.AwalBulan(lalu); d.Sampai = Format.AkhirBulan(lalu); });
+    }
+
+    private void SemuaWaktu() => _filter.Ubah(d => { d.Dari = ""; d.Sampai = ""; });
+
+    /// <summary>Keterangan satu mutasi: sumbernya, trip yang terkait, dan catatan.</summary>
+    private RenderFragment Keterangan(MutasiKasbon e)
+    {
+        var t = e.TripId != "" ? Db.Cari<Trip>(e.TripId) : null;
+        return @<span class="d-block" style="line-height:1.4">
+            <span class="text-ink-2">@JenisKasbon.Label(e.Kind)</span>
+            @if (t is not null)
+            {
+                <text> · </text><a href="@($"transaksi/trip/{t.Id}{(e.Kind == JenisKasbon.Trip ? "?tab=uj" : "")}")" class="tnum fw-medium text-decoration-none">Trip @t.TransactionNo</a>
+            }
+            else if (e.TripId != "")
+            {
+                <span class="text-ink-3"> · trip sudah dihapus</span>
+            }
+            @if (e.Notes != "") { <span class="d-block fs-12 text-ink-3">@e.Notes</span> }
+        </span>;
+    }
+}

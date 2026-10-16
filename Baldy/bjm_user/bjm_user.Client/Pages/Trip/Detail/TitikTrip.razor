@@ -1,0 +1,28 @@
+@* Satu sisi kartu Pick Up / Destination Details: salinan alamat yang tersimpan di trip. *@
+@{
+    var telepon = Titik?.Telepon?.Trim() ?? "";
+}
+<div class="min-w-0 p-3">
+    <p class="mb-3 fs-12-5 fw-semibold text-ink-2">@Judul</p>
+    <dl class="m-0 d-flex flex-column gap-3">
+        <InfoItem Label="Nama">@Isi(Titik?.Nama)</InfoItem>
+        <InfoItem Label="Alamat">@Isi(Titik?.Jalan)</InfoItem>
+        @if (!string.IsNullOrEmpty(Titik?.Catatan)) { <InfoItem Label="Catatan"><span class="text-wrap text-break">@Titik.Catatan</span></InfoItem> }
+        <div class="row g-3">
+            <InfoItem Label="Kontak" Class="col-6">@Isi(Titik?.Kontak)</InfoItem>
+            <InfoItem Label="Telepon" Class="col-6" Mono>
+                @if (telepon != "") { <a href="@($"tel:{new string(telepon.Where(c => char.IsDigit(c) || c == '+').ToArray())}")" class="text-ink text-wrap text-break text-decoration-none">@telepon</a> }
+                else { <span class="fw-normal text-ink-3">Belum diisi</span> }
+            </InfoItem>
+        </div>
+    </dl>
+</div>
+
+@code {
+    [Parameter] public string Judul { get; set; } = "";
+    [Parameter] public TitikAlamat? Titik { get; set; }
+
+    private RenderFragment Isi(string? v) => string.IsNullOrWhiteSpace(v)
+        ? @<span class="fw-normal text-ink-3">Belum diisi</span>
+        : @<span class="text-wrap text-break">@v</span>;
+}

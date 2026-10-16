@@ -1,0 +1,26 @@
+@page "/Error"
+@using System.Diagnostics
+@layout bjm_user.Client.Layout.LayoutKosong
+
+<PageTitle>Terjadi kesalahan — SIKOTIS</PageTitle>
+
+<div class="container py-5" style="max-width: 36rem">
+    <h1 class="fs-20 fw-semibold text-danger">Terjadi kesalahan.</h1>
+    <p class="fs-13 text-ink-2">Permintaan tidak bisa diproses. Muat ulang halaman; bila terulang, sampaikan ke pengelola sistem.</p>
+    @if (ShowRequestId)
+    {
+        <p class="fs-12 text-ink-3"><strong>ID permintaan:</strong> <code>@RequestId</code></p>
+    }
+    <a class="btn btn-primary btn-sm" href="/dashboard">Kembali ke Dashboard</a>
+</div>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private string? RequestId { get; set; }
+    private bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+
+    protected override void OnInitialized() =>
+        RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+}

@@ -1,0 +1,96 @@
+@* Tabel Bootstrap (.table .table-hover) dengan urutan, pilihan baris, dan keadaan memuat / kosong / tidak ditemukan. *@
+@typeparam T
+
+@if (Loading)
+{
+    <TableSkeleton Cols="@(SkeletonCols ?? Math.Min(Columns.Count, 7))" />
+}
+else if (Error is not null)
+{
+    <ErrorState Message="@Error" OnRetry="OnRetry" />
+}
+else if (Rows.Count == 0)
+{
+    @(IsFiltered ? NotFound : Empty)
+}
+else
+{
+    var selectable = SelectedKeys is not null && OnToggleRow.HasDelegate;
+    var allChecked = selectable && Rows.All(r => SelectedKeys!.Contains(RowKey(r)));
+    <div class="w-100 overflow-x-auto @(MaxHeight is not null ? "overflow-y-auto" : "")" style="@(MaxHeight is not null ? $"max-height:{MaxHeight}" : null)">
+        <table class="print-table table table-hover @(Dense ? "table-sm" : "") @Class" style="min-width:max-content">
+            <thead class="@(MaxHeight is not null ? "sticky-top" : "")">
+                <tr>
+                    @if (selectable)
+                    {
+                        <th scope="col" style="width:40px"><input type="checkbox" class="form-check-input" checked="@allChecked" aria-label="Pilih semua baris" @onchange="() => OnToggleAll.InvokeAsync()" /></th>
+                    }
+                    @foreach (var c in Columns)
+                    {
+                        var aktif = SortKey == c.Key;
+                        <th scope="col" style="@(c.Width is not null ? $"width:{c.Width}" : null)" class="@Rata(c.Align) @c.HeaderClass @(c.NoPrint ? "no-print" : "")">
+                            @if (c.Sortable && OnSortChange.HasDelegate)
+                            {
+                                <button type="button" class="tombol-urut @(c.Align == "right" ? "flex-row-reverse" : "") @(aktif ? "aktif" : "")" @onclick="() => OnSortChange.InvokeAsync(c.Key)">
+                                    @c.Header
+                                    @if (aktif) { <IkonSvg Def="@(SortNaik ? Ikon.ArrowUp : Ikon.ArrowDown)" Size="12" /> } else { <IkonSvg Def="Ikon.Sort" Size="12" Class="opacity-50" /> }
+                                </button>
+                            }
+                            else { @c.Header }
+                        </th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @{ var i = 0; }
+                @foreach (var row in Rows)
+                {
+                    var key = RowKey(row);
+                    var checked_ = selectable && SelectedKeys!.Contains(key);
+                    <tr @key="key" class="@(OnRowClick.HasDelegate ? "cursor-pointer" : "") @(ActiveKey == key ? "baris-aktif" : checked_ ? "baris-terpilih" : "")" @onclick="() => KlikBaris(row)">
+                        @if (selectable)
+                        {
+                            <td style="width:40px" @onclick:stopPropagation="true"><input type="checkbox" class="form-check-input" checked="@checked_" aria-label="Pilih baris" @onchange="() => OnToggleRow.InvokeAsync(key)" /></td>
+                        }
+                        @foreach (var c in Columns)
+                        {
+                            <td class="@Rata(c.Align) @c.CellClass @(c.NoPrint ? "no-print" : "")">
+                                @if (c.Render is not null) { @c.Render(row) } else if (c.Teks is not null) { @c.Teks(row) }
+                            </td>
+                        }
+                    </tr>
+                    i++;
+                }
+            </tbody>
+            @if (Footer is not null) { <tfoot>@Footer</tfoot> }
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public List<Kolom<T>> Columns { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<T> Rows { get; set; } = [];
+    [Parameter, EditorRequired] public Func<T, string> RowKey { get; set; } = _ => "";
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+    [Parameter] public RenderFragment? Empty { get; set; }
+    [Parameter] public RenderFragment? NotFound { get; set; }
+    [Parameter] public bool IsFiltered { get; set; }
+    [Parameter] public string? SortKey { get; set; }
+    [Parameter] public bool SortNaik { get; set; } = true;
+    [Parameter] public EventCallback<string> OnSortChange { get; set; }
+    [Parameter] public HashSet<string>? SelectedKeys { get; set; }
+    [Parameter] public EventCallback<string> OnToggleRow { get; set; }
+    [Parameter] public EventCallback OnToggleAll { get; set; }
+    [Parameter] public EventCallback<T> OnRowClick { get; set; }
+    [Parameter] public string? ActiveKey { get; set; }
+    [Parameter] public string? MaxHeight { get; set; }
+    [Parameter] public bool Dense { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+    [Parameter] public int? SkeletonCols { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private static string Rata(string a) => a switch { "right" => "text-end", "center" => "text-center", _ => "text-start" };
+    private Task KlikBaris(T row) => OnRowClick.HasDelegate ? OnRowClick.InvokeAsync(row) : Task.CompletedTask;
+}

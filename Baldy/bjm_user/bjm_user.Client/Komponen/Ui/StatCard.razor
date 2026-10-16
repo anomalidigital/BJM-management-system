@@ -1,0 +1,33 @@
+@* Kartu angka ringkas dengan perubahan persen terhadap periode pembanding. *@
+<div class="card shadow-card h-100">
+    <div class="card-body">
+        <div class="d-flex align-items-start justify-content-between gap-3">
+            <p class="m-0 fs-12-5 fw-medium text-ink-3">@Label</p>
+            @if (Icon is not null) { <span class="flex-shrink-0 rounded-2 bg-brand-50 text-brand p-1"><IkonSvg Def="Icon" Size="15" /></span> }
+        </div>
+        <p class="m-0 mt-2 fw-semibold text-ink lh-1" style="font-size:24px; letter-spacing:-.01em">@Value</p>
+        @if (Delta is double d && !double.IsNaN(d))
+        {
+            var datar = Math.Abs(d) < 0.05; var naik = d > 0; var baik = InvertDelta ? !naik : naik;
+            <p class="m-0 mt-2 d-flex align-items-center gap-1 fs-12">
+                <IkonSvg Def="@(datar ? Ikon.Minus : naik ? Ikon.ArrowTrendUp : Ikon.ArrowTrendDown)" Size="13" Style="@(datar ? "color:var(--ink-3)" : baik ? "color:var(--good)" : "color:var(--critical)")" />
+                <span class="tnum fw-semibold" style="@(datar ? "color:var(--ink-3)" : baik ? "color:#006300" : "color:var(--critical)")">@(datar ? "0%" : $"{(naik ? "+" : "")}{d.ToString("0.0").Replace('.', ',')}%")</span>
+                <span class="text-ink-3">@DeltaLabel</span>
+            </p>
+        }
+        else if (Hint is not null)
+        {
+            <p class="m-0 mt-2 fs-12 text-ink-3">@Hint</p>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public IkonDef? Icon { get; set; }
+    [Parameter] public double? Delta { get; set; }
+    [Parameter] public string DeltaLabel { get; set; } = "vs bulan lalu";
+    [Parameter] public bool InvertDelta { get; set; }
+    [Parameter] public string? Hint { get; set; }
+}

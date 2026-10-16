@@ -1,0 +1,17 @@
+@* Tabel bergaris untuk dokumen cetak A4. Kolom: (label, align, width). Baris ditulis pemakai dengan <tr><td class="p-sel">…</td></tr>. *@
+<table class="tabel-cetak w-100" style="border-collapse:collapse;font-size:10px">
+    <thead>
+        <tr style="background:#f3f4f6">
+            @foreach (var (label, align, width) in Cols)
+            {
+                <th style="@(width is not null ? $"width:{width};" : "")" class="p-sel fw-semibold @(align == "right" ? "text-end" : align == "center" ? "text-center" : "text-start")">@label</th>
+            }
+        </tr>
+    </thead>
+    <tbody>@ChildContent</tbody>
+</table>
+
+@code {
+    [Parameter] public List<(string Label, string Align, string? Width)> Cols { get; set; } = [];
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

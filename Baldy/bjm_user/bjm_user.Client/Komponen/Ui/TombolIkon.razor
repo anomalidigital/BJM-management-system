@@ -1,0 +1,16 @@
+@* Tombol ikon kecil (Ubah, Hapus, Lihat). Label dipakai sebagai aria-label; tanpa alasan bila mati (keputusan Baldy 15 Okt 2026). *@
+<button type="button" class="btn btn-sm btn-link p-1 lh-1 @(Tone == "danger" ? "text-danger" : "text-ink-2") @Class" disabled="@Disabled"
+        aria-label="@Label" title="@(Title ?? Label)" @onclick="OnClick" @onclick:stopPropagation="true">
+    <IkonSvg Def="Icon" Size="@Size" />
+</button>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public IkonDef Icon { get; set; } = Ikon.Pen;
+    [Parameter] public string Tone { get; set; } = "neutral";
+    [Parameter] public int Size { get; set; } = 14;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
+}

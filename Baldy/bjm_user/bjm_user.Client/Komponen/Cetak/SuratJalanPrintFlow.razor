@@ -1,0 +1,63 @@
+@* Alur cetak Berita Acara (Karawang) / Surat Jalan (Priok): klik Cetak langsung preview; template di panel kiri; Cetak / PDF menandai trip sudah dicetak. *@
+@inherits KomponenData
+
+@if (Open && Notes.Count > 0)
+{
+    var ba = Notes.All(n => n.T.Workspace == WorkspaceKode.Karawang || string.IsNullOrEmpty(n.T.Workspace) && Karawang);
+    var nama = ba ? "Berita Acara" : "Surat Jalan";
+    <ReportPreview OnClose="OnClose" OnPrint="Dicetak" OrientasiTetap="potret">
+        <Settings>
+            <div class="d-flex flex-column gap-3">
+                <div>
+                    <p class="mb-2 fs-12 fw-semibold text-ink-2" style="letter-spacing:.02em">Template</p>
+                    <div class="d-flex flex-column gap-2">
+                        <Radio Name="tpl-preview" Label="Dengan Logo" Description="Kop surat lengkap dengan logo perusahaan." Checked="@(_template == "logo")" OnChange="@(() => _template = "logo")" />
+                        <Radio Name="tpl-preview" Label="Tanpa Logo" Description="Kop teks saja, untuk kertas berkop." Checked="@(_template == "nologo")" OnChange="@(() => _template = "nologo")" />
+                    </div>
+                </div>
+                <div class="rounded-3 border border-hairline bg-sunken p-3">
+                    <p class="m-0 fs-12 fw-semibold text-ink-2">@Notes.Count dokumen</p>
+                    <ul class="tnum mt-1 mb-0 ps-0 list-unstyled d-flex flex-column gap-1 overflow-y-auto fs-11-5 text-ink-3" style="max-height:14rem">
+                        @foreach (var n in Notes) { <li class="text-break">@(ba ? string.Join(" · ", new[] { n.IdTampil, n.PlateNumber }.Where(x => x != "")) : (n.T.SjNo != "" ? n.T.SjNo : n.T.TransactionNo))</li> }
+                    </ul>
+                </div>
+                <p class="m-0 fs-11-5 text-ink-3" style="line-height:1.6">
+                    @(Notes.Count > 1 ? $"{Notes.Count} {nama} dicetak berurutan, satu dokumen per halaman A4{(ba ? ", satu untuk tiap mobil" : "")}." : $"{nama} dicetak pada satu halaman A4.")
+                    @(ba ? " Isian yang belum ada di sistem dicetak titik-titik untuk diisi tangan." : "")
+                </p>
+            </div>
+        </Settings>
+        <ChildContent>
+            <PrintDocument>
+                @foreach (var n in Notes)
+                {
+                    @if (n.T.Workspace == WorkspaceKode.Karawang || string.IsNullOrEmpty(n.T.Workspace) && Karawang)
+                    {
+                        <BeritaAcaraDocument Note="n" WithLogo="@(_template == "logo")" />
+                    }
+                    else
+                    {
+                        <SuratJalanDocument Note="n" WithLogo="@(_template == "logo")" />
+                    }
+                }
+            </PrintDocument>
+        </ChildContent>
+    </ReportPreview>
+}
+
+@code {
+    [Parameter] public List<BarisTrip> Notes { get; set; } = [];
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    /// <summary>Dipanggil dengan id trip yang dicetak (untuk menandai printed_at).</summary>
+    [Parameter] public EventCallback<List<string>> OnPrinted { get; set; }
+
+    private string _template = "logo";
+
+    private async Task Dicetak()
+    {
+        var ids = Notes.Select(n => n.Id).ToList();
+        if (OnPrinted.HasDelegate) await OnPrinted.InvokeAsync(ids);
+        else Db.TandaiDicetak(ids);
+    }
+}

@@ -1,0 +1,11 @@
+@* Ada data, tapi filter / pencarian tidak menemukan apa pun. *@
+<States Title="Data tidak ditemukan." Description="Coba periksa kembali kata kunci atau filter.">
+    <Icon><IkonSvg Def="Ikon.MagnifyingGlassMinus" Size="20" /></Icon>
+    <Action>
+        @if (OnReset.HasDelegate) { <Tombol Size="sm" Icon="Ikon.RotateLeft" IconSize="14" OnClick="OnReset">Reset filter</Tombol> }
+    </Action>
+</States>
+
+@code {
+    [Parameter] public EventCallback OnReset { get; set; }
+}

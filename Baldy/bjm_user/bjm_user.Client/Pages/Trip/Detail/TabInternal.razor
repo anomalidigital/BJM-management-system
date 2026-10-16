@@ -1,0 +1,271 @@
+@inherits KomponenData
+@inject Lampiran LampiranSvc
+@*
+    Tab Komisi (dulu Biaya Internal, diganti atasan 13 Okt 2026): pembayaran komisi (biaya internal jenis "Komisi"), uang makan,
+    kernet, servis, dan sejenisnya. Kotak hitungan komisi supir & manager dari Aturan Komisi dihapus dulu (Baldy 14 Okt 2026);
+    hasil hitungnya tetap dipakai sebagai acuan nominal di form.
+*@
+@{
+    var internals = Internal;
+    var batal = Trip.Batal;
+}
+<div>
+    <KepalaTab Judul="Biaya internal" Tombol="Tambah Biaya Internal" BisaUbah="BisaCatat" OnTambah="() => Buka(null)">
+        <Keterangan>@(batal ? "Trip dibatalkan: biaya di bawah hanya arsip yang tidak dihitung di laporan." : "Pembayaran komisi, uang makan, kernet, servis, dan sejenisnya.")</Keterangan>
+    </KepalaTab>
+    @if (internals.Count == 0)
+    {
+        <KosongTab Judul="Belum ada biaya internal." Keterangan="Trip ini belum mencatat komisi, kernet, atau biaya internal lain." />
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle text-nowrap">
+                <thead>
+                    <tr><th>Jenis Biaya</th><th>Penerima</th><th>Tanggal</th><th class="text-end">Nominal</th><th>Catatan</th><th>Bukti</th><th class="text-end">Action</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in internals)
+                    {
+                        var cc = c;
+                        <tr>
+                            <td><Badge Tone="@(cc.CostType == "Komisi" ? "brand" : "neutral")">@JenisBiayaInternal.Label(cc.CostType)</Badge></td>
+                            <td>
+                                @if (cc.CostType != "Komisi" || cc.RecipientRole == "")
+                                {
+                                    <span class="text-ink-3">—</span>
+                                }
+                                else
+                                {
+                                    var terdaftar = cc.RecipientId != "" ? Db.Cari<Karyawan>(cc.RecipientId) : null;
+                                    <span class="d-inline-flex align-items-center gap-2">
+                                        <Badge Tone="neutral">@PeranKaryawan.Label(cc.RecipientRole)</Badge>
+                                        @if (terdaftar is not null) { <a href="@($"master/karyawan/{terdaftar.Id}")" class="fw-medium text-ink text-decoration-none">@terdaftar.DriverName</a> }
+                                        else { <span class="fw-medium text-ink">@(cc.RecipientName != "" ? cc.RecipientName : "—")</span> }
+                                    </span>
+                                }
+                            </td>
+                            <td class="tnum text-ink-2">@Format.Tanggal(cc.CostDate)</td>
+                            <td class="tnum text-end fw-semibold @(batal ? "text-ink-3" : "text-ink") @AturDetail.Coret(batal)">@Format.Rupiah(cc.Amount)</td>
+                            <td class="text-ink-3 text-wrap" style="max-width:16rem">@(cc.Notes != "" ? cc.Notes : "—")</td>
+                            <td><LampiranThumbs Ids="cc.Attachments" Ukuran="30" /></td>
+                            <td class="text-end">
+                                <span class="d-inline-flex justify-content-end gap-1">
+                                    <TombolIkon Label="Ubah" Icon="Ikon.Pen" Disabled="@(!BisaCatat)" OnClick="() => Buka(cc)" />
+                                    <TombolIkon Label="Hapus" Icon="Ikon.TrashCan" Tone="danger" Disabled="@(!BisaCatat)" OnClick="() => _menghapus = cc" />
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td class="fs-12 text-ink-2" colspan="3">Total @internals.Count biaya internal@(batal ? " (arsip)" : "")</td>
+                        <td class="tnum text-end text-ink">@Format.Rupiah(internals.Sum(x => x.Amount))</td>
+                        <td colspan="3"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    }
+</div>
+
+<Modal Open="_terbuka" Title="@(_editing is not null ? "Ubah Biaya Internal" : JenisKomisi ? "Catat Pembayaran Komisi" : "Tambah Biaya Internal")" Subtitle="@($"Trip {Trip.IdTampil}")" Size="md" OnClose="() => _terbuka = false">
+    <ChildContent>
+        @if (_terbuka)
+        {
+            <div class="row gx-3 gy-3">
+                <Field Label="Jenis Biaya" Required Class="col-12">
+                    <Pilihan Id="@context" Options="OpsiJenis" Value="@_jenis" ValueChanged="UbahJenis" Cari="false" Clearable="false" />
+                </Field>
+
+                @if (JenisKomisi)
+                {
+                    <div class="col-12">
+                        <div class="rounded-3 border border-hairline bg-sunken p-3"><div class="row gx-3 gy-3">
+                            <Field Label="Komisi untuk" Required Class="col-sm-6">
+                                <Pilihan Id="@context" Options="OpsiPeran" Value="@_peran" ValueChanged="UbahPeran" Cari="false" Clearable="false" />
+                            </Field>
+                            <Field Label="Atas nama" Required Class="col-sm-6" Hint="@AturDetail.Teks(_peran != "" ? "Terdaftar di Supir / Karyawan, atau isi nama sendiri." : "Pilih peran lebih dulu.")">
+                                @if (_peran != "")
+                                {
+                                    <PilihKaryawan @key="_peran" Id="@context" Karyawan="KaryawanPeran" ValueId="@_penerimaId" ValueNama="@_penerimaNama" Peran="@_peran"
+                                                   Placeholder="@($"Pilih {PeranKaryawan.Label(_peran).ToLowerInvariant()}...")" OnChange="v => { _penerimaId = v.Id; _penerimaNama = v.Nama; }" />
+                                }
+                                else
+                                {
+                                    <input id="@context" class="form-control" disabled placeholder="—" />
+                                }
+                            </Field>
+                        </div></div>
+                    </div>
+                }
+
+                <Field Label="Nominal" Required Class="col-sm-6" Hint="HintNominal">
+                    <UangInput Id="@context" Value="_nominal" ValueChanged="v => _nominal = v" />
+                </Field>
+                <Field Label="Tanggal" Required Class="col-sm-6">
+                    <TanggalInput Id="@context" Value="@_tanggal" ValueChanged="v => _tanggal = v" />
+                </Field>
+                <Field Label="Catatan" Class="col-12">
+                    <input id="@context" class="form-control" value="@_catatan" @oninput="e => _catatan = e.Value?.ToString() ?? string.Empty" />
+                </Field>
+                <Field Label="Bukti / foto" Class="col-12">
+                    <LampiranInput Id="@context" Value="_lampiran" ValueChanged="v => _lampiran = v" />
+                </Field>
+                @if (_galat is not null) { <div class="col-12"><PesanGalat Teks="@_galat" /></div> }
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="() => _terbuka = false">Batal</Tombol>
+        <Tombol Variant="primary" OnClick="Simpan">Simpan</Tombol>
+    </Footer>
+</Modal>
+
+<KonfirmasiDialog Open="_menghapus is not null" Title="Hapus biaya internal?" ConfirmLabel="Hapus" Tone="danger"
+                  Message="@(_menghapus is null ? "" : $"{JenisBiayaInternal.Label(_menghapus.CostType)}{(_menghapus.RecipientName != "" ? $" untuk {_menghapus.RecipientName}" : "")} senilai {Format.Rupiah(_menghapus.Amount)} akan dihapus beserta buktinya.")"
+                  OnCancel="() => _menghapus = null" OnConfirm="Hapus" />
+
+@code {
+    [Parameter, EditorRequired] public BarisTrip Trip { get; set; } = default!;
+    [Parameter] public bool BisaUbah { get; set; }
+
+    private bool _terbuka;
+    private BiayaInternal? _editing;
+    private string _jenis = "Uang Makan";
+    private long _nominal;
+    private string _tanggal = "", _catatan = "";
+    private string _peran = "", _penerimaId = "", _penerimaNama = "";
+    private List<string> _lampiran = [];
+    private string? _galat;
+    private BiayaInternal? _menghapus;
+
+    /// <summary>Catat biaya internal & pembayaran komisi: Manager & Owner.</summary>
+    private bool BisaCatat => BisaUbah && Bisa("biaya") && !Trip.Batal;
+    private bool JenisKomisi => _jenis == "Komisi";
+
+    /// <summary>Dibaca dari seluruh data supaya arsip trip batal tetap terlihat.</summary>
+    private List<BiayaInternal> Internal => Db.Semua.BiayaInternal.Where(c => c.TripId == Trip.Id).OrderBy(c => c.CostDate, StringComparer.Ordinal).ToList();
+
+    /// <summary>Jenis lama yang sudah tidak ditawarkan tetap tampil saat record itu dibuka.</summary>
+    private List<Opsi> OpsiJenis
+    {
+        get
+        {
+            var daftar = JenisBiayaInternal.Semua.ToList();
+            if (_editing is not null && !daftar.Contains(_editing.CostType)) daftar.Add(_editing.CostType);
+            return daftar.Select(j => new Opsi(j, JenisBiayaInternal.Label(j))).ToList();
+        }
+    }
+
+    private static List<Opsi> OpsiPeran => [new("", "— pilih peran —"), .. PeranKaryawan.Semua.Select(r => new Opsi(r, PeranKaryawan.Label(r)))];
+
+    /// <summary>Karyawan sesuai peran; orang di trip ini ditaruh paling atas.</summary>
+    private List<Karyawan> KaryawanPeran
+    {
+        get
+        {
+            if (_peran == "") return [];
+            var daftar = Db.Semua.Karyawan.Where(d => d.Role == _peran && (d.Status == "aktif" || d.Id == _penerimaId)).ToList();
+            var diTrip = new HashSet<string>([.. Trip.DriverIds, Trip.T.ManagerId]);
+            return [.. daftar.Where(d => diTrip.Contains(d.Id)), .. daftar.Where(d => !diTrip.Contains(d.Id))];
+        }
+    }
+
+    /// <summary>Komisi menurut aturan untuk peran yang dipilih di form.</summary>
+    private long AcuanKomisi => _peran == PeranKaryawan.Sopir ? Trip.KomisiSopir : _peran == PeranKaryawan.Manager ? Trip.KomisiManager : 0;
+
+    private RenderFragment? HintNominal => !JenisKomisi || AcuanKomisi <= 0 ? null
+        : _nominal != AcuanKomisi
+            ? @<text>Komisi menurut aturan @Format.Rupiah(AcuanKomisi) · <PakaiNilai Label="Pakai" OnClick="() => _nominal = AcuanKomisi" /></text>
+            : AturDetail.Teks("Sesuai hasil hitung Aturan Komisi.");
+
+    /// <summary>Orang di trip ini untuk satu peran: supir utama, atau manager trip.</summary>
+    private (string Id, string Nama) OrangTrip(string peran)
+    {
+        if (peran == PeranKaryawan.Sopir)
+        {
+            var s = Db.Cari<Karyawan>(Trip.DriverIds.FirstOrDefault() ?? "");
+            return (s?.Id ?? "", s?.DriverName ?? "");
+        }
+        if (peran == PeranKaryawan.Manager) return (Trip.T.ManagerId, Trip.ManagerLabel);
+        return ("", "");
+    }
+
+    private void Buka(BiayaInternal? c)
+    {
+        _editing = c;
+        if (c is not null)
+        {
+            _jenis = c.CostType; _nominal = c.Amount; _tanggal = c.CostDate; _catatan = c.Notes;
+            _peran = c.RecipientRole; _penerimaId = c.RecipientId; _penerimaNama = c.RecipientName; _lampiran = c.Attachments.ToList();
+        }
+        else
+        {
+            _jenis = "Uang Makan"; _nominal = 0; _tanggal = Trip.T.TransactionDate; _catatan = "";
+            _peran = ""; _penerimaId = ""; _penerimaNama = ""; _lampiran = [];
+        }
+        _galat = null;
+        _terbuka = true;
+    }
+
+    /// <summary>Ganti jenis ke Komisi -> penerima awal: supir utama trip ini.</summary>
+    private void UbahJenis(string? v)
+    {
+        var jenis = v ?? "Uang Makan";
+        _jenis = jenis;
+        if (jenis != "Komisi" || _peran != "") return;
+        _peran = PeranKaryawan.Sopir;
+        (_penerimaId, _penerimaNama) = OrangTrip(_peran);
+    }
+
+    /// <summary>Ganti peran -> penerima awal: orang trip ini untuk peran itu (tetap bisa diganti).</summary>
+    private void UbahPeran(string? v)
+    {
+        _peran = v ?? "";
+        (_penerimaId, _penerimaNama) = OrangTrip(_peran);
+    }
+
+    private void Simpan()
+    {
+        if (_nominal <= 0) { _galat = "Nominal harus lebih dari 0."; return; }
+        if (_tanggal == "") { _galat = "Tanggal wajib diisi."; return; }
+        if (JenisKomisi && _peran == "") { _galat = "Pilih komisi ini untuk manager atau supir."; return; }
+        if (JenisKomisi && _penerimaId == "" && _penerimaNama.Trim() == "") { _galat = "Pilih penerima komisi, atau isi namanya."; return; }
+        var komisi = JenisKomisi;
+        var (peran, id, nama) = komisi
+            ? (_peran, _penerimaId, _penerimaId != "" ? Db.Cari<Karyawan>(_penerimaId)?.DriverName ?? _penerimaNama : _penerimaNama.Trim())
+            : ("", "", "");
+        var (jenis, nominal, tanggal, catatan, lampiran) = (_jenis, _nominal, _tanggal, _catatan, _lampiran.ToList());
+        if (_editing is not null)
+        {
+            Db.Ubah<BiayaInternal>(_editing.Id, x =>
+            {
+                x.CostType = jenis; x.Amount = nominal; x.CostDate = tanggal; x.Notes = catatan; x.Attachments = lampiran;
+                x.RecipientRole = peran; x.RecipientId = id; x.RecipientName = nama;
+            });
+            Toast.Sukses("Biaya internal berhasil diperbarui.");
+        }
+        else
+        {
+            Db.Buat(new BiayaInternal
+            {
+                TripId = Trip.Id, CostType = jenis, Amount = nominal, CostDate = tanggal, Notes = catatan, Attachments = lampiran,
+                RecipientRole = peran, RecipientId = id, RecipientName = nama,
+            });
+            Toast.Sukses(komisi ? "Pembayaran komisi berhasil dicatat." : "Biaya internal berhasil ditambahkan.");
+        }
+        _terbuka = false;
+    }
+
+    private async Task Hapus()
+    {
+        if (_menghapus is null) return;
+        var c = _menghapus;
+        _menghapus = null;
+        Db.Hapus<BiayaInternal>(c.Id);
+        Toast.Sukses("Biaya internal berhasil dihapus.");
+        await LampiranSvc.HapusAsync(c.Attachments);
+    }
+}

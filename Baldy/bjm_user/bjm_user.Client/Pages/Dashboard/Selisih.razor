@@ -1,0 +1,15 @@
+@* Perubahan dibanding bulan lalu. Naik = baik untuk pendapatan & netto; untuk uang yang keluar (Keluar) warnanya dibalik: naik merah, turun hijau. *@
+@if (Persen is double p && double.IsFinite(p))
+{
+    var rata = Math.Abs(p) < 0.05;
+    var baik = Keluar ? p < 0 : p > 0;
+    <span class="tnum d-block fs-11-5" style="color:@(rata ? "var(--ink-3)" : baik ? "#0a7d0a" : "var(--critical)")">
+        @(rata ? "sama dengan" : $"{(p > 0 ? "+" : "")}{p.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture).Replace('.', ',')}% dari") @BulanLalu
+    </span>
+}
+
+@code {
+    [Parameter] public double? Persen { get; set; }
+    [Parameter] public string BulanLalu { get; set; } = "";
+    [Parameter] public bool Keluar { get; set; }
+}

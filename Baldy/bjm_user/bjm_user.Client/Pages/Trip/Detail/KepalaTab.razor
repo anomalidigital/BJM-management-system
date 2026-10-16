@@ -1,0 +1,20 @@
+@* Baris judul / keterangan + tombol tambah di atas tabel tiap tab detail trip. Tanpa Tombol / OnTambah tidak ada tombol tambah. *@
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 border-bottom border-hairline px-3 py-3 @Class">
+    <div class="min-w-0" style="max-width:48rem">
+        @if (Judul is not null) { <h3 class="m-0 fw-semibold text-ink" style="font-size:13.5px">@Judul</h3> }
+        <div class="fs-12-5 text-ink-3 @(Judul is not null ? "mt-1" : "")">@Keterangan</div>
+    </div>
+    @if (Tombol is not null && OnTambah.HasDelegate)
+    {
+        <Tombol Size="sm" Variant="primary" Icon="Ikon.Plus" IconSize="14" Disabled="@(!BisaUbah)" OnClick="() => OnTambah.InvokeAsync()">@Tombol</Tombol>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Judul { get; set; }
+    [Parameter] public RenderFragment? Keterangan { get; set; }
+    [Parameter] public string? Tombol { get; set; }
+    [Parameter] public bool BisaUbah { get; set; }
+    [Parameter] public EventCallback OnTambah { get; set; }
+    [Parameter] public string? Class { get; set; }
+}

@@ -1,0 +1,312 @@
+@page "/transaksi/trip/{Id}"
+@inherits KomponenData
+@*
+    Detail Trip: dokumen Surat Jalan / Berita Acara dan seluruh catatan keuangan perjalanan. Trip Karawang punya tab Perjalanan,
+    Tutup Trip (POD, pool), dan Berita Acara sebagai dokumen cetak. Tab yang terbuka selalu mengikuti ?tab= di URL, jadi tab lain
+    bisa memindahkan tab lewat URL (mis. ?tab=uj&tambah=uang_dorong). ?print=1 langsung membuka preview cetak.
+    Backload / lanjutan hanya dari menu ⋯ daftar trip (Baldy 14 Okt 2026), tidak dari detail.
+*@
+@{
+    var trip = Db.BarisTrip(Id);
+}
+<PageTitle>@(trip is null ? "Trip tidak ditemukan" : $"Trip {trip.IdTampil}") — SIKOTIS</PageTitle>
+
+@if (trip is null)
+{
+    <PageHeader Title="Trip tidak ditemukan" Crumbs="Crumbs(null)" />
+    <Kartu>
+        <div class="px-4 py-5 text-center">
+            <p class="m-0 fs-14 fw-semibold text-ink">Data tidak ditemukan.</p>
+            <p class="m-0 mt-1 fs-13 text-ink-3">Trip mungkin sudah dihapus, atau milik workspace lain.</p>
+            <Tombol Class="mt-3" OnClick="() => Ke(KembaliKe)">@(Asal is not null ? "Kembali ke Pengeluaran" : "Kembali ke daftar")</Tombol>
+        </div>
+    </Kartu>
+}
+else
+{
+    var t = trip.T;
+    var batal = trip.Batal;
+    var karawang = AturDetail.Karawang(trip);
+    var bisaUbah = Bisa("trip") && !batal;
+    /* Tutup Trip: trip yang masih jalan. */
+    var bisaTutup = karawang && bisaUbah && StatusTrip.BisaDitutup(t.Status);
+    /* Trip sudah selesai tetapi mobilnya belum tercatat kembali di pool: mobil belum bisa dipakai trip lain. */
+    var belumDiPool = karawang && t.Status == StatusTrip.Selesai && trip.MenahanKendaraan;
+    /* Biaya tambahan (operasional & internal) hanya Owner & Manager. */
+    var bisaBiaya = Bisa("biaya") && !batal;
+    var tabs = DaftarTab(trip, karawang);
+    var tab = tabs.Any(x => x.Id == AturDetail.NormalTab(TabUrl)) ? AturDetail.NormalTab(TabUrl) : AturDetail.Overview;
+
+    <PageHeader Title="@($"Trip {trip.IdTampil}")" Crumbs="Crumbs(trip.IdTampil)">
+        <Description>Berangkat @Format.TanggalPanjang(t.TransactionDate) · @(trip.DriverNames != "" ? trip.DriverNames : "tanpa supir") · @(trip.PlateNumber != "" ? trip.PlateNumber : "tanpa kendaraan")</Description>
+        <Actions>
+            <Badge Tone="@StatusTrip.Nada(t.Status)">@StatusTrip.Label(t.Status)</Badge>
+            <Tombol Icon="Ikon.ArrowLeft" OnClick="() => Ke(KembaliKe)">Kembali</Tombol>
+            <Tombol Icon="Ikon.Pen" Disabled="@(!bisaUbah)" OnClick="@(() => Ke($"transaksi/trip/{trip.Id}/edit"))">Edit</Tombol>
+            <Tombol Variant="outlineDanger" Icon="Ikon.Ban" Disabled="@(!Bisa("batal") || batal || t.PiNumber != "")" OnClick="() => _membatalkan = true"
+                    Title="@(t.PiNumber != "" && !batal ? $"Sudah ditagih lewat PI {t.PiNumber}: trip yang sudah ditagih tidak bisa dibatalkan." : null)">Batalkan Trip</Tombol>
+            <Tombol Variant="@(bisaTutup ? "secondary" : "primary")" Icon="Ikon.Print" OnClick="() => _printing = true">@(karawang ? "Cetak Berita Acara" : "Cetak Surat Jalan")</Tombol>
+            @if (bisaTutup) { <Tombol Variant="primary" Icon="Ikon.FlagCheckered" OnClick="() => _menutup = true">Tutup Trip</Tombol> }
+            <OverflowMenu Actions="MenuLain(trip, karawang, belumDiPool)" />
+        </Actions>
+    </PageHeader>
+
+    @if (batal)
+    {
+        <div class="mb-3 d-flex align-items-start gap-2 rounded-3 px-3 py-3 fs-13" style="border:1px solid #f3d5d5;background:#fdf2f2;color:#8a2424" data-kotak-batal>
+            <IkonSvg Def="Ikon.Ban" Size="16" Style="margin-top:1px;color:#b02c2c" />
+            <div>
+                <p class="m-0">
+                    <span class="fw-semibold" style="color:#b02c2c">Trip ini dibatalkan@(string.IsNullOrEmpty(t.CancelledAt) ? "" : $" pada {Format.Tanggal(t.CancelledAt)}").</span>
+                    Catatannya tetap disimpan sebagai arsip (dicoret) dan tidak dihitung di laporan. Trip tidak bisa diubah lagi.
+                </p>
+                @if (t.CancelReason != "") { <p class="m-0 mt-1">Alasan: @t.CancelReason</p> }
+                @if (t.CancelSettlement.Count > 0)
+                {
+                    <ul class="m-0 mt-1 ps-4 fs-12-5">
+                        @foreach (var x in t.CancelSettlement)
+                        {
+                            <li>Transfer @Format.Rupiah(x.Tf) @(Db.Cari<Karyawan>(x.DriverId)?.DriverName ?? "supir"): @(x.Cara == "kasbon" ? "dijadikan kasbon" : "dikembalikan tunai")</li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    }
+
+    @if (belumDiPool)
+    {
+        @* Aturan 12 Okt 2026: mobil baru bisa dipilih trip lain setelah tercatat kembali di pool. Trip yang ditutup "ada backload"
+           tetapi trip lanjutannya belum dibuat juga masih menahan mobilnya. *@
+        <div class="mb-3 d-flex flex-wrap align-items-center justify-content-between gap-3 rounded-3 px-3 py-3 fs-13" style="border:1px solid #f6e2ac;background:#fff8e6;color:#8a6100" data-kotak-pool>
+            <p class="m-0 d-flex min-w-0 align-items-start gap-2">
+                <IkonSvg Def="Ikon.Warehouse" Size="16" Style="margin-top:1px" />
+                <span>
+                    <span class="fw-semibold">Mobil belum tercatat kembali di pool, jadi belum bisa dipakai trip lain.</span>
+                    @if (t.AdaBackload == true)
+                    {
+                        <span class="d-block fs-12-5">Trip ini ditandai ada backload / lanjutan: buat tripnya lewat menu ⋯ di daftar trip, atau tandai sudah di pool bila tidak jadi.</span>
+                    }
+                    else if (trip.PlateNumber != "")
+                    {
+                        <span class="d-block fs-12-5">@trip.PlateNumber masih tertahan di trip ini sejak ditutup@(string.IsNullOrEmpty(t.ClosedAt) ? "" : $" {Format.Tanggal(t.ClosedAt)}"). Backload / lanjutan dibuat lewat menu ⋯ di daftar trip.</span>
+                    }
+                </span>
+            </p>
+            <Tombol Size="sm" Variant="primary" Icon="Ikon.Warehouse" IconSize="14" Disabled="@(!Bisa("trip"))" OnClick="() => TandaiPool(trip)">Tandai sudah di pool</Tombol>
+        </div>
+    }
+
+    @* Ringkasan finansial trip *@
+    <div class="row row-cols-2 row-cols-sm-3 row-cols-xl-6 g-3 mb-3" data-kartu-ringkas>
+        @foreach (var k in KartuRingkasan(trip, karawang))
+        {
+            var kk = k;
+            <div class="col">
+                <button type="button" class="kartu shadow-card w-100 h-100 p-3 text-start d-flex flex-column justify-content-start" disabled="@(kk.Tab is null)" @onclick="() => GantiTab(kk.Tab!)"
+                        style="@(kk.Acuan ? "border-style:dashed;border-color:var(--brand-200);background:color-mix(in srgb, var(--brand-50) 40%, var(--surface))" : null)">
+                    <p class="m-0 fs-12-5 fw-medium text-ink-3">@kk.Label</p>
+                    <p class="m-0 mt-2 tnum fw-semibold text-ink lh-1" style="font-size:19px;letter-spacing:-.01em">@kk.Nilai</p>
+                    <p class="m-0 mt-2 fs-11-5 text-ink-3" style="line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" title="@kk.Ket">@kk.Ket</p>
+                </button>
+            </div>
+        }
+    </div>
+
+    <Kartu>
+        <Tabs Items="tabs" Value="@tab" ValueChanged="GantiTab" Class="px-2" />
+        <div @key="@($"{trip.Id}-{tab}")">
+            @switch (tab)
+            {
+                case AturDetail.Perjalanan:
+                    <TabPerjalanan Trip="trip" BisaUbah="bisaUbah" />
+                    break;
+                case AturDetail.Uj:
+                    <TabUangJalan Trip="trip" BisaUbah="bisaUbah" Tambah="@Tambah" />
+                    break;
+                case AturDetail.Biaya:
+                    <TabBiaya Trip="trip" />
+                    break;
+                case AturDetail.Internal:
+                    <TabInternal Trip="trip" BisaUbah="bisaBiaya" />
+                    break;
+                case AturDetail.Dokumen:
+                    <TabDokumen Trip="trip" BisaUbah="bisaUbah" />
+                    break;
+                default:
+                    if (karawang) { <OverviewKarawang Trip="trip" /> } else { <OverviewPriok Trip="trip" /> }
+                    break;
+            }
+        </div>
+    </Kartu>
+
+    <SuratJalanPrintFlow Notes="@([trip])" Open="_printing" OnClose="() => _printing = false" />
+    <ModalBatalTrip Trip="@(_membatalkan ? trip : null)" OnClose="() => _membatalkan = false" />
+    <ModalTutupTrip Trip="@(_menutup ? trip : null)" OnClose="() => _menutup = false" />
+    <ModalRekapTrip Trip="@(_rekap ? trip : null)" OnClose="() => _rekap = false" />
+    <ModalHapusTrip Trip="@(_menghapus ? trip : null)" OnClose="() => _menghapus = false" OnDeleted="_ => Ke(KembaliKe)" />
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "tab")] public string? TabUrl { get; set; }
+    /// <summary>Perintah sekali pakai untuk tab tujuannya (mis. uang_dorong untuk tab Uang Jalan).</summary>
+    [SupplyParameterFromQuery(Name = "tambah")] public string? Tambah { get; set; }
+    /// <summary>Datang dari "Simpan & Cetak": langsung buka preview cetak.</summary>
+    [SupplyParameterFromQuery(Name = "print")] public string? Print { get; set; }
+    [SupplyParameterFromQuery(Name = "dari")] public string? Dari { get; set; }
+    [SupplyParameterFromQuery(Name = "dari_tab")] public string? DariTab { get; set; }
+    [SupplyParameterFromQuery(Name = "awal")] public string? Awal { get; set; }
+    [SupplyParameterFromQuery(Name = "akhir")] public string? Akhir { get; set; }
+
+    private bool _printing, _membatalkan, _menghapus, _menutup, _rekap;
+    private bool _hapusPrint;
+
+    /* ── Asal dari Laporan → Pengeluaran (breadcrumb & tombol Kembali) ───────────────────── */
+
+    private sealed record AsalPengeluaran(string Tab, string Awal, string Akhir);
+    private static readonly Dictionary<string, string> TabPengeluaran = new() { ["trip"] = "Per Trip", ["uj"] = "Uang Jalan", ["biaya"] = "Biaya Operasional" };
+    /// <summary>Asal dari Pengeluaran diingat per trip: bila URL diganti tab lain tanpa ?dari=, breadcrumb & Kembali tetap ke sana.</summary>
+    private (string Id, AsalPengeluaran Asal)? _ingatAsal;
+
+    private static string TanggalSah(string? v) => v is { Length: 10 } && Format.Pecah(v, out _, out _, out _) ? v : "";
+
+    private AsalPengeluaran? AsalUrl => Dari != "pengeluaran" ? null
+        : new AsalPengeluaran(DariTab is not null && TabPengeluaran.ContainsKey(DariTab) ? DariTab : "trip", TanggalSah(Awal), TanggalSah(Akhir));
+
+    private AsalPengeluaran? Asal => AsalUrl ?? (_ingatAsal is { } a && a.Id == Id ? a.Asal : null);
+
+    private static string AlamatPengeluaran(AsalPengeluaran a, bool denganTab = true)
+    {
+        var q = new List<string>();
+        if (denganTab && a.Tab != "trip") q.Add($"tab={a.Tab}");
+        if (a.Awal != "") q.Add($"awal={a.Awal}");
+        if (a.Akhir != "") q.Add($"akhir={a.Akhir}");
+        return $"laporan/pengeluaran{(q.Count > 0 ? "?" + string.Join("&", q) : "")}";
+    }
+
+    private string KembaliKe => Asal is { } a ? AlamatPengeluaran(a) : "transaksi/trip";
+
+    private List<Crumb> Crumbs(string? label)
+    {
+        var c = Asal is { } a
+            ? new List<Crumb> { new("Laporan"), new("Pengeluaran", AlamatPengeluaran(a, false)), new(TabPengeluaran[a.Tab], AlamatPengeluaran(a)) }
+            : new List<Crumb> { new("Trip / Job Order", "transaksi/trip") };
+        if (label is not null) c.Add(new Crumb(label));
+        return c;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (AsalUrl is { } asal) _ingatAsal = (Id, asal);
+        if (Print == "1")
+        {
+            if (Db.BarisTrip(Id) is not null) _printing = true;
+            _hapusPrint = true;
+        }
+    }
+
+    protected override void OnAfterRender(bool pertama)
+    {
+        if (!_hapusPrint) return;
+        _hapusPrint = false;
+        Nav.NavigateTo(Nav.GetUriWithQueryParameter("print", (string?)null), replace: true);
+    }
+
+    /* ── Tab & kartu ringkasan ─────────────────────────────────────────────────────────── */
+
+    private List<TabItem> DaftarTab(BarisTrip trip, bool karawang)
+    {
+        var d = Db.Semua;
+        var tabs = new List<TabItem> { new(AturDetail.Overview, "Overview") };
+        if (karawang) tabs.Add(new(AturDetail.Perjalanan, "Perjalanan", d.Kejadian.Count(e => e.TripId == trip.Id).ToString()));
+        tabs.Add(new(AturDetail.Uj, "Uang Jalan", d.Termin.Count(p => p.TripId == trip.Id).ToString()));
+        tabs.Add(new(AturDetail.Biaya, "Biaya Operasional", d.Biaya.Count(e => e.TripId == trip.Id).ToString()));
+        // Atasan 13 Okt 2026: "biaya internal diubah ke Komisi" (komisi supir & manager + biaya internal lain).
+        tabs.Add(new(AturDetail.Internal, "Komisi", d.BiayaInternal.Count(c => c.TripId == trip.Id).ToString()));
+        tabs.Add(new(AturDetail.Dokumen, "Dokumen", d.CatatanTrip.Count(n => n.TripId == trip.Id).ToString()));
+        return tabs;
+    }
+
+    /// <summary>Tab mengikuti URL; "tambah" adalah perintah sekali pakai untuk tab tujuannya, jangan terbawa ke tab lain.</summary>
+    private void GantiTab(string t)
+    {
+        if (AturDetail.NormalTab(TabUrl) == t && Tambah is null) return;
+        Nav.NavigateTo(Nav.GetUriWithQueryParameters(new Dictionary<string, object?> { ["tab"] = t == AturDetail.Overview ? null : t, ["tambah"] = null }), replace: true);
+    }
+
+    private sealed record KartuRingkas(string Label, string Nilai, string Ket, string? Tab, bool Acuan = false);
+
+    private List<KartuRingkas> KartuRingkasan(BarisTrip trip, bool karawang)
+    {
+        var d = Db.Semua;
+        var t = trip.T;
+        var batal = trip.Batal;
+        // Catatan dibaca dari seluruh data: untuk trip batal, ini arsipnya.
+        var termin = d.Termin.Where(p => p.TripId == trip.Id).ToList();
+        var biaya = d.Biaya.Where(e => e.TripId == trip.Id).ToList();
+        var internal_ = d.BiayaInternal.Where(c => c.TripId == trip.Id).ToList();
+        var biayaTagih = biaya.Where(TripLogika.Ditagihkan).ToList();
+        var uj = termin.Sum(p => p.UjAmount);
+        var kasbon = termin.Sum(p => p.KasbonDeduction);
+        var tol = biaya.Where(e => e.ExpenseType == "Tol").Sum(e => e.Amount);
+        var totalBiaya = biaya.Sum(e => e.Amount);
+        var tagih = biayaTagih.Sum(e => e.Amount);
+        var prsh = biaya.Where(TripLogika.DibayarPerusahaan).Sum(e => e.Amount);
+        /* Pembayaran komisi yang sudah dicatat (jenis Komisi) dan biaya internal lain (uang makan, kernet, ...). */
+        var komisiDibayar = internal_.Where(c => c.CostType == "Komisi").Sum(c => c.Amount);
+        var internalLain = internal_.Where(c => c.CostType != "Komisi").Sum(c => c.Amount);
+        // Patokan Uang Jalan Rute hanya dibandingkan dengan termin jenis uang jalan biasa; uang dorong, uang pulang, dan tambahan di luar patokan.
+        var ujBiasa = termin.Where(p => string.IsNullOrEmpty(p.Jenis) || p.Jenis == JenisTermin.Uj).Sum(p => p.UjAmount);
+        var sisaUj = trip.Ujroute - ujBiasa;
+        var arsip = batal ? " · arsip" : "";
+
+        var kartu = new List<KartuRingkas>
+        {
+            new("Total Uang Jalan", Format.Rupiah(uj),
+                trip.Ujroute > 0 && !batal
+                    ? (sisaUj >= 0 ? $"patokan {Format.Rupiah(trip.Ujroute)} · sisa {Format.Rupiah(sisaUj)}" : $"lebih {Format.Rupiah(-sisaUj)} dari patokan")
+                    : $"{termin.Count} termin{arsip}", AturDetail.Uj),
+            karawang
+                // Karawang: biaya operasional yang ikut ditagihkan ke klien (biaya tambahan di PI).
+                ? new("Ditagihkan ke klien", Format.Rupiah(trip.BiayaDitagihkan),
+                    batal
+                        ? (tagih > 0 ? $"arsip {Format.Rupiah(tagih)}, tidak ditagihkan" : "trip batal tidak ditagihkan")
+                        : biayaTagih.Count > 0 ? $"{biayaTagih.Count} biaya ikut ke PI" : "belum ada biaya yang ditagihkan", AturDetail.Biaya)
+                : new("Tol", Format.Rupiah(tol), trip.Toll > 0 ? $"patokan rute {Format.Rupiah(trip.Toll)}" : "dari biaya operasional jenis Tol", AturDetail.Biaya, true),
+            new("Potong Kasbon", Format.Rupiah(kasbon), $"dari kasbon supir{arsip}", AturDetail.Uj),
+            new("Transfer ke Supir", Format.Rupiah(uj - kasbon), $"Uang Jalan − Potong Kasbon{arsip}", AturDetail.Uj),
+            new("Biaya Operasional", Format.Rupiah(totalBiaya),
+                karawang
+                    ? $"{(prsh > 0 ? $"{Format.Rupiah(prsh)} oleh perusahaan" : "dari uang jalan")} · {Format.Rupiah(tagih)} ke klien{arsip}"
+                    : $"{biaya.Count} item{arsip}", AturDetail.Biaya),
+            // Pembayaran komisi dan biaya internal lain disebut terpisah supaya uang makan / kernet tidak terbaca sebagai komisi.
+            new("Komisi", Format.Rupiah(batal ? 0 : trip.KomisiSopir + trip.KomisiManager),
+                batal ? "trip batal"
+                    : string.Join(" · ", new[]
+                    {
+                        komisiDibayar > 0 ? $"dibayar {Format.Rupiah(komisiDibayar)}" : "dari Aturan Komisi",
+                        internalLain > 0 ? $"biaya internal lain {Format.Rupiah(internalLain)}" : "",
+                    }.Where(x => x != "")) + arsip, AturDetail.Internal),
+        };
+        return kartu;
+    }
+
+    /* ── Aksi ──────────────────────────────────────────────────────────────────────────── */
+
+    private List<AksiMenu> MenuLain(BarisTrip trip, bool karawang, bool belumDiPool)
+    {
+        var menu = new List<AksiMenu>();
+        // Backload / lanjutan hanya dari menu ⋯ daftar trip (Baldy 14 Okt 2026), tidak dari detail.
+        if (karawang) menu.Add(new AksiMenu("Rekap Trip", () => _rekap = true, Ikon.ClipboardCheck));
+        if (belumDiPool) menu.Add(new AksiMenu("Tandai mobil di pool", () => TandaiPool(trip), Ikon.Warehouse, disabled: !Bisa("trip")));
+        menu.Add(new AksiMenu("Hapus Trip", () => _menghapus = true, Ikon.TrashCan, "danger", !Bisa("hapus")));
+        return menu;
+    }
+
+    private void TandaiPool(BarisTrip trip)
+    {
+        Db.TandaiDiPool(trip.Id);
+        Toast.Sukses($"Mobil {(trip.PlateNumber != "" ? trip.PlateNumber : $"Trip {trip.IdTampil}")} tercatat kembali di pool dan bisa dipakai trip lain.");
+    }
+}

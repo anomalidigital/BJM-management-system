@@ -1,0 +1,113 @@
+@* Berita Acara Serah Terima Barang untuk trip Karawang (format Meeting 2). Isian yang belum ada dicetak titik-titik untuk ditulis tangan. *@
+@{
+    var t = Note.T;
+    var tgl = Format.KeTanggal(t.TransactionDate);
+    var hari = tgl is null ? "" : new[] { "Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu" }[(int)tgl.Value.DayOfWeek];
+    var jenis = (string.IsNullOrEmpty(t.Gandengan) ? Note.VehicleConfig : t.Gandengan).Trim();
+    var kendaraan = Note.PlateNumber != "" ? string.Join(" · ", new[] { "1 unit", KonfigurasiKendaraan.Label(jenis.ToUpperInvariant()) }.Where(x => x != "")) : "";
+    var barang = string.Join("; ", TripLogika.Muatan(t).Select(m => string.Join(" · ", new[] { m.IdPerjalanan, m.Keterangan }.Where(x => x != ""))).Where(x => x != ""));
+    var catatan = string.Join(" · ", new[] { t.Pengirim?.Catatan is { Length: > 0 } cp ? $"Pick up: {cp}" : "", t.Penerima?.Catatan is { Length: > 0 } cd ? $"Destinasi: {cd}" : "" }.Where(x => x != ""));
+    var keteranganLain = new List<string> { barang, catatan }.Where(x => x != "").ToList();
+    while (keteranganLain.Count < 3) keteranganLain.Add("");
+    var kontakTujuan = string.Join(" · ", new[] { t.Penerima?.Kontak, t.Penerima?.Telepon }.Where(x => !string.IsNullOrWhiteSpace(x)));
+    string Titik(TitikAlamat? a) => string.Join(", ", new[] { a?.Nama, a?.Jalan }.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!.Trim()));
+    var baris = new (string Label, string Nilai, bool DuaBaris, string? Keterangan)[]
+    {
+        ("Nomor TR/OR", string.Join(", ", Note.TrList), true, null),
+        ("Lokasi Muat", Titik(t.Pengirim) is { Length: > 0 } muatTitik ? muatTitik : Note.Muat, true, null),
+        ("Lokasi Bongkar", Titik(t.Penerima) is { Length: > 0 } bongkarTitik ? bongkarTitik : Note.Bongkar, true, kontakTujuan != "" ? $"Kontak tujuan: {kontakTujuan}" : null),
+        ("Jumlah & Jenis Kendaraan", kendaraan, false, null),
+        ("Plat No", Note.PlateNumber, false, null),
+        ("Nama Driver", Note.DriverNames, false, null),
+        ("Nama Helper", "", false, null),
+    };
+}
+<section class="print-sheet ba mx-auto d-flex flex-column bg-white text-black border border-hairline shadow-card" style="width:210mm;max-width:100%;padding:14mm;font-size:11px;line-height:1.35">
+    <header class="d-flex align-items-start justify-content-between gap-4 pb-2" style="border-bottom:@(WithLogo ? "3px" : "1px") solid #000">
+        <div class="d-flex align-items-start gap-3">
+            @if (WithLogo)
+            {
+                <div class="flex-shrink-0 d-grid rounded-1" style="width:48px;height:48px;place-items:center;border:2.5px solid #000"><span class="fw-black lh-1" style="font-size:17px;font-weight:900;letter-spacing:-.04em">BM</span></div>
+            }
+            <div>
+                <p class="m-0 fw-bold lh-tight" style="font-size:16px;letter-spacing:-.01em">PT BIMAJAYA MUSTIKA</p>
+                <p class="m-0" style="font-size:10.5px;letter-spacing:.18em">KARAWANG</p>
+                @if (WithLogo) { <p class="m-0 mt-1 text-secondary" style="font-size:9px">Heavy Equipment Transportation</p> }
+            </div>
+        </div>
+        <dl class="m-0 text-end" style="line-height:1.35">
+            <dt class="text-secondary fw-normal" style="font-size:9.5px">ID Trip</dt>
+            <dd class="m-0 fw-bold" style="font-size:12px;max-width:62mm;word-break:break-all">@(t.TransactionNo == "" ? "—" : t.TransactionNo)</dd>
+        </dl>
+    </header>
+    <h1 class="mt-3 text-center fw-bold text-decoration-underline" style="font-size:14px;letter-spacing:.06em;text-underline-offset:4px">BERITA ACARA SERAH TERIMA BARANG</h1>
+    <p class="mt-3 mb-0 d-flex flex-wrap align-items-end gap-1">
+        <span>Pada hari</span><span class="isian" style="width:26mm">@hari</span>
+        <span>tanggal</span><span class="isian" style="width:12mm">@(tgl?.Day.ToString() ?? "")</span>
+        <span>bulan</span><span class="isian" style="width:12mm">@(tgl is null ? "" : tgl.Value.Month.ToString("00"))</span>
+        <span>tahun</span><span class="isian" style="width:16mm">@(tgl?.Year.ToString() ?? "")</span>
+    </p>
+    <p class="mt-2 mb-0">Bahwa yang bertanda tangan di bawah ini telah melakukan serah terima barang berdasarkan:</p>
+    <div class="mt-2 px-3 py-2" style="border:1px solid #000">
+        @foreach (var b in baris)
+        {
+            <div class="py-0" style="padding:2px 0">
+                <div class="d-flex align-items-end gap-2">
+                    <span class="flex-shrink-0 fw-semibold" style="width:44mm">@b.Label</span><span>:</span>
+                    <span class="isian flex-grow-1 @(b.DuaBaris ? "dua-baris" : "")" style="@(b.Nilai.Length > 110 ? "font-size:10px" : null)">@b.Nilai</span>
+                </div>
+                @if (b.Keterangan is not null)
+                {
+                    <p class="m-0 d-flex gap-2 text-secondary" style="font-size:9.5px;line-height:1.2;margin-top:1px"><span class="flex-shrink-0" style="width:44mm"></span><span class="invisible">:</span><span class="min-w-0 flex-grow-1 text-truncate px-1">@b.Keterangan</span></p>
+                }
+            </div>
+        }
+        <div class="d-flex align-items-end gap-2" style="padding:2px 0"><span class="flex-shrink-0 fw-semibold" style="width:44mm">Kategori Barang</span><span>:</span><span class="d-flex gap-4"><span class="kotak">B3</span><span class="kotak">Non B3</span></span></div>
+        <div class="d-flex align-items-end gap-2" style="padding:2px 0"><span class="flex-shrink-0 fw-semibold" style="width:44mm">Berat &amp; Jumlah Kolli</span><span>:</span><span class="isian" style="width:24mm"></span><span>Kg,</span><span class="isian" style="width:20mm"></span><span>Collie(s)</span></div>
+        <div class="d-flex align-items-start gap-2" style="padding:2px 0"><span class="flex-shrink-0 fw-semibold" style="width:44mm">Mode of Transport (MOT)</span><span>:</span>
+            <span class="d-flex flex-wrap gap-1 column-gap-4"><span class="kotak centang">Darat</span><span class="kotak">Laut</span><span class="kotak">Udara</span><span class="kotak">Multidrop</span><span class="kotak">Combine</span><span class="kotak">Multi Pick-up</span></span>
+        </div>
+    </div>
+    <p class="mt-2 mb-0 fw-semibold">Pelaksanaan Pengiriman:</p>
+    <div class="mt-1 d-flex flex-column gap-1">
+        <p class="m-0 d-flex align-items-end gap-1"><span class="kotak">Menginap di lokasi muat sejak tanggal</span><span class="isian" style="width:28mm"></span></p>
+        <p class="m-0 d-flex align-items-end gap-1"><span class="kotak">Menginap di lokasi bongkar sejak tanggal</span><span class="isian" style="width:28mm"></span><span>s/d</span><span class="isian" style="width:28mm"></span></p>
+        <p class="m-0 d-flex align-items-end gap-1"><span class="kotak">Relokasi / dialihkan, alasannya</span><span class="isian flex-grow-1"></span></p>
+        <p class="m-0 d-flex align-items-end gap-1"><span class="kotak">Dikembalikan ke gudang, alasannya</span><span class="isian flex-grow-1"></span></p>
+        <p class="m-0 d-flex align-items-end gap-1"><span class="kotak">Disimpan sementara sejak tanggal</span><span class="isian" style="width:28mm"></span><span>s/d</span><span class="isian" style="width:28mm"></span></p>
+    </div>
+    <div class="mt-2 pt-2 d-flex flex-column gap-1" style="border-top:1px solid #000">
+        @foreach (var (label, ya, tidak) in new[] { ("Kondisi kemasan / peti / karton / kardus", "Baik", "Rusak"), ("Kondisi lashing", "Sesuai standar", "Tidak sesuai standar"), ("Jumlah & jenis barang sesuai dokumen OR / TR", "Ya", "Tidak") })
+        {
+            <div class="d-grid align-items-center gap-2" style="grid-template-columns:1fr 38mm 42mm"><span>@label</span><span class="kotak">@ya</span><span class="kotak">@tidak</span></div>
+        }
+    </div>
+    <p class="mt-2 mb-0 fw-semibold">Packing list / keterangan lain:</p>
+    <div class="mt-1 d-flex flex-column gap-2">
+        @foreach (var v in keteranganLain) { <span class="isian d-block w-100 @(v.Length > 120 ? "dua-baris" : "")" style="@(v.Length > 120 ? "font-size:10px" : null)">@v</span> }
+    </div>
+    <p class="mt-2 mb-0">Demikian Berita Acara ini dibuat dengan sebenarnya untuk dipergunakan sebagaimana mestinya.</p>
+    <div class="mt-2 row row-cols-3 g-4">
+        @foreach (var (peran, barisTtd) in new[] { ("Yang Menyerahkan", new[] { "Nama", "Tanggal" }), ("Transporter", new[] { "Nama", "Tanggal" }), ("Penerima", new[] { "Nama", "Tanggal & jam", "Perusahaan", "HP" }) })
+        {
+            <div class="col">
+                <p class="m-0 fw-semibold">@peran,</p>
+                <div style="height:18mm"></div>
+                <div class="d-flex flex-column gap-1">
+                    @foreach (var l in barisTtd) { <p class="m-0 d-flex align-items-end gap-1"><span class="flex-shrink-0" style="width:17mm;font-size:10px">@l</span><span>:</span><span class="isian min-w-0 flex-grow-1" style="font-size:10px"></span></p> }
+                </div>
+            </div>
+        }
+    </div>
+    <div class="mt-2 pt-2 d-flex flex-column gap-1" style="border-top:1px solid #000">
+        <p class="m-0 d-flex align-items-end gap-1"><span class="flex-shrink-0">Penerima tiba di site, tgl &amp; jam:</span><span class="isian flex-grow-1"></span></p>
+        <p class="m-0 d-flex align-items-end gap-1"><span class="flex-shrink-0">Pengirim tiba di site, tgl &amp; jam:</span><span class="isian flex-grow-1"></span><span class="flex-shrink-0">Selesai bongkar, tgl &amp; jam:</span><span class="isian flex-grow-1"></span><span class="flex-shrink-0 fw-semibold">(wajib diisi)</span></p>
+    </div>
+    <p class="mt-2 mb-0 text-center fw-semibold" style="font-size:9.5px;line-height:1.6">Bila kolom keterangan lain dibiarkan kosong dan Berita Acara ini sudah ditandatangani penerima, barang dinyatakan diterima sesuai jenis, jumlah, dan kondisinya.</p>
+    <footer class="mt-auto pt-1 text-secondary" style="border-top:1px solid #9ca3af;font-size:8.5px">SIKOTIS · PT Bimajaya Mustika@(t.TransactionNo != "" ? $" · ID Trip {t.TransactionNo}" : "")</footer>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public BarisTrip Note { get; set; } = default!;
+    [Parameter] public bool WithLogo { get; set; } = true;
+}

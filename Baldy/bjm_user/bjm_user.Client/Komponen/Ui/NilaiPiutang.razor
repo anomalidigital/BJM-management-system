@@ -1,0 +1,10 @@
+@* Nominal piutang dari sisi karyawan: minus merah = piutang, plus hijau = pelunasan, nol abu-abu. *@
+<span class="tnum text-nowrap @(Tebal ? "fw-semibold" : "") @Class" style="@(Nilai < 0 ? "color:var(--critical)" : Nilai > 0 ? "color:#0a7d0a" : "color:var(--ink-3)")">@Teks(Nilai)</span>
+
+@code {
+    [Parameter] public long Nilai { get; set; }
+    [Parameter] public bool Tebal { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    public static string Teks(long n) => n < 0 ? $"−{Format.Rupiah(-n)}" : n > 0 ? $"+{Format.Rupiah(n)}" : Format.Rupiah(0);
+}

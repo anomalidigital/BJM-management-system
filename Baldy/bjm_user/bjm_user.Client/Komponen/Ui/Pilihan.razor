@@ -1,0 +1,215 @@
+@* Dropdown pilihan SIKOTIS — satu tampilan untuk semua dropdown. Tombol bergaya .form-select, daftar .dropdown-menu
+   berposisi tetap di layar (tidak terpotong modal / tabel), membuka ke atas bila ruang bawah kurang.
+   Dipakai langsung (Supir / Rute / Kendaraan) maupun sebagai pengganti <select> (Cari=false, Clearable=false). *@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="position-relative @Class" @ref="_akar">
+    <button id="@Id" type="button" class="form-select @(Ukuran == "sm" ? "form-select-sm" : "") @(Invalid ? "is-invalid" : "") @(_buka ? "terbuka" : "")"
+            disabled="@Disabled" aria-haspopup="listbox" aria-expanded="@_buka" aria-label="@AriaLabel" @ref="_tombol"
+            @onclick="Toggle" @onkeydown="TombolKey">
+        <span class="isi-pilihan @(Terpilih is null ? "kosong" : "")">@(Terpilih?.Label ?? Placeholder)</span>
+        @if (Clearable && Terpilih is not null && Terpilih.Value != "" && !Disabled)
+        {
+            <span role="button" tabindex="-1" aria-label="Kosongkan pilihan" class="hapus-pilihan" @onclick="Kosongkan" @onclick:stopPropagation="true">
+                <IkonSvg Def="Ikon.Xmark" Size="13" />
+            </span>
+        }
+    </button>
+
+    @if (_buka)
+    {
+        <div class="dropdown-menu show panel-pilihan" data-lapis-atas style="@_gaya" @ref="_panel" @onclick:stopPropagation="true">
+            @if (PakaiCari)
+            {
+                <div class="px-2 pt-1 pb-2">
+                    <div class="kotak-cari">
+                        <IkonSvg Def="Ikon.MagnifyingGlass" Size="13" Class="ikon-cari" />
+                        <input class="form-control form-control-sm" value="@_q" placeholder="@SearchPlaceholder" aria-label="@SearchPlaceholder"
+                               @oninput="Ketik" @onkeydown="DaftarKey" @ref="_input" />
+                    </div>
+                </div>
+            }
+            @if (Tambahan is not null)
+            {
+                <button type="button" class="dropdown-item aksi-tambah" disabled="@Tambahan.Disabled" @onclick="KlikTambahan">
+                    <IkonSvg Def="Ikon.Plus" Size="13" />
+                    <span class="min-w-0 flex-grow-1">
+                        <span class="d-block text-truncate">@Tambahan.Label(_q.Trim())</span>
+                        @if (Tambahan.Hint is not null) { <span class="d-block fs-11-5 fw-normal text-ink-3">@Tambahan.Hint</span> }
+                    </span>
+                </button>
+                <hr class="dropdown-divider" />
+            }
+            <div role="listbox" tabindex="-1" class="pilihan-daftar" @onkeydown="DaftarKey" @ref="_daftar">
+                @if (Tersaring.Count == 0)
+                {
+                    <div class="px-3 py-4 text-center fs-12 text-ink-3">@EmptyText</div>
+                }
+                @for (var i = 0; i < Tersaring.Count; i++)
+                {
+                    var o = Tersaring[i]; var idx = i;
+                    <button type="button" role="option" aria-selected="@(o.Value == Nilai)" aria-disabled="@(o.Disabled ? "true" : null)"
+                            data-aktif="@(idx == _aktif ? "true" : null)" title="@(o.Disabled ? o.Meta : null)"
+                            class="dropdown-item @(idx == _aktif && !o.Disabled ? "active" : "")"
+                            @onmouseenter="() => { if (!o.Disabled) _aktif = idx; }" @onclick="() => Pilih(o)">
+                        @if (o.Disabled) { <IkonSvg Def="Ikon.Lock" Size="12" Class="text-ink-3" /> }
+                        <span class="min-w-0 flex-grow-1">
+                            <span class="label-opsi">@o.Label</span>
+                            @if (!string.IsNullOrEmpty(o.Meta)) { <span class="meta-opsi">@o.Meta</span> }
+                        </span>
+                        @if (o.Value == Nilai) { <IkonSvg Def="Ikon.Check" Size="14" Class="text-brand" /> }
+                    </button>
+                }
+            </div>
+            @if (PakaiCari)
+            {
+                <div class="dropdown-footer">@Tersaring.Count dari @Options.Count data@(Nonaktif > 0 ? $" · {Nonaktif} tidak bisa dipilih" : "")</div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<Opsi> Options { get; set; } = [];
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Pilih...";
+    [Parameter] public string SearchPlaceholder { get; set; } = "Ketik untuk mencari...";
+    [Parameter] public string EmptyText { get; set; } = "Tidak ada pilihan yang cocok.";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Invalid { get; set; }
+    [Parameter] public bool Clearable { get; set; } = true;
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public AksiTambahan? Tambahan { get; set; }
+    /// <summary>Kotak pencarian di panel; null = otomatis (ada bila pilihan > 8).</summary>
+    [Parameter] public bool? Cari { get; set; }
+    [Parameter] public string Ukuran { get; set; } = "md";
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
+
+    private bool _buka;
+    private string _q = "";
+    private int _aktif;
+    private string _gaya = "position:fixed;top:-9999px;left:-9999px;min-width:220px";
+    private ElementReference _akar, _tombol, _panel, _input, _daftar;
+    private DotNetObjectReference<Pilihan>? _ref;
+    private IJSObjectReference? _pegangan;
+    private bool _terpasang;
+    private bool _perluPosisi;
+
+    private string Nilai => Value ?? "";
+    private Opsi? Terpilih => Options.FirstOrDefault(o => o.Value == Nilai);
+    private bool PakaiCari => Cari ?? Options.Count > 8;
+    private int Nonaktif => Options.Count(o => o.Disabled);
+    private List<Opsi> Tersaring => Saring(_q);
+    private List<Opsi> Saring(string q) => Options.Where(o => Util.CocokCari(q, o.Label, o.Meta, o.Keywords, o.Value)).ToList();
+    private static int PertamaAktif(List<Opsi> l) => Math.Max(0, l.FindIndex(o => !o.Disabled));
+
+    private async Task Toggle()
+    {
+        if (_buka) { await TutupAsync(); return; }
+        _q = "";
+        var l = Options;
+        var t = l.FindIndex(o => o.Value == Nilai && !o.Disabled);
+        _aktif = t >= 0 ? t : PertamaAktif(l);
+        _buka = true;
+        _perluPosisi = true;
+    }
+
+    private async Task TombolKey(KeyboardEventArgs e)
+    {
+        if (!_buka && e.Key is "ArrowDown" or "ArrowUp") await Toggle();
+    }
+
+    private void Ketik(ChangeEventArgs e)
+    {
+        _q = e.Value?.ToString() ?? "";
+        _aktif = PertamaAktif(Saring(_q));
+        _perluPosisi = true;
+    }
+
+    private async Task DaftarKey(KeyboardEventArgs e)
+    {
+        var l = Tersaring;
+        switch (e.Key)
+        {
+            case "ArrowDown": Geser(l, 1); await GulirAktif(); break;
+            case "ArrowUp": Geser(l, -1); await GulirAktif(); break;
+            case "Enter": if (_aktif >= 0 && _aktif < l.Count) await Pilih(l[_aktif]); break;
+            case "Escape": await TutupAsync(); break;
+            case "Tab": await TutupAsync(); break;
+        }
+    }
+
+    private void Geser(List<Opsi> l, int arah)
+    {
+        for (var j = _aktif + arah; j >= 0 && j < l.Count; j += arah) if (!l[j].Disabled) { _aktif = j; return; }
+    }
+
+    private async Task Pilih(Opsi o)
+    {
+        if (o.Disabled) return;
+        await ValueChanged.InvokeAsync(o.Value);
+        await TutupAsync();
+    }
+
+    private async Task Kosongkan() => await ValueChanged.InvokeAsync(null);
+
+    private async Task KlikTambahan()
+    {
+        var q = _q.Trim();
+        await TutupAsync();
+        if (Tambahan is not null) await Tambahan.OnClick(q);
+    }
+
+    private async Task TutupAsync()
+    {
+        if (!_buka) return;
+        _buka = false;
+        await LepasAsync();
+        StateHasChanged();
+    }
+
+    [JSInvokable] public Task TutupDariLuar() => TutupAsync();
+
+    protected override async Task OnAfterRenderAsync(bool pertama)
+    {
+        if (_buka && !_terpasang)
+        {
+            _terpasang = true;
+            _ref ??= DotNetObjectReference.Create(this);
+            try
+            {
+                _pegangan = await JS.InvokeAsync<IJSObjectReference>("sikotis.pasangTutupLuar", _akar, _ref);
+                await JS.InvokeVoidAsync("sikotis.jagaKunci", _panel);
+                await JS.InvokeVoidAsync("sikotis.fokusDalam", PakaiCari ? _input : _daftar);
+            }
+            catch { /* abaikan */ }
+        }
+        if (_buka && _perluPosisi)
+        {
+            _perluPosisi = false;
+            try
+            {
+                var gaya = await JS.InvokeAsync<string>("sikotis.posisiPanel", _tombol, _panel, 220);
+                if (gaya != _gaya) { _gaya = gaya; StateHasChanged(); }
+                await GulirAktif();
+            }
+            catch { /* abaikan */ }
+        }
+    }
+
+    private async Task GulirAktif() { try { await JS.InvokeVoidAsync("sikotis.gulirAktif", _daftar); } catch { /* abaikan */ } }
+
+    private async Task LepasAsync()
+    {
+        _terpasang = false;
+        _gaya = "position:fixed;top:-9999px;left:-9999px;min-width:220px";
+        if (_pegangan is null) return;
+        try { await JS.InvokeVoidAsync("sikotis.lepasTutupLuar", _pegangan); await _pegangan.DisposeAsync(); } catch { /* abaikan */ }
+        _pegangan = null;
+    }
+
+    public async ValueTask DisposeAsync() { await LepasAsync(); _ref?.Dispose(); }
+}

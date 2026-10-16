@@ -1,0 +1,202 @@
+@inherits KomponenData
+@* Tab Overview trip Priok: seluruh isi dokumen Surat Jalan dan data trip dalam satu tampilan. *@
+@{
+    var t = Trip.T;
+    var manager = t.ManagerId != "" ? Db.Cari<Karyawan>(t.ManagerId) : null;
+    var kontrak = t.ContractId != "" ? Db.Data.Kontrak.FirstOrDefault(c => c.Id == t.ContractId) : null;
+    var terpakaiKontrak = kontrak is null ? 0
+        : Db.Baris.Where(x => x.T.ContractId == kontrak.Id && !x.Batal).Sum(x => x.UjTotal + x.ExpenseTotal + x.InternalTotal);
+    var tagihan = t.JobOrderId != "" ? Db.BarisTagihan.Where(b => b.B.JobOrderId == t.JobOrderId).ToList() : [];
+    var pengiriman = new (string Label, string Nilai, bool Mono)[]
+    {
+        ("No. Kendaraan", AturDetail.Strip(Trip.PlateNumber), true), ("Party", AturDetail.Strip(t.Party), false), ("Jenis Brg", AturDetail.Strip(t.GoodsType), false),
+        ("Kosongan", AturDetail.Strip(t.Kosongan), false), ("Lokasi", AturDetail.Strip(t.Location), false), ("Kapal", AturDetail.Strip(t.Ship), false),
+        ("Tujuan", AturDetail.Strip(t.DestinationDetail), false),
+    };
+}
+<div class="row g-3 p-3">
+    <div class="col-xl-8 d-flex flex-column gap-3">
+        <Kartu>
+            <KepalaKartu Title="Informasi Dokumen">
+                <Actions>
+                    @if (!string.IsNullOrEmpty(t.PrintedAt)) { <Badge Tone="good">Tercetak @Format.Tanggal(t.PrintedAt)</Badge> }
+                    else { <Badge Tone="warning">Belum dicetak</Badge> }
+                </Actions>
+            </KepalaKartu>
+            <div class="p-3">
+                <dl class="row row-cols-1 row-cols-sm-3 g-3 mb-0">
+                    <InfoItem Label="Tanggal Order" Value="@(string.IsNullOrEmpty(t.OrderDate) ? "—" : Format.Tanggal(t.OrderDate))" Mono />
+                    <InfoItem Label="Tanggal Berangkat" Value="@Format.Tanggal(t.TransactionDate)" Mono />
+                    <InfoItem Label="Nomor Trip" Value="@t.TransactionNo" Mono />
+                    <InfoItem Label="Nomor Surat Jalan" Value="@AturDetail.Strip(t.SjNo)" Mono />
+                    <InfoItem Label="Manager">
+                        @if (manager is not null) { <a href="@($"master/karyawan/{manager.Id}")" class="text-ink text-decoration-none">@manager.DriverName</a> }
+                        else { @(t.ManagerName != "" ? t.ManagerName : "—") }
+                    </InfoItem>
+                    <InfoItem Label="Klien" Value="@(Trip.ProjectCode != "" ? $"{Trip.ProjectCode} — {Trip.ProjectName}" : "—")" />
+                    <InfoItem Label="Status" Value="@StatusTrip.Label(t.Status)" />
+                    <InfoItem Label="Layanan" Value="@TipeKlien.Label(t.ServiceType)" />
+                    @if (t.ServiceType != TipeKlien.Dedicated)
+                    {
+                        <InfoItem Label="Harga" Mono>
+                            @Format.Rupiah(Trip.Harga)
+                            @if (!Trip.HargaKhusus && Trip.Harga > 0) { <span class="ms-2 fs-11-5 fw-normal text-ink-3">ikut Harga Rute</span> }
+                            @if (!string.IsNullOrEmpty(t.OverrideNote)) { <span class="mt-1 d-block fs-11-5 fw-normal text-ink-3 text-wrap">Alasan: @t.OverrideNote</span> }
+                        </InfoItem>
+                    }
+                    @if (kontrak is not null) { <InfoItem Label="Kontrak" Value="@($"{kontrak.ContractNo} — {(Trip.ClientName != "" ? Trip.ClientName : "klien tidak ditemukan")}")" /> }
+                </dl>
+            </div>
+        </Kartu>
+
+        <Kartu>
+            <KepalaKartu Title="Penerima" />
+            <div class="p-3">
+                <dl class="row row-cols-1 row-cols-sm-2 g-3 mb-0">
+                    <InfoItem Label="Kepada Yth" Value="@AturDetail.Strip(t.RecipientName)" />
+                    <InfoItem Label="di">
+                        @(t.RecipientAddress1 != "" ? t.RecipientAddress1 : "—")
+                        @if (t.RecipientAddress2 != "") { <br />@t.RecipientAddress2 }
+                    </InfoItem>
+                </dl>
+            </div>
+        </Kartu>
+
+        <Kartu>
+            <KepalaKartu Title="Informasi Pengiriman" />
+            <div class="p-3">
+                <div class="mb-3">
+                    <p class="m-0 fs-11-5 fw-semibold text-ink-3 text-uppercase" style="letter-spacing:.04em">Sopir</p>
+                    @if (Trip.DriverIds.Count == 0) { <p class="m-0 mt-1 fs-13 fw-medium text-ink">—</p> }
+                    else
+                    {
+                        <ul class="list-unstyled m-0 mt-1 d-flex flex-column gap-1 fs-13">
+                            @for (var i = 0; i < Trip.DriverIds.Count; i++)
+                            {
+                                var d = Db.Cari<Karyawan>(Trip.DriverIds[i]);
+                                var utama = i == 0;
+                                if (d is null) { continue; }
+                                <li class="d-flex align-items-center gap-2">
+                                    <a href="@($"master/karyawan/{d.Id}")" class="fw-medium text-ink text-decoration-none">@d.DriverName</a>
+                                    <span class="tnum fs-12 text-ink-3">@d.DriverCode</span>
+                                    @if (Trip.DriverIds.Count > 1) { if (utama) { <Badge Tone="brand">Utama · penerima komisi</Badge> } else { <Badge Tone="neutral">Tambahan</Badge> } }
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+                <dl class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 mb-0">
+                    <InfoItem Label="@pengiriman[0].Label" Value="@pengiriman[0].Nilai" Mono />
+                    <InfoItem Label="@pengiriman[1].Label" Value="@pengiriman[1].Nilai" />
+                    <InfoItem Label="SI / BL" Mono>
+                        @if (Trip.Sijo != "") { <a href="@($"pencarian/sijo?sijo={Uri.EscapeDataString(Trip.Sijo)}")" class="text-decoration-none">@Trip.Sijo</a> }
+                        else { @("—") }
+                    </InfoItem>
+                    @foreach (var p in pengiriman.Skip(2)) { <InfoItem Label="@p.Label" Value="@p.Nilai" Mono="p.Mono" /> }
+                </dl>
+            </div>
+        </Kartu>
+
+        <Kartu>
+            <KepalaKartu Title="Identifier & Catatan" />
+            <div class="p-3">
+                <dl class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 mb-0">
+                    <InfoItem Label="TR" Value="@AturDetail.Strip(t.TrReference)" Mono />
+                    <InfoItem Label="No PI" Value="@AturDetail.Strip(t.PiNumber)" Mono />
+                    <InfoItem Label="Status PI" Value="@AturDetail.Strip(t.PiStatus)" />
+                    <InfoItem Label="Tanggal Bon" Value="@(string.IsNullOrEmpty(t.BonDate) ? "—" : Format.Tanggal(t.BonDate))" Mono />
+                    <InfoItem Label="Bon Pribadi" Value="@(t.PersonalBon > 0 ? Format.Rupiah(t.PersonalBon) : "—")" Mono />
+                </dl>
+            </div>
+            @if (t.Notes != "")
+            {
+                <div class="border-top border-hairline px-3 py-3">
+                    <p class="m-0 fs-11-5 fw-semibold text-ink-3 text-uppercase" style="letter-spacing:.04em">Catatan</p>
+                    <p class="m-0 mt-1 fs-13 text-ink" style="white-space:pre-line">@t.Notes</p>
+                </div>
+            }
+        </Kartu>
+    </div>
+
+    <div class="col-xl-4 d-flex flex-column gap-3">
+        <Kartu>
+            <KepalaKartu Title="ID Perjalanan/Trip" Subtitle="@($"{t.TripIds.Count} ID pada trip ini.")" />
+            <div class="p-3">
+                @if (t.TripIds.Count == 0)
+                {
+                    <p class="m-0 py-4 text-center fs-13 text-ink-3">Belum ada ID Perjalanan/Trip.</p>
+                }
+                else
+                {
+                    <ol class="list-unstyled m-0 d-flex flex-column gap-2">
+                        @for (var i = 0; i < t.TripIds.Count; i++)
+                        {
+                            <li class="d-flex align-items-center gap-2 rounded-2 border border-hairline bg-sunken px-3 py-2">
+                                <span class="tnum flex-shrink-0 fs-12 fw-semibold text-ink-3" style="width:20px">@(i + 1).</span>
+                                <IkonSvg Def="Ikon.Hashtag" Size="14" Class="text-ink-3" />
+                                <span class="tnum fs-13 fw-medium text-ink" style="letter-spacing:.02em">@t.TripIds[i]</span>
+                            </li>
+                        }
+                    </ol>
+                }
+            </div>
+        </Kartu>
+
+        <KartuRute Trip="Trip" />
+
+        @if (kontrak is not null)
+        {
+            <Kartu>
+                <KepalaKartu Title="Kontrak Dedicated" Subtitle="@(Trip.ClientName != "" ? Trip.ClientName : "Klien tidak ditemukan")">
+                    <Actions>@if (kontrak.ProjectId != "") { <a href="@($"master/klien/{kontrak.ProjectId}")" class="fs-12-5 fw-medium text-decoration-none">Lihat klien</a> }</Actions>
+                </KepalaKartu>
+                <div class="p-3">
+                    <dl class="row row-cols-2 g-3 mb-0">
+                        <InfoItem Label="No. Kontrak" Value="@kontrak.ContractNo" Mono />
+                        <InfoItem Label="Nilai" Value="@Format.Rupiah(kontrak.Value)" Mono />
+                        <InfoItem Label="Terpakai" Value="@Format.Rupiah(terpakaiKontrak)" Mono />
+                        <InfoItem Label="Sisa (balance)" Value="@Format.Rupiah(kontrak.Value - terpakaiKontrak)" Mono />
+                    </dl>
+                </div>
+            </Kartu>
+        }
+
+        <Kartu>
+            <KepalaKartu Title="Komisi" Subtitle="Dihitung otomatis dari Komisi → tab Aturan." />
+            <div class="p-3">
+                <dl class="row row-cols-2 g-3 mb-0">
+                    <InfoItem Label="Sopir utama" Value="@Format.Rupiah(Trip.KomisiSopir)" Mono />
+                    <InfoItem Label="Manager" Value="@(t.ManagerId != "" || t.ManagerName != "" ? Format.Rupiah(Trip.KomisiManager) : "—")" Mono />
+                </dl>
+            </div>
+            <p class="m-0 border-top border-hairline px-3 py-2 fs-12 text-ink-3">@(Trip.KomisiKeterangan != "" ? Trip.KomisiKeterangan : "Belum ada aturan komisi yang cocok.")</p>
+        </Kartu>
+
+        <Kartu>
+            <KepalaKartu Title="Tagihan terkait" Subtitle="@(Trip.Sijo != "" ? $"Tagihan dengan SI/JO {Trip.Sijo}." : "Pilih SI / BL untuk menautkan tagihan.")" />
+            @if (tagihan.Count == 0)
+            {
+                <p class="m-0 px-3 py-4 text-center fs-13 text-ink-3">Belum ada tagihan terkait.</p>
+            }
+            else
+            {
+                <ul class="list-unstyled m-0">
+                    @foreach (var b in tagihan)
+                    {
+                        <li class="d-flex align-items-center justify-content-between gap-3 border-bottom border-hairline px-3 py-2">
+                            <span>
+                                <span class="tnum d-block fs-13 fw-semibold text-ink">@b.B.InvoiceNo</span>
+                                <span class="d-block fs-12 text-ink-3">@b.B.CostCode · @Format.Tanggal(b.B.BillingDate)</span>
+                            </span>
+                            <span class="tnum fs-13 fw-semibold text-ink">@Format.Rupiah(b.B.Amount)</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </Kartu>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public BarisTrip Trip { get; set; } = default!;
+}

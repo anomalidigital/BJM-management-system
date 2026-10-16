@@ -1,0 +1,68 @@
+@* Upload dokumen penting (KTP, SIM, ... / STNK, KIR, ...): satu kotak kecil per jenis + tanggal berlaku, dokumen lainnya di ujung. *@
+<div class="d-flex flex-wrap align-items-end gap-3">
+    @foreach (var j in Jenis)
+    {
+        var dok = Value.GetValueOrDefault(j.Kode);
+        var s = StatusBerlaku(dok?.BerlakuSampai);
+        var warna = s == "habis" ? "var(--critical)" : s == "segera" ? "#8a6100" : "var(--ink-3)";
+        var tambahan = s == "habis" ? " · sudah habis" : s == "segera" ? " · segera habis" : "";
+        <div class="d-flex align-items-end gap-2">
+            <LampiranInput Nama="@j.Label" Value="@(dok?.Berkas ?? new List<string>())" ValueChanged="@(berkas => UbahBerkas(j.Kode, berkas))" />
+            @if (j.Berlaku)
+            {
+                <div style="width:168px">
+                    <label for="@($"{_dasar}-{j.Kode}-tgl")" class="d-block mb-1 fw-semibold" style="font-size:11px;color:@warna">
+                        <span class="visually-hidden">@j.Label </span>Berlaku s/d@tambahan
+                    </label>
+                    <TanggalInput Id="@($"{_dasar}-{j.Kode}-tgl")" Value="@(dok?.BerlakuSampai ?? "")" Invalid="@(s == "habis")" ValueChanged="@(v => UbahTanggal(j.Kode, v))" />
+                </div>
+            }
+        </div>
+    }
+    @if (LainnyaLabel is not null)
+    {
+        <LampiranInput Label="@LainnyaLabel" Value="Lainnya" ValueChanged="LainnyaChanged" />
+    }
+</div>
+
+@code {
+    [Parameter] public JenisDokumenPenting[] Jenis { get; set; } = [];
+    [Parameter] public Dictionary<string, DokumenPenting> Value { get; set; } = [];
+    [Parameter] public EventCallback<Dictionary<string, DokumenPenting>> ValueChanged { get; set; }
+    [Parameter] public string? LainnyaLabel { get; set; }
+    [Parameter] public List<string> Lainnya { get; set; } = [];
+    [Parameter] public EventCallback<List<string>> LainnyaChanged { get; set; }
+
+    private readonly string _dasar = "dok-" + Guid.NewGuid().ToString("N")[..6];
+
+    private Task UbahBerkas(string kode, List<string> berkas) => Ubah(kode, d => d.Berkas = berkas);
+    private Task UbahTanggal(string kode, string v) => Ubah(kode, d => d.BerlakuSampai = v == "" ? null : v);
+
+    private async Task Ubah(string kode, Action<DokumenPenting> patch)
+    {
+        var baru = new Dictionary<string, DokumenPenting>(Value);
+        var lama = baru.GetValueOrDefault(kode) ?? new DokumenPenting();
+        var d = new DokumenPenting { Berkas = [.. lama.Berkas], BerlakuSampai = lama.BerlakuSampai };
+        patch(d);
+        baru[kode] = d;
+        await ValueChanged.InvokeAsync(baru);
+    }
+
+    /// <summary>Keadaan masa berlaku: habis, segera (≤ 30 hari), berlaku, atau "" (tidak dicatat).</summary>
+    public static string StatusBerlaku(string? tanggal)
+    {
+        if (string.IsNullOrEmpty(tanggal)) return "";
+        var hariIni = Format.HariIni();
+        if (string.CompareOrdinal(tanggal, hariIni) < 0) return "habis";
+        if (string.CompareOrdinal(tanggal, Format.TambahHari(hariIni, 30)) <= 0) return "segera";
+        return "berlaku";
+    }
+
+    public sealed record Ringkasan(List<string> Ada, int Total, List<string> Habis, List<string> Segera);
+
+    public static Ringkasan Ringkas(JenisDokumenPenting[] jenis, Dictionary<string, DokumenPenting>? dokumen) => new(
+        jenis.Where(j => (dokumen?.GetValueOrDefault(j.Kode)?.Berkas.Count ?? 0) > 0).Select(j => j.Label).ToList(),
+        jenis.Length,
+        jenis.Where(j => StatusBerlaku(dokumen?.GetValueOrDefault(j.Kode)?.BerlakuSampai) == "habis").Select(j => j.Label).ToList(),
+        jenis.Where(j => StatusBerlaku(dokumen?.GetValueOrDefault(j.Kode)?.BerlakuSampai) == "segera").Select(j => j.Label).ToList());
+}

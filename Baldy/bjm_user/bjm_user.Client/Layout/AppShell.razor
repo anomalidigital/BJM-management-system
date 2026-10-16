@@ -1,0 +1,74 @@
+@* Kerangka aplikasi: sidebar + topbar + area konten. Tanpa login dilempar ke /login. *@
+@inherits LayoutComponentBase
+@inject Sesi Sesi
+@inject Db Db
+@inject NavigationManager Nav
+@inject Lampiran LampiranSvc
+@implements IDisposable
+
+@if (!Sesi.SudahMasuk)
+{
+    <div class="p-5 text-center text-ink-3 fs-13">Mengalihkan ke halaman masuk…</div>
+}
+else
+{
+    <div class="app-shell">
+        <Sidebar Terbuka="_menuMobile" OnTutup="() => _menuMobile = false" />
+        <div class="app-isi">
+            <Topbar OnBukaMenu="() => _menuMobile = true" OnLogout="() => _konfirmasiKeluar = true" />
+            <main class="app-main">
+                @if (!Db.Siap)
+                {
+                    <div class="py-5 text-center text-ink-3 fs-13"><span class="spinner-border spinner-border-sm me-2"></span>Memuat data…</div>
+                }
+                else if (Db.Galat is not null)
+                {
+                    <div class="kotak-galat"><IkonSvg Def="Ikon.TriangleExclamation" Size="15" /> @Db.Galat</div>
+                }
+                else
+                {
+                    @Body
+                }
+            </main>
+        </div>
+        <KonfirmasiDialog Open="_konfirmasiKeluar" Title="Keluar dari SIKOTIS?" Message="Anda akan kembali ke halaman login. Data yang tersimpan tidak akan terhapus."
+                          ConfirmLabel="Logout" OnCancel="() => _konfirmasiKeluar = false" OnConfirm="Keluar" />
+    </div>
+}
+<ToastHost />
+
+@code {
+    private bool _menuMobile;
+    private bool _konfirmasiKeluar;
+
+    protected override void OnInitialized()
+    {
+        Sesi.Berubah += Segarkan;
+        Db.Berubah += Segarkan;
+        Periksa();
+    }
+
+    protected override void OnParametersSet() => Periksa();
+
+    protected override async Task OnAfterRenderAsync(bool pertama)
+    {
+        // Sapu berkas lampiran yang sudah tidak dirujuk record mana pun (sisa form yang dibatalkan).
+        if (pertama && Db.Siap) await LampiranSvc.BersihkanAsync(Db.LampiranDipakai());
+    }
+
+    private void Periksa()
+    {
+        if (!Sesi.SudahMasuk) Nav.NavigateTo("login", replace: true);
+    }
+
+    private void Segarkan() => InvokeAsync(() => { Periksa(); StateHasChanged(); });
+
+    private async Task Keluar()
+    {
+        _konfirmasiKeluar = false;
+        await Sesi.KeluarAsync();
+        Nav.NavigateTo("login", replace: true);
+    }
+
+    public void Dispose() { Sesi.Berubah -= Segarkan; Db.Berubah -= Segarkan; }
+}

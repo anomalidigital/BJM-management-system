@@ -1,0 +1,135 @@
+@* Papan depo: trip sebulan sebagai tumpukan kontainer per hari. Satu kotak = satu trip, warnanya status trip itu. *@
+@{
+    const int tinggiPapan = 148, jarak = 2, ruangAngka = 14;
+    var tertinggi = Math.Max(1, Hari.Count == 0 ? 0 : Hari.Max(h => h.Trip.Count));
+    var tinggiKotak = Math.Max(3, Math.Min(18, (tinggiPapan - ruangAngka - (tertinggi - 1) * jarak) / tertinggi));
+    var selisih = Jumlah - JumlahLalu;
+    var persen = DeltaTrip is double d && double.IsFinite(d) && selisih != 0
+        ? $", {(selisih > 0 ? "naik" : "turun")} {Math.Abs(d).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture).Replace('.', ',')}%"
+        : "";
+    var angka = new (string Label, int Nilai, string Dari)[]
+    {
+        ("Supir bertugas", SopirBertugas, $"dari {Format.Angka(SopirAktif)} supir aktif"),
+        ("Karyawan aktif", KaryawanAktif, $"dari {Format.Angka(KaryawanTotal)} terdaftar"),
+        ("Mobil terpakai", MobilTerpakai, $"dari {Format.Angka(MobilTotal)} aktif"),
+    };
+    // Status yang dijelaskan di keterangan papan.
+    var tampil = StatusPapan.UrutTumpuk.Where(s => !(TanpaDraft && s == StatusTrip.Draft)).ToList();
+    var ringkas = string.Join(", ", StatusPapan.UrutTumpuk.Where(s => Jml(s) > 0).Select(s => $"{Jml(s)} {StatusTrip.Label(s).ToLowerInvariant()}"));
+    var urut = 0;
+}
+<section class="dash-depo d-flex h-100 flex-column" aria-labelledby="papan-judul">
+    <div class="dash-depo-grid">
+        <div class="d-flex flex-column">
+            <h2 id="papan-judul" class="m-0 fs-15 dash-rail dash-nav-ink">Trip @Bulan</h2>
+            <p class="dash-angka-besar">@Format.Angka(Jumlah)</p>
+            <p class="m-0 fs-12-5 dash-nav-ink" style="margin-top:.75rem !important; line-height:1.375">
+                @if (JumlahLalu > 0)
+                {
+                    @($"{(selisih == 0 ? "Sama dengan" : selisih > 0 ? $"{Format.Angka(selisih)} lebih banyak dari" : $"{Format.Angka(-selisih)} lebih sedikit dari")} {BulanLalu} ({Format.Angka(JumlahLalu)} trip){persen}.")
+                }
+                else
+                {
+                    @($"Belum ada trip di {BulanLalu} untuk dibandingkan.")
+                }
+                @if (Batal > 0) { @($" {Format.Angka(Batal)} trip dibatalkan tidak dihitung.") }
+            </p>
+            <dl class="m-0 mt-auto pt-3 dash-garis-atas d-flex flex-column gap-2">
+                @foreach (var (label, nilai, dari) in angka)
+                {
+                    <div class="d-flex align-items-baseline justify-content-between gap-3">
+                        <dt class="fs-12 fw-normal dash-nav-ink">@label</dt>
+                        <dd class="m-0 tnum text-end fs-12 dash-nav-ink">
+                            <span class="dash-rail dash-fs-19 lh-1 text-white">@Format.Angka(nilai)</span> @dari
+                        </dd>
+                    </div>
+                }
+            </dl>
+        </div>
+
+        <div class="d-flex min-w-0 flex-column">
+            @* Lajur status: proporsi trip per status, berikut keterangannya. *@
+            <div class="dash-lajur" aria-hidden="true">
+                @foreach (var s in StatusPapan.UrutTumpuk.Where(s => Jml(s) > 0))
+                {
+                    <div class="@(s == StatusTrip.Draft ? "draft" : "")" style="flex-grow:@Jml(s);@StatusPapan.Isi(s)">
+                        @if ((double)Jml(s) / Math.Max(1, Jumlah) >= 0.09) { <span class="tnum dash-rail fs-14">@Jml(s)</span> }
+                    </div>
+                }
+            </div>
+            <ul class="list-unstyled m-0 mt-2 d-flex flex-wrap fs-12-5 dash-nav-ink" style="gap:.375rem 1rem">
+                @foreach (var s in tampil)
+                {
+                    <li class="d-flex align-items-center" style="gap:.375rem">
+                        <span class="dash-kotak-kecil" style="@StatusPapan.Isi(s)" aria-hidden="true"></span>
+                        @StatusTrip.Label(s)
+                        <span class="tnum dash-rail fs-14 text-white">@Format.Angka(Jml(s))</span>
+                    </li>
+                }
+            </ul>
+
+            @* Tumpukan kontainer per hari. *@
+            <div class="dash-tumpuk" style="height:@(tinggiPapan)px" role="img"
+                 aria-label="@($"Trip per hari selama {Bulan}: {Format.Angka(Jumlah)} trip{(ringkas != "" ? $", {ringkas}" : "")}.")">
+                @foreach (var h in Hari)
+                {
+                    <div class="dash-kolom-hari @(h.Mendatang ? "mendatang" : "")" style="gap:@(jarak)px" title="@JudulHari(h)">
+                        @if (h.Mendatang) { <div class="dash-garis-mendatang"></div> }
+                        @foreach (var t in h.Trip)
+                        {
+                            <div @key="t.Id" class="dash-blok" style="height:@(tinggiKotak)px;@StatusPapan.Isi(t.Status);--urut:@(urut++)"></div>
+                        }
+                        @* Jumlah trip hari itu; di layar sempit kolomnya terlalu kecil untuk angka. *@
+                        @if (h.Trip.Count > 0)
+                        {
+                            <span class="tnum dash-angka-hari @(h.HariIni ? "dash-signal" : "")" aria-hidden="true">@h.Trip.Count</span>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="dash-tanggal" aria-hidden="true">
+                @foreach (var h in Hari)
+                {
+                    <span class="tnum @(h.HariIni ? "fw-semibold dash-signal" : "")">@(h.HariIni || h.Tanggal == 1 || h.Tanggal % 5 == 0 ? h.Tanggal.ToString() : "")</span>
+                }
+            </div>
+            <div class="mt-3 d-flex flex-wrap align-items-center justify-content-between gap-2 fs-12 dash-nav-ink">
+                <span>Satu kotak = satu trip, ditumpuk per tanggal.@(TanpaDraft ? "" : " Kotak kosong = draft.")</span>
+                <a href="transaksi/trip" class="dash-tautan-terang">Buka daftar trip</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+@code {
+    [Parameter] public string Bulan { get; set; } = "";
+    [Parameter] public string BulanLalu { get; set; } = "";
+    [Parameter] public int Jumlah { get; set; }
+    [Parameter] public int JumlahLalu { get; set; }
+    /// <summary>Persen perubahan jumlah trip dari bulan lalu; null bila bulan lalu kosong.</summary>
+    [Parameter] public double? DeltaTrip { get; set; }
+    [Parameter] public Dictionary<string, int> PerStatus { get; set; } = [];
+    /// <summary>Karawang tidak memakai Draft: sembunyikan dari keterangan bila jumlahnya 0.</summary>
+    [Parameter] public bool TanpaDraft { get; set; }
+    [Parameter] public int Batal { get; set; }
+    [Parameter] public List<HariPapan> Hari { get; set; } = [];
+    [Parameter] public int SopirBertugas { get; set; }
+    [Parameter] public int SopirAktif { get; set; }
+    /// <summary>Semua karyawan (supir + manager).</summary>
+    [Parameter] public int KaryawanAktif { get; set; }
+    [Parameter] public int KaryawanTotal { get; set; }
+    [Parameter] public int MobilTerpakai { get; set; }
+    [Parameter] public int MobilTotal { get; set; }
+
+    private int Jml(string s) => PerStatus.GetValueOrDefault(s);
+
+    private static string JudulHari(HariPapan h)
+    {
+        if (h.Trip.Count == 0) return $"{h.Label}: {(h.Mendatang ? "belum terjadi" : "tidak ada trip")}";
+        var isi = StatusPapan.UrutTumpuk
+            .Select(s => (s, n: h.Trip.Count(t => t.Status == s)))
+            .Where(x => x.n > 0)
+            .Select(x => $"{x.n} {StatusTrip.Label(x.s).ToLowerInvariant()}");
+        return $"{h.Label}: {string.Join(", ", isi)}";
+    }
+}

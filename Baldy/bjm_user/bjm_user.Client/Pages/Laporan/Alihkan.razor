@@ -1,0 +1,19 @@
+@page "/laporan/uang-jalan"
+@page "/laporan/biaya"
+@page "/master/komisi"
+@* Alamat lama laporan: Uang Jalan & Biaya Operasional kini tab di Rekap Pengeluaran; Aturan Komisi kini tab Aturan di halaman Komisi. *@
+@inject NavigationManager Nav
+
+@code {
+    protected override void OnInitialized()
+    {
+        var jalur = Nav.ToBaseRelativePath(Nav.Uri).Split('?')[0].TrimEnd('/');
+        var tujuan = jalur switch
+        {
+            "laporan/uang-jalan" => "laporan/pengeluaran?tab=uj",
+            "laporan/biaya" => "laporan/pengeluaran?tab=biaya",
+            _ => "laporan/komisi?tab=aturan",
+        };
+        Nav.NavigateTo(tujuan, replace: true);
+    }
+}

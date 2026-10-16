@@ -1,0 +1,58 @@
+@* Ringkasan PI (gabungan PI / shipment summary) dalam format tabel Summary Submission. *@
+
+<ReportPreview OnClose="OnClose" OrientasiAwal="lanskap">
+    @{
+        var per = PrintDocument.BarisPerLembar(context, 22);
+        var hal = PrintDocument.Bagi(Rows, per);
+        var total = Rows.Sum(t => t.NilaiTotal);
+    }
+    <PrintDocument>
+        @for (var i = 0; i < hal.Count; i++)
+        {
+            var ii = i; var isi = hal[ii];
+            <PrintPage Title="Summary Submission PI" Subtitle="PT Bima Jaya Manggala" Page="@(ii + 1)" TotalPages="hal.Count"
+                       Meta="@(new List<(string, string)> { ("Jumlah PI", Format.Angka(Rows.Count)), ("Total", Format.Rupiah(total)) })">
+                <PrintTable Cols="Kolom">
+                    @for (var r = 0; r < isi.Count; r++)
+                    {
+                        var rr = r; var t = isi[rr];
+                        <tr>
+                            <td class="p-sel text-end">@(ii * per + rr + 1)</td>
+                            <td class="p-sel">@Isi(string.Join(", ", t.R.TrList))</td>
+                            <td class="p-sel">@Isi(t.R.PlateNumber)</td>
+                            <td class="p-sel">@Isi(t.R.Muat)</td>
+                            <td class="p-sel">@Isi(t.R.Bongkar)</td>
+                            <td class="p-sel text-end">@Format.Angka(t.NilaiPokok)</td>
+                            <td class="p-sel">@Isi(RincianPi(t))</td>
+                            <td class="p-sel text-end fw-semibold">@Format.Angka(t.NilaiTotal)</td>
+                            <td class="p-sel">@Isi(t.T.PiNumber)</td>
+                            <td class="p-sel">@Isi(TagihanLogika.TanggalAta(t.R.Ata))</td>
+                        </tr>
+                    }
+                    @if (ii == hal.Count - 1)
+                    {
+                        <tr class="total">
+                            <td class="p-sel text-end" colspan="7">TOTAL</td>
+                            <td class="p-sel text-end">@Format.Angka(total)</td>
+                            <td class="p-sel" colspan="2"></td>
+                        </tr>
+                    }
+                </PrintTable>
+            </PrintPage>
+        }
+    </PrintDocument>
+</ReportPreview>
+
+@code {
+    [Parameter, EditorRequired] public List<BarisPi> Rows { get; set; } = [];
+    [Parameter, EditorRequired] public Func<BarisPi, string> RincianPi { get; set; } = _ => "";
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private static string Isi(string s) => s == "" ? "-" : s;
+
+    private static readonly List<(string, string, string?)> Kolom =
+    [
+        ("No.", "right", "4%"), ("TR/OR", "left", "13%"), ("No.Pol", "left", "9%"), ("Origin", "left", null), ("Destination", "left", null),
+        ("Trucking", "right", null), ("Additional Cost", "left", "16%"), ("Total", "right", null), ("No. PI", "left", "15%"), ("ATA", "left", "8%"),
+    ];
+}

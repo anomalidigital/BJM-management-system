@@ -1,0 +1,152 @@
+@page "/uji-komponen"
+@inherits KomponenData
+@* Halaman contoh & uji komponen (bukan menu): daftar rute dengan pencarian, filter berdraf, tabel berurut + paginasi, modal form, dropdown. *@
+<PageTitle>Uji Komponen — SIKOTIS</PageTitle>
+
+<PageHeader Title="Uji Komponen" Crumbs="@(new List<Crumb> { new("Master Data"), new("Uji Komponen") })">
+    <Description>Contoh pemakaian komponen bersama: pencarian, Filter berdraf, tabel, paginasi, modal, dropdown, lampiran.</Description>
+    <Actions>
+        <Tombol Icon="Ikon.Print" OnClick="() => _preview = true">Cetak</Tombol>
+        <Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Bisa("master"))" OnClick="BukaTambah">Tambah Rute</Tombol>
+    </Actions>
+</PageHeader>
+
+<Kartu>
+    <Toolbar>
+        <Left>
+            <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Placeholder="Cari nama atau No. Rute..." />
+            <PanelFilter T="FilterRute" Filter="_filter" Chips="Chips" Galat="@Format.GalatRentang(_filter.Draf.Dari, _filter.Draf.Sampai)">
+                <Field Label="Klien">
+                    <Pilihan Id="@context" Options="OpsiKlien" Value="@_filter.Draf.Klien" ValueChanged="v => _filter.Ubah(d => d.Klien = v ?? string.Empty)" Placeholder="Semua klien" Cari="false" />
+                </Field>
+                <Field Label="Harga minimal">
+                    <UangInput Id="@context" Value="_filter.Draf.HargaMin" ValueChanged="v => _filter.Ubah(d => d.HargaMin = v)" />
+                </Field>
+                <div class="row g-2">
+                    <div class="col-6"><Field Label="Dari"><TanggalInput Id="@context" Value="@_filter.Draf.Dari" ValueChanged="v => _filter.Ubah(d => d.Dari = v)" /></Field></div>
+                    <div class="col-6"><Field Label="Sampai"><TanggalInput Id="@context" Value="@_filter.Draf.Sampai" ValueChanged="v => _filter.Ubah(d => d.Sampai = v)" /></Field></div>
+                </div>
+            </PanelFilter>
+        </Left>
+        <Right>
+            <Tabs Items="@(new List<TabItem> { new("semua", "Semua", Db.Data.Rute.Count.ToString()), new("kembar", "Kode kembar") })" Value="@_tab" ValueChanged="v => _tab = v" />
+        </Right>
+    </Toolbar>
+    @{
+        var tersaring = _tabel.Saring(Db.Data.Rute);
+        var halaman = _tabel.Halaman(tersaring);
+    }
+    <DataTable T="Rute" Columns="Kolom" Rows="halaman" RowKey="r => r.Id" SortKey="@_tabel.SortKey" SortNaik="_tabel.Naik" OnSortChange="k => _tabel.ToggleSort(k)" IsFiltered="_tabel.IsFiltered">
+        <Empty><EmptyState Entity="rute" /></Empty>
+        <NotFound><NotFoundState OnReset="() => { _tabel.Reset(); _filter.LepasSemua(); }" /></NotFound>
+    </DataTable>
+    <Pagination Page="_tabel.Page" PageSize="_tabel.PageSize" Total="_tabel.Total" OnPageChange="p => _tabel.SetPage(p)" />
+</Kartu>
+
+<Modal Open="_form is not null" Title="@(_form?.Id == "" ? "Tambah Rute" : "Ubah Rute")" Subtitle="@(_form?.RouteCode)" OnClose="() => _form = null">
+    <ChildContent>
+        @if (_form is not null)
+        {
+            <div class="d-flex flex-column gap-3">
+                <Field Label="Nama Rute" Required Error="@_galat.GetValueOrDefault("nama")">
+                    <input id="@context" class="form-control @(_galat.ContainsKey("nama") ? "is-invalid" : "")" value="@_form.RouteName" placeholder="mis. CIB - DURI" @oninput="UbahNama" />
+                </Field>
+                <div class="row g-3">
+                    <div class="col-6"><Field Label="Harga" Required><UangInput Id="@context" @bind-Value="_form.Price" /></Field></div>
+                    <div class="col-6"><Field Label="Uang Jalan Rute"><UangInput Id="@context" @bind-Value="_form.Ujroute" /></Field></div>
+                </div>
+                <Field Label="Klien"><Pilihan Id="@context" Options="OpsiKlien" @bind-Value="_form.ProjectId" Placeholder="Pilih klien..." /></Field>
+                <Checkbox Label="Rute aktif" Checked="true" />
+                <Field Label="Lampiran"><LampiranInput Id="@context" @bind-Value="_lampiran" Label="Tambah berkas" /></Field>
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="() => _form = null">Batal</Tombol>
+        <Tombol Variant="primary" Icon="Ikon.FloppyDisk" OnClick="Simpan">Simpan</Tombol>
+    </Footer>
+</Modal>
+
+@if (_preview)
+{
+    <ReportPreview OnClose="() => _preview = false" OrientasiAwal="potret">
+        @{ var per = PrintDocument.BarisPerLembar(context, 30); var hal = PrintDocument.Bagi(_tabel.Saring(Db.Data.Rute), per); }
+        <PrintDocument>
+            @for (var i = 0; i < hal.Count; i++)
+            {
+                var ii = i; var isi = hal[ii];
+                <PrintPage Title="Daftar Rute" Subtitle="Master Data" Page="@(ii + 1)" TotalPages="hal.Count">
+                    <PrintTable Cols="@(new List<(string, string, string?)> { ("No.", "left", "28px"), ("No. Rute", "left", null), ("Nama Rute", "left", null), ("Harga", "right", "90px") })">
+                        @for (var r = 0; r < isi.Count; r++)
+                        {
+                            var rr = r; var x = isi[rr];
+                            <tr><td class="p-sel">@(ii * per + rr + 1)</td><td class="p-sel tnum">@x.RouteCode</td><td class="p-sel">@x.RouteName</td><td class="p-sel text-end tnum">@Format.Angka(x.Price)</td></tr>
+                        }
+                    </PrintTable>
+                </PrintPage>
+            }
+        </PrintDocument>
+    </ReportPreview>
+}
+
+@code {
+    public sealed class FilterRute { public string Klien { get; set; } = ""; public long HargaMin { get; set; } public string Dari { get; set; } = ""; public string Sampai { get; set; } = ""; }
+
+    private readonly KendaliTabel<Rute> _tabel = new(10, "route_name");
+    private KendaliFilter<FilterRute> _filter = default!;
+    private string _tab = "semua";
+    private Rute? _form;
+    private List<string> _lampiran = [];
+    private readonly Dictionary<string, string> _galat = [];
+    private bool _preview;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _filter = new KendaliFilter<FilterRute>(() => new FilterRute(), StateHasChanged);
+        _tabel.Search = (r, q) => Util.CocokCari(q, r.RouteName, r.RouteCode, r.RouteCodeLama);
+        _tabel.SortAccessor = k => k switch { "price" => r => r.Price, "route_code" => r => r.RouteCode, _ => r => r.RouteName };
+        _tabel.ExtraFilter = r => (_filter.Nilai.Klien == "" || r.ProjectId == _filter.Nilai.Klien) && r.Price >= _filter.Nilai.HargaMin;
+    }
+
+    protected override void OnParametersSet() => _tabel.ExtraFilterActive = _filter.Aktif;
+
+    private List<Opsi> OpsiKlien => Db.Data.Klien.Select(k => new Opsi(k.Id, k.ProjectName, k.ProjectCode)).ToList();
+
+    private List<ChipFilter> Chips => new List<ChipFilter?>
+    {
+        _filter.Nilai.Klien != "" ? new ChipFilter($"Klien: {Db.Cari<Klien>(_filter.Nilai.Klien)?.ProjectName}", () => _filter.Lepas((n, a) => n.Klien = a.Klien)) : null,
+        _filter.Nilai.HargaMin > 0 ? new ChipFilter($"Harga ≥ {Format.Rupiah(_filter.Nilai.HargaMin)}", () => _filter.Lepas((n, a) => n.HargaMin = a.HargaMin)) : null,
+    }.Where(c => c is not null).Select(c => c!).ToList();
+
+    private List<Kolom<Rute>> Kolom =>
+    [
+        new() { Key = "route_code", Header = "No. Rute", Sortable = true, Teks = r => r.RouteCode, CellClass = "tnum fw-medium" },
+        new() { Key = "route_name", Header = "Nama Rute", Sortable = true, Render = r => @<span>@r.RouteName @if (r.RouteCodeLama is not null) { <span class="fs-11-5 text-ink-3">· dulu @r.RouteCodeLama</span> }</span> },
+        new() { Key = "price", Header = "Harga", Sortable = true, Align = "right", Teks = r => Format.Rupiah(r.Price), CellClass = "tnum" },
+        new() { Key = "aksi", Header = "", Align = "right", NoPrint = true, Render = r => @<span class="d-inline-flex gap-1"><TombolIkon Label="Ubah" Icon="Ikon.Pen" Disabled="@(!Bisa("master"))" OnClick="() => BukaUbah(r)" /><OverflowMenu Actions="@(new List<AksiMenu> { new("Ubah", () => BukaUbah(r), Ikon.Pen), new("Hapus", () => Db.Hapus<Rute>(r.Id), Ikon.TrashCan, "danger", !Bisa("master")) })" /></span> },
+    ];
+
+    private void UbahNama(ChangeEventArgs e) { if (_form is null) return; _form.RouteName = (e.Value?.ToString() ?? "").ToUpperInvariant(); _galat.Remove("nama"); }
+    private void BukaTambah() { _form = new Rute(); _galat.Clear(); }
+    private void BukaUbah(Rute r) { _form = Database.Salin(r); _galat.Clear(); }
+
+    private void Simpan()
+    {
+        if (_form is null) return;
+        if (_form.RouteName.Trim() == "") { _galat["nama"] = "Nama rute wajib diisi."; return; }
+        if (_form.Id == "")
+        {
+            _form.RouteCode = Kode.KodeRuteDari(_form.RouteName.Trim(), Db.Semua.Rute);
+            Db.Buat(_form);
+            Toast.Sukses($"Rute {_form.RouteName} ditambahkan.");
+        }
+        else
+        {
+            var f = _form;
+            Db.Ubah<Rute>(f.Id, r => { r.RouteName = f.RouteName; r.Price = f.Price; r.Ujroute = f.Ujroute; r.ProjectId = f.ProjectId; });
+            Toast.Sukses("Rute diperbarui.");
+        }
+        _form = null;
+    }
+}

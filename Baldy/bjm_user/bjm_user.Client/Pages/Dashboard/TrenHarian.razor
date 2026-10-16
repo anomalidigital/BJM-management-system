@@ -1,0 +1,42 @@
+@* Pendapatan dan komisi per hari. Dua grafik bertumpuk dengan skala masing-masing:
+   komisi hanya sebagian kecil pendapatan, jadi di satu sumbu garisnya rata di dasar. *@
+@{
+    var labels = Hari.Select(Format.TanggalPendek).ToList();
+    var seri = new List<SeriGrafik>
+    {
+        new("Pendapatan", "var(--series-1)", Pendapatan),
+        new("Komisi supir", "var(--series-2)", Komisi),
+    };
+}
+<Panel Title="Pendapatan & komisi per hari" Subtitle="@($"{Bulan}, tanggal 1 s/d {(labels.Count > 0 ? labels[^1] : "-")}. Tiap grafik punya skala sendiri.")">
+    <div class="d-flex flex-column gap-3 px-3 pb-3">
+        @foreach (var s in seri)
+        {
+            var total = s.Nilai.Sum();
+            <div @key="s.Nama">
+                <div class="d-flex align-items-baseline justify-content-between gap-3 px-2">
+                    <span class="d-flex align-items-center fs-13 text-ink" style="gap:.375rem">
+                        <span class="dash-bulat" style="background:@s.Warna" aria-hidden="true"></span>@s.Nama
+                    </span>
+                    <span class="fs-12 text-ink-3">sebulan <span class="tnum dash-rail fs-17 text-ink">@Format.RupiahRingkas(total)</span></span>
+                </div>
+                @if (total == 0)
+                {
+                    <p class="m-0 px-2 fs-12-5 text-ink-3" style="padding-top:1.25rem; padding-bottom:1.25rem">Belum ada @s.Nama.ToLowerInvariant() tercatat di bulan ini.</p>
+                }
+                else
+                {
+                    <GrafikGaris Labels="labels" Series="@(new List<SeriGrafik> { s })" Tinggi="132" />
+                }
+            </div>
+        }
+    </div>
+</Panel>
+
+@code {
+    [Parameter] public string Bulan { get; set; } = "";
+    /// <summary>Tanggal ISO dari tanggal 1 sampai hari terakhir yang ditampilkan.</summary>
+    [Parameter] public List<string> Hari { get; set; } = [];
+    [Parameter] public List<long> Pendapatan { get; set; } = [];
+    [Parameter] public List<long> Komisi { get; set; } = [];
+}

@@ -1,0 +1,19 @@
+@* Daftar catatan trip untuk isi peringatan Batalkan / Hapus Trip. *@
+<ul class="m-0 mt-2 ps-4 d-flex flex-column gap-1 fs-12-5" style="color:#8a2424">
+    @foreach (var b in Baris(Isi)) { <li>@b</li> }
+</ul>
+
+@code {
+    [Parameter, EditorRequired] public IsiTrip Isi { get; set; } = default!;
+
+    public static bool AdaIsi(IsiTrip isi) => isi.Termin + isi.Biaya + isi.Internal + isi.Lainnya + isi.Perjalanan > 0;
+
+    private static IEnumerable<string> Baris(IsiTrip isi)
+    {
+        if (isi.Termin > 0) yield return $"{isi.Termin} termin uang jalan · {Format.Rupiah(isi.Uj)}{(isi.Kasbon > 0 ? $" (potong kasbon {Format.Rupiah(isi.Kasbon)})" : "")}";
+        if (isi.Biaya > 0) yield return $"{isi.Biaya} biaya operasional · {Format.Rupiah(isi.BiayaTotal)}";
+        if (isi.Internal > 0) yield return $"{isi.Internal} biaya internal · {Format.Rupiah(isi.InternalTotal)}";
+        if (isi.Lainnya > 0) yield return $"{isi.Lainnya} dokumen di tab Dokumen";
+        if (isi.Perjalanan > 0) yield return $"{isi.Perjalanan} catatan di tab Perjalanan";
+    }
+}

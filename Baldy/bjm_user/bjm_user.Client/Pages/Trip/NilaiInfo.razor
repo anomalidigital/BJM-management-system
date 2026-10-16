@@ -1,0 +1,11 @@
+@* Pasangan label + nominal di dalam KotakInfo (rute, kontrak). *@
+<div class="min-w-0">
+    <dt class="fw-semibold" style="font-size:11px;color:color-mix(in srgb, var(--brand-700) 80%, transparent)">@Label</dt>
+    <dd class="m-0 tnum fs-13 fw-semibold" style="color:@(Merah ? "var(--critical)" : "var(--brand-900)")">@ChildContent</dd>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public bool Merah { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

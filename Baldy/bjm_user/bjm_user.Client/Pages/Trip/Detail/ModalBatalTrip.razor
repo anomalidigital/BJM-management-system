@@ -1,0 +1,140 @@
+@inherits KomponenData
+@*
+    Konfirmasi Batalkan Trip. Trip ditandai Dibatalkan dan seluruh catatannya tetap disimpan sebagai arsip, tetapi tidak dihitung di
+    laporan. Uang jalan yang sudah ditransfer ke supir harus diselesaikan: dikembalikan tunai, atau dijadikan kasbon supir itu.
+    Dipakai juga dari daftar trip.
+*@
+@if (Trip is not null && _isi is not null)
+{
+    var isi = _isi;
+    var berjalan = DaftarIsiTrip.AdaIsi(isi);
+    var perluSelesai = isi.RincianTermin.Where(x => x.Tf > 0).ToList();
+    <Modal Open="true" Size="md" Title="@($"Batalkan Trip {Trip.IdTampil}?")" OnClose="Tutup">
+        <ChildContent>
+            <p class="m-0 fs-13 text-ink-2" style="line-height:1.6">
+                Trip akan ditandai <span class="fw-semibold text-ink">Dibatalkan</span> dan tidak bisa diubah lagi. Seluruh catatannya tetap disimpan
+                sebagai arsip, tetapi tidak dihitung di laporan.
+            </p>
+
+            @if (berjalan)
+            {
+                <div class="mt-3 rounded-3 px-3 py-3" style="border:1px solid #f3d5d5;background:#fdf2f2">
+                    <p class="m-0 d-flex align-items-center gap-2 fs-13 fw-semibold" style="color:#b02c2c">
+                        <IkonSvg Def="Ikon.TriangleExclamation" Size="15" />
+                        Trip ini sudah berjalan
+                    </p>
+                    <p class="m-0 mt-1 fs-12-5" style="color:#8a2424">Catatan berikut menjadi arsip dan keluar dari laporan:</p>
+                    <DaftarIsiTrip Isi="isi" />
+                    @if (isi.KasbonKembali > 0)
+                    {
+                        <p class="m-0 mt-2 fs-12" style="color:#8a2424">Potongan kasbon @Format.Rupiah(isi.KasbonKembali) dikembalikan ke kasbon supirnya, tercatat sebagai “Pembatalan Trip”.</p>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="m-0 mt-2 fs-12-5 text-ink-3">Trip ini belum punya uang jalan, biaya, maupun catatan lain.</p>
+            }
+
+            @if (perluSelesai.Count > 0)
+            {
+                <div class="mt-3 rounded-3 border border-hairline" data-penyelesaian>
+                    <p class="m-0 border-bottom border-hairline bg-sunken px-3 py-2 fs-12 fw-semibold text-ink-2">Uang jalan yang sudah diterima supir</p>
+                    <ul class="list-unstyled m-0">
+                        @foreach (var r in perluSelesai)
+                        {
+                            var rr = r;
+                            var nama = NamaSopir(rr.DriverId);
+                            var pilihan = CaraTermin(rr.Id, rr.DriverId != "");
+                            <li class="d-flex flex-wrap align-items-center justify-content-between gap-2 border-bottom border-hairline px-3 py-2">
+                                <span class="fs-12-5 text-ink-2">Termin @rr.Sequence · @(nama != "" ? nama : "tanpa supir") · Transfer <span class="tnum fw-semibold text-ink">@Format.Rupiah(rr.Tf)</span></span>
+                                @if (rr.DriverId != "")
+                                {
+                                    <span class="btn-group btn-group-sm" role="group" aria-label="@($"Penyelesaian termin {rr.Sequence}")">
+                                        <button type="button" aria-pressed="@(pilihan == "kembali" ? "true" : "false")" class="btn fs-12 fw-medium @(pilihan == "kembali" ? "btn-primary" : "btn-outline-secondary bg-white text-ink-2 border-hairline")" @onclick="() => AturCara(rr.Id, CaraKembali)">Dikembalikan tunai</button>
+                                        <button type="button" aria-pressed="@(pilihan == "kasbon" ? "true" : "false")" class="btn fs-12 fw-medium @(pilihan == "kasbon" ? "btn-primary" : "btn-outline-secondary bg-white text-ink-2 border-hairline")" @onclick="() => AturCara(rr.Id, CaraKasbon)">Jadi kasbon @nama</button>
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="fs-12 text-ink-3">Dicatat dikembalikan tunai</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                    <div class="px-3 py-2">
+                        <Checkbox Checked="_paham" CheckedChanged="v => _paham = v" Label="Penyelesaian uang di atas sudah benar." />
+                    </div>
+                </div>
+            }
+
+            <div class="mt-3">
+                <label class="form-label" for="alasan-batal">Alasan pembatalan</label>
+                <textarea id="alasan-batal" class="form-control" rows="2" placeholder="mis. order dibatalkan customer" value="@_alasan" @oninput="e => _alasan = e.Value?.ToString() ?? string.Empty"></textarea>
+            </div>
+
+            @if (AturDetail.Karawang(Trip))
+            {
+                <div class="mt-3">
+                    <label class="form-label" for="biaya-cancel">Biaya cancel ditagihkan ke klien</label>
+                    <UangInput Id="biaya-cancel" Value="_biayaCancel" ValueChanged="v => _biayaCancel = v" />
+                    <p class="form-text">Isi bila klien tetap membayar cancel fee. Trip batal dengan biaya cancel masuk Tagihan untuk dibuatkan PI.</p>
+                </div>
+            }
+        </ChildContent>
+        <Footer>
+            <Tombol OnClick="Tutup">Kembali</Tombol>
+            <Tombol Variant="danger" Disabled="@(perluSelesai.Count > 0 && !_paham)" OnClick="() => Konfirmasi(perluSelesai)">Batalkan Trip</Tombol>
+        </Footer>
+    </Modal>
+}
+
+@code {
+    [Parameter] public BarisTrip? Trip { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private IsiTrip? _isi;
+    private string _alasan = "";
+    private Dictionary<string, string> _cara = [];
+    private bool _paham;
+    /// <summary>Karawang: biaya cancel yang tetap ditagihkan ke klien (disetujui Manager / Owner).</summary>
+    private long _biayaCancel;
+    private string? _idTerakhir;
+
+    protected override void OnParametersSet()
+    {
+        if (Trip?.Id == _idTerakhir) return;
+        _idTerakhir = Trip?.Id;
+        _alasan = ""; _cara = []; _paham = false; _biayaCancel = 0;
+        _isi = Trip is null ? null : Db.IsiTrip(Trip.Id);
+    }
+
+    private const string CaraKembali = "kembali", CaraKasbon = "kasbon";
+
+    private void AturCara(string id, string cara) => _cara[id] = cara;
+
+    private string NamaSopir(string id) => Db.Cari<Karyawan>(id)?.DriverName ?? "";
+
+    private string CaraTermin(string id, bool adaSopir) => adaSopir ? _cara.GetValueOrDefault(id) ?? "kasbon" : "kembali";
+
+    private Task Tutup() => OnClose.InvokeAsync();
+
+    private async Task Konfirmasi(List<RincianTermin> perluSelesai)
+    {
+        if (Trip is null || _isi is null) return;
+        var penyelesaian = perluSelesai.ToDictionary(x => x.Id, x => CaraTermin(x.Id, x.DriverId != ""));
+        var jadiKasbon = perluSelesai.Where(x => penyelesaian[x.Id] == "kasbon").Sum(x => x.Tf);
+        var kasbonKembali = _isi.KasbonKembali;
+        var biayaCancel = _biayaCancel;
+        var id = Trip.IdTampil;
+        Db.BatalkanTrip(Trip.Id, new OpsiBatal { Alasan = _alasan, Penyelesaian = penyelesaian, BiayaCancel = biayaCancel });
+        var bagian = new[]
+        {
+            kasbonKembali > 0 ? $"potongan kasbon {Format.Rupiah(kasbonKembali)} dikembalikan" : "",
+            jadiKasbon > 0 ? $"uang jalan {Format.Rupiah(jadiKasbon)} jadi kasbon supir" : "",
+            biayaCancel > 0 ? $"biaya cancel {Format.Rupiah(biayaCancel)} masuk Tagihan" : "",
+        }.Where(x => x != "").ToList();
+        Toast.Sukses($"Trip {id} dibatalkan{(bagian.Count > 0 ? $"; {string.Join(", ", bagian)}" : "")}.");
+        await OnClose.InvokeAsync();
+    }
+}

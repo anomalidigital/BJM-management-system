@@ -1,0 +1,76 @@
+@* Surat Jalan A4 untuk satu trip Priok. Dua varian: Dengan Logo dan Tanpa Logo. *@
+@{
+    var t = Note.T;
+    var nomor = t.SjNo != "" ? t.SjNo : t.TransactionNo;
+    var idTrip = t.TripIds;
+    var baris = new (string Label, string Nilai)[]
+    {
+        ("No. Kendaraan", Note.PlateNumber), ("Sopir", Note.DriverNames), ("Party", t.Party), ("SI / BL", Note.Sijo), ("Jenis Brg", t.GoodsType),
+        ("Kosongan", t.Kosongan), ("Lokasi", t.Location), ("Kapal", t.Ship), ("Tujuan", t.DestinationDetail),
+    };
+    var kota = (string.IsNullOrEmpty(t.Workspace) ? WorkspaceKode.Priok : t.Workspace) == WorkspaceKode.Priok ? "Jakarta" : "Karawang";
+}
+<section class="print-sheet mx-auto d-flex flex-column bg-white text-black border border-hairline shadow-card" style="width:210mm;max-width:100%;padding:16mm;font-size:11.5px">
+    <header class="d-flex align-items-start justify-content-between gap-5 pb-3" style="border-bottom:@(WithLogo ? "3px" : "1px") solid #000">
+        <div class="d-flex align-items-start gap-3">
+            @if (WithLogo)
+            {
+                <div class="flex-shrink-0 d-grid rounded-1" style="width:56px;height:56px;place-items:center;border:2.5px solid #000"><span class="lh-1" style="font-size:19px;font-weight:900;letter-spacing:-.04em">BM</span></div>
+            }
+            <div>
+                <p class="m-0 fw-bold lh-tight" style="font-size:17px;letter-spacing:-.01em">PT BIMAJAYA MUSTIKA</p>
+                <p class="m-0" style="font-size:11px;letter-spacing:.18em">JAKARTA</p>
+                @if (WithLogo) { <p class="m-0 mt-1 text-secondary" style="font-size:9.5px">Transportation &amp; Container Trucking Services</p> }
+            </div>
+        </div>
+        <div class="pt-1 text-end" style="font-size:10.5px"><p class="m-0">@kota, @Format.TanggalPanjang(t.TransactionDate)</p></div>
+    </header>
+    <div class="mt-4 mb-4 text-center">
+        <h1 class="d-inline-block px-3 pb-1 fw-bold" style="font-size:16px;letter-spacing:.12em;border-bottom:2px solid #000">SURAT JALAN</h1>
+        <p class="m-0 mt-1 fw-semibold" style="font-size:11.5px">Nomor: @nomor</p>
+        @if (t.SjNo != "") { <p class="m-0 text-secondary" style="font-size:10px">Trip @t.TransactionNo</p> }
+    </div>
+    <div class="mb-4 d-grid gap-1" style="grid-template-columns:74px 1fr;font-size:11.5px">
+        <span class="fw-semibold">Kepada Yth</span><span>: @(t.RecipientName != "" ? t.RecipientName : "-")</span>
+        <span class="fw-semibold">di</span>
+        <span>: @(t.RecipientAddress1 != "" ? t.RecipientAddress1 : "-")@if (t.RecipientAddress2 != "") { <br /><span class="ps-2">@t.RecipientAddress2</span> }</span>
+    </div>
+    <p class="mb-3" style="font-size:11px;line-height:1.6">Dengan hormat, bersama ini kami kirimkan barang dengan keterangan sebagai berikut:</p>
+    <table class="mb-4 w-100" style="border-collapse:collapse;font-size:11px">
+        <tbody>
+            @foreach (var (label, nilai) in baris)
+            {
+                <tr><td class="fw-semibold px-2" style="width:34%;border:1px solid #6b7280;background:#f3f4f6;padding:5px 8px">@label</td><td class="px-2" style="border:1px solid #6b7280;padding:5px 8px">@(nilai != "" ? nilai : "-")</td></tr>
+            }
+        </tbody>
+    </table>
+    <div class="mb-4">
+        <p class="mb-1 fw-semibold" style="font-size:11.5px">ID Perjalanan/Trip <span class="fw-normal text-secondary">(@idTrip.Count ID)</span></p>
+        @if (idTrip.Count == 0)
+        {
+            <p class="m-0 px-2 py-3 text-center text-secondary" style="border:1px solid #6b7280;font-size:10.5px">Belum ada ID Perjalanan/Trip.</p>
+        }
+        else
+        {
+            <table class="w-100" style="border-collapse:collapse;font-size:11px">
+                <thead><tr style="background:#f3f4f6"><th class="text-start fw-semibold" style="width:48px;border:1px solid #6b7280;padding:5px 8px">No.</th><th class="text-start fw-semibold" style="border:1px solid #6b7280;padding:5px 8px">ID Perjalanan/Trip</th></tr></thead>
+                <tbody>
+                    @for (var i = 0; i < idTrip.Count; i++) { <tr><td style="border:1px solid #6b7280;padding:5px 8px">@(i + 1).</td><td class="fw-medium" style="border:1px solid #6b7280;padding:5px 8px;letter-spacing:.02em">@idTrip[i]</td></tr> }
+                </tbody>
+            </table>
+        }
+    </div>
+    <p class="mb-5" style="font-size:11px;line-height:1.6">Mohon barang tersebut di atas diterima dalam keadaan baik dan lengkap. Atas perhatian dan kerja samanya kami ucapkan terima kasih.</p>
+    <div class="mt-auto row row-cols-3 g-4 pt-3 text-center" style="font-size:11px">
+        @foreach (var peran in new[] { "Penerima", "Sopir", "Hormat kami," })
+        {
+            <div class="col"><p class="mb-5 pb-4">@peran</p><p class="mx-auto pt-1" style="width:80%;border-top:1px solid #000;font-size:10.5px">( ................................ )</p></div>
+        }
+    </div>
+    <footer class="mt-4 pt-1 text-secondary" style="border-top:1px solid #9ca3af;font-size:8.5px">SIKOTIS — Sistem Komisi Otomatis · PT Bimajaya Mustika · Surat Jalan @nomor</footer>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public BarisTrip Note { get; set; } = default!;
+    [Parameter] public bool WithLogo { get; set; } = true;
+}

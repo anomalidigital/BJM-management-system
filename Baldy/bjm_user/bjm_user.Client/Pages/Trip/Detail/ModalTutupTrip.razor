@@ -1,0 +1,153 @@
+@inherits KomponenData
+@*
+    Tutup Trip (Receive all POD / bukti dokumen fisik). Sebelum ditutup tampil rekap keseluruhan trip beserta daftar yang masih
+    kurang (bisa dicetak / disimpan PDF). Lalu dua pertanyaan: keadaan dokumen POD, dan apakah mobil sudah kembali ke pool (selama
+    belum, mobilnya tidak bisa dipilih trip lain). Backload / lanjutan tidak ditanyakan di sini: dibuat dari menu ⋯ daftar trip.
+    Keputusan Baldy 15 Okt 2026: trip tanpa supir tidak bisa ditutup (komisi & Siap PI butuh supir).
+    Rincian rekap dilipat supaya muat tanpa scroll: angka utamanya tetap tampil di judulnya.
+*@
+@if (Trip is not null)
+{
+    var data = Rekap.Susun(Trip, Db.Semua);
+    var kejadian = TripLogika.Kejadian(Db.Semua.Kejadian, Trip.Id);
+    var fotoBongkar = kejadian.Where(e => e.Jenis == "bongkar").SelectMany(e => e.Attachments).ToList();
+    var catatanPool = AturDetail.WaktuPool(Trip, kejadian);
+    var tanyaPool = Trip.T.VehicleId != "" && catatanPool == "";
+    if (_cetak)
+    {
+        <CetakRekapTrip Data="data" OnClose="() => _cetak = false" />
+    }
+    else
+    {
+        <Modal Open="true" Size="xl" Title="@($"Tutup Trip {Trip.IdTampil}?")" OnClose="Tutup"
+               Subtitle="@string.Join(" · ", new[] { Trip.PlateNumber, Trip.DriverNames, Trip.Ata != "" ? $"ATA {Format.Waktu(Trip.Ata)}" : "" }.Where(x => x != ""))">
+            <ChildContent>
+                <div class="d-flex flex-column gap-3">
+                    <DaftarCek Cek="data.Cek" OnBuka="Buka" SebelumTutup="true" />
+
+                    <div class="rounded-3 border border-hairline">
+                        <button type="button" class="btn w-100 d-flex flex-wrap align-items-baseline column-gap-3 row-gap-1 px-3 py-2 text-start fs-12-5 border-0" aria-expanded="@_rincian" @onclick="() => _rincian = !_rincian">
+                            <span class="fw-semibold text-ink-2">Rekap keseluruhan trip</span>
+                            <span class="tnum text-ink-3">Harga @Format.Rupiah(data.Angka.Harga) · Uang jalan @Format.Rupiah(data.Angka.UjDihitung) · Biaya @Format.Rupiah(data.Angka.Biaya) · Netto @Format.Rupiah(data.Angka.Netto)</span>
+                            <span class="ms-auto fw-semibold text-brand">@(_rincian ? "Lipat" : "Lihat rincian")</span>
+                        </button>
+                        @if (_rincian)
+                        {
+                            <div class="border-top border-hairline px-3 py-3"><RekapTripIsi Data="data" /></div>
+                        }
+                    </div>
+
+                    <div class="d-flex flex-column gap-3 rounded-3 border border-brand-100 px-3 py-3" style="background:color-mix(in srgb, var(--brand-50) 50%, var(--surface))" id="pertanyaan-tutup">
+                        <div>
+                            <p class="mb-2 fs-12-5 fw-semibold text-ink-2">Dokumen POD (Berita Acara / Surat Jalan / TR bertanda tangan penerima)</p>
+                            <div class="row g-2">
+                                <div class="col-sm-6">
+                                    <Radio Name="pod-tutup" Class="h-100" Checked="@(_pod == "fisik")" OnChange="() => PilihPod(PodFisik)" Label="Dokumen fisik diterima"
+                                           Description="Supir sudah menyerahkan hardcopy di pool." />
+                                </div>
+                                <div class="col-sm-6">
+                                    <Radio Name="pod-tutup" Class="h-100" Checked="@(_pod == "foto")" OnChange="() => PilihPod(PodFoto)" Label="Foto dulu, fisik menyusul"
+                                           Description="Supir lanjut jalan, mis. backload / lanjutan. PI tetap bisa dibuat." />
+                                </div>
+                            </div>
+                            @if (_pod != "")
+                            {
+                                <div class="mt-3">
+                                    <LampiranInput Label="Tambah foto POD" Value="_foto" ValueChanged="v => { _foto = v; _galat = null; }" />
+                                    @if (fotoBongkar.Count > 0) { <p class="m-0 mt-1 fs-12 text-ink-3">@fotoBongkar.Count foto dari catatan Selesai bongkar ikut menjadi bukti POD.</p> }
+                                </div>
+                            }
+                        </div>
+
+                        @if (tanyaPool)
+                        {
+                            <div>
+                                <p class="mb-2 fs-12-5 fw-semibold text-ink-2">Mobil @(Trip.PlateNumber != "" ? Trip.PlateNumber : "trip ini") sudah kembali ke pool?</p>
+                                <div class="row g-2">
+                                    <div class="col-sm-6">
+                                        <Radio Name="pool-tutup" Class="h-100" Checked="@(_diPool == "ya")" OnChange="() => PilihPool(PoolYa)" Label="Ya, sudah di pool"
+                                               Description="Mobil langsung bisa dipakai trip lain." />
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <Radio Name="pool-tutup" Class="h-100" Checked="@(_diPool == "tidak")" OnChange="() => PilihPool(PoolBelum)" Label="Belum"
+                                               Description="Mobil tetap tertahan di trip ini. Lanjut backload? Buat dari menu ⋯ Ada Backload / Lanjutan di daftar trip." />
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else if (Trip.T.VehicleId != "" && catatanPool != "")
+                        {
+                            <p class="m-0 fs-12-5 text-ink-3">Mobil sudah tercatat kembali di pool @Format.Waktu(catatanPool).</p>
+                        }
+
+                        <PesanGalat Teks="@_galat" />
+                    </div>
+                </div>
+            </ChildContent>
+            <Footer>
+                <Tombol OnClick="Tutup">Batal</Tombol>
+                <Tombol Icon="Ikon.Print" IconSize="14" OnClick="() => _cetak = true">Cetak Rekap</Tombol>
+                <Tombol Variant="primary" OnClick="() => Konfirmasi(tanyaPool, fotoBongkar.Count)">Tutup Trip</Tombol>
+            </Footer>
+        </Modal>
+    }
+}
+
+@code {
+    [Parameter] public BarisTrip? Trip { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    /// <summary>Dipanggil setelah trip ditutup.</summary>
+    [Parameter] public EventCallback OnClosed { get; set; }
+
+    [Inject] private Penyimpanan Simpan { get; set; } = default!;
+
+    private string _pod = "";
+    private List<string> _foto = [];
+    private string _diPool = "";
+    private string? _galat;
+    private bool _cetak;
+    private bool _rincian;
+    private string? _idTerakhir;
+
+    protected override void OnParametersSet()
+    {
+        if (Trip?.Id == _idTerakhir) return;
+        _idTerakhir = Trip?.Id;
+        _pod = ""; _foto = Trip?.T.PodAttachments?.ToList() ?? []; _diPool = ""; _galat = null; _cetak = false; _rincian = false;
+    }
+
+    private const string PodFisik = "fisik", PodFoto = "foto", PoolYa = "ya", PoolBelum = "tidak";
+
+    private void PilihPod(string v) { _pod = v; _galat = null; }
+    private void PilihPool(string v) { _diPool = v; _galat = null; }
+
+    private Task Tutup() => OnClose.InvokeAsync();
+
+    private async Task Gagal(string pesan)
+    {
+        _galat = pesan;
+        await Simpan.GulirKeAsync("#pertanyaan-tutup");
+    }
+
+    private async Task Konfirmasi(bool tanyaPool, int jumlahFotoBongkar)
+    {
+        if (Trip is null) return;
+        if (Trip.DriverIds.Count == 0) { await Gagal("Trip belum punya supir. Pilih supir di Edit sebelum ditutup."); return; }
+        if (_pod == "") { await Gagal("Pilih keadaan dokumen POD."); return; }
+        if (_pod == "foto" && _foto.Count + jumlahFotoBongkar == 0) { await Gagal("Lampirkan foto POD, karena dokumen fisiknya belum diterima."); return; }
+        if (tanyaPool && _diPool == "") { await Gagal("Jawab dulu: mobil sudah kembali ke pool atau belum."); return; }
+        var masukPool = tanyaPool && _diPool == "ya";
+        var id = Trip.IdTampil;
+        Db.TutupTrip(Trip.Id, new OpsiTutup { PodFisik = _pod == "fisik", PodFoto = _foto.ToList(), DiPool = masukPool });
+        Toast.Sukses($"Trip {id} ditutup{(tanyaPool && !masukPool ? ". Mobil belum tercatat di pool: tandai setelah kembali, atau buat backload / lanjutan dari menu ⋯ di daftar trip." : " dan siap dibuatkan PI di Tagihan.")}");
+        await OnClose.InvokeAsync();
+        await OnClosed.InvokeAsync();
+    }
+
+    private async Task Buka(string tab)
+    {
+        var id = Trip!.Id;
+        await OnClose.InvokeAsync();
+        Ke(AturDetail.AlamatTab(id, tab));
+    }
+}

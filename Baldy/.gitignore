@@ -1,19 +1,29 @@
-node_modules/
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build output
+**/bin/
+**/obj/
 dist/
 dist-ssr/
-*.local
-.env
-.env.*
-!.env.example
 
-# Editor / OS / tooling
-.claude/
-.vscode/*
-!.vscode/extensions.json
-.idea/
-.DS_Store
-Thumbs.db
-*.sw?
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+
+# ASP.NET Core / .NET configuration
+**/appsettings*.json
+!**/appsettings.sample.json
+
+# Alat pembuat aset (Node), hanya dipakai lokal
+**/node_modules/
+node_modules/
 
 # Logs
 logs/
@@ -22,8 +32,28 @@ npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 
-# Aset presentasi (berisi tangkapan layar sistem client)
-presentasi/
+# Test results
+TestResults/
+*.trx
 
-# Berkas kunci sementara Office
+# Code coverage
+coverage/
+*.coverage
+*.coveragexml
+
+# Editor / OS / tooling
+.claude/
+.vscode/
+.idea/
+*.sln.iml
+.DS_Store
+Thumbs.db
+*.sw?
+*.local
+.env
+.env.*
+!.env.example
+
+# Aset presentasi & kunci sementara Office
+presentasi/
 ~$*

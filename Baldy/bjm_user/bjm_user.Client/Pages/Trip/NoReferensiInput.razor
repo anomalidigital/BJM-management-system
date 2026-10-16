@@ -1,0 +1,48 @@
+@* Isian No. Referensi (TR / Order Release klien): ketik lalu Enter, koma, atau Tambah; boleh lebih dari satu; dihapus satu per satu (×). *@
+<div>
+    <div class="d-flex align-items-center gap-2">
+        <input id="@Id" class="form-control min-w-0 flex-grow-1" value="@_ketik" placeholder="TR2600512595" disabled="@Disabled"
+               @oninput="e => _ketik = e.Value?.ToString() ?? string.Empty" @onkeydown="Tombol" @onblur="SaatKeluar" />
+        <Tombol Size="sm" Icon="Ikon.Plus" IconSize="13" Disabled="@(Disabled || _ketik.Trim() == "")" OnClick="() => Tambah()">Tambah</Tombol>
+    </div>
+    @if (Value.Count > 0)
+    {
+        <ul class="mt-2 mb-0 ps-0 list-unstyled d-flex flex-wrap gap-1">
+            @foreach (var no in Value)
+            {
+                <li class="tnum d-inline-flex align-items-center gap-1 rounded-2 border border-hairline bg-sunken fs-12-5 fw-medium text-ink mw-100" style="padding:2px 4px 2px 8px">
+                    <span class="text-truncate">@no</span>
+                    <button type="button" class="btn btn-link p-0 text-ink-3 place-center" style="width:20px;height:20px" aria-label="@($"Hapus No. Referensi {no}")" disabled="@Disabled" @onclick="() => Hapus(no)"><IkonSvg Def="Ikon.Xmark" Size="11" /></button>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public List<string> Value { get; set; } = [];
+    [Parameter] public EventCallback<List<string>> ValueChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+
+    private string _ketik = "";
+
+    private async Task Tambah(string? teks = null)
+    {
+        var baru = (teks ?? _ketik).Split([',', ';', '\n']).Select(TripLogika.RapikanTr).Where(x => x != "").ToList();
+        var gabung = new List<string>(Value);
+        foreach (var no in baru) if (!gabung.Any(x => TripLogika.KunciTr(x) == TripLogika.KunciTr(no))) gabung.Add(no);
+        _ketik = "";
+        if (gabung.Count != Value.Count) await ValueChanged.InvokeAsync(gabung);
+    }
+
+    private async Task Tombol(KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter" or ",") await Tambah();
+        else if (e.Key == "Backspace" && _ketik == "" && Value.Count > 0) await ValueChanged.InvokeAsync(Value.Take(Value.Count - 1).ToList());
+    }
+
+    private async Task SaatKeluar() { if (_ketik.Trim() != "") await Tambah(); }
+
+    private Task Hapus(string no) => ValueChanged.InvokeAsync(Value.Where(x => x != no).ToList());
+}

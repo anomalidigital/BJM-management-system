@@ -1,0 +1,298 @@
+@inherits KomponenData
+@* Proses Data (Priok): daftar record dapat diklik langsung, dilengkapi tombol Previous / Next Record. *@
+
+@{
+    var records = Records;
+    var index = records.FindIndex(r => r.B.Id == _activeId);
+    var active = index >= 0 ? records[index] : records.FirstOrDefault();
+    if (_mode == "view") IsiDari(active);
+    var readOnly = _mode == "view";
+    var jo = Db.Data.JobOrders.FirstOrDefault(j => j.Id == _form.JobOrderId);
+    var bolehUbah = Bisa("master");
+}
+
+<div class="row g-0">
+    @* Daftar record — pengganti navigasi Atas/Bawah/Sebelum/Berikut *@
+    <aside class="col-12 col-lg-auto border-bottom border-hairline" style="width:300px;max-width:100%">
+        <div class="border-bottom border-hairline p-3">
+            <SearchInput Value="@_query" ValueChanged="v => _query = v" Width="100%" Placeholder="Cari faktur / SI-JO..." />
+        </div>
+        <ul class="list-unstyled m-0 overflow-y-auto" style="max-height:560px">
+            @if (records.Count == 0)
+            {
+                <li class="px-4 py-5 text-center fs-13 text-ink-3">Data tidak ditemukan.</li>
+            }
+            @foreach (var r in records)
+            {
+                var rr = r;
+                <li>
+                    <button type="button" class="w-100 border-0 text-start px-3 py-2 @(rr.B.Id == active?.B.Id ? "bg-brand-50" : "bg-transparent")"
+                            style="border-bottom:1px solid var(--grid) !important" @onclick="() => PilihRecord(rr)">
+                        <span class="d-flex align-items-center justify-content-between gap-2">
+                            <span class="tnum fs-12-5 fw-semibold text-ink">@rr.B.InvoiceNo</span>
+                            <span class="tnum fs-11-5 text-ink-3">@Format.Tanggal(rr.B.BillingDate)</span>
+                        </span>
+                        <span class="mt-1 d-flex align-items-center justify-content-between gap-2">
+                            <span class="tnum text-truncate fs-12 text-ink-3">Sijo @rr.Sijo</span>
+                            <span class="tnum flex-shrink-0 fs-12 fw-medium text-ink-2">@Format.RupiahRingkas(rr.B.Amount)</span>
+                        </span>
+                    </button>
+                </li>
+            }
+        </ul>
+    </aside>
+
+    @* Form record *@
+    <section class="col-lg min-w-0 border-hairline" style="border-left:1px solid var(--hairline)">
+        <header class="d-flex flex-wrap align-items-center justify-content-between gap-3 border-bottom border-hairline px-3 py-2">
+            <div class="d-flex align-items-center gap-2">
+                <Tombol Size="sm" Icon="Ikon.ChevronLeft" IconSize="14" Disabled="@(_mode != "view" || index <= 0)" OnClick="() => _activeId = index > 0 ? records[index - 1].B.Id : null">Previous Record</Tombol>
+                <Tombol Size="sm" Disabled="@(_mode != "view" || index < 0 || index >= records.Count - 1)" OnClick="() => _activeId = index + 1 < records.Count ? records[index + 1].B.Id : null">
+                    Next Record <IkonSvg Def="Ikon.ChevronRight" Size="14" />
+                </Tombol>
+                @if (records.Count > 0)
+                {
+                    <span class="tnum ms-1 fs-12 text-ink-3">Record @(Math.Max(index, 0) + 1) dari @records.Count</span>
+                }
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                @if (_mode == "view")
+                {
+                    <Tombol Size="sm" Icon="Ikon.Plus" IconSize="14" Disabled="@(!bolehUbah)" OnClick="MulaiTambah">Tambah</Tombol>
+                    <Tombol Size="sm" Icon="Ikon.Pen" IconSize="14" Disabled="@(!bolehUbah || active is null)" OnClick="() => MulaiUbah(active)">Edit</Tombol>
+                    <Tombol Size="sm" Variant="ghost" Icon="Ikon.TrashCan" IconSize="14" Disabled="@(!bolehUbah || active is null)" OnClick="() => _hapus = true">Hapus</Tombol>
+                }
+                else
+                {
+                    <Tombol Size="sm" Icon="Ikon.Xmark" IconSize="14" OnClick="Batal">Batal</Tombol>
+                    <Tombol Size="sm" Variant="primary" Icon="Ikon.FloppyDisk" IconSize="14" OnClick="() => Simpan(active, records)">Simpan</Tombol>
+                }
+            </div>
+        </header>
+
+        @if (active is null && _mode == "view")
+        {
+            <div class="px-4 py-5 text-center">
+                <p class="m-0 fs-14 fw-semibold text-ink">Belum ada data.</p>
+                <p class="m-0 mt-1 fs-13 text-ink-3">Tambahkan tagihan pertama lewat tombol Tambah di atas.</p>
+            </div>
+        }
+        else
+        {
+            <div class="p-3">
+                @if (_mode != "view")
+                {
+                    <p class="mb-3 rounded-2 border border-brand-100 bg-brand-50 px-3 py-2 fs-12-5 fw-medium" style="color:var(--brand-800)">
+                        @(_mode == "create" ? "Mode tambah data baru." : $"Mode ubah record {active?.B.InvoiceNo}.")
+                    </p>
+                }
+
+                <div class="row g-3">
+                    <div class="col-sm-12 col-xl-4">
+                        <Field Label="No. SI/JO" Required Error="@_galat.GetValueOrDefault("job_order_id")">
+                            <Pilihan Id="@context" Options="OpsiJo" Value="@(_form.JobOrderId == "" ? null : _form.JobOrderId)" Disabled="readOnly" Invalid="@_galat.ContainsKey("job_order_id")"
+                                     Placeholder="Cari nomor SI / Job Order..." ValueChanged="PilihJo" />
+                        </Field>
+                    </div>
+                    <div class="col-sm-6 col-xl-4">
+                        <Field Label="Data Cost" Required Error="@_galat.GetValueOrDefault("cost_code")" Hint="@(_galat.ContainsKey("cost_code") ? null : Teks("Kode biaya (Kodecost)."))">
+                            <input id="@context" class="form-control @(_galat.ContainsKey("cost_code") ? "is-invalid" : "")" value="@_form.CostCode" readonly="@readOnly"
+                                   @oninput="e => _form.CostCode = e.Value?.ToString() ?? string.Empty" />
+                        </Field>
+                    </div>
+                    <div class="col-sm-6 col-xl-4">
+                        <Field Label="No Faktur" Required Error="@_galat.GetValueOrDefault("invoice_no")" Hint="@(readOnly || _galat.ContainsKey("invoice_no") ? null : Teks("Terisi otomatis, boleh diganti."))">
+                            <KodeInput Id="@context" Value="@_form.InvoiceNo" ReadOnly="readOnly" Invalid="@_galat.ContainsKey("invoice_no")" Placeholder="INV-047" Uppercase
+                                       GenerateTitle="Buat nomor faktur berikutnya" ValueChanged="v => _form.InvoiceNo = v"
+                                       OnGenerate="() => FakturBerikut(active)" />
+                        </Field>
+                    </div>
+                    <div class="col-sm-6 col-xl-4">
+                        <Field Label="Customer" Hint="@Teks("Diambil dari SI/JO.")"><input id="@context" class="form-control" value="@(jo?.CustomerName ?? "")" readonly /></Field>
+                    </div>
+                    <div class="col-sm-6 col-xl-4">
+                        <Field Label="Party" Hint="@Teks("Diambil dari SI/JO.")"><input id="@context" class="form-control" value="@(jo?.Party ?? "")" readonly /></Field>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-0">
+                    <div class="col-sm-6 col-xl-4">
+                        <Field Label="Tanggal Tagih" Required Error="@_galat.GetValueOrDefault("billing_date")">
+                            <TanggalInput Id="@context" Value="@_form.BillingDate" Disabled="readOnly" Invalid="@_galat.ContainsKey("billing_date")" ValueChanged="v => _form.BillingDate = v" />
+                        </Field>
+                    </div>
+                    <div class="col-sm-6 col-xl-4">
+                        <Field Label="Tanggal Tarik"><TanggalInput Id="@context" Value="@_form.WithdrawalDate" Disabled="readOnly" ValueChanged="v => _form.WithdrawalDate = v" /></Field>
+                    </div>
+                    <div class="col-sm-6 col-xl-4">
+                        <Field Label="Tanggal Lunas" Hint="@Teks("Kosongkan bila belum lunas.")">
+                            <TanggalInput Id="@context" Value="@(_form.PaidDate ?? "")" Disabled="readOnly" ValueChanged="v => _form.PaidDate = v == string.Empty ? null : v" />
+                        </Field>
+                    </div>
+                    <div class="col-sm-6 col-xl-4">
+                        <Field Label="Jumlah Rp" Required Error="@_galat.GetValueOrDefault("amount")">
+                            <UangInput Id="@context" Value="_form.Amount" Disabled="readOnly" Invalid="@_galat.ContainsKey("amount")" ValueChanged="v => _form.Amount = v" />
+                        </Field>
+                    </div>
+                    <div class="col-sm-6 col-xl-4">
+                        <Field Label="Jaminan Rp"><UangInput Id="@context" Value="_form.GuaranteeAmount" Disabled="readOnly" ValueChanged="v => _form.GuaranteeAmount = v" /></Field>
+                    </div>
+                </div>
+
+                <div class="mt-3 d-flex flex-wrap align-items-center gap-4 rounded-3 border border-hairline bg-sunken px-3 py-2">
+                    <Checkbox Label="SUNTING" Checked="_form.IsSunting" Disabled="readOnly" CheckedChanged="v => _form.IsSunting = v" />
+                    <Checkbox Label="DITOLAK" Checked="_form.IsRejected" Disabled="readOnly" CheckedChanged="v => _form.IsRejected = v" />
+                    <span class="ms-auto d-flex flex-wrap align-items-center gap-2">
+                        @if (_form.IsRejected) { <Badge Tone="critical">DITOLAK</Badge> }
+                        @if (_form.IsSunting) { <Badge Tone="warning">SUNTING</Badge> }
+                        @if (!string.IsNullOrEmpty(_form.PaidDate)) { <Badge Tone="good">Lunas @Format.Tanggal(_form.PaidDate)</Badge> }
+                    </span>
+                </div>
+
+                <details class="mt-3 rounded-3 border border-hairline">
+                    <summary class="px-3 py-2 fs-12-5 fw-medium text-ink-2 user-select-none" style="cursor:pointer">Field lainnya (BL No, Invoice No, Catatan)</summary>
+                    <div class="border-top border-hairline p-3"><div class="row g-3">
+                        <div class="col-sm-4">
+                            <Field Label="BL No"><input id="@context" class="form-control" value="@_form.BlNo" readonly="@readOnly" @oninput="e => _form.BlNo = e.Value?.ToString() ?? string.Empty" /></Field>
+                        </div>
+                        <div class="col-sm-4">
+                            <Field Label="Invoice No">
+                                <KodeInput Id="@context" Value="@_form.InvoiceRef" ReadOnly="readOnly" Uppercase GenerateTitle="Buat nomor invoice berikutnya" ValueChanged="v => _form.InvoiceRef = v"
+                                           OnGenerate="() => InvoiceBerikut(active)" />
+                            </Field>
+                        </div>
+                        <div class="col-sm-4">
+                            <Field Label="Catatan"><input id="@context" class="form-control" value="@_form.Notes" readonly="@readOnly" @oninput="e => _form.Notes = e.Value?.ToString() ?? string.Empty" /></Field>
+                        </div>
+                    </div></div>
+                </details>
+            </div>
+        }
+    </section>
+</div>
+
+<KonfirmasiDialog Open="_hapus" Title="Hapus Data?" ConfirmLabel="Hapus" Tone="danger" OnCancel="() => _hapus = false" OnConfirm="() => Hapus(active, records, index)">
+    <p class="m-0 fs-13 text-ink-2">Data yang sudah dihapus mungkin tidak dapat dikembalikan.</p>
+    <p class="m-0 mt-2 fs-13 fw-medium text-ink">@active?.B.InvoiceNo — Sijo @active?.Sijo</p>
+</KonfirmasiDialog>
+
+@code {
+    private string _query = "";
+    private string? _activeId;
+    private string _mode = "view";
+    private Model.Tagihan _form = Kosong();
+    private readonly Dictionary<string, string> _galat = [];
+    private bool _hapus;
+
+    private static Model.Tagihan Kosong() => new() { BillingDate = Format.HariIni(), WithdrawalDate = Format.HariIni() };
+    private static RenderFragment Teks(string s) => b => b.AddContent(0, s);
+
+    private List<BarisTagihan> Records
+    {
+        get
+        {
+            var daftar = Db.BarisTagihan
+                .Where(b => Util.CocokCari(_query, b.B.InvoiceNo, b.Sijo, b.B.CostCode, b.CustomerName))
+                .OrderByDescending(b => b.B.BillingDate, StringComparer.Ordinal).ToList();
+            if (_activeId is null && daftar.Count > 0) _activeId = daftar[0].B.Id;
+            return daftar;
+        }
+    }
+
+    private List<Opsi> OpsiJo => Db.Data.JobOrders.Select(j => new Opsi(j.Id, j.Sijo, $"{j.CustomerName} · {j.Party}", j.CustomerCode)).ToList();
+
+    /// <summary>Isi form mengikuti record yang dipilih (mode lihat).</summary>
+    private void IsiDari(BarisTagihan? active)
+    {
+        if (active is null) return;
+        var b = active.B;
+        _form = new Model.Tagihan
+        {
+            InvoiceNo = b.InvoiceNo, JobOrderId = b.JobOrderId, CostCode = b.CostCode, BillingDate = b.BillingDate, WithdrawalDate = b.WithdrawalDate,
+            Amount = b.Amount, GuaranteeAmount = b.GuaranteeAmount, IsSunting = b.IsSunting, IsRejected = b.IsRejected, PaidDate = b.PaidDate,
+            BlNo = b.BlNo, InvoiceRef = b.InvoiceRef, Notes = b.Notes,
+        };
+    }
+
+    /// <summary>Nomor faktur & invoice lain, dari seluruh workspace supaya tidak kembar.</summary>
+    private List<string> NomorLain(Func<Model.Tagihan, string> ambil, BarisTagihan? active) =>
+        Db.Semua.Tagihan.Where(b => b.Id != (_mode == "edit" ? active?.B.Id : null)).Select(ambil).ToList();
+
+    private void FakturBerikut(BarisTagihan? active) => _form.InvoiceNo = Kode.NomorBerurut("INV-", NomorLain(b => b.InvoiceNo, active), 3);
+    private void InvoiceBerikut(BarisTagihan? active) => _form.InvoiceRef = Kode.NomorBerurut("FK-", NomorLain(b => b.InvoiceRef, active), 4);
+
+    private void PilihJo(string? v)
+    {
+        var jo = Db.Data.JobOrders.FirstOrDefault(j => j.Id == v);
+        _form.JobOrderId = v ?? "";
+        if (_form.CostCode == "") _form.CostCode = jo?.CustomerCode ?? "";
+    }
+
+    private void MulaiTambah()
+    {
+        _mode = "create";
+        _form = Kosong();
+        _form.InvoiceNo = Kode.NomorBerurut("INV-", Db.Semua.Tagihan.Select(b => b.InvoiceNo), 3);
+        _form.InvoiceRef = Kode.NomorBerurut("FK-", Db.Semua.Tagihan.Select(b => b.InvoiceRef), 4);
+        _galat.Clear();
+    }
+
+    private void MulaiUbah(BarisTagihan? active)
+    {
+        if (active is null) return;
+        _mode = "edit"; _galat.Clear();
+    }
+
+    private void PilihRecord(BarisTagihan r) { _activeId = r.B.Id; _mode = "view"; }
+
+    private void Batal() { _mode = "view"; _galat.Clear(); }
+
+    private bool Valid(BarisTagihan? active)
+    {
+        _galat.Clear();
+        var lain = _mode == "edit" ? active?.B.Id : null;
+        if (_form.InvoiceNo.Trim() == "") _galat["invoice_no"] = "No Faktur wajib diisi.";
+        else if (Db.Data.Tagihan.Any(b => string.Equals(b.InvoiceNo, _form.InvoiceNo.Trim(), StringComparison.OrdinalIgnoreCase) && b.Id != lain))
+            _galat["invoice_no"] = "No Faktur sudah dipakai.";
+        if (_form.JobOrderId == "") _galat["job_order_id"] = "No. SI/JO wajib dipilih.";
+        if (_form.CostCode.Trim() == "") _galat["cost_code"] = "Data Cost wajib diisi.";
+        if (_form.BillingDate == "") _galat["billing_date"] = "Tanggal Tagih wajib diisi.";
+        if (_form.Amount <= 0) _galat["amount"] = "Jumlah Rp harus lebih dari 0.";
+        return _galat.Count == 0;
+    }
+
+    private void Simpan(BarisTagihan? active, List<BarisTagihan> records)
+    {
+        if (!Valid(active)) { Toast.Galat("Periksa kembali isian yang ditandai merah."); return; }
+        var f = _form;
+        f.InvoiceNo = f.InvoiceNo.Trim();
+        f.CostCode = f.CostCode.Trim().ToUpperInvariant();
+        if (_mode == "edit" && active is not null)
+        {
+            Db.Ubah<Model.Tagihan>(active.B.Id, b =>
+            {
+                b.InvoiceNo = f.InvoiceNo; b.JobOrderId = f.JobOrderId; b.CostCode = f.CostCode; b.BillingDate = f.BillingDate; b.WithdrawalDate = f.WithdrawalDate;
+                b.Amount = f.Amount; b.GuaranteeAmount = f.GuaranteeAmount; b.IsSunting = f.IsSunting; b.IsRejected = f.IsRejected; b.PaidDate = f.PaidDate;
+                b.BlNo = f.BlNo; b.InvoiceRef = f.InvoiceRef; b.Notes = f.Notes;
+            });
+            Toast.Sukses("Data berhasil diperbarui.");
+        }
+        else
+        {
+            f.IsMarked = false;
+            var dibuat = Db.Buat(f);
+            _activeId = dibuat.Id;
+            Toast.Sukses("Data berhasil disimpan.");
+        }
+        _mode = "view";
+    }
+
+    private void Hapus(BarisTagihan? active, List<BarisTagihan> records, int index)
+    {
+        if (active is null) return;
+        Db.Hapus<Model.Tagihan>(active.B.Id);
+        _activeId = index + 1 < records.Count ? records[index + 1].B.Id : index - 1 >= 0 ? records[index - 1].B.Id : null;
+        _hapus = false;
+        Toast.Sukses("Data berhasil dihapus.");
+    }
+}

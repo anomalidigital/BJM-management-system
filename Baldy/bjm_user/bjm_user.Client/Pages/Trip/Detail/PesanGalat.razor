@@ -1,0 +1,9 @@
+@* Pesan galat simpan di bawah form tab trip. Kosong = tidak tampil. *@
+@if (!string.IsNullOrEmpty(Teks))
+{
+    <p class="pesan-galat m-0 fs-12 fw-medium" role="alert" style="color:var(--critical)">@Teks</p>
+}
+
+@code {
+    [Parameter] public string? Teks { get; set; }
+}

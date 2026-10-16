@@ -1,0 +1,239 @@
+@page "/laporan/netto"
+@inherits KomponenData
+@*
+    Laporan Pendapatan Netto: rekap per nomor polisi, seperti laporan sistem lama. Trip tanpa kendaraan tetap dihitung di baris
+    tersendiri. Kernet belum dicatat di data mana pun, jadi selalu 0 sampai aturannya ada (TBD-11).
+*@
+<PageTitle>Pendapatan Netto — SIKOTIS</PageTitle>
+@{ Susun(); }
+
+@if (_preview && _mode == "perMobil")
+{
+    <ReportPreview OnClose="() => _preview = false">
+        @{
+            var per = PrintDocument.BarisPerLembar(context, 26);
+            var hal = PrintDocument.Bagi(_perMobil, per);
+        }
+        <PrintDocument>
+            @for (var i = 0; i < hal.Count; i++)
+            {
+                var ii = i; var isi = hal[ii];
+                <PrintPage Page="@(ii + 1)" TotalPages="hal.Count" Title="Laporan Pendapatan Netto" Subtitle="Per mobil" Periode="@PeriodeTeks" Meta="MetaTotal">
+                    <PrintTable Cols="@(KolomCetak("No. Mobil", "13%"))">
+                        @for (var r = 0; r < isi.Count; r++)
+                        {
+                            var rr = r; var x = isi[rr];
+                            <tr>
+                                <td class="p-sel text-end">@(ii * per + rr + 1)</td>
+                                <td class="p-sel fw-semibold">@x.Kunci</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Ritan)</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Pendapatan)</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Ditagihkan)</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Perjalanan)</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Komisi)</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Kernet)</td>
+                                <td class="p-sel text-end fw-semibold">@Format.Angka(x.Netto)</td>
+                            </tr>
+                        }
+                        @if (ii == hal.Count - 1) { @BarisTotal }
+                    </PrintTable>
+                </PrintPage>
+            }
+        </PrintDocument>
+    </ReportPreview>
+}
+else if (_preview)
+{
+    <ReportPreview OnClose="() => _preview = false">
+        @{
+            var per = PrintDocument.BarisPerLembar(context, 28);
+            var perHari = Kelompok(_rows, t => t.T.TransactionDate).OrderBy(x => x.Kunci, StringComparer.Ordinal).ToList();
+            var hal = PrintDocument.Bagi(perHari, per);
+        }
+        <PrintDocument>
+            @for (var i = 0; i < hal.Count; i++)
+            {
+                var ii = i; var isi = hal[ii];
+                <PrintPage Page="@(ii + 1)" TotalPages="hal.Count" Title="Laporan Pendapatan Netto" Subtitle="GLOBAL, rekap harian seluruh armada" Periode="@PeriodeTeks" Meta="MetaTotal">
+                    <PrintTable Cols="@(KolomCetak("Tanggal", "12%"))">
+                        @for (var r = 0; r < isi.Count; r++)
+                        {
+                            var rr = r; var x = isi[rr];
+                            <tr>
+                                <td class="p-sel text-end">@(ii * per + rr + 1)</td>
+                                <td class="p-sel">@Format.Tanggal(x.Kunci)</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Ritan)</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Pendapatan)</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Ditagihkan)</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Perjalanan)</td>
+                                <td class="p-sel text-end">@Format.Angka(x.Komisi)</td>
+                                <td class="p-sel text-end">0</td>
+                                <td class="p-sel text-end fw-semibold">@Format.Angka(x.Netto)</td>
+                            </tr>
+                        }
+                        @if (ii == hal.Count - 1) { @BarisTotal }
+                    </PrintTable>
+                </PrintPage>
+            }
+        </PrintDocument>
+    </ReportPreview>
+}
+else
+{
+    <PageHeader Title="Pendapatan Netto Bulan Berjalan" Crumbs="@(new List<Crumb> { new("Laporan"), new("Netto") })">
+        <Description>Pilih periode dan tipe laporan, buka preview, lalu cetak atau simpan sebagai PDF.</Description>
+    </PageHeader>
+
+    <div class="row g-4">
+        <div class="col-12 col-xl-auto" style="max-width:100%;width:420px">
+            <Kartu Class="h-auto">
+                <KepalaKartu Title="Periode" Subtitle="Rentang tanggal transaksi." />
+                <div class="d-flex flex-column gap-3 p-3">
+                    <div class="row g-3">
+                        <div class="col-12 col-sm-6"><Field Label="Tanggal Awal" Required><TanggalInput Id="@context" Value="@_dari" ValueChanged="v => _dari = v" /></Field></div>
+                        <div class="col-12 col-sm-6"><Field Label="Tanggal Akhir" Required><TanggalInput Id="@context" Value="@_sampai" ValueChanged="v => _sampai = v" /></Field></div>
+                    </div>
+                    <div>
+                        <p class="mb-2 fs-12 fw-semibold text-ink-2" style="letter-spacing:.02em">Tipe Laporan</p>
+                        <div class="d-flex flex-column gap-2">
+                            <Radio Name="netto-mode" Label="Cetak Pendapatan Netto perMobil" Description="Satu baris per nomor polisi." Checked="@(_mode == "perMobil")" OnChange="@(() => GantiMode("perMobil"))" />
+                            <Radio Name="netto-mode" Label="Cetak Pendapatan Netto GLOBAL" Description="Rekap harian seluruh armada." Checked="@(_mode == "global")" OnChange="@(() => GantiMode("global"))" />
+                        </div>
+                    </div>
+                    @if (_galat is not null) { <p class="invalid-feedback m-0">@_galat</p> }
+                    <div class="d-flex flex-wrap align-items-center gap-2 border-top border-hairline pt-3">
+                        <Tombol Variant="primary" Icon="Ikon.Print" OnClick="BukaPreview">Cetak</Tombol>
+                        <Tombol Variant="ghost" Icon="Ikon.Xmark" IconSize="14" OnClick="Batal">Batal</Tombol>
+                    </div>
+                </div>
+            </Kartu>
+        </div>
+
+        <div class="col-12 col-xl d-flex flex-column gap-4" style="min-width:0">
+            <div class="row g-4">
+                <div class="col-12 col-sm-6 col-xl-3"><StatCard Label="Pendapatan Bruto" Value="@Format.RupiahRingkas(_totals.Pendapatan)" Hint="@($"harga trip · + {Format.RupiahRingkas(_totals.Ditagihkan)} ditagihkan ke klien")" /></div>
+                <div class="col-12 col-sm-6 col-xl-3"><StatCard Label="Biaya Perjalanan" Value="@Format.RupiahRingkas(_totals.UangJalan + _totals.BiayaPerusahaan)" Hint="@($"uang jalan {Format.RupiahRingkas(_totals.UangJalan)} + dibayar perusahaan {Format.RupiahRingkas(_totals.BiayaPerusahaan)}")" /></div>
+                <div class="col-12 col-sm-6 col-xl-3"><StatCard Label="Komisi" Value="@Format.RupiahRingkas(_totals.Komisi)" Hint="kernet belum dicatat (0)" /></div>
+                <div class="col-12 col-sm-6 col-xl-3"><StatCard Label="Pendapatan Netto" Value="@Format.RupiahRingkas(_totals.Netto)" Hint="periode terpilih" /></div>
+            </div>
+
+            <Kartu>
+                <KepalaKartu Title="Rekap per Mobil" Subtitle="@($"{_perMobil.Count} mobil aktif pada periode {PeriodeTeks}.")" />
+                <div class="overflow-y-auto" style="max-height:420px">
+                    @if (_perMobil.Count == 0)
+                    {
+                        <p class="m-0 px-3 py-5 text-center fs-13 text-ink-3">Tidak ada transaksi pada periode tersebut.</p>
+                    }
+                    else
+                    {
+                        <table class="table table-hover fs-13 w-100">
+                            <thead class="sticky-top">
+                                <tr>
+                                    <th class="px-3 text-start">No. Kendaraan</th>
+                                    @foreach (var h in new[] { "Ritan", "Bruto", "Ditagihkan", "Biaya Perjalanan", "Komisi", "Kernet", "Netto" })
+                                    {
+                                        <th class="px-3 text-end">@h</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var r in _perMobil)
+                                {
+                                    <tr @key="r.Kunci">
+                                        <td class="tnum px-3 fw-medium text-ink">@r.Kunci</td>
+                                        <td class="tnum px-3 text-end text-ink-2">@r.Ritan</td>
+                                        <td class="tnum px-3 text-end text-ink-2">@Format.Rupiah(r.Pendapatan)</td>
+                                        <td class="tnum px-3 text-end text-ink-2">@Format.Rupiah(r.Ditagihkan)</td>
+                                        <td class="tnum px-3 text-end text-ink-2">@Format.Rupiah(r.Perjalanan)</td>
+                                        <td class="tnum px-3 text-end text-ink-2">@Format.Rupiah(r.Komisi)</td>
+                                        <td class="tnum px-3 text-end text-ink-3">@Format.Rupiah(r.Kernet)</td>
+                                        <td class="tnum px-3 text-end fw-semibold text-ink">@Format.Rupiah(r.Netto)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </Kartu>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>Baris untuk trip yang belum punya nomor kendaraan.</summary>
+    private const string TanpaMobil = "(tanpa No. Kendaraan)";
+
+    private sealed record BarisNetto(string Kunci, int Ritan, long Pendapatan, long Ditagihkan, long Perjalanan, long Komisi, long Kernet, long Netto);
+
+    private string _dari = "", _sampai = "";
+    private string _mode = "perMobil";
+    private string? _galat;
+    private bool _preview;
+    private List<BarisTrip> _rows = [];
+    private Hitung.Ringkasan _totals = Hitung.Ringkas([]);
+    private List<BarisNetto> _perMobil = [];
+
+    private Periode Bawaan => Periode.Aktif(Db.Baris.Select(t => t.T.TransactionDate));
+    private string PeriodeTeks => $"{Format.Tanggal(_dari)} s/d {Format.Tanggal(_sampai)}";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        var b = Bawaan;
+        _dari = b.Awal; _sampai = b.Akhir;
+    }
+
+    private static IEnumerable<BarisNetto> Kelompok(IEnumerable<BarisTrip> rows, Func<BarisTrip, string> kunci) => rows
+        .GroupBy(kunci)
+        .Select(g => new BarisNetto(g.Key, g.Count(), g.Sum(Hitung.Pendapatan), g.Sum(Hitung.Ditagihkan), g.Sum(r => Hitung.UangJalan(r) + Hitung.BiayaPerusahaan(r)), g.Sum(Hitung.Komisi), 0, g.Sum(Hitung.Netto)));
+
+    private void Susun()
+    {
+        _rows = Db.Baris.Where(t => Hitung.Dihitung(t) && string.CompareOrdinal(t.T.TransactionDate, _dari) >= 0 && string.CompareOrdinal(t.T.TransactionDate, _sampai) <= 0).ToList();
+        _totals = Hitung.Ringkas(_rows);
+        _perMobil = Kelompok(_rows, t => t.PlateNumber != "" ? t.PlateNumber : TanpaMobil)
+            .OrderBy(r => r.Kunci == TanpaMobil ? 1 : 0).ThenByDescending(r => r.Kunci == TanpaMobil ? 0 : r.Netto).ToList();
+    }
+
+    private List<(string, string)> MetaTotal => [
+        ("Jumlah transaksi", Format.Angka(_totals.Transaksi)), ("Total pendapatan", Format.Rupiah(_totals.Pendapatan)), ("Biaya ditagihkan", Format.Rupiah(_totals.Ditagihkan)),
+        ("Biaya perjalanan", Format.Rupiah(_totals.UangJalan + _totals.BiayaPerusahaan)), ("Total netto", Format.Rupiah(_totals.Netto)),
+    ];
+
+    private static List<(string, string, string?)> KolomCetak(string kunci, string lebar) => [
+        ("No.", "right", "5%"), (kunci, "left", lebar), ("Ritan", "right", "6%"), ("Pendapatan Bruto", "right", null), ("Ditagihkan", "right", null),
+        ("Biaya Perjalanan", "right", null), ("Komisi", "right", null), ("Kernet", "right", "9%"), ("Pendapatan Netto", "right", null),
+    ];
+
+    private RenderFragment BarisTotal => @<tr class="total">
+        <td class="p-sel text-end" colspan="2">TOTAL</td>
+        <td class="p-sel text-end">@Format.Angka(_totals.Ritan)</td>
+        <td class="p-sel text-end">@Format.Angka(_totals.Pendapatan)</td>
+        <td class="p-sel text-end">@Format.Angka(_totals.Ditagihkan)</td>
+        <td class="p-sel text-end">@Format.Angka(_totals.UangJalan + _totals.BiayaPerusahaan)</td>
+        <td class="p-sel text-end">@Format.Angka(_totals.Komisi)</td>
+        <td class="p-sel text-end">0</td>
+        <td class="p-sel text-end">@Format.Angka(_totals.Netto)</td>
+    </tr>;
+
+    private void GantiMode(string m) { _mode = m; _galat = null; }
+
+    private void Batal()
+    {
+        var b = Bawaan;
+        _dari = b.Awal; _sampai = b.Akhir; _mode = "perMobil"; _galat = null;
+    }
+
+    private void BukaPreview()
+    {
+        if (string.CompareOrdinal(_dari, _sampai) > 0) { _galat = "Tanggal Awal tidak boleh lebih besar dari Tanggal Akhir."; return; }
+        if (_rows.Count == 0)
+        {
+            _galat = "Tidak ada transaksi pada periode tersebut.";
+            Toast.Info("Tidak ada data untuk ditampilkan.");
+            return;
+        }
+        _galat = null;
+        _preview = true;
+    }
+}

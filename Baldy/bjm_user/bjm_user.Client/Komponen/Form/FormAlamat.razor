@@ -1,0 +1,249 @@
+@* Modal Tambah / Ubah Alamat (Master Data -> Alamat), ringkas tanpa gulir (revisi 13 Okt 2026): nama lokasi, kota, alamat,
+   kontak, catatan. Kode area dibuat otomatis dari kota (KodeAwal diberikan = kode itu yang dipakai), boleh diganti. Saat nama
+   diketik, alamat yang mungkin sama ditampilkan supaya lokasi yang sudah ada tidak dobel. Dipakai juga dari form rute & trip. *@
+@inherits KomponenData
+@inject Penyimpanan Penyimpan
+
+<Modal Open="Open" Size="lg" Title="@(_editing is not null ? "Ubah Alamat" : "Tambah Alamat")" Subtitle="@Subjudul" OnClose="Tutup">
+    <ChildContent>
+        @if (Open)
+        {
+            var kembar = Kembar;
+            <div class="row g-3">
+                <Field Label="Nama Lokasi" Required Error="@G("nama")" Class="col-sm-8" Hint="@Teks("Nama perusahaan atau tempat, mis. PT Pindodeli Pulp & Paper Mills.")">
+                    <input id="@context" class="form-control @(G("nama") is not null ? "is-invalid" : "")" value="@_f.Nama" placeholder="PT Pindodeli Pulp & Paper Mills"
+                           @oninput="@(e => Atur("nama", e))" />
+                </Field>
+                <Field Label="Kota" Required Error="@G("kota")" Class="col-sm-4">
+                    <input id="@context" class="form-control @(G("kota") is not null ? "is-invalid" : "")" value="@_f.Kota" placeholder="Karawang" @oninput="@(e => Atur("kota", e))" />
+                </Field>
+
+                @if (kembar.Count > 0)
+                {
+                    <div class="col-12">
+                        <div class="kotak-peringatan fs-12-5 py-2 px-3">
+                            <p class="m-0 d-flex align-items-center gap-2 fw-semibold"><IkonSvg Def="Ikon.TriangleExclamation" Size="12" /> Mungkin sudah ada:</p>
+                            <ul class="list-unstyled m-0 mt-1 d-flex flex-column gap-1">
+                                @foreach (var a in kembar)
+                                {
+                                    var aa = a;
+                                    <li class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                        <span class="min-w-0">
+                                            <span class="fw-semibold text-ink">@aa.Nama</span>
+                                            <span class="text-ink-3"> · @KodeKota(aa)</span>
+                                        </span>
+                                        @if (OnTersimpan.HasDelegate)
+                                        {
+                                            <button type="button" class="btn btn-link p-0 fs-inherit fw-semibold align-baseline" @onclick="() => PakaiYangAda(aa)">Pakai yang ini</button>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                }
+
+                <Field Label="Alamat" Class="col-sm-8">
+                    <input id="@context" class="form-control" value="@_f.Jalan" placeholder="Jl. Raya Tanjung Pura, Karawang Barat" @oninput="@(e => Atur("alamat", e))" />
+                </Field>
+                <Field Label="Kode Area" Required Error="@G("kode")" Hint="@PetunjukKode" Class="col-sm-4">
+                    <input id="@context" class="form-control tnum fw-medium @(G("kode") is not null ? "is-invalid" : "")" style="letter-spacing:.025em"
+                           value="@(_kodeSendiri ? _f.KodeArea : KodeOtomatis)" placeholder="Otomatis" autocomplete="off" spellcheck="false" @oninput="KetikKode" />
+                </Field>
+                <Field Label="Nama Kontak" Class="col-sm-4">
+                    <input id="@context" class="form-control" value="@_f.NamaKontak" placeholder="Nama PIC di lokasi" @oninput="@(e => Atur("kontak", e))" />
+                </Field>
+                <Field Label="Telepon" Class="col-sm-4">
+                    <input id="@context" type="tel" inputmode="tel" class="form-control" value="@_f.Telepon" placeholder="0812 3456 7890" @oninput="@(e => Atur("telepon", e))" />
+                </Field>
+                @if (_editing is not null)
+                {
+                    <Field Label="Status" Class="col-sm-4" Hint="@Teks("Nonaktif = tidak ditawarkan untuk trip baru.")">
+                        <Pilihan Id="@context" Options="OpsiStatus" Value="@_f.Status" ValueChanged="@(v => _f.Status = v ?? "aktif")" Cari="false" Clearable="false" />
+                    </Field>
+                }
+                else
+                {
+                    <div class="col-sm-4 d-none d-sm-block"></div>
+                }
+                <Field Label="Catatan" Class="col-12">
+                    <input id="@context" class="form-control" value="@_f.Catatan" placeholder="mis. jam bongkar, akses jalan, gerbang masuk" @oninput="@(e => Atur("catatan", e))" />
+                </Field>
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="Tutup">Batal</Tombol>
+        <Tombol Variant="primary" OnClick="SimpanAlamat">@(_editing is not null ? "Simpan Perubahan" : "Simpan")</Tombol>
+    </Footer>
+</Modal>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    /// <summary>Alamat yang diubah; null = tambah alamat baru.</summary>
+    [Parameter] public Alamat? Alamat { get; set; }
+    /// <summary>Kode area alamat baru (mis. dari rute); diberikan = dianggap sudah dipilih, tidak mengikuti kota.</summary>
+    [Parameter] public string? KodeAwal { get; set; }
+    /// <summary>Nama lokasi awal, mis. ketikan pencarian di dropdown.</summary>
+    [Parameter] public string? NamaAwal { get; set; }
+    /// <summary>Pengganti keterangan di bawah judul modal.</summary>
+    [Parameter] public string? Keterangan { get; set; }
+    /// <summary>Pesan toast setelah tersimpan; bawaan "Data berhasil disimpan/diperbarui."</summary>
+    [Parameter] public Func<Alamat, string>? PesanSukses { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    /// <summary>Setelah tersimpan (atau "Pakai yang ini" pada alamat kembar), dengan alamatnya.</summary>
+    [Parameter] public EventCallback<Alamat> OnTersimpan { get; set; }
+
+    private static readonly List<Opsi> OpsiStatus = [new("aktif", "Aktif"), new("nonaktif", "Nonaktif")];
+
+    private bool _aktif;
+    private Alamat? _editing;
+    private Alamat _f = new();
+    private bool _kodeSendiri;
+    private List<List<string>> _tanda = [];
+    private readonly Dictionary<string, string> _galat = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Open && !_aktif)
+        {
+            _aktif = true;
+            Mulai();
+            _tanda = await TandaKodeArea.BacaAsync(Penyimpan);
+        }
+        else if (!Open) _aktif = false;
+    }
+
+    private void Mulai()
+    {
+        _editing = Alamat;
+        _galat.Clear();
+        if (_editing is not null)
+        {
+            _f = Database.Salin(_editing);
+            _kodeSendiri = true;
+        }
+        else
+        {
+            _f = new Alamat { Nama = NamaAwal ?? "", KodeArea = KodeArea.Rapikan(KodeAwal ?? "").Trim() };
+            _kodeSendiri = (KodeAwal ?? "").Trim() != "";
+        }
+    }
+
+    private string? G(string k) => _galat.GetValueOrDefault(k);
+    private static string KodeKota(Alamat a) => string.Join(" · ", new[] { a.KodeArea, a.Kota }.Where(x => !string.IsNullOrEmpty(x)));
+    private static RenderFragment? Teks(string? s) => s is null ? null : b => b.AddContent(0, s);
+
+    private string Subjudul => Keterangan ?? (_editing is not null ? $"{_editing.KodeArea} · {_editing.Nama}" : "Tanda * wajib diisi. Cari dulu di daftar; tambah bila belum ada.");
+
+    private List<Alamat> AlamatLain => Db.Data.Alamat.Where(a => a.Id != _editing?.Id).ToList();
+    private Dictionary<string, PakaiKode> Pakai => KodeArea.Pemakaian(Db.Data.Rute, AlamatLain);
+    private string KodeOtomatis => KodeArea.DariLokasi(_f.Kota, _f.Nama);
+    private string KodeDipakai => (_kodeSendiri ? _f.KodeArea : KodeOtomatis).Trim();
+    private List<Alamat> Kembar => _editing is not null ? [] : KodeArea.AlamatMirip(_f.Nama, AlamatLain);
+
+    private RenderFragment? PetunjukKode
+    {
+        get
+        {
+            if (G("kode") is not null) return null;
+            var kode = KodeDipakai;
+            var pakai = Pakai;
+            var saran = KodeArea.Saran(kode, pakai, _tanda);
+            var rute = pakai.GetValueOrDefault(kode)?.Rute ?? 0;
+            if (saran is { } s)
+                return @<span style="color:#8a6100">
+                    <IkonSvg Def="Ikon.TriangleExclamation" Size="11" Class="me-1" />
+                    Mirip <span class="fw-semibold">@s.Kode</span> yang sudah dipakai @s.Pakai.Teks. Salah ketik?
+                    <button type="button" class="btn btn-link p-0 fs-inherit fw-semibold align-baseline text-decoration-underline" style="color:inherit" @onclick="() => PakaiSaran(s.Kode)">Pakai @s.Kode</button>
+                </span>;
+            if (kode == "") return Teks("Terisi otomatis dari kota.");
+            if (!_kodeSendiri) return Teks($"Otomatis dari {(_f.Kota.Trim() != "" ? "kota" : "nama lokasi")}{(rute > 0 ? $"; dipakai {rute} rute" : "")}. Boleh diganti.");
+            return Teks(rute > 0 ? $"Dipakai {rute} rute." : "Kode area baru.");
+        }
+    }
+
+    private void Atur(string kunci, ChangeEventArgs e)
+    {
+        var v = e.Value?.ToString() ?? "";
+        switch (kunci)
+        {
+            case "nama": _f.Nama = v; _galat.Remove("kode"); break;
+            case "kota": _f.Kota = v; _galat.Remove("kode"); break;
+            case "alamat": _f.Jalan = v; break;
+            case "kontak": _f.NamaKontak = v; break;
+            case "telepon": _f.Telepon = v; break;
+            case "catatan": _f.Catatan = v; break;
+        }
+        _galat.Remove(kunci);
+    }
+
+    private void KetikKode(ChangeEventArgs e)
+    {
+        _kodeSendiri = true;
+        _f.KodeArea = KodeArea.Rapikan(e.Value?.ToString() ?? "");
+        _galat.Remove("kode");
+    }
+
+    private void PakaiSaran(string kode)
+    {
+        _kodeSendiri = true;
+        _f.KodeArea = kode;
+        _galat.Remove("kode");
+    }
+
+    private bool Validasi()
+    {
+        _galat.Clear();
+        var kode = KodeDipakai;
+        if (_f.Nama.Trim() == "") _galat["nama"] = "Nama lokasi wajib diisi.";
+        if (_f.Kota.Trim() == "") _galat["kota"] = "Kota wajib diisi; kode area dibuat dari kota.";
+        if (kode == "") _galat["kode"] = "Kode area wajib diisi, mis. CIB atau DURI.";
+        var dobel = AlamatLain.FirstOrDefault(a => a.KodeArea.Trim().ToUpperInvariant() == kode
+            && a.Nama.Trim().ToLowerInvariant() == _f.Nama.Trim().ToLowerInvariant());
+        if (!_galat.ContainsKey("kode") && !_galat.ContainsKey("nama") && dobel is not null)
+            _galat["nama"] = dobel.Status == "nonaktif"
+                ? $"Alamat {dobel.Nama} di kode area {dobel.KodeArea} sudah ada tapi nonaktif. Aktifkan yang lama saja."
+                : $"Alamat {dobel.Nama} di kode area {dobel.KodeArea} sudah ada.";
+        return _galat.Count == 0;
+    }
+
+    private async Task SimpanAlamat()
+    {
+        if (!Validasi()) return;
+        var kode = KodeDipakai;
+        var f = _f;
+        void Isi(Alamat a)
+        {
+            a.KodeArea = kode; a.Nama = f.Nama.Trim(); a.Jalan = f.Jalan.Trim(); a.Kota = f.Kota.Trim(); a.NamaKontak = f.NamaKontak.Trim();
+            a.Telepon = f.Telepon.Trim(); a.Catatan = f.Catatan.Trim(); a.Status = f.Status; a.Jenis = f.Jenis; a.ProjectId = f.ProjectId;
+            a.LatLong = f.LatLong; a.IdLokasiKlien = f.IdLokasiKlien;
+        }
+        Alamat tersimpan;
+        if (_editing is not null)
+        {
+            var id = _editing.Id;
+            Db.Ubah<Alamat>(id, Isi);
+            tersimpan = Db.Cari<Alamat>(id) ?? _editing;
+        }
+        else
+        {
+            var baru = new Alamat();
+            Isi(baru);
+            tersimpan = Db.Buat(baru);
+        }
+        Toast.Sukses(PesanSukses?.Invoke(tersimpan) ?? (_editing is not null ? "Data berhasil diperbarui." : "Data berhasil disimpan."));
+        await OnTersimpan.InvokeAsync(tersimpan);
+        await Tutup();
+    }
+
+    /// <summary>Alamat kembar dipilih: tidak menambah data baru.</summary>
+    private async Task PakaiYangAda(Alamat a)
+    {
+        Toast.Info($"{a.Nama} sudah ada di Master Alamat, dipakai yang sudah ada.");
+        await OnTersimpan.InvokeAsync(a);
+        await Tutup();
+    }
+
+    private Task Tutup() => OnClose.InvokeAsync();
+}

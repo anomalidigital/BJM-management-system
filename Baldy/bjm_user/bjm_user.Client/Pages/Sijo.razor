@@ -1,0 +1,215 @@
+@page "/pencarian/sijo"
+@inherits KomponenData
+@*
+    Pencarian nomor SI - Job Order (Priok). Bisa diakses langsung dengan mengetik nomor, atau otomatis terisi ketika user
+    mengklik nilai Sijo dari Browsing Data / Trip (?sijo=).
+*@
+<PageTitle>Pencarian SI / Job Order — SIKOTIS</PageTitle>
+
+@{
+    var jobOrder = JobOrderAktif;
+    var rows = Rows(jobOrder);
+}
+
+<PageHeader Title="Pencarian nomor SI - Job Order" Crumbs="@(new List<Crumb> { new("Pencarian"), new("SI / Job Order") })">
+    <Description>Ketik nomor SI / Job Order, atau klik nilai Sijo dari halaman lain untuk langsung membuka detailnya.</Description>
+</PageHeader>
+
+<Kartu Class="mb-3">
+    <div class="row g-3 p-3 align-items-lg-end">
+        <div class="col-lg">
+            <div class="row g-3">
+                <div class="col-sm-6">
+                    <label class="form-label" for="sijo-input">No. SI / Job Order</label>
+                    <div class="d-flex gap-2">
+                        <input id="sijo-input" class="form-control tnum" style="max-width:20rem" value="@_input" placeholder="3252209"
+                               @oninput="e => _input = e.Value?.ToString() ?? string.Empty" @onkeydown="TekanTombol" />
+                        <Tombol Variant="primary" Icon="Ikon.MagnifyingGlass" OnClick="() => Cari()">Cari</Tombol>
+                        @if (_submitted is not null)
+                        {
+                            <Tombol Variant="ghost" Icon="Ikon.Xmark" IconSize="14" OnClick="Bersihkan">Bersihkan</Tombol>
+                        }
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <Field Label="Atau pilih dari daftar">
+                        <Pilihan Id="@context" Options="OpsiJo" Value="@jobOrder?.Sijo" Placeholder="Cari SI / Job Order..." ValueChanged="PilihDaftar" />
+                    </Field>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-auto pb-2">
+            <Checkbox Label="Komplit" Checked="_komplit" CheckedChanged="v => _komplit = v" />
+            <p class="m-0 mt-1 fs-11-5 text-ink-3">Batasi daftar hanya SI/JO berstatus Komplit.</p>
+        </div>
+    </div>
+</Kartu>
+
+@if (_submitted is null)
+{
+    <Kartu>
+        <div class="px-4 py-5 text-center">
+            <div class="mx-auto mb-3 d-grid rounded-circle border border-hairline bg-sunken text-ink-3" style="width:44px;height:44px;place-items:center"><IkonSvg Def="Ikon.Ship" Size="20" /></div>
+            <p class="m-0 fs-14 fw-semibold text-ink">Masukkan nomor SI / Job Order.</p>
+            <p class="m-0 mt-1 fs-13 text-ink-3">Sistem akan menampilkan customer beserta daftar mobil dan sopirnya.</p>
+        </div>
+    </Kartu>
+}
+else if (jobOrder is null)
+{
+    <Kartu>
+        <div class="px-4 py-5 text-center">
+            <p class="m-0 fs-14 fw-semibold text-ink">Data tidak ditemukan.</p>
+            <p class="m-0 mt-1 fs-13 text-ink-3">Coba periksa kembali kata kunci atau filter.</p>
+            <Tombol Class="mt-3" OnClick="Bersihkan">Bersihkan pencarian</Tombol>
+        </div>
+    </Kartu>
+}
+else
+{
+    <div class="d-flex flex-column gap-3">
+        <Kartu>
+            <KepalaKartu Title="@($"SI / Job Order {jobOrder.Sijo}")" Subtitle="Informasi customer diambil otomatis dari master SI / Job Order.">
+                <Actions>@if (jobOrder.IsComplete) { <Badge Tone="good">Komplit</Badge> } else { <Badge Tone="warning">Belum komplit</Badge> }</Actions>
+            </KepalaKartu>
+            <dl class="row g-3 m-0 p-3">
+                <InfoItem Class="col-sm-6 col-lg" Label="Customer" Value="@jobOrder.CustomerName" />
+                <InfoItem Class="col-sm-6 col-lg" Label="Kode Cust" Value="@jobOrder.CustomerCode" Mono />
+                <InfoItem Class="col-sm-6 col-lg" Label="Party" Value="@jobOrder.Party" />
+                <InfoItem Class="col-sm-6 col-lg" Label="Kapal" Value="@jobOrder.Ship" />
+                <InfoItem Class="col-sm-6 col-lg" Label="Barang" Value="@jobOrder.Goods" />
+            </dl>
+        </Kartu>
+
+        <Kartu>
+            <KepalaKartu Title="Daftar Mobil & Sopir" Subtitle="Seluruh transaksi yang terhubung dengan SI / Job Order ini.">
+                <Actions>
+                    <Tombol Icon="Ikon.Print" Disabled="@(rows.Count == 0)" OnClick="() => _preview = true">Cetak</Tombol>
+                    <Tombol Variant="primary" OnClick="@(() => Ke("transaksi/tagihan"))">Selesai</Tombol>
+                </Actions>
+            </KepalaKartu>
+            <DataTable T="BarisTrip" Columns="Kolom" Rows="UrutTabel(rows)" RowKey="t => t.Id" SortKey="@_sortKey" SortNaik="_naik" OnSortChange="UrutBerdasar" MaxHeight="480px">
+                <Empty>
+                    <div class="px-4 py-5 text-center">
+                        <p class="m-0 fw-semibold text-ink" style="font-size:13.5px">Belum ada transaksi untuk SI/JO ini.</p>
+                        <p class="m-0 mt-1 fs-13 text-ink-3">Buat trip dengan SI / BL ini pada halaman Trip.</p>
+                    </div>
+                </Empty>
+            </DataTable>
+            <div class="d-flex align-items-center justify-content-between border-top border-hairline bg-sunken px-3 py-2">
+                <p class="m-0 tnum fs-13 fw-semibold text-ink">Jumlah: @Format.Angka(rows.Count) MOBIL</p>
+                <p class="m-0 fs-12 text-ink-3">@rows.Select(r => r.T.DriverId).Distinct().Count() sopir terlibat</p>
+            </div>
+        </Kartu>
+    </div>
+
+    @if (_preview)
+    {
+        <ReportPreview OnClose="() => _preview = false">
+            @{ var per = PrintDocument.BarisPerLembar(context, 26); var hal = PrintDocument.Bagi(rows, per); }
+            <PrintDocument>
+                @for (var i = 0; i < hal.Count; i++)
+                {
+                    var ii = i; var isi = hal[ii];
+                    <PrintPage Title="Daftar Mobil per SI / Job Order" Subtitle="@($"SI / Job Order {jobOrder.Sijo}")" Page="@(ii + 1)" TotalPages="hal.Count"
+                               Meta="@(new List<(string, string)> { ("Customer", jobOrder.CustomerName), ("Kode Cust", jobOrder.CustomerCode), ("Party", jobOrder.Party), ("Kapal", jobOrder.Ship), ("Barang", jobOrder.Goods), ("Status", jobOrder.IsComplete ? "Komplit" : "Belum komplit") })">
+                        <PrintTable Cols="KolomCetak">
+                            @for (var r = 0; r < isi.Count; r++)
+                            {
+                                var rr = r; var t = isi[rr];
+                                <tr>
+                                    <td class="p-sel text-end">@(ii * per + rr + 1)</td>
+                                    <td class="p-sel">@t.Sijo</td>
+                                    <td class="p-sel">@Format.Tanggal(t.T.TransactionDate)</td>
+                                    <td class="p-sel fw-medium">@t.PlateNumber</td>
+                                    <td class="p-sel">@t.DriverNames</td>
+                                    <td class="p-sel">@(t.T.TripIds.Count > 0 ? string.Join(", ", t.T.TripIds) : "-")</td>
+                                </tr>
+                            }
+                            @if (ii == hal.Count - 1)
+                            {
+                                <tr class="total"><td class="p-sel text-end" colspan="6">Jumlah: @rows.Count MOBIL</td></tr>
+                            }
+                        </PrintTable>
+                    </PrintPage>
+                }
+            </PrintDocument>
+        </ReportPreview>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "sijo")] public string? SijoQuery { get; set; }
+
+    private string _input = "";
+    private bool _komplit;
+    private string? _submitted;
+    private bool _preview;
+    private string? _queryTerakhir;
+    private string? _sortKey;
+    private bool _naik = true;
+
+    // Nomor dari URL (hasil klik pada kolom Sijo) langsung dicari.
+    protected override void OnParametersSet()
+    {
+        if (SijoQuery == _queryTerakhir) return;
+        _queryTerakhir = SijoQuery;
+        if (!string.IsNullOrEmpty(SijoQuery)) { _input = SijoQuery; _submitted = SijoQuery; }
+    }
+
+    private List<Opsi> OpsiJo => Db.Data.JobOrders.Where(j => !_komplit || j.IsComplete)
+        .Select(j => new Opsi(j.Sijo, j.Sijo, $"{j.CustomerName} · {j.Party}", j.CustomerCode)).ToList();
+
+    private JobOrder? JobOrderAktif => _submitted is null ? null : Db.Data.JobOrders.FirstOrDefault(j => j.Sijo == _submitted.Trim());
+
+    private List<BarisTrip> Rows(JobOrder? jo) => jo is null ? [] :
+        Db.Baris.Where(t => t.T.JobOrderId == jo.Id).OrderBy(t => t.T.TransactionDate, StringComparer.Ordinal).ToList();
+
+    private List<BarisTrip> UrutTabel(List<BarisTrip> rows)
+    {
+        if (_sortKey is null) return rows;
+        Func<BarisTrip, object?> kunci = _sortKey switch
+        {
+            "plate_number" => t => t.PlateNumber,
+            "driver_names" => t => t.DriverNames,
+            _ => t => t.T.TransactionDate,
+        };
+        return Util.Urutkan(rows, kunci, _naik);
+    }
+
+    private void UrutBerdasar(string k) { if (_sortKey == k) _naik = !_naik; else { _sortKey = k; _naik = true; } }
+
+    private void TekanTombol(KeyboardEventArgs e) { if (e.Key == "Enter") Cari(); }
+
+    private void Cari(string? nilai = null)
+    {
+        var q = (nilai ?? _input).Trim();
+        _submitted = q;
+        _queryTerakhir = q == "" ? null : q;
+        Ke(q != "" ? $"pencarian/sijo?sijo={Uri.EscapeDataString(q)}" : "pencarian/sijo", true);
+    }
+
+    private void PilihDaftar(string? v) { _input = v ?? ""; Cari(v ?? ""); }
+
+    private void Bersihkan()
+    {
+        _input = ""; _submitted = null; _queryTerakhir = null;
+        Ke("pencarian/sijo", true);
+    }
+
+    private static readonly List<(string, string, string?)> KolomCetak =
+        [("No.", "left", null), ("Sijo", "left", null), ("Tgltrans", "left", null), ("No. Kendaraan", "left", null), ("Sopir", "left", null), ("ID Perjalanan/Trip", "left", null)];
+
+    private List<Kolom<BarisTrip>> Kolom =>
+    [
+        new() { Key = "sijo", Header = "Sijo", Width = "110px", Render = t => @<span class="tnum fw-semibold text-ink">@t.Sijo</span> },
+        new() { Key = "transaction_date", Header = "Tgltrans", Sortable = true, Width = "116px", Render = t => @<span class="tnum text-ink-2">@Format.Tanggal(t.T.TransactionDate)</span> },
+        new() { Key = "plate_number", Header = "No. Kendaraan", Sortable = true, Width = "136px", Render = t => @<span class="tnum fw-medium">@(t.PlateNumber != "" ? t.PlateNumber : "—")</span> },
+        new()
+        {
+            Key = "driver_names", Header = "Sopir", Sortable = true,
+            Render = t => @<a href="@($"transaksi/trip/{t.Id}")" class="fw-medium text-ink text-decoration-none" title="@($"Buka Trip {t.T.TransactionNo}")">@(t.DriverNames != "" ? t.DriverNames : "—")</a>,
+        },
+        new() { Key = "trip_ids", Header = "ID Perjalanan/Trip", Width = "180px", Render = t => @<span class="tnum text-ink-2">@(t.T.TripIds.Count > 0 ? string.Join(", ", t.T.TripIds) : "—")</span> },
+    ];
+}

@@ -1,0 +1,28 @@
+@* Navigasi halaman tabel. Tanpa pemilih jumlah baris per halaman (Baldy 15 Okt 2026). *@
+@{
+    var totalPages = Math.Max(1, (int)Math.Ceiling(Total / (double)PageSize));
+    var dari = Total == 0 ? 0 : (Page - 1) * PageSize + 1;
+    var sampai = Math.Min(Page * PageSize, Total);
+    var mulai = Math.Max(1, Math.Min(Page - 2, totalPages - 4));
+    var nomor = Enumerable.Range(mulai, Math.Min(5, totalPages)).ToList();
+}
+<div class="no-print d-flex flex-wrap align-items-center justify-content-between gap-3 border-top border-hairline px-3 py-2">
+    <p class="m-0 tnum fs-12-5 text-ink-3">Menampilkan <span class="fw-semibold text-ink-2">@dari</span>–<span class="fw-semibold text-ink-2">@sampai</span> dari <span class="fw-semibold text-ink-2">@Total</span> data</p>
+    <nav aria-label="Navigasi halaman">
+        <ul class="pagination pagination-sm m-0">
+            <li class="page-item @(Page <= 1 ? "disabled" : "")"><button type="button" class="page-link" disabled="@(Page <= 1)" aria-label="Halaman sebelumnya" @onclick="() => OnPageChange.InvokeAsync(Page - 1)"><IkonSvg Def="Ikon.ChevronLeft" Size="13" /></button></li>
+            @foreach (var n in nomor)
+            {
+                <li class="page-item @(n == Page ? "active" : "")"><button type="button" class="page-link" aria-current="@(n == Page ? "page" : null)" @onclick="() => OnPageChange.InvokeAsync(n)">@n</button></li>
+            }
+            <li class="page-item @(Page >= totalPages ? "disabled" : "")"><button type="button" class="page-link" disabled="@(Page >= totalPages)" aria-label="Halaman berikutnya" @onclick="() => OnPageChange.InvokeAsync(Page + 1)"><IkonSvg Def="Ikon.ChevronRight" Size="13" /></button></li>
+        </ul>
+    </nav>
+</div>
+
+@code {
+    [Parameter] public int Page { get; set; } = 1;
+    [Parameter] public int PageSize { get; set; } = 10;
+    [Parameter] public int Total { get; set; }
+    [Parameter] public EventCallback<int> OnPageChange { get; set; }
+}

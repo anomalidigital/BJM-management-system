@@ -1,0 +1,8 @@
+@* Belum ada data sama sekali. Tanpa tombol: tombol tambah cukup satu, di kanan atas halaman. *@
+<States Title="Belum ada data." Description="@($"Tambahkan {Entity} pertama untuk memulai.")">
+    <Icon><IkonSvg Def="Ikon.Inbox" Size="20" /></Icon>
+</States>
+
+@code {
+    [Parameter] public string Entity { get; set; } = "data";
+}

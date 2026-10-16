@@ -1,0 +1,36 @@
+@* Daftar pemeriksaan rekap: yang kurang paling atas, lalu catatan, lalu yang sudah lengkap. Tautan "Buka" / "Ubah trip" ke tempat membetulkannya. *@
+@if (Cek.Count > 0)
+{
+    var urut = Cek.Select((c, i) => (c, i)).OrderBy(x => Array.IndexOf(Rekap.UrutTingkat, x.c.Tingkat)).ThenBy(x => x.i).Select(x => x.c).ToList();
+    var kurang = Cek.Count(c => c.Tingkat == "kurang");
+    <section aria-label="Pemeriksaan kelengkapan" class="rounded-3 border px-3 py-3" style="@(kurang > 0 ? "border-color:#f6e2ac !important;background:#fff8e6" : "border-color:#cfeccf !important;background:#effaef")">
+        <p class="m-0 fs-12-5 fw-semibold" style="color:@(kurang > 0 ? "#8a6100" : "#0a7d0a")">
+            @(kurang > 0 ? $"{kurang} hal masih kurang.{(SebelumTutup ? " Periksa sebelum trip ditutup." : "")}" : "Data trip sudah lengkap.")
+        </p>
+        <ul class="list-unstyled m-0 mt-2 row row-cols-1 row-cols-sm-2 gx-4 gy-1">
+            @foreach (var c in urut)
+            {
+                var cc = c;
+                <li class="d-flex min-w-0 align-items-start gap-2 fs-12-5" data-cek="@cc.Tingkat">
+                    @if (cc.Tingkat == "ok") { <IkonSvg Def="Ikon.CircleCheck" Size="13" Style="margin-top:2px;color:#0ca30c" /> }
+                    else if (cc.Tingkat == "kurang") { <IkonSvg Def="Ikon.TriangleExclamation" Size="13" Style="margin-top:2px;color:#b7791f" /> }
+                    else { <IkonSvg Def="Ikon.CircleInfo" Size="13" Class="text-ink-3" Style="margin-top:2px" /> }
+                    <span class="min-w-0 @(cc.Tingkat == "kurang" ? "fw-medium text-ink" : "text-ink-2")">
+                        @cc.Teks
+                        @if (cc.Tab is not null && cc.Tingkat != "ok" && OnBuka.HasDelegate)
+                        {
+                            <text> · </text><button type="button" class="btn btn-link p-0 align-baseline fs-inherit fw-semibold text-brand" style="text-underline-offset:2px" @onclick="() => OnBuka.InvokeAsync(cc.Tab)">@(cc.Tab == "edit" ? "Ubah trip" : "Buka")</button>
+                        }
+                    </span>
+                </li>
+            }
+        </ul>
+    </section>
+}
+
+@code {
+    [Parameter] public List<CekRekap> Cek { get; set; } = [];
+    [Parameter] public EventCallback<string> OnBuka { get; set; }
+    /// <summary>Trip belum ditutup: ajak memeriksa sebelum ditutup.</summary>
+    [Parameter] public bool SebelumTutup { get; set; }
+}

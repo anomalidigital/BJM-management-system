@@ -1,0 +1,86 @@
+@* Menu ⋯ untuk aksi sekunder. Aksi yang mati tampil mati tanpa keterangan (Baldy 15 Okt 2026). *@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="position-relative d-inline-block" @ref="_akar">
+    <button type="button" class="btn btn-sm btn-link p-1 text-ink-2" aria-label="@Label" title="@Label" aria-haspopup="menu" aria-expanded="@_buka" @ref="_tombol"
+            @onclick="Toggle" @onclick:stopPropagation="true">
+        <IkonSvg Def="Ikon.Ellipsis" Size="15" />
+    </button>
+    @if (_buka)
+    {
+        <div role="menu" class="menu-lebih shadow-pop animate-in-pop" data-lapis-atas style="@_gaya" @ref="_panel" @onclick:stopPropagation="true">
+            @foreach (var a in Actions)
+            {
+                <button type="button" role="menuitem" disabled="@a.Disabled" class="@(a.Tone == "danger" ? "bahaya" : "")" @onclick="() => Jalankan(a)">
+                    @if (a.Icon is not null) { <IkonSvg Def="a.Icon" Size="14" /> }
+                    @if (a.Disabled && a.Alasan is not null)
+                    {
+                        <span class="min-w-0"><span class="d-block">@a.Label</span><span class="d-block fw-normal" style="font-size:11px;line-height:1.3">@a.Alasan</span></span>
+                    }
+                    else { @a.Label }
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<AksiMenu> Actions { get; set; } = [];
+    [Parameter] public string Label { get; set; } = "Aksi lainnya";
+
+    private bool _buka;
+    private string _gaya = "position:fixed;top:-9999px;left:-9999px;width:216px";
+    private ElementReference _akar, _tombol, _panel;
+    private DotNetObjectReference<OverflowMenu>? _ref;
+    private IJSObjectReference? _pegangan;
+    private bool _terpasang;
+
+    private async Task Toggle() { if (_buka) await Tutup(); else _buka = true; }
+
+    private async Task Jalankan(AksiMenu a)
+    {
+        await Tutup();
+        await a.OnSelect();
+    }
+
+    private async Task Tutup()
+    {
+        if (!_buka) return;
+        _buka = false;
+        await LepasAsync();
+        StateHasChanged();
+    }
+
+    [JSInvokable] public Task TutupDariLuar() => Tutup();
+
+    protected override async Task OnAfterRenderAsync(bool pertama)
+    {
+        if (_buka && !_terpasang)
+        {
+            _terpasang = true;
+            _ref ??= DotNetObjectReference.Create(this);
+            try { _pegangan = await JS.InvokeAsync<IJSObjectReference>("sikotis.pasangTutupLuar", _akar, _ref); } catch { /* abaikan */ }
+        }
+        if (_buka)
+        {
+            try
+            {
+                var gaya = await JS.InvokeAsync<string>("sikotis.posisiMenu", _tombol, _panel, 216);
+                if (gaya != _gaya) { _gaya = gaya; StateHasChanged(); }
+            }
+            catch { /* abaikan */ }
+        }
+    }
+
+    private async Task LepasAsync()
+    {
+        _terpasang = false;
+        _gaya = "position:fixed;top:-9999px;left:-9999px;width:216px";
+        if (_pegangan is null) return;
+        try { await JS.InvokeVoidAsync("sikotis.lepasTutupLuar", _pegangan); await _pegangan.DisposeAsync(); } catch { /* abaikan */ }
+        _pegangan = null;
+    }
+
+    public async ValueTask DisposeAsync() { await LepasAsync(); _ref?.Dispose(); }
+}

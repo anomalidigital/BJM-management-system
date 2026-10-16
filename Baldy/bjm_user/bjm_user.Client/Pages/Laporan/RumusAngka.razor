@@ -1,0 +1,17 @@
+@* Deretan angka berhubungan, mis. Uang jalan − Potong kasbon = Transfer ke supir. *@
+<div class="d-flex flex-wrap align-items-end" style="column-gap:.75rem;row-gap:.375rem">
+    @foreach (var s in Suku)
+    {
+        <div class="d-flex align-items-end" style="column-gap:.75rem">
+            @if (s.Operator is not null) { <span aria-hidden="true" class="text-ink-3 lh-1" style="font-size:18px;padding-bottom:2px">@s.Operator</span> }
+            <div>
+                <p class="m-0 fs-11-5 text-ink-3">@s.Label</p>
+                <p class="m-0 mt-1 lh-tight text-nowrap text-ink @(s.Tebal ? "fw-bold" : "fw-semibold")" style="font-size:16px">@Format.Rupiah(s.Nilai)</p>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<SukuRumus> Suku { get; set; } = [];
+}

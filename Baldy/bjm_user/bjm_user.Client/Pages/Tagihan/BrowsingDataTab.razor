@@ -1,0 +1,154 @@
+@inherits KomponenData
+@* Browsing Data (Priok). Nilai kolom Sijo dapat diklik dan langsung membuka halaman SI / Job Order tanpa perlu menyalin nomornya. *@
+
+@{
+    _tabel.ExtraFilterActive = _filter.Aktif;
+    var tersaring = _tabel.Saring(Db.BarisTagihan);
+    var halaman = _tabel.Halaman(tersaring);
+}
+
+<Toolbar>
+    <Left>
+        <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Width="18rem" Placeholder="Cari faktur, Sijo, Kodecost..." />
+        <PanelFilter T="FilterBrowsing" Filter="_filter" Chips="Chips" Galat="@Format.GalatRentang(_filter.Draf.DateFrom, _filter.Draf.DateTo)">
+            <div>
+                <p class="form-label">Tanggal Tagih</p>
+                <div class="row g-2">
+                    <div class="col-6"><TanggalInput AriaLabel="Tanggal dari" Value="@_filter.Draf.DateFrom" ValueChanged="v => _filter.Ubah(d => d.DateFrom = v)" /></div>
+                    <div class="col-6"><TanggalInput AriaLabel="Tanggal sampai" Value="@_filter.Draf.DateTo" ValueChanged="v => _filter.Ubah(d => d.DateTo = v)" /></div>
+                </div>
+            </div>
+            <div>
+                <p class="form-label">Kodecost</p>
+                <Pilihan AriaLabel="Filter Kodecost" Options="OpsiKodecost" Value="@_filter.Draf.CostCode" ValueChanged="v => _filter.Ubah(d => d.CostCode = v ?? string.Empty)" Clearable="false" />
+            </div>
+        </PanelFilter>
+    </Left>
+</Toolbar>
+
+@if (_pilih.Count > 0)
+{
+    <div class="bar-pilihan animate-in-fade">
+        <p class="m-0 fs-13 fw-semibold" style="color:var(--brand-800)">@_pilih.Count data ditandai</p>
+        <div class="d-flex align-items-center gap-2">
+            <Tombol Size="sm" Variant="danger" Icon="Ikon.TrashCan" IconSize="14" Disabled="@(!Bisa("master"))" OnClick="() => _konfirmasi = true">Hapus</Tombol>
+            <Tombol Size="sm" Variant="ghost" OnClick="() => _pilih.Clear()">Batalkan</Tombol>
+        </div>
+    </div>
+}
+
+<DataTable T="BarisTagihan" Columns="Kolom" Rows="halaman" RowKey="b => b.B.Id" SortKey="@_tabel.SortKey" SortNaik="_tabel.Naik" OnSortChange="k => _tabel.ToggleSort(k)"
+           IsFiltered="_tabel.IsFiltered" SelectedKeys="_pilih" OnToggleRow="TogglePilih" OnToggleAll="() => TogglePilihSemua(halaman)" MaxHeight="560px">
+    <Empty><EmptyState Entity="data tagihan" /></Empty>
+    <NotFound><NotFoundState OnReset="ResetFilter" /></NotFound>
+    <Footer>
+        <tr>
+            <td class="fs-12 text-ink-2" colspan="7">Total @_tabel.Total tagihan</td>
+            <td class="tnum text-end fs-12-5 text-ink">@Format.Rupiah(tersaring.Sum(b => b.B.Amount))</td>
+            <td class="tnum text-end fs-12-5">@Format.Rupiah(tersaring.Sum(b => b.B.GuaranteeAmount))</td>
+            <td></td>
+        </tr>
+    </Footer>
+</DataTable>
+
+@if (_tabel.Total > 0)
+{
+    <Pagination Page="_tabel.Page" PageSize="_tabel.PageSize" Total="_tabel.Total" OnPageChange="p => _tabel.SetPage(p)" />
+}
+
+<p class="m-0 border-top border-hairline px-3 py-2 fs-11-5 text-ink-3">
+    Klik nilai pada kolom <span class="fw-semibold text-ink-2">Sijo</span> untuk langsung membuka detail
+    SI / Job Order — tidak perlu menyalin nomornya secara manual.
+</p>
+
+<KonfirmasiDialog Open="_konfirmasi" Title="Hapus Data?" ConfirmLabel="Hapus" Tone="danger"
+                  Message="@($"{_pilih.Count} data tagihan akan dihapus. Data yang sudah dihapus mungkin tidak dapat dikembalikan.")"
+                  OnCancel="() => _konfirmasi = false" OnConfirm="Hapus" />
+
+@code {
+    public sealed class FilterBrowsing { public string DateFrom { get; set; } = ""; public string DateTo { get; set; } = ""; public string CostCode { get; set; } = ""; }
+
+    private readonly KendaliTabel<BarisTagihan> _tabel = new(10, "billing_date", false);
+    private KendaliFilter<FilterBrowsing> _filter = default!;
+    private readonly HashSet<string> _pilih = [];
+    private bool _konfirmasi;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _filter = new KendaliFilter<FilterBrowsing>(() => new FilterBrowsing(), StateHasChanged);
+        _tabel.Search = (b, q) => Util.CocokCari(q, b.B.InvoiceNo, b.Sijo, b.B.CostCode, b.CustomerName);
+        _tabel.SortAccessor = k => k switch
+        {
+            "invoice_no" => b => b.B.InvoiceNo,
+            "sijo" => b => b.Sijo,
+            "cost_code" => b => b.B.CostCode,
+            "customer_name" => b => b.CustomerName,
+            "withdrawal_date" => b => b.B.WithdrawalDate,
+            "amount" => b => b.B.Amount,
+            "guarantee_amount" => b => b.B.GuaranteeAmount,
+            _ => b => b.B.BillingDate,
+        };
+        _tabel.ExtraFilter = b =>
+        {
+            var f = _filter.Nilai;
+            return (f.DateFrom == "" || string.CompareOrdinal(b.B.BillingDate, f.DateFrom) >= 0) && (f.DateTo == "" || string.CompareOrdinal(b.B.BillingDate, f.DateTo) <= 0)
+                && (f.CostCode == "" || b.B.CostCode == f.CostCode);
+        };
+    }
+
+    private List<Opsi> OpsiKodecost =>
+        [new Opsi("", "Semua Kodecost"), .. Db.BarisTagihan.Select(b => b.B.CostCode).Where(c => c != "").Distinct().OrderBy(c => c, StringComparer.Ordinal).Select(c => new Opsi(c, c))];
+
+    private List<ChipFilter> Chips
+    {
+        get
+        {
+            var f = _filter.Nilai;
+            var c = new List<ChipFilter>();
+            if (f.DateFrom != "" || f.DateTo != "") c.Add(new($"Tanggal Tagih {Format.RentangTanggal(f.DateFrom, f.DateTo)}", () => _filter.Lepas((n, a) => { n.DateFrom = a.DateFrom; n.DateTo = a.DateTo; })));
+            if (f.CostCode != "") c.Add(new($"Kodecost: {f.CostCode}", () => _filter.Lepas((n, a) => n.CostCode = a.CostCode)));
+            return c;
+        }
+    }
+
+    private void TogglePilih(string id) { if (!_pilih.Remove(id)) _pilih.Add(id); }
+
+    private void TogglePilihSemua(List<BarisTagihan> halaman)
+    {
+        var ids = halaman.Select(b => b.B.Id).ToList();
+        var semua = ids.All(_pilih.Contains);
+        _pilih.Clear();
+        if (!semua) _pilih.UnionWith(ids);
+    }
+
+    private void Hapus()
+    {
+        var n = Db.Hapus<Model.Tagihan>(_pilih.ToList());
+        _pilih.Clear(); _konfirmasi = false;
+        Toast.Sukses($"{n} data tagihan berhasil dihapus.");
+    }
+
+    private void ResetFilter() { _tabel.Reset(); _filter.LepasSemua(); }
+
+    private static string StatusNada(Model.Tagihan b) => b.IsRejected ? "critical" : !string.IsNullOrEmpty(b.PaidDate) ? "good" : b.IsSunting ? "warning" : "neutral";
+    private static string StatusLabel(Model.Tagihan b) => b.IsRejected ? "DITOLAK" : !string.IsNullOrEmpty(b.PaidDate) ? "Lunas" : b.IsSunting ? "SUNTING" : "Belum lunas";
+
+    private List<Kolom<BarisTagihan>> Kolom =>
+    [
+        new() { Key = "invoice_no", Header = "Nofaktur", Sortable = true, Width = "120px", Render = b => @<span class="tnum fw-semibold text-ink">@b.B.InvoiceNo</span> },
+        new()
+        {
+            Key = "sijo", Header = "Sijo", Sortable = true, Width = "112px",
+            Render = b => @<a href="@($"pencarian/sijo?sijo={Uri.EscapeDataString(b.Sijo)}")" title="Buka detail SI / Job Order" class="tnum fw-semibold" style="text-underline-offset:2px"
+                              @onclick:stopPropagation="true">@(b.Sijo != "" ? b.Sijo : "—")</a>,
+        },
+        new() { Key = "cost_code", Header = "Kodecost", Sortable = true, Width = "112px", Render = b => @<Badge Tone="neutral">@(b.B.CostCode != "" ? b.B.CostCode : "—")</Badge> },
+        new() { Key = "customer_name", Header = "Customer", Sortable = true, Render = b => @<span class="text-ink-2">@(b.CustomerName != "" ? b.CustomerName : "—")</span> },
+        new() { Key = "billing_date", Header = "Tgltagih", Sortable = true, Width = "106px", Render = b => @<span class="tnum text-ink-2">@Format.Tanggal(b.B.BillingDate)</span> },
+        new() { Key = "withdrawal_date", Header = "Tgltarik", Sortable = true, Width = "106px", Render = b => @<span class="tnum text-ink-2">@Format.Tanggal(b.B.WithdrawalDate)</span> },
+        new() { Key = "amount", Header = "Jumlah", Sortable = true, Align = "right", Width = "140px", Render = b => @<span class="tnum fw-semibold text-ink">@Format.Rupiah(b.B.Amount)</span> },
+        new() { Key = "guarantee_amount", Header = "Jaminan", Sortable = true, Align = "right", Width = "128px", Render = b => @<span class="tnum text-ink-2">@Format.Rupiah(b.B.GuaranteeAmount)</span> },
+        new() { Key = "status", Header = "Status", Width = "116px", Render = b => @<Badge Tone="@StatusNada(b.B)">@StatusLabel(b.B)</Badge> },
+    ];
+}

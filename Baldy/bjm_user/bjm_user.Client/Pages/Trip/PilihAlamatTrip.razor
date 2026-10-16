@@ -1,0 +1,46 @@
+@* Pick Up Details / Destination Details: pilih alamat tersimpan (alamat di area rute paling atas), baris pertama "Tambah alamat", lalu catatan khusus trip. *@
+<div class="d-flex flex-column gap-2">
+    <Field Label="@Label" Hint="Hint">
+        <Pilihan Id="@context" Options="Opsi" Value="@(Nilai == "" ? null : Nilai)" Disabled="Disabled" Placeholder="Pilih alamat tersimpan..." SearchPlaceholder="Cari nama lokasi, kontak, atau kota..."
+                 EmptyText="Alamat belum ada. Tambahkan lewat baris paling atas." ValueChanged="v => NilaiChanged.InvokeAsync(v ?? string.Empty)" Cari="true"
+                 Tambahan="@(new AksiTambahan { Label = q => q.Trim() != "" ? $"Tambah alamat “{q.Trim()}”" : "Tambah alamat baru", OnClick = q => OnTambah.InvokeAsync(q), Disabled = !BolehTambah, Hint = BolehTambah ? null : "Perlu izin ubah data master." })" />
+    </Field>
+    <Field Label="@LabelCatatan">
+        <input id="@context" class="form-control" value="@Catatan" disabled="@Disabled" placeholder="@PlaceholderCatatan" @oninput="e => CatatanChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" />
+    </Field>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public RenderFragment? Hint { get; set; }
+    /// <summary>Id Master Alamat, AturanTrip.TitikLama, atau kosong.</summary>
+    [Parameter] public string Nilai { get; set; } = "";
+    [Parameter] public EventCallback<string> NilaiChanged { get; set; }
+    [Parameter] public string Catatan { get; set; } = "";
+    [Parameter] public EventCallback<string> CatatanChanged { get; set; }
+    [Parameter] public string LabelCatatan { get; set; } = "Catatan";
+    [Parameter] public string PlaceholderCatatan { get; set; } = "";
+    [Parameter] public List<Alamat> Daftar { get; set; } = [];
+    /// <summary>Kode area rute di sisi ini: alamatnya tampil paling atas.</summary>
+    [Parameter] public string Area { get; set; } = "";
+    [Parameter] public TitikAlamat? TitikLama { get; set; }
+    [Parameter] public EventCallback<string> OnTambah { get; set; }
+    [Parameter] public bool BolehTambah { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+
+    private List<Opsi> Opsi
+    {
+        get
+        {
+            var dipakai = Daftar.Where(a => a.Status == "aktif" || a.Id == Nilai)
+                .OrderByDescending(a => AturanTrip.SamaArea(a.KodeArea, Area)).ThenBy(a => a.Nama, StringComparer.OrdinalIgnoreCase)
+                .Select(a => new Opsi(a.Id, AturanTrip.LabelAlamat(a.Nama, a.NamaKontak, a.Telepon),
+                    string.Join(" · ", new[] { AturanTrip.SamaArea(a.KodeArea, Area) ? $"Area rute {a.KodeArea}" : a.KodeArea != "" ? $"Area {a.KodeArea}" : "", AturanTrip.TulisAlamat(a) }.Where(x => x != "")),
+                    $"{a.KodeArea} {a.Kota} {a.Catatan}")).ToList();
+            if (TitikLama is not null)
+                dipakai.Insert(0, new Opsi(AturanTrip.TitikLama, AturanTrip.LabelAlamat(TitikLama.Nama != "" ? TitikLama.Nama : "Tanpa nama", TitikLama.Kontak, TitikLama.Telepon),
+                    string.Join(" · ", new[] { TitikLama.Jalan, "isian lama, belum di Master Alamat" }.Where(x => x != ""))));
+            return dipakai;
+        }
+    }
+}

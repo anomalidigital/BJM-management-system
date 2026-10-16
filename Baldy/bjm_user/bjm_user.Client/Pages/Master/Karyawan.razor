@@ -1,0 +1,316 @@
+@page "/master/karyawan"
+@* Master -> Supir / Karyawan. Revisi 13 Okt 2026: tanpa status lunas / belum lunas, piutang tampil merah bertanda minus; dokumen penting
+   (KTP, SIM, KK, NPWP) punya tempat upload sendiri di form, terpisah dari dokumen lainnya. Transaksi piutang dicatat di menu Piutang Karyawan. *@
+@using System.Text.RegularExpressions
+@inherits KomponenData
+<PageTitle>Supir / Karyawan — SIKOTIS</PageTitle>
+
+<PageHeader Title="Supir / Karyawan" Crumbs="@(new List<Crumb> { new("Master Data"), new("Supir / Karyawan") })">
+    <Actions>
+        <Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Bisa("master"))" OnClick="BukaTambah">Tambah Karyawan</Tombol>
+    </Actions>
+</PageHeader>
+
+<Kartu>
+    <Toolbar>
+        <Left>
+            <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Placeholder="Cari kode, nama, alamat, atau kota..." />
+            <PanelFilter T="FilterKaryawan" Filter="_filter" Chips="Chips">
+                <div class="row g-3">
+                    <Field Label="Peran" Class="col-6">
+                        <Pilihan Id="@context" Options="OpsiPeranFilter" Value="@_filter.Draf.Peran" ValueChanged="v => _filter.Ubah(d => d.Peran = v ?? string.Empty)" Cari="false" Clearable="false" />
+                    </Field>
+                    <Field Label="Status" Class="col-6">
+                        <Pilihan Id="@context" Options="OpsiStatusFilter" Value="@_filter.Draf.Status" ValueChanged="v => _filter.Ubah(d => d.Status = v ?? string.Empty)" Cari="false" Clearable="false" />
+                    </Field>
+                </div>
+                <Field Label="Piutang">
+                    <Pilihan Id="@context" Options="OpsiPiutang" Value="@_filter.Draf.Piutang" ValueChanged="v => _filter.Ubah(d => d.Piutang = v ?? string.Empty)" Cari="false" Clearable="false" />
+                </Field>
+                <Field Label="Dokumen penting">
+                    <Pilihan Id="@context" Options="OpsiDokumen" Value="@_filter.Draf.Dokumen" ValueChanged="v => _filter.Ubah(d => d.Dokumen = v ?? string.Empty)" Cari="false" Clearable="false" />
+                </Field>
+            </PanelFilter>
+        </Left>
+        <Right><span class="fs-12-5 text-ink-3">@Db.Data.Karyawan.Count karyawan terdaftar</span></Right>
+    </Toolbar>
+    @{
+        _tabel.ExtraFilterActive = _filter.Aktif;
+        var tersaring = _tabel.Saring(Baris);
+        var halaman = _tabel.Halaman(tersaring);
+    }
+    <DataTable T="BarisKaryawan" Columns="Kolom" Rows="halaman" RowKey="d => d.K.Id" SortKey="@_tabel.SortKey" SortNaik="_tabel.Naik" OnSortChange="k => _tabel.ToggleSort(k)" IsFiltered="_tabel.IsFiltered">
+        <Empty><EmptyState Entity="karyawan" /></Empty>
+        <NotFound><NotFoundState OnReset="ResetFilter" /></NotFound>
+    </DataTable>
+    @if (_tabel.Total > 0)
+    {
+        <Pagination Page="_tabel.Page" PageSize="_tabel.PageSize" Total="_tabel.Total" OnPageChange="p => _tabel.SetPage(p)" />
+    }
+</Kartu>
+
+<Modal Open="_formOpen" Size="lg" Title="@(_editing is not null ? "Ubah Karyawan" : "Tambah Karyawan")"
+       Subtitle="@(_editing is not null ? $"Kode {_editing.DriverCode}" : "Lengkapi data karyawan baru. Tanda * wajib diisi.")" OnClose="() => _formOpen = false">
+    <ChildContent>
+        @if (_formOpen)
+        {
+            @* Ringkas tanpa scroll (Baldy 14 Okt 2026): tiga kolom, dokumen sebaris di bawah. *@
+            <div class="row g-3">
+                <Field Label="Peran" Required Class="col-sm-4">
+                    <Pilihan Id="@context" Options="OpsiPeran" Value="@_f.Role" ValueChanged="GantiPeran" Cari="false" Clearable="false" />
+                </Field>
+                <Field Label="Kode" Required Error="@G("kode")" Class="col-sm-4">
+                    <KodeInput Id="@context" Value="@_f.DriverCode" Invalid="@(G("kode") is not null)" Placeholder="SPR027" Uppercase
+                               GenerateTitle="Buat kode berikutnya: SPR untuk supir, MGR untuk manager"
+                               ValueChanged="@(v => { _f.DriverCode = v; _galat.Remove("kode"); })" OnGenerate="GenerateKode" />
+                </Field>
+                <Field Label="Status" Class="col-sm-4">
+                    <Pilihan Id="@context" Options="OpsiStatus" Value="@_f.Status" ValueChanged="v => _f.Status = v ?? StatusAktif" Cari="false" Clearable="false" />
+                </Field>
+                <Field Label="Nama" Required Error="@G("nama")" Class="col-sm-8">
+                    <input id="@context" class="form-control @(G("nama") is not null ? "is-invalid" : "")" value="@_f.DriverName" placeholder="Nama lengkap"
+                           @oninput="e => { _f.DriverName = e.Value?.ToString() ?? string.Empty; _galat.Remove(NamaKunci); }" />
+                </Field>
+                <Field Label="Telepon" Error="@G("telepon")" Class="col-sm-4">
+                    <input id="@context" class="form-control @(G("telepon") is not null ? "is-invalid" : "")" value="@_f.Phone" placeholder="0812xxxxxxx"
+                           @oninput="e => { _f.Phone = e.Value?.ToString() ?? string.Empty; _galat.Remove(TeleponKunci); }" />
+                </Field>
+                <Field Label="Alamat" Class="col-sm-8">
+                    <input id="@context" class="form-control" value="@_f.Address1" placeholder="Jl. Melati No. 12, Jakarta Timur" @oninput="e => _f.Address1 = e.Value?.ToString() ?? string.Empty" />
+                </Field>
+                <Field Label="Kota" Required="KotaWajib" Error="@G("kota")" Class="col-sm-4">
+                    <input id="@context" class="form-control @(G("kota") is not null ? "is-invalid" : "")" value="@_f.City" placeholder="Jakarta"
+                           @oninput="e => { _f.City = e.Value?.ToString() ?? string.Empty; _galat.Remove(KotaKunci); }" />
+                </Field>
+                <fieldset class="col-12 min-w-0">
+                    <legend class="form-label">Dokumen <span class="fw-normal text-ink-3">· klik kotak untuk upload; foto diperkecil otomatis, PDF juga bisa</span></legend>
+                    <DokumenPentingInput Jenis="DokumenPentingJenis.Karyawan" Value="_dokumen" ValueChanged="v => _dokumen = v"
+                                         LainnyaLabel="Dokumen lainnya" Lainnya="_f.Attachments" LainnyaChanged="v => _f.Attachments = v" />
+                </fieldset>
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="() => _formOpen = false">Batal</Tombol>
+        <Tombol Variant="primary" OnClick="Simpan">@(_editing is not null ? "Simpan Perubahan" : "Simpan")</Tombol>
+    </Footer>
+</Modal>
+
+<KonfirmasiDialog Open="_hapus is not null" Title="Hapus Data?" Message="Data yang sudah dihapus mungkin tidak dapat dikembalikan." ConfirmLabel="Hapus" Tone="danger"
+                  OnCancel="() => _hapus = null" OnConfirm="HapusSekarang">
+    <p class="m-0 mt-2 fs-13 fw-medium text-ink">@_hapus?.DriverCode — @_hapus?.DriverName</p>
+</KonfirmasiDialog>
+
+@code {
+    public sealed class FilterKaryawan { public string Peran { get; set; } = ""; public string Status { get; set; } = ""; public string Piutang { get; set; } = ""; public string Dokumen { get; set; } = ""; }
+
+    /// <summary>Saldo piutang dari sisi karyawan (minus = masih punya piutang) dan jumlah dokumen penting yang sudah diunggah.</summary>
+    public sealed record BarisKaryawan(Model.Karyawan K, long Saldo, int JumlahDok);
+
+    private const string StatusAktif = "aktif", NamaKunci = "nama", TeleponKunci = "telepon", KotaKunci = "kota";
+
+    private static readonly List<Opsi> OpsiPeran = PeranKaryawan.Semua.Select(r => new Opsi(r, PeranKaryawan.Label(r))).ToList();
+    private static readonly List<Opsi> OpsiPeranFilter = [new("", "Semua"), .. OpsiPeran];
+    private static readonly List<Opsi> OpsiStatus = [new("aktif", "Aktif"), new("nonaktif", "Nonaktif")];
+    private static readonly List<Opsi> OpsiStatusFilter = [new("", "Semua"), .. OpsiStatus];
+    private static readonly List<Opsi> OpsiPiutang = [new("", "Semua"), new("ada", "Masih punya piutang"), new("tidak", "Tidak punya piutang")];
+    private static readonly List<Opsi> OpsiDokumen = [new("", "Semua"), new("kurang", "Belum lengkap"), new("habis", "Habis / segera habis")];
+
+    private readonly KendaliTabel<BarisKaryawan> _tabel = new(10, "driver_code");
+    private KendaliFilter<FilterKaryawan> _filter = default!;
+    private Model.Karyawan? _editing;
+    private bool _formOpen;
+    private Model.Karyawan _f = new();
+    private Dictionary<string, DokumenPenting> _dokumen = [];
+    private readonly Dictionary<string, string> _galat = [];
+    private Model.Karyawan? _hapus;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _filter = new KendaliFilter<FilterKaryawan>(() => new FilterKaryawan(), StateHasChanged);
+        _tabel.Search = (d, q) => Util.CocokCari(q, d.K.DriverCode, d.K.DriverName, d.K.Address1, d.K.Address2, d.K.City, d.K.Phone);
+        _tabel.SortAccessor = k => k switch
+        {
+            "driver_name" => d => d.K.DriverName, "role" => d => d.K.Role, "address_1" => d => d.K.Address1, "jumlahDok" => d => d.JumlahDok,
+            "saldo" => d => d.Saldo, "status" => d => d.K.Status, _ => d => d.K.DriverCode,
+        };
+        _tabel.ExtraFilter = d =>
+        {
+            var f = _filter.Nilai;
+            var r = DokumenPentingInput.Ringkas(DokumenPentingJenis.Karyawan, d.K.Dokumen);
+            return (f.Peran == "" || d.K.Role == f.Peran) && (f.Status == "" || d.K.Status == f.Status)
+                && (f.Piutang == "" || (f.Piutang == "ada" ? d.Saldo < 0 : d.Saldo >= 0))
+                && (f.Dokumen == "" || (f.Dokumen == "kurang" ? r.Ada.Count < r.Total : r.Habis.Count + r.Segera.Count > 0));
+        };
+    }
+
+    private List<BarisKaryawan> Baris => Db.Data.Karyawan.Select(k => new BarisKaryawan(k, Kasbon.SisiKaryawan(Db.SaldoKasbon.GetValueOrDefault(k.Id)),
+        DokumenPentingInput.Ringkas(DokumenPentingJenis.Karyawan, k.Dokumen).Ada.Count)).ToList();
+
+    private List<ChipFilter> Chips
+    {
+        get
+        {
+            var f = _filter.Nilai;
+            var l = new List<ChipFilter>();
+            if (f.Peran != "") l.Add(new($"Peran: {PeranKaryawan.Label(f.Peran)}", () => _filter.Lepas((n, a) => n.Peran = a.Peran)));
+            if (f.Status != "") l.Add(new($"Status: {(f.Status == "aktif" ? "Aktif" : "Nonaktif")}", () => _filter.Lepas((n, a) => n.Status = a.Status)));
+            if (f.Piutang != "") l.Add(new(f.Piutang == "ada" ? "Masih punya piutang" : "Tidak punya piutang", () => _filter.Lepas((n, a) => n.Piutang = a.Piutang)));
+            if (f.Dokumen != "") l.Add(new(f.Dokumen == "kurang" ? "Dokumen belum lengkap" : "Dokumen habis / segera habis", () => _filter.Lepas((n, a) => n.Dokumen = a.Dokumen)));
+            return l;
+        }
+    }
+
+    /// <summary>Jumlah trip (kedua workspace) yang dibawa karyawan ini sebagai supir atau manager.</summary>
+    private int DipakaiTrip(string id) => Db.Semua.Trip.Count(t => t.DriverId == id || t.DriverIds.Contains(id) || t.ManagerId == id);
+
+    private List<Kolom<BarisKaryawan>> Kolom =>
+    [
+        new() { Key = "driver_code", Header = "Kode", Sortable = true, Width = "96px", Render = d => @<span class="tnum fw-semibold text-ink">@d.K.DriverCode</span> },
+        new() { Key = "driver_name", Header = "Nama", Sortable = true, Render = d => @<span class="fw-medium">@d.K.DriverName</span> },
+        new() { Key = "role", Header = "Peran", Sortable = true, Width = "104px", Render = d => @<Badge Tone="@(d.K.Role == PeranKaryawan.Manager ? "brand" : "neutral")">@PeranKaryawan.Label(d.K.Role)</Badge> },
+        new() { Key = "address_1", Header = "Alamat", Sortable = true, Render = SelAlamat },
+        new() { Key = "jumlahDok", Header = "Dokumen", Sortable = true, Width = "150px", Render = SelDokumen },
+        // Piutang dari sisi karyawan (atasan 13 Okt 2026): minus merah = masih punya piutang.
+        new() { Key = "saldo", Header = "Piutang", Sortable = true, Align = "right", Width = "140px", Render = d => @<NilaiPiutang Nilai="d.Saldo" Tebal="@(d.Saldo < 0)" /> },
+        new() { Key = "status", Header = "Status", Sortable = true, Width = "100px", Render = SelStatus },
+        new() { Key = "action", Header = "Action", Align = "right", Width = "124px", NoPrint = true, Render = SelAksi },
+    ];
+
+    private static RenderFragment SelAlamat(BarisKaryawan d)
+    {
+        var alamat = string.Join(", ", new[] { d.K.Address1, d.K.Address2 }.Where(x => !string.IsNullOrEmpty(x)));
+        return @<span class="d-block lh-tight">
+            <span class="text-ink-2">@(alamat == "" ? "—" : alamat)</span>
+            @if (d.K.City != "") { <span class="mt-1 d-block fs-12 text-ink-3">@d.K.City</span> }
+        </span>;
+    }
+
+    private static RenderFragment SelDokumen(BarisKaryawan d)
+    {
+        var r = DokumenPentingInput.Ringkas(DokumenPentingJenis.Karyawan, d.K.Dokumen);
+        var lain = d.K.Attachments.Count;
+        return @<span class="d-block lh-tight">
+            <span class="@(r.Ada.Count > 0 ? "text-ink-2" : "text-ink-3")">@(r.Ada.Count > 0 ? string.Join(", ", r.Ada) : "Belum ada")</span>
+            @if (r.Habis.Count > 0 || r.Segera.Count > 0)
+            {
+                <span class="mt-1 d-block fs-11-5 fw-medium" style="color:var(--critical)">@string.Join(", ", r.Habis.Concat(r.Segera)) @(r.Habis.Count > 0 ? "habis" : "segera habis")</span>
+            }
+            @if (lain > 0) { <span class="mt-1 d-block fs-11-5 text-ink-3">+@lain dokumen lainnya</span> }
+        </span>;
+    }
+
+    private static RenderFragment SelStatus(BarisKaryawan d)
+    {
+        if (d.K.Status == "aktif") return @<Badge Tone="good">Aktif</Badge>;
+        return @<Badge Tone="neutral">Nonaktif</Badge>;
+    }
+
+    private RenderFragment SelAksi(BarisKaryawan d)
+    {
+        var bisa = Bisa("master");
+        var dipakai = DipakaiTrip(d.K.Id);
+        return @<span class="d-inline-flex justify-content-end gap-1">
+            <TombolIkon Label="@($"Lihat detail {d.K.DriverName} (piutang & trip)")" Icon="Ikon.FileLines" OnClick="@(() => Ke($"master/karyawan/{d.K.Id}"))" />
+            <TombolIkon Label="Ubah" Icon="Ikon.Pen" Disabled="@(!bisa)" OnClick="() => BukaUbah(d.K)" />
+            <TombolIkon Label="Hapus" Tone="danger" Icon="Ikon.TrashCan" Disabled="@(!bisa || dipakai > 0)" Title="@(bisa && dipakai > 0 ? $"Dipakai {dipakai} trip" : null)" OnClick="() => _hapus = d.K" />
+        </span>;
+    }
+
+    private string? G(string k) => _galat.GetValueOrDefault(k);
+
+    /// <summary>Kode berikutnya untuk peran tertentu, mis. SPR040 atau MGR002.</summary>
+    private string KodeBerikut(string peran) => Kode.KodeKaryawanBerikut(Db.Data.Karyawan, peran);
+
+    /// <summary>Karyawan dari data asli belum punya kota; jangan paksa diisi hanya untuk menambah dokumen.</summary>
+    private bool KotaWajib => _editing is null || _editing.City != "";
+
+    private void BukaTambah()
+    {
+        _editing = null;
+        _f = new Model.Karyawan { Role = PeranKaryawan.Sopir, Status = "aktif", DriverCode = KodeBerikut(PeranKaryawan.Sopir) };
+        _dokumen = [];
+        _galat.Clear();
+        _formOpen = true;
+    }
+
+    private void BukaUbah(Model.Karyawan k)
+    {
+        _editing = k;
+        _f = Database.Salin(k);
+        _dokumen = k.Dokumen is null ? [] : new Dictionary<string, DokumenPenting>(Database.Salin(k.Dokumen));
+        _galat.Clear();
+        _formOpen = true;
+    }
+
+    /// <summary>Ganti peran saat menambah: kode ikut menyesuaikan bila belum diubah manual.</summary>
+    private void GantiPeran(string? v)
+    {
+        var peran = v ?? PeranKaryawan.Sopir;
+        var otomatis = _editing is null && (_f.DriverCode == "" || _f.DriverCode == KodeBerikut(_f.Role));
+        _f.Role = peran;
+        if (otomatis) _f.DriverCode = KodeBerikut(peran);
+    }
+
+    private void GenerateKode()
+    {
+        _f.DriverCode = Kode.KodeKaryawanBerikut(Db.Data.Karyawan.Where(k => k.Id != _editing?.Id), _f.Role);
+        _galat.Remove("kode");
+    }
+
+    private bool Validasi()
+    {
+        _galat.Clear();
+        var kode = _f.DriverCode.Trim();
+        if (kode == "") _galat["kode"] = "Kode karyawan wajib diisi.";
+        else if (Db.Data.Karyawan.Any(k => k.DriverCode.Equals(kode, StringComparison.OrdinalIgnoreCase) && k.Id != _editing?.Id)) _galat["kode"] = "Kode karyawan sudah dipakai.";
+        if (_f.DriverName.Trim() == "") _galat["nama"] = "Nama wajib diisi.";
+        if (KotaWajib && _f.City.Trim() == "") _galat["kota"] = "Kota wajib diisi.";
+        if (_f.Phone != "" && !Regex.IsMatch(_f.Phone.Trim(), @"^[\d+\-\s()]{6,20}$")) _galat["telepon"] = "Format nomor telepon tidak valid.";
+        return _galat.Count == 0;
+    }
+
+    /// <summary>Dokumen penting tersimpan tanpa slot kosong (tidak ada berkas & tanggal).</summary>
+    private static Dictionary<string, DokumenPenting>? RapikanDokumen(Dictionary<string, DokumenPenting> d)
+    {
+        var isi = d.Where(x => x.Value.Berkas.Count > 0 || !string.IsNullOrEmpty(x.Value.BerlakuSampai))
+            .ToDictionary(x => x.Key, x => new DokumenPenting { Berkas = x.Value.Berkas, BerlakuSampai = string.IsNullOrEmpty(x.Value.BerlakuSampai) ? null : x.Value.BerlakuSampai });
+        return isi.Count > 0 ? isi : null;
+    }
+
+    private void Simpan()
+    {
+        if (!Validasi()) return;
+        var f = _f;
+        var dok = RapikanDokumen(_dokumen);
+        void Isi(Model.Karyawan k)
+        {
+            k.DriverCode = f.DriverCode.Trim().ToUpperInvariant(); k.DriverName = f.DriverName.Trim(); k.Role = f.Role; k.Address1 = f.Address1;
+            k.Address2 = f.Address2; k.City = f.City; k.Phone = f.Phone; k.Status = f.Status; k.Dokumen = dok; k.Attachments = f.Attachments;
+        }
+        if (_editing is not null)
+        {
+            Db.Ubah<Model.Karyawan>(_editing.Id, Isi);
+            Toast.Sukses("Data berhasil diperbarui.");
+        }
+        else
+        {
+            var baru = new Model.Karyawan();
+            Isi(baru);
+            Db.Buat(baru);
+            Toast.Sukses("Data berhasil disimpan.");
+        }
+        _formOpen = false;
+    }
+
+    private void HapusSekarang()
+    {
+        if (_hapus is null) return;
+        Db.Hapus<Model.Karyawan>(_hapus.Id);
+        Toast.Sukses("Data berhasil dihapus.");
+        _hapus = null;
+    }
+
+    private void ResetFilter() { _tabel.Reset(); _filter.LepasSemua(); }
+}

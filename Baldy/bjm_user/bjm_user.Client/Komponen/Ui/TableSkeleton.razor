@@ -1,0 +1,19 @@
+@* Kerangka tabel saat data awal dimuat. *@
+<div class="px-3 py-3" aria-busy="true" aria-label="Memuat data">
+    <div class="mb-3 d-flex gap-3 border-bottom border-hairline pb-3">
+        @for (var i = 0; i < Cols; i++) { <div class="skeleton flex-grow-1" style="height:12px"></div> }
+    </div>
+    <div class="d-flex flex-column gap-3">
+        @for (var r = 0; r < Rows; r++)
+        {
+            <div class="d-flex gap-3">
+                @for (var c = 0; c < Cols; c++) { <div class="skeleton flex-grow-1" style="height:14px"></div> }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public int Rows { get; set; } = 8;
+    [Parameter] public int Cols { get; set; } = 6;
+}

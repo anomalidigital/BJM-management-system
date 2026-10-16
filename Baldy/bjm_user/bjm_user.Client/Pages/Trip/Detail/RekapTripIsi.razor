@@ -1,0 +1,204 @@
+@* Isi rekap trip untuk layar (modal Rekap Trip dan Tutup Trip). *@
+@{
+    var trip = Data.Trip;
+    var t = trip.T;
+    var angka = Data.Angka;
+    var dedicated = t.ServiceType == TipeKlien.Dedicated;
+}
+<div class="d-flex flex-column gap-4" data-rekap>
+    <dl class="row row-cols-1 row-cols-sm-4 gx-4 gy-3 mb-0">
+        @Isi("ID Trip", Tnum(t.TransactionNo, true))
+        @Isi("Berangkat", Teks(Format.Tanggal(t.TransactionDate)))
+        @Isi("Klien", Teks(Data.Klien))
+        @Isi("Tipe Layanan", Teks($"{Data.Layanan}{(Data.Kontrak != "" ? $" · {Data.Kontrak}" : "")}"))
+        @Isi("No Referensi", Tnum(trip.TrList.Count > 0 ? string.Join(", ", trip.TrList) : "—"))
+        @Isi("Status", IsiStatus(t.Status))
+        @Isi("Berita Acara", Teks(!string.IsNullOrEmpty(t.PrintedAt) ? $"Dicetak {Format.Tanggal(t.PrintedAt)}" : "Belum dicetak"))
+        @Isi("Ditutup", Teks(string.IsNullOrEmpty(t.ClosedAt) ? "—" : Format.Tanggal(t.ClosedAt)))
+    </dl>
+
+    <div class="row g-4">
+        <section class="col-lg-6">
+            <h4 class="mb-2 fs-11-5 fw-semibold text-ink-2 text-uppercase" style="letter-spacing:.04em">Kendaraan &amp; supir</h4>
+            <dl class="row row-cols-1 row-cols-sm-2 gx-4 gy-2 mb-0">
+                @Isi("Kendaraan Utama", Tnum(AturDetail.Strip(trip.PlateNumber)))
+                @Isi("Sub Kendaraan / Gandengan", Teks(AturDetail.Strip(Data.Gandengan)))
+                @Isi("Supir", Teks(Data.Supir.Count > 0 ? string.Join(", ", Data.Supir) : "—"))
+                @Isi("Manager", Teks(AturDetail.Strip(Data.Manager)))
+            </dl>
+        </section>
+        <section class="col-lg-6">
+            <h4 class="mb-2 fs-11-5 fw-semibold text-ink-2 text-uppercase" style="letter-spacing:.04em">Rute</h4>
+            <dl class="row row-cols-1 row-cols-sm-2 gx-4 gy-2 mb-0">
+                @Isi("Rute", IsiRute(trip))
+                @Isi("Muat → Bongkar", Teks($"{AturDetail.Strip(trip.Muat)} → {AturDetail.Strip(trip.Bongkar)}"))
+                @Isi("Patokan Uang Jalan", Teks(Format.Rupiah(trip.Ujroute)))
+                @if (!dedicated) { @Isi("Harga", Teks($"{Format.Rupiah(trip.Harga)}{(trip.HargaKhusus ? " (khusus)" : "")}")) }
+            </dl>
+        </section>
+    </div>
+
+    <section>
+        <h4 class="mb-2 fs-11-5 fw-semibold text-ink-2 text-uppercase" style="letter-spacing:.04em">Informasi pengiriman</h4>
+        <dl class="row row-cols-1 row-cols-sm-2 gx-4 gy-3 mb-0">
+            @Isi("Pick Up Details", Titik(t.Pengirim))
+            @Isi("Destination Details", Titik(t.Penerima))
+            <div class="min-w-0" style="@(t.Kosongan == "" ? "width:100%" : null)">
+                <dt class="fs-11 fw-semibold text-ink-3">Add Items Details</dt>
+                <dd class="m-0 fs-13 text-ink text-break">
+                    @if (Data.Muatan.Count == 0) { <span class="text-ink-3">—</span> }
+                    else
+                    {
+                        <ul class="list-unstyled m-0 d-flex flex-column gap-1">
+                            @foreach (var m in Data.Muatan)
+                            {
+                                <li><span class="tnum fw-medium">@(m.IdPerjalanan != "" ? m.IdPerjalanan : "Tanpa ID")</span>@if (m.Keterangan != "") { <span class="text-ink-2"> · @m.Keterangan</span> }</li>
+                            }
+                        </ul>
+                    }
+                </dd>
+            </div>
+            @if (t.Kosongan != "") { @Isi("Kosongan", Teks(t.Kosongan)) }
+        </dl>
+    </section>
+
+    <section>
+        <h4 class="mb-2 fs-11-5 fw-semibold text-ink-2 text-uppercase" style="letter-spacing:.04em">Perjalanan</h4>
+        @if (Data.Kejadian.Count == 0) { @Kosong("Belum ada catatan perjalanan.") }
+        else
+        {
+            <div class="table-responsive rounded-2 border border-hairline">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Waktu</th><th>Kejadian</th><th>Lokasi</th><th>Catatan</th></tr></thead>
+                    <tbody>
+                        @foreach (var e in Data.Kejadian)
+                        {
+                            <tr><td class="tnum">@Format.Waktu(e.Waktu)</td><td>@JenisPerjalanan.Label(e.Jenis)</td><td>@AturDetail.Strip(e.Lokasi)</td><td>@AturDetail.Strip(e.Catatan)</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section>
+        <h4 class="mb-2 fs-11-5 fw-semibold text-ink-2 text-uppercase" style="letter-spacing:.04em">Uang jalan</h4>
+        @if (Data.Termin.Count == 0) { @Kosong("Uang jalan belum dicatat.") }
+        else
+        {
+            <div class="table-responsive rounded-2 border border-hairline">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Termin</th><th>Tanggal</th><th>Jenis</th><th>Supir</th><th class="text-end">Uang Jalan</th><th class="text-end">Potong Kasbon</th><th class="text-end">Transfer ke Supir</th></tr></thead>
+                    <tbody>
+                        @foreach (var p in Data.Termin)
+                        {
+                            <tr>
+                                <td>@p.Sequence</td><td>@Format.Tanggal(p.PaymentDate)</td><td>@Rekap.LabelTermin(p)</td><td>@Data.NamaKaryawan(p.DriverId)</td>
+                                <td class="tnum text-end">@Format.Rupiah(p.UjAmount)</td><td class="tnum text-end">@(p.KasbonDeduction > 0 ? Format.Rupiah(p.KasbonDeduction) : "—")</td>
+                                <td class="tnum text-end">@Format.Rupiah(p.UjAmount - p.KasbonDeduction)</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot><tr><td>Total</td><td></td><td></td><td></td><td class="tnum text-end">@Format.Rupiah(angka.Uj)</td><td class="tnum text-end">@Format.Rupiah(angka.Kasbon)</td><td class="tnum text-end">@Format.Rupiah(angka.Tf)</td></tr></tfoot>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section>
+        <h4 class="mb-2 fs-11-5 fw-semibold text-ink-2 text-uppercase" style="letter-spacing:.04em">Biaya operasional</h4>
+        @if (Data.Biaya.Count == 0) { @Kosong("Belum ada biaya operasional.") }
+        else
+        {
+            <div class="table-responsive rounded-2 border border-hairline">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Jenis</th><th>Tanggal</th><th>Dibayar oleh</th><th>Ke klien</th><th class="text-end">Nominal</th></tr></thead>
+                    <tbody>
+                        @foreach (var e in Data.Biaya)
+                        {
+                            <tr>
+                                <td>@JenisBiaya.Label(e.ExpenseType)</td><td>@Format.Tanggal(e.ExpenseDate)</td><td>@PembayarBiaya.Label(e.Dibayar)</td>
+                                <td>@(TripLogika.Ditagihkan(e) ? "Ditagihkan" : "—")</td><td class="tnum text-end">@Format.Rupiah(e.Amount)</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td><td></td><td>@(angka.BiayaPerusahaan > 0 ? $"{Format.Rupiah(angka.BiayaPerusahaan)} perusahaan" : "")</td>
+                            <td>@(angka.Ditagihkan > 0 ? Format.Rupiah(angka.Ditagihkan) : "")</td><td class="tnum text-end">@Format.Rupiah(angka.Biaya)</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        }
+    </section>
+
+    <div class="row g-4">
+        <section class="col-lg-6">
+            <h4 class="mb-2 fs-11-5 fw-semibold text-ink-2 text-uppercase" style="letter-spacing:.04em">Komisi</h4>
+            <dl class="row row-cols-1 row-cols-sm-2 gx-4 gy-2 mb-0">
+                @Isi("Komisi supir (aturan)", Teks(Format.Rupiah(trip.KomisiSopir)))
+                @Isi("Komisi manager (aturan)", Teks(Format.Rupiah(trip.KomisiManager)))
+                <div class="min-w-0" style="width:100%">
+                    <dt class="fs-11 fw-semibold text-ink-3">Biaya internal dicatat</dt>
+                    <dd class="m-0 fs-13 text-ink text-break">@(Data.Internal.Count == 0 ? "—" : string.Join(" · ", Data.Internal.Select(c => $"{JenisBiayaInternal.Label(c.CostType)} {Format.Rupiah(c.Amount)}")))</dd>
+                </div>
+            </dl>
+        </section>
+        <section class="col-lg-6">
+            <h4 class="mb-2 fs-11-5 fw-semibold text-ink-2 text-uppercase" style="letter-spacing:.04em">Tagihan &amp; netto</h4>
+            <dl class="row row-cols-1 row-cols-sm-2 gx-4 gy-2 mb-0">
+                @Isi("Tagihan ke klien", IsiTagihan(angka))
+                @Isi("No PI / tahap", Teks($"{AturDetail.Strip(t.PiNumber)}{(!string.IsNullOrEmpty(t.PiTahap) ? $" · {TahapPi.Label(t.PiTahap)}" : "")}"))
+                @Isi("Uang jalan + biaya perusahaan + komisi", Teks(Format.Rupiah(angka.UjDihitung + angka.BiayaPerusahaan + angka.Komisi)))
+                @Isi("Perkiraan netto", IsiNetto(angka.Netto))
+            </dl>
+            @if (t.Status != StatusTrip.Selesai && trip.Ujroute > angka.Uj)
+            {
+                <p class="m-0 mt-2 fs-11-5 text-ink-3">Selama trip belum ditutup, sisa patokan uang jalan dianggap masih akan dibayar.</p>
+            }
+        </section>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public DataRekap Data { get; set; } = default!;
+
+    private RenderFragment Teks(string s) => b => b.AddContent(0, s);
+
+    private RenderFragment Tnum(string s, bool tebal = false) => @<span class="tnum @(tebal ? "fw-semibold" : "")">@s</span>;
+
+    private RenderFragment IsiStatus(string status) => @<Badge Tone="@StatusTrip.Nada(status)">@StatusTrip.Label(status)</Badge>;
+
+    /// <summary>Pasangan label + isi pada rekap.</summary>
+    private RenderFragment Isi(string label, RenderFragment isi) =>
+        @<div class="min-w-0">
+            <dt class="fs-11 fw-semibold text-ink-3">@label</dt>
+            <dd class="m-0 fs-13 text-ink text-break">@isi</dd>
+        </div>;
+
+    private RenderFragment Kosong(string teks) =>
+        @<p class="m-0 rounded-2 border border-hairline px-3 py-2 fs-12-5 text-ink-3" style="border-style:dashed !important">@teks</p>;
+
+    private RenderFragment IsiRute(BarisTrip trip) =>
+        @<span>@AturDetail.Strip(trip.RouteName)@if (trip.RouteCode != "") { <span class="tnum text-ink-3"> · @trip.RouteCode</span> }</span>;
+
+    private RenderFragment IsiTagihan(AngkaRekap angka) =>
+        @<span>@Format.Rupiah(angka.Tagihan)@if (angka.Ditagihkan > 0) { <span class="text-ink-3"> (termasuk biaya @Format.Rupiah(angka.Ditagihkan))</span> }</span>;
+
+    private RenderFragment IsiNetto(long netto) =>
+        @<span class="fw-semibold" style="@(netto < 0 ? "color:var(--critical)" : null)">@Format.Rupiah(netto)</span>;
+
+    /// <summary>"NAMA · alamat · kontak telp" + catatan khusus trip.</summary>
+    private RenderFragment Titik(TitikAlamat? t)
+    {
+        if (t is null || (string.IsNullOrEmpty(t.Nama) && string.IsNullOrEmpty(t.Jalan))) return @<span class="text-ink-3">—</span>;
+        var kontak = string.Join(" ", new[] { t.Kontak, t.Telepon }.Where(x => !string.IsNullOrEmpty(x)));
+        return @<span class="d-block lh-sm">
+            <span class="fw-medium">@AturDetail.Strip(t.Nama)</span>
+            @if (!string.IsNullOrEmpty(t.Jalan)) { <span class="d-block fs-12 text-ink-3">@t.Jalan</span> }
+            @if (kontak != "") { <span class="d-block fs-12 text-ink-3">Kontak: @kontak</span> }
+            @if (!string.IsNullOrEmpty(t.Catatan)) { <span class="d-block fs-12 text-ink-2">Catatan: @t.Catatan</span> }
+        </span>;
+    }
+}

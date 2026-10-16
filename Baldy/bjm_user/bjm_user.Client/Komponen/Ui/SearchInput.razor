@@ -1,0 +1,20 @@
+@* Kotak pencarian instan. *@
+<div class="kotak-cari mw-100 @Class" style="width:@Width">
+    <IkonSvg Def="Ikon.MagnifyingGlass" Size="14" Class="ikon-cari" />
+    <input type="search" class="form-control" value="@Value" placeholder="@Placeholder" aria-label="@Placeholder" @oninput="Ketik" />
+    @if (!string.IsNullOrEmpty(Value))
+    {
+        <button type="button" class="hapus-cari btn btn-link p-0 text-ink-3" aria-label="Hapus pencarian" @onclick="() => Kirim(string.Empty)"><IkonSvg Def="Ikon.Xmark" Size="14" /></button>
+    }
+</div>
+
+@code {
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Cari...";
+    [Parameter] public string Width { get; set; } = "18rem";
+    [Parameter] public string? Class { get; set; }
+
+    private Task Ketik(ChangeEventArgs e) => Kirim(e.Value?.ToString() ?? "");
+    private async Task Kirim(string v) { Value = v; await ValueChanged.InvokeAsync(v); }
+}
