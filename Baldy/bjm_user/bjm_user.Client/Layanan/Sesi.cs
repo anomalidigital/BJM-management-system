@@ -91,16 +91,20 @@ public sealed class Sesi(Penyimpanan simpan)
         Berubah?.Invoke();
     }
 
+    public const string SandiDefault = "BJM2026";
+
     /// <summary>
-    /// Masuk (simulasi sampai backend ada): hanya akun yang terdaftar & aktif di Pengguna & Peran; sandi belum dicek
-    /// (minimal 4 karakter). Di produksi diganti POST /api/v1/auth/public/login.
+    /// Masuk (simulasi sampai backend ada): hanya akun yang terdaftar & aktif di Pengguna & Peran dengan sandi BJM2026.
+    /// Di produksi diganti POST /api/v1/auth/public/login.
     /// </summary>
     public async Task MasukAsync(string username, string password)
     {
-        await Task.Delay(450);
+        await Task.Delay(350);
         var nama = username.Trim();
         if (nama == "") throw new InvalidOperationException("Username wajib diisi.");
-        if (password.Trim().Length < 4) throw new InvalidOperationException("Password minimal 4 karakter.");
+        if (password.Trim() == "") throw new InvalidOperationException("Password wajib diisi.");
+        if (!string.Equals(password.Trim(), SandiDefault, StringComparison.Ordinal))
+            throw new InvalidOperationException("Password yang dimasukkan salah.");
         var akun = Akun.FirstOrDefault(p => string.Equals(p.Username, nama, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException("Akun tidak terdaftar. Minta Owner menambahkannya di Pengguna & Peran.");
         if (!akun.Aktif) throw new InvalidOperationException("Akun ini dinonaktifkan. Hubungi Owner.");

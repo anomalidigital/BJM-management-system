@@ -50,22 +50,12 @@
                     <input id="@context" class="form-control tnum fw-medium @(G("kode") is not null ? "is-invalid" : "")" style="letter-spacing:.025em"
                            value="@(_kodeSendiri ? _f.KodeArea : KodeOtomatis)" placeholder="Otomatis" autocomplete="off" spellcheck="false" @oninput="KetikKode" />
                 </Field>
-                <Field Label="Nama Kontak" Class="col-sm-4">
+                <Field Label="Nama Kontak" Class="col-sm-6">
                     <input id="@context" class="form-control" value="@_f.NamaKontak" placeholder="Nama PIC di lokasi" @oninput="@(e => Atur("kontak", e))" />
                 </Field>
-                <Field Label="Telepon" Class="col-sm-4">
+                <Field Label="Telepon" Class="col-sm-6">
                     <input id="@context" type="tel" inputmode="tel" class="form-control" value="@_f.Telepon" placeholder="0812 3456 7890" @oninput="@(e => Atur("telepon", e))" />
                 </Field>
-                @if (_editing is not null)
-                {
-                    <Field Label="Status" Class="col-sm-4" Hint="@Teks("Nonaktif = tidak ditawarkan untuk trip baru.")">
-                        <Pilihan Id="@context" Options="OpsiStatus" Value="@_f.Status" ValueChanged="@(v => _f.Status = v ?? "aktif")" Cari="false" Clearable="false" />
-                    </Field>
-                }
-                else
-                {
-                    <div class="col-sm-4 d-none d-sm-block"></div>
-                }
                 <Field Label="Catatan" Class="col-12">
                     <input id="@context" class="form-control" value="@_f.Catatan" placeholder="mis. jam bongkar, akses jalan, gerbang masuk" @oninput="@(e => Atur("catatan", e))" />
                 </Field>
@@ -93,8 +83,6 @@
     [Parameter] public EventCallback OnClose { get; set; }
     /// <summary>Setelah tersimpan (atau "Pakai yang ini" pada alamat kembar), dengan alamatnya.</summary>
     [Parameter] public EventCallback<Alamat> OnTersimpan { get; set; }
-
-    private static readonly List<Opsi> OpsiStatus = [new("aktif", "Aktif"), new("nonaktif", "Nonaktif")];
 
     private bool _aktif;
     private Alamat? _editing;
