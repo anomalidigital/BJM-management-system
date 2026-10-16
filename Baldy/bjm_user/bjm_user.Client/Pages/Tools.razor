@@ -2,7 +2,7 @@
 @inherits KomponenData
 @inject Penyimpanan Simpan
 @* Tools: isi database, export / muat ulang / reset data, dan daftar business rule yang masih perlu dikonfirmasi. Hanya Owner & Manager. *@
-<PageTitle>Tools — SIKOTIS</PageTitle>
+<PageTitle>Tools — BJM Logistik</PageTitle>
 
 @if (Bisa("master"))
 {
@@ -64,7 +64,7 @@
             <Kartu>
                 <KepalaKartu Title="Tentang" />
                 <dl class="m-0 d-flex flex-column gap-2 p-3 fs-12-5">
-                    <div class="d-flex justify-content-between gap-3"><dt class="fw-normal text-ink-3">Sistem</dt><dd class="m-0 fw-medium text-ink">SIKOTIS — Sistem Komisi Otomatis</dd></div>
+                    <div class="d-flex justify-content-between gap-3"><dt class="fw-normal text-ink-3">Sistem</dt><dd class="m-0 fw-medium text-ink">BJM Logistik</dd></div>
                     <div class="d-flex justify-content-between gap-3"><dt class="fw-normal text-ink-3">Perusahaan</dt><dd class="m-0 fw-medium text-ink">PT Bimajaya Mustika</dd></div>
                     <div class="d-flex justify-content-between gap-3"><dt class="fw-normal text-ink-3">Version</dt><dd class="m-0 fw-medium text-ink">0.1</dd></div>
                     <div class="d-flex justify-content-between gap-3"><dt class="fw-normal text-ink-3">Penyimpanan</dt><dd class="m-0 fw-medium text-ink">Browser (localStorage)</dd></div>
@@ -114,7 +114,7 @@
     private async Task ExportJson()
     {
         var opsi = new System.Text.Json.JsonSerializerOptions(Database.Json) { WriteIndented = true };
-        await Simpan.UnduhAsync($"sikotis-data-{Format.HariIni()}.json", System.Text.Json.JsonSerializer.Serialize(Db.Semua, opsi));
+        await Simpan.UnduhAsync($"bjm-logistik-data-{Format.HariIni()}.json", System.Text.Json.JsonSerializer.Serialize(Db.Semua, opsi));
         Toast.Sukses("Data seluruh workspace berhasil diexport.");
     }
 
