@@ -49,7 +49,7 @@
     }
 </Kartu>
 
-<Modal Open="_formOpen" Title="@(_editing is not null ? "Ubah Klien" : "Tambah Klien")"
+<Modal Open="_formOpen" Size="lg" Title="@(_editing is not null ? "Ubah Klien" : "Tambah Klien")"
        Subtitle="@(_editing?.ProjectCode ?? "Tanda * wajib diisi. Kontrak klien Dedicated ditambahkan setelah klien tersimpan.")" OnClose="() => _formOpen = false">
     <ChildContent>
         @if (_formOpen)
@@ -66,18 +66,27 @@
                         }
                     </div>
                 </Field>
-                <Field Label="Nama Klien" Required Error="@G("nama")" Class="col-12">
+                <Field Label="Nama Klien" Required Error="@G("nama")" Class="col-sm-8" Hint="@Teks("Nama resmi perusahaan.")">
                     <input id="@context" class="form-control @(G("nama") is not null ? "is-invalid" : "")" value="@_f.ProjectName" placeholder="PT Delta Energi Riau"
                            @oninput="e => { _f.ProjectName = e.Value?.ToString() ?? string.Empty; _galat.Remove(NamaKunci); }" @onfocusout="IsiKodeDariNama" />
                 </Field>
-                <Field Label="Kode Klien" Required Error="@G("kode")" Class="col-sm-6" Hint="@Teks("Terisi dari singkatan Nama Klien (PT Delta Energi Riau → DER). Boleh diubah.")">
+                <Field Label="Kode Klien" Required Error="@G("kode")" Class="col-sm-4" Hint="@Teks("Dari singkatan Nama Klien (PT Delta Energi Riau → DER). Boleh diubah.")">
                     <KodeInput Id="@context" Value="@_f.ProjectCode" Invalid="@(G("kode") is not null)" Placeholder="Isi Nama Klien dulu" Uppercase GenerateTitle="Buat kode dari Nama Klien"
                                ValueChanged="@(v => { _f.ProjectCode = v; _galat.Remove("kode"); })" OnGenerate="GenerateKode" />
                 </Field>
-                <Field Label="Status" Class="col-sm-6">
+                <Field Label="Alamat Resmi" Class="col-sm-6">
+                    <input id="@context" class="form-control" value="@_f.AlamatResmi" placeholder="Alamat sesuai akta / NPWP" @oninput="e => _f.AlamatResmi = e.Value?.ToString() ?? string.Empty" />
+                </Field>
+                <Field Label="Alamat Surat-Menyurat" Class="col-sm-6" Hint="@Teks("Kosongkan bila sama dengan alamat resmi.")">
+                    <input id="@context" class="form-control" value="@_f.AlamatSurat" placeholder="Alamat pengiriman surat & tagihan" @oninput="e => _f.AlamatSurat = e.Value?.ToString() ?? string.Empty" />
+                </Field>
+                <Field Label="NPWP" Class="col-sm-4" Hint="@Teks("ID perpajakan klien.")">
+                    <input id="@context" class="form-control tnum" value="@_f.Npwp" placeholder="00.000.000.0-000.000" @oninput="e => _f.Npwp = e.Value?.ToString() ?? string.Empty" />
+                </Field>
+                <Field Label="Status" Class="col-sm-3">
                     <Pilihan Id="@context" Options="OpsiStatus" Value="@_f.Status" ValueChanged="v => _f.Status = v ?? StatusAktif" Cari="false" Clearable="false" />
                 </Field>
-                <Field Label="Deskripsi" Class="col-12">
+                <Field Label="Deskripsi" Class="col-sm-5">
                     <input id="@context" class="form-control" value="@_f.Description" @oninput="e => _f.Description = e.Value?.ToString() ?? string.Empty" />
                 </Field>
                 <div class="col-12">
@@ -201,15 +210,12 @@
         @if (p.K.Description != "") { <span class="mt-1 d-block fs-12 text-ink-3">@p.K.Description</span> }
     </div>;
 
-    private static RenderFragment SelTipe(BarisKlien p)
-    {
-        if (p.K.ClientType == TipeKlien.Dedicated) return @<Badge Tone="brand">Dedicated</Badge>;
-        return @<Badge Tone="neutral">Callout</Badge>;
-    }
+    /// <summary>Callout dan Dedicated berwarna sama: jenis layanan, bukan tingkat penting (Baldy 19 Okt 2026).</summary>
+    private static RenderFragment SelTipe(BarisKlien p) => @<Badge Tone="neutral">@TipeKlien.Label(p.K.ClientType)</Badge>;
 
     private static RenderFragment SelDokumen(BarisKlien p)
     {
-        if (p.K.RequiresDocument) return @<Badge Tone="brand">Pakai No Referensi / No PI</Badge>;
+        if (p.K.RequiresDocument) return @<Badge Tone="neutral">Pakai No Referensi / No PI</Badge>;
         return @<Badge Tone="neutral">Tanpa dokumen</Badge>;
     }
 
@@ -306,6 +312,7 @@
         {
             p.ProjectCode = f.ProjectCode.Trim().ToUpperInvariant(); p.ProjectName = f.ProjectName.Trim(); p.ClientType = f.ClientType;
             p.Description = f.Description; p.RequiresDocument = f.RequiresDocument; p.Status = f.Status;
+            p.AlamatResmi = f.AlamatResmi.Trim(); p.AlamatSurat = f.AlamatSurat.Trim(); p.Npwp = f.Npwp.Trim();
         }
         if (_editing is not null)
         {

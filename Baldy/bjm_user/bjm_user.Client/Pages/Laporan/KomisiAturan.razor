@@ -223,7 +223,7 @@
                 <span class="fw-medium text-ink">@s.Name</span>
                 <span class="mt-1 d-block fs-12 text-ink-3">@DasarKomisi.Label(s.Basis)@(s.BaseDeductionPct != 0 ? $" · potong {NilaiKomisi.TulisAngka(s.BaseDeductionPct)}%" : "")</span>
             </div> },
-        new() { Key = "role", Header = "Untuk", Width = "110px", Render = s => @<Badge Tone="@(s.Role == PeranKaryawan.Manager ? "brand" : "neutral")">@LabelPeran(s.Role)</Badge> },
+        new() { Key = "role", Header = "Untuk", Width = "110px", Render = s => @<Badge Tone="neutral">@LabelPeran(s.Role)</Badge> },
         new() { Key = "configurations", Header = "Berlaku", Width = "190px", Render = s => @<div class="lh-tight">
                 <span class="fs-12-5 text-ink-2">@LabelLayanan(s.ServiceType)</span>
                 <span class="mt-1 d-block fs-12 text-ink-3">@(s.Configurations.Count > 0 ? string.Join(", ", s.Configurations) : "Semua kendaraan")</span>

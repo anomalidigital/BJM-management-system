@@ -84,7 +84,7 @@ public static class DaftarTbd
             "Saat membatalkan trip Karawang, Manager / Owner boleh mengisi biaya cancel yang tetap ditagihkan ke klien. Trip batal itu masuk Tagihan (Siap PI) senilai biaya cancel, tetapi tidak ikut laporan pendapatan & netto.",
             "Siapa yang menentukan besaran cancel fee, dan apakah supir tetap dapat komisi atau uang jalan untuk trip yang dibatalkan setelah berangkat?"),
         new("TBD-26", "Trailer, equipment, dan helper per trip",
-            "Trip kini mencatat Sub Kendaraan / Gandengan (Hi Bed, Low Bed, Dolly, Tronton, CDD, ...) sebagai jenis: terisi otomatis dari konfigurasi kendaraan, bisa diubah, dan tercetak di Berita Acara (12 Okt 2026). Nomor trailer / equipment dan nama helper belum dicatat, karena master Trailer / Equipment belum ada.",
+            "Trip kini mencatat Sub Kendaraan / Gandengan (Hi Bed, Low Bed, Dolly, Tronton, CDD, ...) sebagai jenis: terisi otomatis dari konfigurasi kendaraan, bisa diubah, dan tercetak di Berita Acara (12 Okt 2026). Nomor trailer / equipment dan nama helper belum dicatat, karena master Trailer / Equipment belum ada. Catatan Ibu Anne (19 Okt 2026) di Master Kendaraan: \"Dipisahkan tambah Kendaraan Utama / Sub Kendaraan\" — menunggu keputusan bentuknya.",
             "Perlukah master Trailer / Equipment bernomor (seperti Kendaraan: nomor, jenis, status) yang dipilih per trip dan ikut tertahan sampai kembali ke pool, atau cukup jenisnya? Helper dibayar dari mana dan perlu masuk Kernet di laporan netto?"),
         new("TBD-27", "Lokasi muat & bongkar, Master Data Alamat (terjawab)",
             "Sudah dibuat (12 Okt 2026): Master Data → Alamat menyimpan kode area, nama lokasi, alamat, kota, PIC & telepon, koordinat, dan ID lokasi klien seperti di Order Release SLB. Form trip memilih pengirim (pick up) dan penerima (destinasi) dari master atau mengetik manual (bisa langsung disimpan ke master); trip menyimpan salinannya, jadi perubahan master tidak mengubah trip lama. Lokasi muat & bongkar tetap diambil dari nama rute dan bisa diubah per trip; backload memakai lokasi bongkar trip asal sebagai lokasi muat.",
@@ -120,7 +120,7 @@ public static class DaftarTbd
             "Menu memakai \"Supir / Karyawan\", sedangkan mock atasan 13 Okt 2026 memakai \"Sopir\" di tabel & form trip (judul kartunya \"Kendaraan dan Supir\"). Excel REKAPAN dari klien juga memakai \"SUPIR\". Aplikasi memakai \"Supir\" di semua tempat supaya seragam (diseragamkan lagi 19 Okt 2026, termasuk halaman Priok dan Ritan). KBBI: bentuk baku \"sopir\".",
             "Pakai \"Supir\" (seperti menu sekarang) atau \"Sopir\" (baku KBBI, seperti mock) di seluruh aplikasi?"),
         new("TBD-38", "Jenis dokumen penting",
-            "Karyawan: KTP, SIM (berlaku s/d), Kartu Keluarga, NPWP, ditambah dokumen lainnya. Kendaraan: STNK, KIR, Pajak Kendaraan, Asuransi (semuanya berlaku s/d), ditambah foto & dokumen lainnya. Dokumen yang habis / habis dalam 30 hari ditandai merah di daftar.",
-            "Perlu jenis lain sebagai tempat khusus (mis. BPJS, SKCK karyawan; BPKB kendaraan)? Perlu nomor dokumen (mis. nomor SIM) selain berkasnya?"),
+            "Karyawan: KTP (dengan No. KTP), SIM (berlaku s/d), Kartu Keluarga, NPWP, ditambah dokumen lainnya. Kendaraan: STNK & KIR (nomor + berlaku s/d), Pajak Kendaraan, Asuransi (berlaku s/d), BPKB (nomor), ditambah foto & dokumen lainnya. Nomor & BPKB ditambahkan sesuai catatan Ibu Anne (19 Okt 2026). Masa berlaku tampil sebagai tag di daftar: hijau berlaku, kuning habis dalam 30 hari, merah sudah habis.",
+            "Perlu jenis lain sebagai tempat khusus (mis. BPJS, SKCK karyawan)? Perlu nomor SIM juga, atau cukup masa berlakunya?"),
     ];
 }

@@ -1,8 +1,7 @@
 @page "/master/rute"
 @* Master Data -> Rute (revisi 13 Okt 2026): area pick up & destinasi dari Master Alamat, nama rute kesimpulan keduanya, No. Rute tetap.
-   Klien tidak lagi di rute: dipilih di form trip. Kode area mirip (mungkin salah ketik) bisa dirapikan per kelompok. *@
+   Klien tidak lagi di rute: dipilih di form trip. Panel "kode area mirip" dihapus (Baldy 19 Okt 2026): nama yang mirip memang tempat berbeda. *@
 @inherits KomponenData
-@inject Penyimpanan Penyimpan
 <PageTitle>Rute — BJM Logistik</PageTitle>
 
 <PageHeader Title="Rute" Crumbs="@(new List<Crumb> { new("Master Data"), new("Rute") })">
@@ -16,63 +15,8 @@
 @{
     var baris = Baris;
     var pakai = KodeArea.Pemakaian(Db.Data.Rute);
-    var semuaKelompok = KodeArea.KelompokMirip(pakai);
-    var kelompok = semuaKelompok.Where(g => !KodeArea.SudahDitandai(g, _tanda)).ToList();
-    var disembunyikan = semuaKelompok.Count - kelompok.Count;
-    _curiga = new HashSet<string>(kelompok.SelectMany(g => g.Skip(1)));
     _pakaiKode = pakai;
-    var bisa = Bisa("master");
-}
-
-@if (kelompok.Count > 0)
-{
-    <section aria-label="Kode area mirip" class="kotak-peringatan mb-4 fs-12-5 py-2 px-3">
-        <div class="d-flex align-items-start gap-2">
-            <IkonSvg Def="Ikon.TriangleExclamation" Size="15" Style="margin-top:1px" />
-            <p class="m-0 min-w-0 flex-grow-1">
-                <span class="fw-semibold">Kode area mirip, mungkin salah ketik</span> (@kelompok.Count kelompok).
-                @if (_panelBuka)
-                {
-                    @(bisa ? " Klik Rapikan untuk menyatukan penulisannya di semua rute & alamat sekaligus, atau klik kode untuk melihat rutenya." : " Klik kode untuk melihat rutenya.")
-                }
-            </p>
-            <button type="button" class="btn btn-link p-0 fs-inherit fw-semibold flex-shrink-0 text-decoration-underline" style="color:inherit" aria-expanded="@_panelBuka"
-                    @onclick="() => _panelBuka = !_panelBuka">@(_panelBuka ? "Sembunyikan" : "Lihat")</button>
-        </div>
-        @if (_panelBuka)
-        {
-            <ul class="list-unstyled m-0 mt-2 d-flex flex-wrap gap-1 ps-sm-4">
-                @foreach (var g in kelompok)
-                {
-                    var gg = g;
-                    <li class="d-inline-flex flex-wrap align-items-center gap-1 mw-100 rounded-2 bg-white py-1 pe-1 ps-1" style="border:1px solid #f6e2ac">
-                        @for (var i = 0; i < gg.Count; i++)
-                        {
-                            var k = gg[i];
-                            if (i > 0) { <span aria-hidden="true" style="color:#c9a650">/</span> }
-                            <button type="button" class="btn btn-sm border-0 rounded-1 px-1 py-0 fw-semibold text-ink fs-12-5" aria-pressed="@(_filter.Nilai.Kode == k)"
-                                    title="@($"Tampilkan rute dengan kode area {k}")" style="@(_filter.Nilai.Kode == k ? "background:#fdecc0" : null)" @onclick="() => PilihKode(k)">
-                                @k <span class="tnum fw-normal text-ink-3">@(pakai.GetValueOrDefault(k)?.Rute ?? 0)</span>
-                            </button>
-                        }
-                        <button type="button" class="btn btn-sm border-0 rounded-1 ms-1 px-2 py-0 d-inline-flex align-items-center gap-1 fw-semibold fs-11-5" style="background:#fdecc0;color:#6b4b00"
-                                title="@($"Satukan penulisan {string.Join(" / ", gg)}")" disabled="@(!bisa)" @onclick="() => _rapikan = gg">
-                            <IkonSvg Def="Ikon.WandMagicSparkles" Size="11" /> Rapikan
-                        </button>
-                        <TombolIkon Label="@($"Bukan salah ketik: sembunyikan {string.Join(" / ", gg)}")" Icon="Ikon.Xmark" Size="12" Disabled="@(!bisa)" OnClick="() => TandaiBukanSalahKetik(gg)" />
-                    </li>
-                }
-            </ul>
-            <p class="m-0 mt-2 fs-11-5 ps-sm-4" style="opacity:.85">
-                Angka = jumlah rute.@(bisa ? " Tombol × menandai kelompok yang memang berbeda tempat (bukan salah ketik), mis. SUBAN dan SUBANG." : "")
-                @if (disembunyikan > 0)
-                {
-                    <text> @disembunyikan kelompok disembunyikan. </text>
-                    <button type="button" class="btn btn-link p-0 fs-inherit fw-semibold align-baseline text-decoration-underline" style="color:inherit" @onclick="TampilkanLagi">Tampilkan lagi</button>
-                }
-            </p>
-        }
-    </section>
+    _namaArea = NamaArea();
 }
 
 <Kartu>
@@ -97,11 +41,6 @@
         <Right>
             <span class="fs-12-5 text-ink-3">
                 @Db.Data.Rute.Count rute terdaftar@(JumlahKira > 0 ? $" · {JumlahKira} bernominal perkiraan" : "")
-                @if (kelompok.Count == 0 && disembunyikan > 0)
-                {
-                    <text> · </text>
-                    <button type="button" class="btn btn-link p-0 fs-inherit align-baseline text-ink-3 text-decoration-underline" title="Tampilkan lagi kelompok kode area mirip yang ditandai bukan salah ketik" @onclick="TampilkanLagi">@disembunyikan kode mirip disembunyikan</button>
-                }
             </span>
         </Right>
     </Toolbar>
@@ -124,11 +63,6 @@
 @* Form rute dipakai bersama form trip (tambah rute di tempat). *@
 <FormRute Open="_formOpen" Rute="_editing" OnClose="() => _formOpen = false" />
 
-@if (_rapikan is not null)
-{
-    <ModalRapikanKode Kelompok="_rapikan" Pakai="@KodeArea.Pemakaian(Db.Data.Rute, Db.Data.Alamat)" OnClose="() => _rapikan = null" OnBuka="BukaDariRapikan" />
-}
-
 <KonfirmasiDialog Open="_hapus is not null" Title="Hapus Data?" Message="Data yang sudah dihapus mungkin tidak dapat dikembalikan." ConfirmLabel="Hapus" Tone="danger"
                   OnCancel="() => _hapus = null" OnConfirm="HapusSekarang">
     <p class="m-0 mt-2 fs-13 fw-medium text-ink">@_hapus?.RouteCode — @_hapus?.RouteName</p>
@@ -141,7 +75,7 @@
             var cetak = _tabel.Saring(Baris);
             var per = PrintDocument.BarisPerLembar(context, 24);
             var lembar = PrintDocument.Bagi(cetak, per);
-            var kolomCetak = new List<(string, string, string?)> { ("No.", "right", "28px"), ("No. Rute", "left", null), ("Nama Rute", "left", null), ("Area", "left", null) };
+            var kolomCetak = new List<(string, string, string?)> { ("No.", "right", "28px"), ("No. Rute", "left", null), ("Nama Rute", "left", null), ("Area Pick Up", "left", null), ("Area Destinasi", "left", null) };
             if (PakaiFeet) kolomCetak.Add(("Feet", "left", null));
             kolomCetak.AddRange([("Uang Jalan Rute", "right", null), ("Uang Tol", "right", null), ("Harga", "right", null)]);
             var subjudul = string.Join(" · ", new[] { PakaiFeet && _filter.Nilai.Feet != "" ? $"Feet: {_filter.Nilai.Feet}" : "", _filter.Nilai.Kode != "" ? $"Area: {_filter.Nilai.Kode}" : "" }.Where(x => x != ""));
@@ -160,7 +94,8 @@
                                 <td class="p-sel text-end">@(ii * per + rr + 1)</td>
                                 <td class="p-sel fw-medium">@x.R.RouteCode</td>
                                 <td class="p-sel">@x.R.RouteName</td>
-                                <td class="p-sel text-nowrap">@(x.AreaAsal == "" ? "—" : x.AreaAsal) → @(x.AreaTujuan == "" ? "—" : x.AreaTujuan)</td>
+                                <td class="p-sel text-nowrap">@(x.AreaAsal == "" ? "—" : x.AreaAsal)</td>
+                                <td class="p-sel text-nowrap">@(x.AreaTujuan == "" ? "—" : x.AreaTujuan)</td>
                                 @if (PakaiFeet) { <td class="p-sel">@(x.R.Feet == "" ? "—" : x.R.Feet)</td> }
                                 <td class="p-sel text-end">@Format.Angka(x.R.Ujroute)</td>
                                 <td class="p-sel text-end">@Format.Angka(x.R.Toll)</td>
@@ -187,23 +122,16 @@
     public sealed class FilterRute { public string Kode { get; set; } = ""; public string Feet { get; set; } = ""; public string Kira { get; set; } = ""; }
 
     /// <summary>Baris tabel rute: rute beserta area pick up & destinasinya (dipilih di form rute, atau turunan nama lama).</summary>
-    public sealed record BarisRute(Model.Rute R, string AreaAsal, string AreaTujuan, bool AreaSendiri)
-    {
-        /// <summary>Kunci urut kolom area, mis. "CIB → DURI".</summary>
-        public string Area => $"{AreaAsal} → {AreaTujuan}";
-    }
+    public sealed record BarisRute(Model.Rute R, string AreaAsal, string AreaTujuan);
 
     private readonly KendaliTabel<BarisRute> _tabel = new(10, "route_code");
     private KendaliFilter<FilterRute> _filter = default!;
     private Model.Rute? _editing;
     private bool _formOpen;
     private Model.Rute? _hapus;
-    private List<string>? _rapikan;
     private bool _preview;
-    private bool _panelBuka = true;
-    private List<List<string>> _tanda = [];
-    private HashSet<string> _curiga = [];
     private Dictionary<string, PakaiKode> _pakaiKode = [];
+    private Dictionary<string, string> _namaArea = [];
 
     private static readonly List<Opsi> OpsiKira = [new("", "Semua"), new("ya", "Masih ada perkiraan"), new("tidak", "Sudah pasti")];
     private static readonly List<Opsi> OpsiFeetFilter = [new("", "Semua"), .. FormRute.PilihanFeet.Select(f => new Opsi(f, f)), new("-", "Belum diisi")];
@@ -218,7 +146,7 @@
         _tabel.Search = (r, q) => Util.CocokCari(q, r.R.RouteCode, r.R.RouteCodeLama ?? "", r.R.RouteName, r.R.Feet, r.AreaAsal, r.AreaTujuan);
         _tabel.SortAccessor = k => k switch
         {
-            "route_name" => r => r.R.RouteName, "area" => r => r.Area, "feet" => r => r.R.Feet,
+            "route_name" => r => r.R.RouteName, "area_asal" => r => r.AreaAsal, "area_tujuan" => r => r.AreaTujuan, "feet" => r => r.R.Feet,
             "ujroute" => r => r.R.Ujroute, "toll" => r => r.R.Toll, "price" => r => r.R.Price, _ => r => r.R.RouteCode,
         };
         _tabel.ExtraFilter = r =>
@@ -230,8 +158,6 @@
         };
     }
 
-    protected override async Task OnInitializedAsync() => _tanda = await TandaKodeArea.BacaAsync(Penyimpan);
-
     protected override void OnAfterRender(bool pertama)
     {
         // Kode yang sudah tidak dipakai rute mana pun (mis. baru dirapikan) dilepas dari filter.
@@ -242,9 +168,14 @@
     private List<BarisRute> Baris => Db.Data.Rute.Select(r =>
     {
         var k = TripLogika.KodeArea(r);
-        var dariNama = TripLogika.KodeArea(r.RouteName, null, null);
-        return new BarisRute(r, k.Asal, k.Tujuan, k.Asal != dariNama.Asal || k.Tujuan != dariNama.Tujuan);
+        return new BarisRute(r, k.Asal, k.Tujuan);
     }).ToList();
+
+    /// <summary>Nama tempat per kode area dari Master Alamat (alamat pertama; "+N" bila ada beberapa).</summary>
+    private Dictionary<string, string> NamaArea() => Db.Data.Alamat
+        .Where(a => a.KodeArea.Trim() != "")
+        .GroupBy(a => a.KodeArea.Trim().ToUpperInvariant())
+        .ToDictionary(g => g.Key, g => g.Count() > 1 ? $"{g.First().Nama} +{g.Count() - 1}" : g.First().Nama);
 
     private int JumlahKira => Db.Data.Rute.Count(r => (r.EstimatedFields?.Count ?? 0) > 0);
 
@@ -275,7 +206,8 @@
             {
                 new() { Key = "route_code", Header = "No. Rute", Sortable = true, Width = "150px", Render = SelKode },
                 new() { Key = "route_name", Header = "Nama Rute", Sortable = true, Render = r => @<span class="fw-medium">@r.R.RouteName</span> },
-                new() { Key = "area", Header = "Area Pick Up → Destinasi", Sortable = true, Width = "200px", Render = SelArea },
+                new() { Key = "area_asal", Header = "Area Pick Up", Sortable = true, Width = "180px", Render = r => SelArea(r.AreaAsal) },
+                new() { Key = "area_tujuan", Header = "Area Destinasi", Sortable = true, Width = "180px", Render = r => SelArea(r.AreaTujuan) },
             };
             if (PakaiFeet) k.Add(new() { Key = "feet", Header = "Feet", Sortable = true, Width = "86px", Render = SelFeet });
             k.Add(new() { Key = "ujroute", Header = "Uang Jalan Rute", Sortable = true, Align = "right", Width = "128px", Render = r => Nominal(r.R.Ujroute, r.R.EstimatedFields?.Contains("ujroute") == true, false) });
@@ -294,30 +226,21 @@
         }
     </span>;
 
-    private RenderFragment SelArea(BarisRute r) => @<span class="d-block lh-tight">
-        <span class="d-inline-flex flex-wrap align-items-center gap-1 fs-12-5 fw-medium">
-            @KodeAreaSel(r.AreaAsal)
-            <IkonSvg Def="Ikon.ArrowRight" Size="10" Class="text-ink-3" />
-            @KodeAreaSel(r.AreaTujuan)
-        </span>
-        @if (r.AreaSendiri)
-        {
-            <span class="mt-1 d-block fs-11 text-ink-3" title="Area dipilih di form rute dan berbeda dari nama rute.">beda dari nama rute</span>
-        }
-    </span>;
+    /// <summary>Kode area dengan nama tempatnya (dari Master Alamat) di bawahnya.</summary>
+    private RenderFragment SelArea(string kode)
+    {
+        if (kode == "") return @<span class="text-ink-3">—</span>;
+        var nama = _namaArea.GetValueOrDefault(kode.ToUpperInvariant());
+        return @<span class="d-block lh-tight">
+            <span class="fs-12-5 fw-medium text-ink">@kode</span>
+            @if (!string.IsNullOrEmpty(nama)) { <span class="mt-1 d-block fs-11-5 text-ink-3 text-truncate" title="@nama">@nama</span> }
+        </span>;
+    }
 
     private static RenderFragment SelFeet(BarisRute r)
     {
         if (r.R.Feet == "") return @<span class="text-ink-3">—</span>;
         return @<Badge Tone="neutral">@r.R.Feet</Badge>;
-    }
-
-    /// <summary>Satu kode area di kolom tabel; yang mungkin salah ketik diberi tanda kuning.</summary>
-    private RenderFragment KodeAreaSel(string kode)
-    {
-        if (kode == "") return @<span class="text-ink-3">—</span>;
-        if (!_curiga.Contains(kode)) return @<span class="text-ink">@kode</span>;
-        return @<span class="d-inline-flex align-items-center gap-1" style="color:#8a6100" title="Mirip kode area lain, mungkin salah ketik"><IkonSvg Def="Ikon.TriangleExclamation" Size="10" />@kode</span>;
     }
 
     /// <summary>Nominal rute; yang masih perkiraan diberi keterangan kecil di bawahnya.</summary>
@@ -341,37 +264,16 @@
 
     /// <summary>Baris total: label menutup semua kolom sebelum Uang Jalan Rute, supaya jumlahnya tepat di bawah kolomnya.</summary>
     private RenderFragment BarisTotal(List<BarisRute> rows) => @<tr>
-        <td class="px-3 py-2 fs-12 text-ink-2" colspan="@(PakaiFeet ? 4 : 3)">Total @Format.Angka(rows.Count) rute</td>
+        <td class="px-3 py-2 fs-12 text-ink-2" colspan="@(PakaiFeet ? 5 : 4)">Total @Format.Angka(rows.Count) rute</td>
         <td class="tnum px-3 py-2 text-end fs-12-5">@Format.Rupiah(rows.Sum(x => x.R.Ujroute))</td>
         <td class="tnum px-3 py-2 text-end fs-12-5">@Format.Rupiah(rows.Sum(x => x.R.Toll))</td>
         <td class="tnum px-3 py-2 text-end fs-12-5 text-ink">@Format.Rupiah(rows.Sum(x => x.R.Price))</td>
         <td></td>
     </tr>;
 
-    /// <summary>Klik kode di panel kode mirip: tampilkan rutenya (klik lagi untuk melepas). Langsung berlaku.</summary>
-    private void PilihKode(string k)
-    {
-        _filter.Atur(n => n.Kode = n.Kode == k ? "" : k);
-        _tabel.SetPage(1);
-    }
-
-    private async Task TandaiBukanSalahKetik(List<string> g)
-    {
-        _tanda = [.. _tanda, g];
-        await TandaKodeArea.SimpanAsync(Penyimpan, _tanda);
-        Toast.Info($"{string.Join(" / ", g)} ditandai bukan salah ketik dan disembunyikan.");
-    }
-
-    private async Task TampilkanLagi()
-    {
-        _tanda = [];
-        await TandaKodeArea.SimpanAsync(Penyimpan, _tanda);
-    }
-
     private void ResetFilter() { _tabel.Reset(); _filter.LepasSemua(); }
     private void BukaTambah() { _editing = null; _formOpen = true; }
     private void BukaUbah(Model.Rute r) { _editing = Db.Cari<Model.Rute>(r.Id) ?? r; _formOpen = true; }
-    private void BukaDariRapikan(Model.Rute r) { _rapikan = null; _editing = r; _formOpen = true; }
 
     private void HapusSekarang()
     {

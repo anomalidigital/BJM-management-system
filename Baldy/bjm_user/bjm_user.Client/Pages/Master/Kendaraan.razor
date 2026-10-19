@@ -5,7 +5,7 @@
 <PageTitle>Kendaraan — BJM Logistik</PageTitle>
 
 <PageHeader Title="Kendaraan" Crumbs="@(new List<Crumb> { new("Master Data"), new("Kendaraan") })">
-    <Description>Master kendaraan beserta konfigurasi dan surat pentingnya (STNK, KIR, Pajak, Asuransi).</Description>
+    <Description>Master kendaraan beserta konfigurasi dan surat pentingnya (STNK, KIR, Pajak, Asuransi, BPKB).</Description>
     <Actions>
         <Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Bisa("master"))" OnClick="BukaTambah">Tambah Kendaraan</Tombol>
     </Actions>
@@ -185,7 +185,7 @@
         new() { Key = "foto", Header = "Foto", Width = "120px", Render = v => @<LampiranThumbs Ids="v.Attachments" Ukuran="30" /> },
         new() { Key = "vehicle_type", Header = "Jenis Kendaraan", Sortable = true, Render = v => @<span class="text-ink-2">@v.VehicleType</span> },
         new() { Key = "configuration", Header = "Konfigurasi", Sortable = true, Width = "130px", Render = SelKonfigurasi },
-        new() { Key = "dokumen", Header = "Surat", Width = "170px", Render = SelSurat },
+        new() { Key = "dokumen", Header = "Surat", Width = "250px", Render = v => @<TagDokumen Jenis="DokumenPentingJenis.Kendaraan" Dokumen="v.Dokumen" /> },
         new() { Key = "trip", Header = "Jumlah Trip", Align = "right", Width = "110px", Render = v => @<span class="tnum text-ink-2">@Format.Angka(_jumlahTrip.GetValueOrDefault(v.Id))</span> },
         new() { Key = "status", Header = "Status", Sortable = true, Width = "110px", Render = SelStatus },
         new() { Key = "action", Header = "Action", Align = "right", Width = "92px", NoPrint = true, Render = SelAksi },
@@ -195,18 +195,6 @@
     {
         if (v.Configuration == "") return @<span class="text-ink-3">—</span>;
         return @<Badge Tone="brand">@KonfigurasiKendaraan.Label(v.Configuration)</Badge>;
-    }
-
-    private static RenderFragment SelSurat(Model.Kendaraan v)
-    {
-        var r = DokumenPentingInput.Ringkas(DokumenPentingJenis.Kendaraan, v.Dokumen);
-        return @<span class="d-block lh-tight">
-            <span class="@(r.Ada.Count > 0 ? "text-ink-2" : "text-ink-3")">@(r.Ada.Count > 0 ? string.Join(", ", r.Ada) : "Belum ada")</span>
-            @if (r.Habis.Count > 0 || r.Segera.Count > 0)
-            {
-                <span class="mt-1 d-block fs-11-5 fw-medium" style="color:var(--critical)">@string.Join(", ", r.Habis.Concat(r.Segera)) @(r.Habis.Count > 0 ? "habis" : "segera habis")</span>
-            }
-        </span>;
     }
 
     private static RenderFragment SelStatus(Model.Kendaraan v) => v.Status switch
@@ -259,19 +247,11 @@
         return _galat.Count == 0;
     }
 
-    /// <summary>Dokumen penting tersimpan tanpa slot kosong (tidak ada berkas & tanggal).</summary>
-    private static Dictionary<string, DokumenPenting>? RapikanDokumen(Dictionary<string, DokumenPenting> d)
-    {
-        var isi = d.Where(x => x.Value.Berkas.Count > 0 || !string.IsNullOrEmpty(x.Value.BerlakuSampai))
-            .ToDictionary(x => x.Key, x => new DokumenPenting { Berkas = x.Value.Berkas, BerlakuSampai = string.IsNullOrEmpty(x.Value.BerlakuSampai) ? null : x.Value.BerlakuSampai });
-        return isi.Count > 0 ? isi : null;
-    }
-
     private void Simpan()
     {
         if (!Validasi()) return;
         var f = _f;
-        var dok = RapikanDokumen(_dokumen);
+        var dok = DokumenPentingInput.Rapikan(_dokumen);
         void Isi(Model.Kendaraan v)
         {
             v.PlateNumber = f.PlateNumber.Trim().ToUpperInvariant(); v.VehicleType = f.VehicleType; v.Configuration = f.Configuration;

@@ -14,7 +14,7 @@
 <Kartu>
     <Toolbar>
         <Left>
-            <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Placeholder="Cari kode, nama, alamat, atau kota..." />
+            <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Placeholder="Cari kode, nama, No. KTP, alamat, atau kota..." />
             <PanelFilter T="FilterKaryawan" Filter="_filter" Chips="Chips">
                 <div class="row g-3">
                     <Field Label="Peran" Class="col-6">
@@ -67,20 +67,24 @@
                 <Field Label="Status" Class="col-sm-4">
                     <Pilihan Id="@context" Options="OpsiStatus" Value="@_f.Status" ValueChanged="v => _f.Status = v ?? StatusAktif" Cari="false" Clearable="false" />
                 </Field>
-                <Field Label="Nama" Required Error="@G("nama")" Class="col-sm-8">
-                    <input id="@context" class="form-control @(G("nama") is not null ? "is-invalid" : "")" value="@_f.DriverName" placeholder="Nama lengkap"
+                <Field Label="Nama Lengkap (sesuai KTP)" Class="col-sm-8">
+                    <input id="@context" class="form-control" value="@_f.NamaLengkap" placeholder="Nama sesuai KTP"
+                           @oninput="e => _f.NamaLengkap = e.Value?.ToString() ?? string.Empty" />
+                </Field>
+                <Field Label="Nama Panggilan" Required Error="@G("nama")" Class="col-sm-4" Hint="@Teks("Dipakai di trip, laporan, dan cetakan.")">
+                    <input id="@context" class="form-control @(G("nama") is not null ? "is-invalid" : "")" value="@_f.DriverName" placeholder="mis. AGUS"
                            @oninput="e => { _f.DriverName = e.Value?.ToString() ?? string.Empty; _galat.Remove(NamaKunci); }" />
                 </Field>
-                <Field Label="Telepon" Error="@G("telepon")" Class="col-sm-4">
-                    <input id="@context" class="form-control @(G("telepon") is not null ? "is-invalid" : "")" value="@_f.Phone" placeholder="0812xxxxxxx"
-                           @oninput="e => { _f.Phone = e.Value?.ToString() ?? string.Empty; _galat.Remove(TeleponKunci); }" />
-                </Field>
-                <Field Label="Alamat" Class="col-sm-8">
+                <Field Label="Alamat" Class="col-sm-6">
                     <input id="@context" class="form-control" value="@_f.Address1" placeholder="Jl. Melati No. 12, Jakarta Timur" @oninput="e => _f.Address1 = e.Value?.ToString() ?? string.Empty" />
                 </Field>
-                <Field Label="Kota" Required="KotaWajib" Error="@G("kota")" Class="col-sm-4">
+                <Field Label="Kota" Required="KotaWajib" Error="@G("kota")" Class="col-sm-3">
                     <input id="@context" class="form-control @(G("kota") is not null ? "is-invalid" : "")" value="@_f.City" placeholder="Jakarta"
                            @oninput="e => { _f.City = e.Value?.ToString() ?? string.Empty; _galat.Remove(KotaKunci); }" />
+                </Field>
+                <Field Label="Telepon" Error="@G("telepon")" Class="col-sm-3">
+                    <input id="@context" class="form-control @(G("telepon") is not null ? "is-invalid" : "")" value="@_f.Phone" placeholder="0812xxxxxxx"
+                           @oninput="e => { _f.Phone = e.Value?.ToString() ?? string.Empty; _galat.Remove(TeleponKunci); }" />
                 </Field>
                 <fieldset class="col-12 min-w-0">
                     <legend class="form-label">Dokumen <span class="fw-normal text-ink-3">· klik kotak untuk upload; foto diperkecil otomatis, PDF juga bisa</span></legend>
@@ -111,7 +115,7 @@
 
     private static readonly List<Opsi> OpsiPeran = PeranKaryawan.Semua.Select(r => new Opsi(r, PeranKaryawan.Label(r))).ToList();
     private static readonly List<Opsi> OpsiPeranFilter = [new("", "Semua"), .. OpsiPeran];
-    private static readonly List<Opsi> OpsiStatus = [new("aktif", "Aktif"), new("nonaktif", "Nonaktif")];
+    private static readonly List<Opsi> OpsiStatus = StatusKaryawan.Semua.Select(s => new Opsi(s, StatusKaryawan.Label(s))).ToList();
     private static readonly List<Opsi> OpsiStatusFilter = [new("", "Semua"), .. OpsiStatus];
     private static readonly List<Opsi> OpsiPiutang = [new("", "Semua"), new("ada", "Masih punya piutang"), new("tidak", "Tidak punya piutang")];
     private static readonly List<Opsi> OpsiDokumen = [new("", "Semua"), new("kurang", "Belum lengkap"), new("habis", "Habis / segera habis")];
@@ -129,10 +133,10 @@
     {
         base.OnInitialized();
         _filter = new KendaliFilter<FilterKaryawan>(() => new FilterKaryawan(), StateHasChanged);
-        _tabel.Search = (d, q) => Util.CocokCari(q, d.K.DriverCode, d.K.DriverName, d.K.Address1, d.K.Address2, d.K.City, d.K.Phone);
+        _tabel.Search = (d, q) => Util.CocokCari(q, d.K.DriverCode, d.K.DriverName, d.K.NamaLengkap, NoKtp(d.K), d.K.Address1, d.K.Address2, d.K.City, d.K.Phone);
         _tabel.SortAccessor = k => k switch
         {
-            "driver_name" => d => d.K.DriverName, "role" => d => d.K.Role, "address_1" => d => d.K.Address1, "jumlahDok" => d => d.JumlahDok,
+            "driver_name" => d => d.K.DriverName, "role" => d => d.K.Role, "ktp" => d => NoKtp(d.K), "address_1" => d => d.K.Address1, "jumlahDok" => d => d.JumlahDok,
             "saldo" => d => d.Saldo, "status" => d => d.K.Status, _ => d => d.K.DriverCode,
         };
         _tabel.ExtraFilter = d =>
@@ -155,7 +159,7 @@
             var f = _filter.Nilai;
             var l = new List<ChipFilter>();
             if (f.Peran != "") l.Add(new($"Peran: {PeranKaryawan.Label(f.Peran)}", () => _filter.Lepas((n, a) => n.Peran = a.Peran)));
-            if (f.Status != "") l.Add(new($"Status: {(f.Status == "aktif" ? "Aktif" : "Nonaktif")}", () => _filter.Lepas((n, a) => n.Status = a.Status)));
+            if (f.Status != "") l.Add(new($"Status: {StatusKaryawan.Label(f.Status)}", () => _filter.Lepas((n, a) => n.Status = a.Status)));
             if (f.Piutang != "") l.Add(new(f.Piutang == "ada" ? "Masih punya piutang" : "Tidak punya piutang", () => _filter.Lepas((n, a) => n.Piutang = a.Piutang)));
             if (f.Dokumen != "") l.Add(new(f.Dokumen == "kurang" ? "Dokumen belum lengkap" : "Dokumen habis / segera habis", () => _filter.Lepas((n, a) => n.Dokumen = a.Dokumen)));
             return l;
@@ -168,10 +172,11 @@
     private List<Kolom<BarisKaryawan>> Kolom =>
     [
         new() { Key = "driver_code", Header = "Kode", Sortable = true, Width = "96px", Render = d => @<span class="tnum fw-semibold text-ink">@d.K.DriverCode</span> },
-        new() { Key = "driver_name", Header = "Nama", Sortable = true, Render = d => @<a href="@($"master/karyawan/{d.K.Id}")" class="fw-medium text-ink text-decoration-none">@d.K.DriverName</a> },
-        new() { Key = "role", Header = "Peran", Sortable = true, Width = "104px", Render = d => @<Badge Tone="@(d.K.Role == PeranKaryawan.Manager ? "brand" : "neutral")">@PeranKaryawan.Label(d.K.Role)</Badge> },
+        new() { Key = "driver_name", Header = "Nama", Sortable = true, Render = SelNama },
+        new() { Key = "role", Header = "Peran", Sortable = true, Width = "104px", Render = d => @<Badge Tone="neutral">@PeranKaryawan.Label(d.K.Role)</Badge> },
+        new() { Key = "ktp", Header = "No. KTP", Sortable = true, Width = "160px", Render = d => NoKtp(d.K) is { Length: > 0 } no ? @<span class="tnum text-ink-2">@no</span> : @<span class="text-ink-3">—</span> },
         new() { Key = "address_1", Header = "Alamat", Sortable = true, Render = SelAlamat },
-        new() { Key = "jumlahDok", Header = "Dokumen", Sortable = true, Width = "150px", Render = SelDokumen },
+        new() { Key = "jumlahDok", Header = "Dokumen", Sortable = true, Width = "190px", Render = d => @<TagDokumen Jenis="DokumenPentingJenis.Karyawan" Dokumen="d.K.Dokumen" Lainnya="d.K.Attachments.Count" /> },
         // Piutang dari sisi karyawan (atasan 13 Okt 2026): minus merah = masih punya piutang.
         new() { Key = "saldo", Header = "Piutang", Sortable = true, Align = "right", Width = "140px", Render = d => @<NilaiPiutang Nilai="d.Saldo" Tebal="@(d.Saldo < 0)" /> },
         new() { Key = "status", Header = "Status", Sortable = true, Width = "100px", Render = SelStatus },
@@ -187,25 +192,19 @@
         </span>;
     }
 
-    private static RenderFragment SelDokumen(BarisKaryawan d)
-    {
-        var r = DokumenPentingInput.Ringkas(DokumenPentingJenis.Karyawan, d.K.Dokumen);
-        var lain = d.K.Attachments.Count;
-        return @<span class="d-block lh-tight">
-            <span class="@(r.Ada.Count > 0 ? "text-ink-2" : "text-ink-3")">@(r.Ada.Count > 0 ? string.Join(", ", r.Ada) : "Belum ada")</span>
-            @if (r.Habis.Count > 0 || r.Segera.Count > 0)
-            {
-                <span class="mt-1 d-block fs-11-5 fw-medium" style="color:var(--critical)">@string.Join(", ", r.Habis.Concat(r.Segera)) @(r.Habis.Count > 0 ? "habis" : "segera habis")</span>
-            }
-            @if (lain > 0) { <span class="mt-1 d-block fs-11-5 text-ink-3">+@lain dokumen lainnya</span> }
-        </span>;
-    }
+    private static RenderFragment SelStatus(BarisKaryawan d) => @<Badge Tone="@StatusKaryawan.Nada(d.K.Status)">@StatusKaryawan.Label(d.K.Status)</Badge>;
 
-    private static RenderFragment SelStatus(BarisKaryawan d)
-    {
-        if (d.K.Status == "aktif") return @<Badge Tone="good">Aktif</Badge>;
-        return @<Badge Tone="neutral">Nonaktif</Badge>;
-    }
+    /// <summary>Nama panggilan (dipakai di trip) dengan nama lengkap sesuai KTP di bawahnya.</summary>
+    private static RenderFragment SelNama(BarisKaryawan d) => @<span class="d-block lh-tight">
+        <a href="@($"master/karyawan/{d.K.Id}")" class="fw-medium text-ink text-decoration-none">@d.K.DriverName</a>
+        @if (d.K.NamaLengkap != "" && !d.K.NamaLengkap.Equals(d.K.DriverName, StringComparison.OrdinalIgnoreCase))
+        {
+            <span class="mt-1 d-block fs-12 text-ink-3">@d.K.NamaLengkap</span>
+        }
+    </span>;
+
+    private static string NoKtp(Model.Karyawan k) => k.Dokumen?.GetValueOrDefault("KTP")?.Nomor ?? "";
+    private static RenderFragment? Teks(string? s) => s is null ? null : b => b.AddContent(0, s);
 
     private RenderFragment SelAksi(BarisKaryawan d)
     {
@@ -228,7 +227,7 @@
     private void BukaTambah()
     {
         _editing = null;
-        _f = new Model.Karyawan { Role = PeranKaryawan.Sopir, Status = "aktif", DriverCode = KodeBerikut(PeranKaryawan.Sopir) };
+        _f = new Model.Karyawan { Role = PeranKaryawan.Sopir, Status = StatusKaryawan.Aktif, DriverCode = KodeBerikut(PeranKaryawan.Sopir) };
         _dokumen = [];
         _galat.Clear();
         _formOpen = true;
@@ -264,28 +263,20 @@
         var kode = _f.DriverCode.Trim();
         if (kode == "") _galat["kode"] = "Kode karyawan wajib diisi.";
         else if (Db.Data.Karyawan.Any(k => k.DriverCode.Equals(kode, StringComparison.OrdinalIgnoreCase) && k.Id != _editing?.Id)) _galat["kode"] = "Kode karyawan sudah dipakai.";
-        if (_f.DriverName.Trim() == "") _galat["nama"] = "Nama wajib diisi.";
+        if (_f.DriverName.Trim() == "") _galat["nama"] = "Nama panggilan wajib diisi.";
         if (KotaWajib && _f.City.Trim() == "") _galat["kota"] = "Kota wajib diisi.";
         if (_f.Phone != "" && !Regex.IsMatch(_f.Phone.Trim(), @"^[\d+\-\s()]{6,20}$")) _galat["telepon"] = "Format nomor telepon tidak valid.";
         return _galat.Count == 0;
-    }
-
-    /// <summary>Dokumen penting tersimpan tanpa slot kosong (tidak ada berkas & tanggal).</summary>
-    private static Dictionary<string, DokumenPenting>? RapikanDokumen(Dictionary<string, DokumenPenting> d)
-    {
-        var isi = d.Where(x => x.Value.Berkas.Count > 0 || !string.IsNullOrEmpty(x.Value.BerlakuSampai))
-            .ToDictionary(x => x.Key, x => new DokumenPenting { Berkas = x.Value.Berkas, BerlakuSampai = string.IsNullOrEmpty(x.Value.BerlakuSampai) ? null : x.Value.BerlakuSampai });
-        return isi.Count > 0 ? isi : null;
     }
 
     private void Simpan()
     {
         if (!Validasi()) return;
         var f = _f;
-        var dok = RapikanDokumen(_dokumen);
+        var dok = DokumenPentingInput.Rapikan(_dokumen);
         void Isi(Model.Karyawan k)
         {
-            k.DriverCode = f.DriverCode.Trim().ToUpperInvariant(); k.DriverName = f.DriverName.Trim(); k.Role = f.Role; k.Address1 = f.Address1;
+            k.DriverCode = f.DriverCode.Trim().ToUpperInvariant(); k.DriverName = f.DriverName.Trim(); k.NamaLengkap = f.NamaLengkap.Trim(); k.Role = f.Role; k.Address1 = f.Address1;
             k.Address2 = f.Address2; k.City = f.City; k.Phone = f.Phone; k.Status = f.Status; k.Dokumen = dok; k.Attachments = f.Attachments;
         }
         if (_editing is not null)

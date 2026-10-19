@@ -515,7 +515,7 @@
         {
             Key = "jenisLabel", Header = "Jenis / Sumber", Sortable = true, Width = "190px",
             Render = r => @<div class="lh-tight">
-                <Badge Tone="@(r.S.Sumber == "dokumen" ? "brand" : "neutral")">@r.JenisLabel</Badge>
+                <Badge Tone="neutral">@r.JenisLabel</Badge>
                 @if (r.S.Rincian != "") { <span class="mt-1 d-block fs-12 text-ink-3">@r.S.Rincian</span> }
             </div>,
         },

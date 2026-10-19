@@ -1,6 +1,6 @@
 @* Tampilan dokumen penting + dokumen lainnya di halaman detail (hanya lihat). *@
 @{
-    var adaApa = Jenis.Any(j => (Dokumen?.GetValueOrDefault(j.Kode)?.Berkas.Count ?? 0) > 0) || Lainnya.Count > 0;
+    var adaApa = Jenis.Any(j => Dokumen?.GetValueOrDefault(j.Kode) is { } d && (d.Berkas.Count > 0 || !string.IsNullOrEmpty(d.BerlakuSampai) || !string.IsNullOrEmpty(d.Nomor))) || Lainnya.Count > 0;
 }
 @if (!adaApa)
 {
@@ -16,9 +16,10 @@ else
             <div class="d-flex flex-wrap align-items-center gap-2">
                 <span class="flex-shrink-0 fs-12-5 fw-medium text-ink-2" style="width:7rem">@j.Label</span>
                 @if ((dok?.Berkas.Count ?? 0) > 0) { <LampiranThumbs Ids="dok!.Berkas" Ukuran="40" /> } else { <span class="fs-12 text-ink-3">Belum ada</span> }
+                @if (!string.IsNullOrEmpty(dok?.Nomor)) { <span class="tnum fs-12 text-ink-2">No. @dok.Nomor</span> }
                 @if (!string.IsNullOrEmpty(dok?.BerlakuSampai))
                 {
-                    <Badge Tone="@(s == "habis" ? "critical" : s == "segera" ? "warning" : "good")">@(s == "berlaku" ? "s/d" : "Habis") @Format.Tanggal(dok.BerlakuSampai)</Badge>
+                    <Badge Tone="@(s == "habis" ? "critical" : s == "segera" ? "warning" : "good")">@(s == "habis" ? "Habis" : "s/d") @Format.Tanggal(dok.BerlakuSampai)</Badge>
                 }
             </div>
         }

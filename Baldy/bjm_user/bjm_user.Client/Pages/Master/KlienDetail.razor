@@ -44,6 +44,17 @@ else
         }
     </div>
 
+    <Kartu Class="mb-4">
+        <KepalaKartu Title="Data Klien" />
+        <div class="p-3">
+            <dl class="row row-cols-1 row-cols-md-3 g-3 mb-0">
+                <InfoItem Label="Alamat Resmi" Value="@(klien.AlamatResmi != "" ? klien.AlamatResmi : "—")" />
+                <InfoItem Label="Alamat Surat-Menyurat" Value="@(klien.AlamatSurat != "" ? klien.AlamatSurat : klien.AlamatResmi != "" ? "Sama dengan alamat resmi" : "—")" />
+                <InfoItem Label="NPWP" Value="@(klien.Npwp != "" ? klien.Npwp : "—")" Mono />
+            </dl>
+        </div>
+    </Kartu>
+
     @if (dedicated)
     {
         <Kartu Class="mb-4">

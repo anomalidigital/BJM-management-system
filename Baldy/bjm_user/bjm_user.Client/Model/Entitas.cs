@@ -31,13 +31,18 @@ public sealed class DokumenPenting
 {
     public List<string> Berkas { get; set; } = [];
     public string? BerlakuSampai { get; set; }
+    /// <summary>Nomor dokumen (No. KTP, No. STNK, No. KIR, No. BPKB) untuk jenis yang memakainya.</summary>
+    public string? Nomor { get; set; }
 }
 
 /// <summary>Master -> Supir / Karyawan (koleksi `drivers`).</summary>
 public sealed class Karyawan : Record
 {
     public string DriverCode { get; set; } = "";
+    /// <summary>Nama panggilan: nama yang dipakai di trip, laporan, dan cetakan (seperti kolom SUPIR di Excel klien).</summary>
     public string DriverName { get; set; } = "";
+    /// <summary>Nama lengkap sesuai KTP.</summary>
+    public string NamaLengkap { get; set; } = "";
     public string Role { get; set; } = PeranKaryawan.Sopir;
     public string Address1 { get; set; } = "";
     public string Address2 { get; set; } = "";
@@ -121,6 +126,11 @@ public sealed class Klien : Record
     public string ProjectName { get; set; } = "";
     public string ClientType { get; set; } = TipeKlien.Callout;
     public string Description { get; set; } = "";
+    public string AlamatResmi { get; set; } = "";
+    /// <summary>Alamat surat-menyurat bila berbeda dari alamat resmi.</summary>
+    public string AlamatSurat { get; set; } = "";
+    /// <summary>ID perpajakan (NPWP) klien.</summary>
+    public string Npwp { get; set; } = "";
     public bool RequiresDocument { get; set; } = true;
     public string Status { get; set; } = "aktif";
 }

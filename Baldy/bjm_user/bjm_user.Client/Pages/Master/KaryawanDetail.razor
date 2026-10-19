@@ -53,10 +53,12 @@ else
                     <div class="rounded-3 border border-hairline">
                         <KepalaKartu Title="Profil" />
                         <dl class="row g-3 m-0 p-3">
+                            <InfoItem Class="col-sm-6" Label="Nama Lengkap (sesuai KTP)" Value="@(orang.NamaLengkap != "" ? orang.NamaLengkap : "—")" />
+                            <InfoItem Class="col-sm-6" Label="No. KTP" Value="@(orang.Dokumen?.GetValueOrDefault("KTP")?.Nomor ?? "—")" Mono />
                             <InfoItem Class="col-sm-6" Label="Kode" Value="@orang.DriverCode" Mono />
                             <InfoItem Class="col-sm-6" Label="Peran" Value="@PeranKaryawan.Label(orang.Role)" />
                             <InfoItem Class="col-sm-6" Label="Telepon" Value="@(orang.Phone != "" ? orang.Phone : "—")" Mono />
-                            <InfoItem Class="col-sm-6" Label="Status" Value="@(orang.Status == "aktif" ? "Aktif" : "Nonaktif")" />
+                            <InfoItem Class="col-sm-6" Label="Status" Value="@StatusKaryawan.Label(orang.Status)" />
                             <InfoItem Class="col-sm-6" Label="Alamat" Value="@AlamatOrang(orang)" />
                             <InfoItem Class="col-sm-6" Label="Kota" Value="@(orang.City != "" ? orang.City : "—")" />
                         </dl>

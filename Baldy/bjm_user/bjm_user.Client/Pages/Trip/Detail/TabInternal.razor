@@ -29,7 +29,7 @@
                     {
                         var cc = c;
                         <tr>
-                            <td><Badge Tone="@(cc.CostType == "Komisi" ? "brand" : "neutral")">@JenisBiayaInternal.Label(cc.CostType)</Badge></td>
+                            <td><Badge Tone="neutral">@JenisBiayaInternal.Label(cc.CostType)</Badge></td>
                             <td>
                                 @if (cc.CostType != "Komisi" || cc.RecipientRole == "")
                                 {

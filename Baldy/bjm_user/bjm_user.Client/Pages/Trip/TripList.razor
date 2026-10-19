@@ -315,7 +315,7 @@ else
         Key = "transaction_no", Header = "ID Trip", Sortable = true, Width = "124px",
         Render = t => @<div class="lh-tight">
             <a href="@($"transaksi/trip/{t.Id}")" class="tnum fw-semibold text-nowrap text-decoration-none" @onclick:stopPropagation="true">@t.T.TransactionNo</a>
-            @if (t.T.ServiceType == TipeKlien.Dedicated) { <div class="mt-1"><Badge Tone="brand">Dedicated@(t.ContractNo != "" ? $" · {t.ContractNo}" : "")</Badge></div> }
+            @if (t.T.ServiceType == TipeKlien.Dedicated) { <div class="mt-1"><Badge Tone="neutral">Dedicated@(t.ContractNo != "" ? $" · {t.ContractNo}" : "")</Badge></div> }
             @if (!Karawang && t.T.SjNo != "") { <div class="tnum fs-12 text-ink-3" title="Nomor Surat Jalan">@t.T.SjNo</div> }
         </div>,
     };

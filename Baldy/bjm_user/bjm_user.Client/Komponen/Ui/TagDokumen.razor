@@ -1,0 +1,49 @@
+@* Tag dokumen penting untuk kolom tabel (Supir / Karyawan, Kendaraan): masa berlaku terlihat langsung tanpa membuka form.
+   Warna: hijau masih berlaku, kuning habis dalam 30 hari, merah sudah habis. Dokumen tanpa masa berlaku cukup namanya. *@
+@{
+    var tag = Jenis.Select(j => (Jenis: j, Dok: Dokumen?.GetValueOrDefault(j.Kode)))
+        .Where(x => x.Dok is not null && (x.Dok.Berkas.Count > 0 || !string.IsNullOrEmpty(x.Dok.BerlakuSampai) || !string.IsNullOrEmpty(x.Dok.Nomor)))
+        .ToList();
+}
+@if (tag.Count == 0 && Lainnya == 0)
+{
+    <span class="text-ink-3">Belum ada</span>
+}
+else
+{
+    <span class="d-flex flex-wrap gap-1">
+        @foreach (var (j, d) in tag)
+        {
+            var s = DokumenPentingInput.StatusBerlaku(d!.BerlakuSampai);
+            if (j.Berlaku && !string.IsNullOrEmpty(d.BerlakuSampai))
+            {
+                <Badge Tone="@(s == "habis" ? "critical" : s == "segera" ? "warning" : "good")" Title="@Keterangan(j, d, s)">
+                    @j.Label @(s == "habis" ? "habis" : "s/d") @Format.Tanggal(d.BerlakuSampai)
+                </Badge>
+            }
+            else
+            {
+                <Badge Tone="neutral" Title="@Keterangan(j, d, s)">@j.Label</Badge>
+            }
+        }
+        @if (Lainnya > 0) { <span class="fs-11-5 text-ink-3 align-self-center">+@Lainnya lainnya</span> }
+    </span>
+}
+
+@code {
+    [Parameter] public JenisDokumenPenting[] Jenis { get; set; } = [];
+    [Parameter] public Dictionary<string, DokumenPenting>? Dokumen { get; set; }
+    /// <summary>Jumlah dokumen lainnya (di luar slot dokumen penting).</summary>
+    [Parameter] public int Lainnya { get; set; }
+
+    private static string Keterangan(JenisDokumenPenting j, DokumenPenting d, string s)
+    {
+        var bagian = new List<string> { j.Label };
+        if (!string.IsNullOrEmpty(d.Nomor)) bagian.Add($"No. {d.Nomor}");
+        if (!string.IsNullOrEmpty(d.BerlakuSampai))
+            bagian.Add(s == "habis" ? $"sudah habis {Format.Tanggal(d.BerlakuSampai)}" : $"berlaku sampai {Format.Tanggal(d.BerlakuSampai)}{(s == "segera" ? " (habis dalam 30 hari)" : "")}");
+        else if (j.Berlaku) bagian.Add("masa berlaku belum diisi");
+        bagian.Add(d.Berkas.Count > 0 ? $"{d.Berkas.Count} berkas" : "berkas belum diunggah");
+        return string.Join(" · ", bagian);
+    }
+}

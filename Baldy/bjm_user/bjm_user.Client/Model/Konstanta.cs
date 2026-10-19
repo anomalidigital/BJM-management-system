@@ -20,18 +20,29 @@ public static class WorkspaceKode
     public static string Label(string w) => w == Priok ? "Tanjung Priok" : "Karawang";
 }
 
-public sealed record JenisDokumenPenting(string Kode, string Label, bool Berlaku = false);
+/// <summary>Jenis dokumen penting: Berlaku = punya masa berlaku; Nomor = nomor dokumennya ikut dicatat (No. KTP, No. STNK, ...).</summary>
+public sealed record JenisDokumenPenting(string Kode, string Label, bool Berlaku = false, bool Nomor = false);
 
 public static class DokumenPentingJenis
 {
     public static readonly JenisDokumenPenting[] Karyawan =
     [
-        new("KTP", "KTP"), new("SIM", "SIM", true), new("KK", "Kartu Keluarga"), new("NPWP", "NPWP"),
+        new("KTP", "KTP", Nomor: true), new("SIM", "SIM", true), new("KK", "Kartu Keluarga"), new("NPWP", "NPWP"),
     ];
     public static readonly JenisDokumenPenting[] Kendaraan =
     [
-        new("STNK", "STNK", true), new("KIR", "KIR", true), new("PAJAK", "Pajak Kendaraan", true), new("ASURANSI", "Asuransi", true),
+        new("STNK", "STNK", true, true), new("KIR", "KIR", true, true), new("PAJAK", "Pajak Kendaraan", true), new("ASURANSI", "Asuransi", true),
+        new("BPKB", "BPKB", Nomor: true),
     ];
+}
+
+/// <summary>Status karyawan: hanya yang Aktif bisa dipilih di trip; Cuti (On Leave) dan Nonaktif tidak.</summary>
+public static class StatusKaryawan
+{
+    public const string Aktif = "aktif", Cuti = "cuti", Nonaktif = "nonaktif";
+    public static readonly string[] Semua = [Aktif, Cuti, Nonaktif];
+    public static string Label(string s) => s switch { Cuti => "Cuti", Nonaktif => "Nonaktif", _ => "Aktif" };
+    public static string Nada(string s) => s switch { Cuti => "warning", Nonaktif => "neutral", _ => "good" };
 }
 
 public static class PeranKaryawan

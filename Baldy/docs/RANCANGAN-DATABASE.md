@@ -155,14 +155,16 @@ Tambahan `user_branches (user_id, branch_id)`: cabang yang boleh dibuka akun itu
 | Kolom | Tipe | Wajib | Keterangan |
 |---|---|---|---|
 | code | varchar(10) | ✔ unik | `SPR001` supir, `MGR001` manager — otomatis |
-| name | varchar(100) | ✔ | |
+| name | varchar(100) | ✔ | Nama panggilan: dipakai di trip, laporan, dan cetakan (seperti kolom SUPIR di Excel klien) |
+| full_name | varchar(150) | | Nama lengkap sesuai KTP (catatan Ibu Anne, 19 Okt 2026) |
 | role | varchar(20) | ✔ | `driver`, `manager` |
 | phone | varchar(30) | | |
 | address_line1, address_line2, city | varchar | | |
-| is_active | boolean | ✔ | |
+| status | varchar(20) | ✔ | `active`, `on_leave` (cuti), `inactive`; hanya `active` yang bisa dipilih di trip |
 | notes | text | | |
 
 Dokumen penting karyawan (KTP, SIM, KK, NPWP, BPJS, lainnya) disimpan di `documents` (bagian E), lengkap dengan nomor & masa berlaku.
+No. KTP = `doc_number` dokumen KTP; daftar karyawan menampilkannya beserta masa berlaku SIM.
 
 **`vehicles` — Kendaraan**
 
@@ -174,7 +176,8 @@ Dokumen penting karyawan (KTP, SIM, KK, NPWP, BPJS, lainnya) disimpan di `docume
 | status | varchar(20) | ✔ | `active`, `maintenance`, `inactive` |
 | notes | text | | |
 
-Dokumen kendaraan (STNK, KIR, pajak, asuransi, BPKB, lainnya) di `documents`.
+Dokumen kendaraan (STNK, KIR, pajak, asuransi, BPKB, lainnya) di `documents`; No. STNK, No. KIR, dan No. BPKB = `doc_number`.
+Daftar kendaraan menampilkan masa berlaku tiap surat sebagai tag (hijau berlaku, kuning ≤ 30 hari, merah habis).
 
 **`trailer_types` — Sub kendaraan / gandengan**: `code`, `name`. Isi awal: `LB` Low Bed, `HB` Hi Bed, `DOLLY` Dolly,
 `TRONTON` Tronton, `DL` DL, `6X6` 6x6, `4X4` 4x4, `EXT` Extension, `CDD` CDD.
@@ -221,8 +224,11 @@ area, trip menyambung ke lokasi persisnya. Di prototipe, area = kumpulan kode ar
 | Kolom | Tipe | Wajib | Keterangan |
 |---|---|---|---|
 | code | varchar(10) | ✔ unik | Singkatan nama (SLB, ATLAS, PDT) |
-| name | varchar(120) | ✔ | |
+| name | varchar(120) | ✔ | Nama resmi perusahaan |
 | service_type | varchar(20) | ✔ | `callout` atau `dedicated` (revisi 13 Okt; dulu "klien tetap / kontrak") |
+| official_address | text | | Alamat resmi (catatan Ibu Anne, 19 Okt 2026) |
+| mailing_address | text | | Alamat surat-menyurat, bila berbeda dari alamat resmi |
+| tax_id | varchar(30) | | NPWP / ID perpajakan |
 | uses_documents | boolean | ✔ | Order memakai alur dokumen No. Referensi / PI; `false` untuk order tunai (CASH) |
 | description | text | | |
 | is_active | boolean | ✔ | |
