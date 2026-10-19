@@ -28,7 +28,7 @@
                     <div class="rounded-3 border border-hairline">
                         <button type="button" class="btn w-100 d-flex flex-wrap align-items-baseline column-gap-3 row-gap-1 px-3 py-2 text-start fs-12-5 border-0" aria-expanded="@_rincian" @onclick="() => _rincian = !_rincian">
                             <span class="fw-semibold text-ink-2">Rekap keseluruhan trip</span>
-                            <span class="tnum text-ink-3">Harga @Format.Rupiah(data.Angka.Harga) · Uang jalan @Format.Rupiah(data.Angka.UjDihitung) · Biaya @Format.Rupiah(data.Angka.Biaya) · Netto @Format.Rupiah(data.Angka.Netto)</span>
+                            <span class="tnum text-ink-3">Harga Jual @Format.Rupiah(data.Angka.Harga) · Uang Jalan @Format.Rupiah(data.Angka.UjDihitung) · Biaya @Format.Rupiah(data.Angka.Biaya) · Netto @Format.Rupiah(data.Angka.Netto)</span>
                             <span class="ms-auto fw-semibold text-brand">@(_rincian ? "Lipat" : "Lihat rincian")</span>
                         </button>
                         @if (_rincian)

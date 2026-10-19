@@ -205,7 +205,7 @@ else
         else
         {
             yield return ("Jumlah Trip", dihitung.Count.ToString(), $"di {ws}, tanpa trip batal");
-            yield return ("Pendapatan", Format.Rupiah(dihitung.Sum(t => t.Harga)), "jumlah harga trip");
+            yield return ("Pendapatan", Format.Rupiah(dihitung.Sum(t => t.Harga)), "jumlah Harga Jual trip");
             yield return ("Total Uang Jalan", Format.Rupiah(dihitung.Sum(t => t.UjTotal)), "termin yang sudah dibayar");
             var pertama = dihitung.FirstOrDefault();
             yield return ("Trip Terakhir", pertama is not null ? Format.Tanggal(pertama.T.TransactionDate) : "—", pertama?.T.TransactionNo ?? "belum ada trip");

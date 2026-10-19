@@ -405,7 +405,7 @@
         },
         new()
         {
-            Key = "nilai_pokok", Header = "Harga", Sortable = true, Align = "right", Width = "124px",
+            Key = "nilai_pokok", Header = "Harga Jual", Sortable = true, Align = "right", Width = "124px",
             Render = t => @<div class="tnum lh-tight">
                 <span class="fw-medium text-ink">@Format.Rupiah(t.NilaiPokok)</span>
                 @if (t.R.Batal) { <span class="d-block fs-11-5 text-ink-3">cancel fee</span> }

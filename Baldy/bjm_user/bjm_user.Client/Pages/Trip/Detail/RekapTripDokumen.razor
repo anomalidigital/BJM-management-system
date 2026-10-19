@@ -101,7 +101,7 @@ else
         </PrintTable>
         @Judul("Ringkasan keuangan")
         <PrintTable Cols="@(new List<(string, string, string?)> { ("Pos", "left", null), ("Nominal", "right", "22%") })">
-            <tr><td class="p-sel">Harga trip</td><td class="p-sel text-end tnum">@Format.Rupiah(Data.Angka.Harga)</td></tr>
+            <tr><td class="p-sel">Harga Jual</td><td class="p-sel text-end tnum">@Format.Rupiah(Data.Angka.Harga)</td></tr>
             <tr><td class="p-sel">Biaya ditagihkan ke klien</td><td class="p-sel text-end tnum">@Format.Rupiah(Data.Angka.Ditagihkan)</td></tr>
             <tr class="fw-semibold"><td class="p-sel">Tagihan ke klien@(Data.Trip.T.PiNumber != "" ? $" (PI {Data.Trip.T.PiNumber})" : "")</td><td class="p-sel text-end tnum">@Format.Rupiah(Data.Angka.Tagihan)</td></tr>
             <tr><td class="p-sel">Uang jalan (patokan bila belum lunas dibayar)</td><td class="p-sel text-end tnum">− @Format.Rupiah(Data.Angka.UjDihitung)</td></tr>

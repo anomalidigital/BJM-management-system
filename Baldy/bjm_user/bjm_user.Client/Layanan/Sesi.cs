@@ -30,7 +30,7 @@ public sealed class Sesi(Penyimpanan simpan)
         ("nota", "Catat nota biaya operasional (tol, solar, SPSI, overnight, ...)", [Peran.Owner, Peran.Manager, Peran.Admin]),
         ("master", "Tambah rute & data master", [Peran.Owner, Peran.Manager]),
         ("biaya", "Biaya internal, hapus nota, dan ubah status ditagihkan / dibayar oleh", [Peran.Owner, Peran.Manager]),
-        ("override", "Override biaya (harga di luar Harga Rute, uang jalan di atas patokan)", [Peran.Owner, Peran.Manager]),
+        ("override", "Override (uang jalan di atas patokan, buka kunci trip yang sudah jalan)", [Peran.Owner, Peran.Manager]),
         ("bukti", "Upload bukti persetujuan", [Peran.Owner, Peran.Manager]),
         ("batal", "Batalkan trip", [Peran.Owner, Peran.Manager]),
         // 15 Okt 2026 (Baldy): admin juga boleh membuat PI — antrian Dashboard "Buat PI lalu tagihkan" berlaku untuknya.

@@ -77,9 +77,9 @@
             var lembar = PrintDocument.Bagi(cetak, per);
             var kolomCetak = new List<(string, string, string?)> { ("No.", "right", "28px"), ("No. Rute", "left", null), ("Nama Rute", "left", null), ("Area Pick Up", "left", null), ("Area Destinasi", "left", null) };
             if (PakaiFeet) kolomCetak.Add(("Feet", "left", null));
-            kolomCetak.AddRange([("Uang Jalan Rute", "right", null), ("Uang Tol", "right", null), ("Harga", "right", null)]);
+            kolomCetak.AddRange([("Uang Jalan Rute", "right", null), ("Uang Tol", "right", null), ("Harga Jual", "right", null)]);
             var subjudul = string.Join(" · ", new[] { PakaiFeet && _filter.Nilai.Feet != "" ? $"Feet: {_filter.Nilai.Feet}" : "", _filter.Nilai.Kode != "" ? $"Area: {_filter.Nilai.Kode}" : "" }.Where(x => x != ""));
-            var meta = new List<(string, string)> { ("Jumlah rute", $"{Format.Angka(cetak.Count)} rute"), ("Total Harga", Format.Rupiah(cetak.Sum(b => b.R.Price))), ("Total Uang Tol", Format.Rupiah(cetak.Sum(b => b.R.Toll))) };
+            var meta = new List<(string, string)> { ("Jumlah rute", $"{Format.Angka(cetak.Count)} rute"), ("Total Harga Jual", Format.Rupiah(cetak.Sum(b => b.R.Price))), ("Total Uang Tol", Format.Rupiah(cetak.Sum(b => b.R.Toll))) };
         }
         <PrintDocument>
             @for (var i = 0; i < lembar.Count; i++)
@@ -212,7 +212,7 @@
             if (PakaiFeet) k.Add(new() { Key = "feet", Header = "Feet", Sortable = true, Width = "86px", Render = SelFeet });
             k.Add(new() { Key = "ujroute", Header = "Uang Jalan Rute", Sortable = true, Align = "right", Width = "128px", Render = r => Nominal(r.R.Ujroute, r.R.EstimatedFields?.Contains("ujroute") == true, false) });
             k.Add(new() { Key = "toll", Header = "Uang Tol", Sortable = true, Align = "right", Width = "128px", Render = r => Nominal(r.R.Toll, r.R.EstimatedFields?.Contains("toll") == true, false) });
-            k.Add(new() { Key = "price", Header = "Harga", Sortable = true, Align = "right", Width = "134px", Render = r => Nominal(r.R.Price, r.R.EstimatedFields?.Contains("price") == true, true) });
+            k.Add(new() { Key = "price", Header = "Harga Jual", Sortable = true, Align = "right", Width = "134px", Render = r => Nominal(r.R.Price, r.R.EstimatedFields?.Contains("price") == true, true) });
             k.Add(new() { Key = "action", Header = "Action", Align = "right", Width = "92px", NoPrint = true, Render = SelAksi });
             return k;
         }

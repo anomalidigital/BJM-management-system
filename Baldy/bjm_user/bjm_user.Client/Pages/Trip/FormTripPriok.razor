@@ -43,7 +43,7 @@ else
     var tampilBon = CabangContainer || _f.BonDate != "" || _f.PersonalBon != 0;
     <div class="halaman-form">
         <PageHeader Title="@(Existing is not null ? $"Ubah Trip {Existing.TransactionNo}" : "Tambah Trip")" Crumbs="Remah">
-            <Description>Klien tidak perlu dipilih: ikut rute (Callout) atau kontrak (Dedicated), begitu juga harga dan patokan uang jalan. Uang jalan, biaya, dan lampiran dicatat di halaman detail trip.</Description>
+            <Description>Klien tidak perlu dipilih: ikut rute (Callout) atau kontrak (Dedicated), begitu juga Harga Jual dan Uang Jalan Rute. Uang jalan, biaya, dan lampiran dicatat di halaman detail trip.</Description>
         </PageHeader>
 
         @if (!Bisa("trip"))
@@ -149,13 +149,13 @@ else
                                             @if (routeProject is not null) { <span> · Klien <span class="fw-semibold">@routeProject.ProjectName</span> (@routeProject.ProjectCode)</span> }
                                         </p>
                                         <dl class="m-0 mt-2 row row-cols-3 gx-3 gy-2">
-                                            @Nilai("Uang Jalan Rute (patokan)", rute.Ujroute)
-                                            @Nilai("Uang Tol (patokan)", rute.Toll)
-                                            @Nilai(HargaBeda ? "Harga trip (khusus)" : "Harga Rute", HargaBeda ? _f.Harga : rute.Price)
+                                            @Nilai("Uang Jalan Rute", rute.Ujroute)
+                                            @Nilai("Uang Tol", rute.Toll)
+                                            @Nilai(HargaBeda ? "Harga Jual trip (khusus)" : "Harga Jual", HargaBeda ? _f.Harga : rute.Price)
                                         </dl>
                                         @if (!Dedicated)
                                         {
-                                            <p class="m-0 mt-2 fs-11-5" style="color:var(--brand-700)">@(HargaBeda ? $"Harga khusus tersimpan di trip ini (Harga Rute {Format.Rupiah(rute.Price)}). Memilih rute lagi memakai Harga Rute." : "Harga mengikuti rute. Perubahan harga dilakukan di Master Rute.")</p>
+                                            <p class="m-0 mt-2 fs-11-5" style="color:var(--brand-700)">@(HargaBeda ? $"Harga Jual khusus tersimpan di trip ini (Harga Jual rute {Format.Rupiah(rute.Price)}). Memilih rute lagi memakai Harga Jual rute." : "Harga Jual mengikuti rute. Perubahan Harga Jual dilakukan di Master Rute.")</p>
                                         }
                                     }
                                     <p class="m-0 fs-12 @(rute is not null ? "mt-2 pt-2 border-top border-brand-100" : "")">
@@ -593,7 +593,7 @@ else
 
     private RenderFragment? HintRute(Rute? rute, Klien? routeProject) => _galat.ContainsKey("route_id") ? null
         : Kunci ? T(LewatKunci)
-        : rute is null ? T(Dedicated ? "Opsional untuk Dedicated: patokan uang jalan & tujuan." : "Klien, Harga, dan patokan uang jalan ikut rute.")
+        : rute is null ? T(Dedicated ? "Opsional untuk Dedicated: patokan uang jalan & tujuan." : "Klien, Harga Jual, dan Uang Jalan Rute ikut rute.")
         : routeProject is not null ? T($"Klien {routeProject.ProjectName} ikut rute ini. Uang Jalan Rute jadi patokan uang jalan.")
         : b =>
         {

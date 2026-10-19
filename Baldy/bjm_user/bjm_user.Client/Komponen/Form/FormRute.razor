@@ -36,8 +36,8 @@
                 <Field Label="Uang Tol" Error="@G("tol")" Class="col-sm-4" Hint="@Teks(MasihKira("toll") ? "Masih perkiraan." : "Patokan tol.")">
                     <UangInput Id="@context" Value="_tol" ValueChanged="@(v => { _tol = v; _galat.Remove("tol"); })" Invalid="@(G("tol") is not null)" />
                 </Field>
-                <Field Label="Harga" Required="HargaWajib" Error="@G("harga")" Class="col-sm-4"
-                       Hint="@Teks(MasihKira("price") ? "Masih perkiraan." : _editing is not null ? "Harga baru berlaku untuk trip berikutnya; trip yang sudah ada tetap." : "Harga ke klien per trip.")">
+                <Field Label="Harga Jual" Required="HargaWajib" Error="@G("harga")" Class="col-sm-4"
+                       Hint="@Teks(MasihKira("price") ? "Masih perkiraan." : _editing is not null ? "Harga Jual baru berlaku untuk trip berikutnya; trip yang sudah ada tetap." : "Harga ke klien per trip.")">
                     <UangInput Id="@context" Value="_harga" ValueChanged="@(v => { _harga = v; _galat.Remove("harga"); })" Invalid="@(G("harga") is not null)" />
                 </Field>
             </div>
@@ -210,7 +210,7 @@
     {
         if (kembar is null) return Teks("Kesimpulan dari area pick up dan destinasi. Boleh ditambah nomor site atau BCKLD, mis. CIB - RAWA 52.");
         return @<span style="color:#8a6100">
-            Sudah ada: <span class="fw-semibold">@kembar.RouteCode</span> @kembar.RouteName (Uang Jalan @Format.Rupiah(kembar.Ujroute), Harga @Format.Rupiah(kembar.Price)).
+            Sudah ada: <span class="fw-semibold">@kembar.RouteCode</span> @kembar.RouteName (Uang Jalan @Format.Rupiah(kembar.Ujroute), Harga Jual @Format.Rupiah(kembar.Price)).
             @if (OnPakai.HasDelegate)
             {
                 <button type="button" class="btn btn-link p-0 fs-inherit fw-semibold align-baseline text-decoration-underline" style="color:inherit" @onclick="() => PakaiKembar(kembar)">Pakai rute ini</button>
@@ -259,7 +259,7 @@
         else if (kembar is not null) _galat["nama"] = $"Sudah ada rute {kembar.RouteName} (No. Rute {kembar.RouteCode}).";
         if (FeetWajib && _feet == "") _galat["feet"] = "Feet wajib dipilih.";
         // Rute dari data asli belum punya harga; jangan paksa diisi saat hanya mengubah UJ / tol.
-        if (HargaWajib && _harga <= 0) _galat["harga"] = "Harga harus lebih dari 0.";
+        if (HargaWajib && _harga <= 0) _galat["harga"] = "Harga Jual harus lebih dari 0.";
         if (_uj < 0) _galat["uj"] = "Uang Jalan Rute tidak boleh negatif.";
         if (_tol < 0) _galat["tol"] = "Uang Tol tidak boleh negatif.";
         return _galat.Count == 0;

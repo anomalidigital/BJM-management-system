@@ -111,7 +111,7 @@ else
 
         <div class="col-12 col-xl d-flex flex-column gap-4" style="min-width:0">
             <div class="row g-4">
-                <div class="col-12 col-sm-6 col-xl-3"><StatCard Label="Pendapatan Bruto" Value="@Format.RupiahRingkas(_totals.Pendapatan)" Hint="@($"harga trip · + {Format.RupiahRingkas(_totals.Ditagihkan)} ditagihkan ke klien")" /></div>
+                <div class="col-12 col-sm-6 col-xl-3"><StatCard Label="Pendapatan Bruto" Value="@Format.RupiahRingkas(_totals.Pendapatan)" Hint="@($"Harga Jual trip · + {Format.RupiahRingkas(_totals.Ditagihkan)} ditagihkan ke klien")" /></div>
                 <div class="col-12 col-sm-6 col-xl-3"><StatCard Label="Biaya Perjalanan" Value="@Format.RupiahRingkas(_totals.UangJalan + _totals.BiayaPerusahaan)" Hint="@($"uang jalan {Format.RupiahRingkas(_totals.UangJalan)} + dibayar perusahaan {Format.RupiahRingkas(_totals.BiayaPerusahaan)}")" /></div>
                 <div class="col-12 col-sm-6 col-xl-3"><StatCard Label="Komisi" Value="@Format.RupiahRingkas(_totals.Komisi)" Hint="kernet belum dicatat (0)" /></div>
                 <div class="col-12 col-sm-6 col-xl-3"><StatCard Label="Pendapatan Netto" Value="@Format.RupiahRingkas(_totals.Netto)" Hint="periode terpilih" /></div>

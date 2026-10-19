@@ -1,4 +1,4 @@
-@* Kartu Rute di Overview: patokan Uang Jalan, tol, dan Harga Rute. *@
+@* Kartu Rute di Overview: Uang Jalan Rute (patokan), Uang Tol, dan Harga Jual rute. *@
 <Kartu>
     <KepalaKartu Title="Rute" Subtitle="@(Trip.RouteName != "" ? Trip.RouteName : "Belum dipilih")" />
     @if (Trip.RouteCode != "")
@@ -7,8 +7,8 @@
             <dl class="row row-cols-2 g-3 mb-0">
                 <InfoItem Label="No. Rute" Mono><span class="text-wrap text-break">@Trip.RouteCode</span></InfoItem>
                 <InfoItem Label="Uang Jalan Rute" Value="@Format.Rupiah(Trip.Ujroute)" Mono />
-                <InfoItem Label="Uang Tol (patokan)" Value="@Format.Rupiah(Trip.Toll)" Mono />
-                <InfoItem Label="Harga Rute" Value="@Format.Rupiah(Trip.RoutePrice)" Mono />
+                <InfoItem Label="Uang Tol" Value="@Format.Rupiah(Trip.Toll)" Mono />
+                <InfoItem Label="Harga Jual" Value="@Format.Rupiah(Trip.RoutePrice)" Mono />
             </dl>
         </div>
     }

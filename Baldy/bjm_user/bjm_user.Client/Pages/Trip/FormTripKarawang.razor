@@ -164,13 +164,13 @@ else
                                 <KotakInfo>
                                     <dl class="m-0 row g-2 row-cols-2 row-cols-sm-4">
                                         <div class="col"><NilaiInfo Label="No. Rute">@rute.RouteCode</NilaiInfo></div>
-                                        <div class="col"><NilaiInfo Label="Patokan Uang Jalan">@Format.Rupiah(rute.Ujroute)</NilaiInfo></div>
-                                        <div class="col"><NilaiInfo Label="Patokan Tol">@Format.Rupiah(rute.Toll)</NilaiInfo></div>
-                                        @if (!Dedicated) { <div class="col"><NilaiInfo Label="@(HargaBeda ? "Harga trip (khusus)" : "Harga")">@Format.Rupiah(HargaBeda ? _f.Harga : rute.Price)</NilaiInfo></div> }
+                                        <div class="col"><NilaiInfo Label="Uang Jalan Rute">@Format.Rupiah(rute.Ujroute)</NilaiInfo></div>
+                                        <div class="col"><NilaiInfo Label="Uang Tol">@Format.Rupiah(rute.Toll)</NilaiInfo></div>
+                                        @if (!Dedicated) { <div class="col"><NilaiInfo Label="@(HargaBeda ? "Harga Jual trip (khusus)" : "Harga Jual")">@Format.Rupiah(HargaBeda ? _f.Harga : rute.Price)</NilaiInfo></div> }
                                     </dl>
                                     @if (!Dedicated)
                                     {
-                                        <p class="m-0 mt-2 fs-11-5" style="color:var(--brand-700)">@(HargaBeda ? $"Harga khusus tersimpan di trip ini (Harga Rute {Format.Rupiah(rute.Price)}). Memilih rute lagi memakai Harga Rute." : "Harga mengikuti rute. Perubahan harga dilakukan di Master Rute.")</p>
+                                        <p class="m-0 mt-2 fs-11-5" style="color:var(--brand-700)">@(HargaBeda ? $"Harga Jual khusus tersimpan di trip ini (Harga Jual rute {Format.Rupiah(rute.Price)}). Memilih rute lagi memakai Harga Jual rute." : "Harga Jual mengikuti rute. Perubahan Harga Jual dilakukan di Master Rute.")</p>
                                     }
                                 </KotakInfo>
                             </div>

@@ -46,9 +46,9 @@
                 <InfoItem Label="Tipe Layanan" Value="@TipeKlien.Label(t.ServiceType)" />
                 @if (!dedicated)
                 {
-                    <InfoItem Label="Harga" Mono>
+                    <InfoItem Label="Harga Jual" Mono>
                         @Format.Rupiah(Trip.Harga)
-                        @if (Trip.Harga > 0 && Trip.Harga == Trip.RoutePrice) { <span class="ms-2 fs-11-5 fw-normal text-ink-3">ikut Harga Rute</span> }
+                        @if (Trip.Harga > 0 && Trip.Harga == Trip.RoutePrice) { <span class="ms-2 fs-11-5 fw-normal text-ink-3">ikut Harga Jual rute</span> }
                         @if (!string.IsNullOrEmpty(t.OverrideNote)) { <span class="mt-1 d-block fs-11-5 fw-normal text-ink-3 text-wrap">Alasan: @t.OverrideNote</span> }
                     </InfoItem>
                 }

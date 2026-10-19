@@ -7,7 +7,7 @@
     double P(long v) => Math.Max(0, Math.Min(1, v / skala));
     var baris = new List<Baris>
     {
-        new("Pendapatan", "jumlah harga trip", Pendapatan, 0, P(Pendapatan), "masuk", true, DeltaPendapatan),
+        new("Pendapatan", "jumlah Harga Jual trip", Pendapatan, 0, P(Pendapatan), "masuk", true, DeltaPendapatan),
         new("Ditagihkan ke klien", "tol, solar, SPSI Banlok, overnight", Ditagihkan, P(Pendapatan), P(masuk), "masuk", false, null),
         new("Uang jalan", "dibayar ke supir; patokan bila masih jalan", -UangJalan, P(masuk - UangJalan), P(masuk), "kurang", true, DeltaUangJalan),
     };

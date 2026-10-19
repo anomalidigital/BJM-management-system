@@ -77,7 +77,7 @@ public static class TipeKlien
     public static string Label(string t) => t == Dedicated ? "Dedicated" : "Callout";
     public static string Keterangan(string t) => t == Dedicated
         ? "Kendaraan dikontrak klien ini. Kontraknya dikelola di halaman klien."
-        : "Order per perjalanan dengan No. Referensi dari klien. Harga ikut rute.";
+        : "Order per perjalanan dengan No. Referensi dari klien. Harga Jual ikut rute.";
 }
 
 public static class StatusTrip
@@ -158,7 +158,7 @@ public static class DasarKomisi
 {
     public const string Nilai = "nilai", Uj = "uj", Kontrak = "kontrak";
     public static readonly string[] Semua = [Nilai, Uj, Kontrak];
-    public static string Label(string d) => d switch { Uj => "Uang jalan (UJ)", Kontrak => "Nilai kontrak", _ => "Harga trip" };
+    public static string Label(string d) => d switch { Uj => "Uang Jalan", Kontrak => "Nilai kontrak", _ => "Harga Jual trip" };
 }
 
 public static class AksiAudit
