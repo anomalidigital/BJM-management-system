@@ -5,26 +5,27 @@
 <PageTitle>Masuk — BJM Logistik</PageTitle>
 
 <div class="login-shell">
-    <aside class="login-brand">
-        <div class="login-brand-tengah my-auto">
-            <h1 class="login-judul">Menghubungkan Setiap Perjalanan, Mendorong Kemajuan Bersama</h1>
+    <aside class="login-merek">
+        <div>
+            <span class="login-marka" aria-hidden="true"></span>
+            <p class="login-nama">BJM <span>Logistik</span></p>
+            <p class="login-pt">PT Bimajaya Mustika</p>
+        </div>
+
+        <div class="login-pesan">
+            <p class="login-slogan">Menghubungkan Setiap Perjalanan, Mendorong Kemajuan Bersama</p>
             <p class="login-subjudul">
                 Dedikasi menghadirkan solusi logistik yang andal, efisien, dan transparan untuk menggerakkan
                 pertumbuhan operasional dan kemajuan berkelanjutan.
             </p>
-        </div>
-
-        <div class="login-brand-bawah fs-12" style="color: rgba(147,161,184,.75)">
-            <span>Version 0.1</span>
+            <p class="login-versi">Version 0.1</p>
         </div>
     </aside>
 
     <main class="login-form">
-        <div class="login-form-inner">
-            <div class="login-brand-header mb-4">
-                <h2 class="m-0 fs-28 fw-bold text-ink lh-tight">BJM Logistik</h2>
-                <div class="fs-13 text-ink-3 mt-1">PT Bimajaya Mustika</div>
-            </div>
+        <div class="login-form-isi">
+            <h1 class="login-form-judul">Masuk ke sistem</h1>
+            <p class="login-form-sub">Gunakan akun operasional Anda untuk melanjutkan.</p>
 
             <form class="d-flex flex-column gap-3" @onsubmit="Masuk">
                 <div>
@@ -54,9 +55,7 @@
                 </div>
             </form>
 
-            <div class="d-lg-none mt-5 text-center fs-12 text-ink-3">
-                Version 0.1
-            </div>
+            <p class="login-versi-hp">Version 0.1</p>
         </div>
     </main>
 </div>

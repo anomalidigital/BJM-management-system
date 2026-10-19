@@ -147,37 +147,49 @@ table { font-variant-numeric: tabular-nums; }
 .kotak-info { border: 1px solid var(--brand-100); background: var(--brand-50); border-radius: .5rem; padding: .75rem .875rem; font-size: 12.5px; color: var(--brand-800); }
 .kotak-peringatan { border: 1px solid #f6e2ac; background: #fff8e6; border-radius: .5rem; padding: .75rem 1rem; font-size: 13px; color: #8a6100; }
 
-/* Login */
-.login-shell { min-height: 100vh; display: grid; background: #ffffff; }
-@media (min-width: 992px) { .login-shell { grid-template-columns: 1.15fr 1fr; } }
-.login-brand {
-  display: none; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden;
-  background-color: var(--nav-900);
-  background-image:
-    radial-gradient(circle at 14% 18%, rgba(42,120,214,.18) 0%, transparent 50%),
-    radial-gradient(circle at 88% 85%, rgba(42,120,214,.10) 0%, transparent 45%);
-  color: #fff; padding: 4rem 3.5rem; border-right: 1px solid rgba(255,255,255,.07);
+/* Login: panel merek di kiri (navy polos seperti sidebar), form masuk di kanan.
+   Huruf merek Bahnschrift: turunan DIN, huruf rambu jalan, bawaan Windows. Mac/iPhone memakai DIN Condensed/DIN Alternate. */
+.login-shell { min-height: 100vh; min-height: 100dvh; display: grid; grid-template-rows: auto 1fr; background: #fff; }
+@media (min-width: 992px) { .login-shell { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); grid-template-rows: none; } }
+.login-merek {
+  --huruf-merek: Bahnschrift, "DIN Alternate", "Segoe UI", system-ui, sans-serif;
+  --huruf-merek-rapat: Bahnschrift, "DIN Condensed", "Roboto Condensed", "sans-serif-condensed", "Arial Narrow", sans-serif;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 3rem;
+  background: var(--nav-900); color: #fff; padding: 1.75rem 1.25rem 1.5rem;
 }
-@media (min-width: 992px) { .login-brand { display: flex; } }
-.login-brand .nav-ink { color: var(--nav-ink); }
-.login-brand-tengah { max-width: 32rem; width: 100%; }
-.login-judul { margin: 0; font-size: 32px; line-height: 1.24; font-weight: 700; letter-spacing: -.024em; color: #fff; }
-.login-subjudul { margin: 1.25rem 0 0; font-size: 14.5px; line-height: 1.7; color: rgba(147,161,184,.85); }
-.login-brand-bawah { padding-top: 2rem; }
+@media (min-width: 992px) { .login-merek { padding: 3.5rem 4rem 3rem; } }
+.login-marka {
+  display: block; width: 3.25rem; height: 6px; margin-bottom: 1.25rem; background: var(--signal);
+  transform-origin: left center; animation: markaMasuk .55s cubic-bezier(.2,.9,.3,1) .15s both;
+}
+@keyframes markaMasuk { from { transform: scaleX(0) } to { transform: none } }
+@media (prefers-reduced-motion: reduce) { .login-marka { animation: none; } }
+.login-nama {
+  margin: 0; font-family: var(--huruf-merek-rapat); font-weight: 700; font-stretch: condensed;
+  font-size: 40px; line-height: .95; letter-spacing: -.005em; color: #fff;
+}
+@media (min-width: 992px) {
+  .login-nama { font-size: clamp(88px, 2rem + 6.4vw, 164px); line-height: .88; letter-spacing: -.01em; }
+  .login-nama > span { display: block; }
+}
+.login-pt { margin: .75rem 0 0; font-family: var(--huruf-merek); font-size: 15px; letter-spacing: .01em; color: var(--nav-ink); }
+@media (min-width: 992px) { .login-pt { margin-top: 1.25rem; font-size: 17px; } }
+.login-pesan { display: none; max-width: 31rem; }
+@media (min-width: 992px) { .login-pesan { display: block; } }
+.login-slogan { margin: 0; font-family: var(--huruf-merek); font-weight: 600; font-size: 28px; line-height: 1.2; color: #fff; }
+.login-subjudul { margin: 1rem 0 0; font-size: 14.5px; line-height: 1.7; color: var(--nav-ink); }
+.login-versi { margin: 2.5rem 0 0; font-size: 12px; color: rgba(147,161,184,.7); }
 
-.login-form {
-  display: flex; align-items: center; justify-content: center; padding: 3rem 2rem;
-  background-color: #ffffff;
-}
-.login-form-inner { width: 100%; max-width: 390px; }
-.login-logo-mark {
-  width: 44px; height: 44px; border-radius: .625rem; background: var(--brand-500);
-  color: #fff; font-weight: 700; font-size: 20px; display: grid; place-items: center;
-  box-shadow: 0 8px 20px -4px rgba(42,120,214,.35);
-}
+.login-form { display: flex; align-items: flex-start; justify-content: center; padding: 2.25rem 1.25rem 2rem; background: #fff; }
+@media (min-width: 992px) { .login-form { align-items: center; padding: 3rem 2.5rem; } }
+.login-form-isi { width: 100%; max-width: 380px; }
+.login-form-judul { margin: 0; font-family: Bahnschrift, "DIN Alternate", "Segoe UI", system-ui, sans-serif; font-size: 26px; font-weight: 600; line-height: 1.2; color: var(--ink); }
+.login-form-sub { margin: .5rem 0 2rem; font-size: 13.5px; line-height: 1.5; color: var(--ink-3); }
 .login-input { height: 44px; font-size: 14px; border-radius: .5rem; border: 1px solid var(--hairline); }
 .login-input:focus { border-color: var(--brand-500); box-shadow: 0 0 0 3px rgba(42,120,214,.15); }
-.login-btn-masuk { height: 44px; font-size: 14px; font-weight: 600; border-radius: .5rem; box-shadow: 0 4px 14px -2px rgba(42,120,214,.35); }
+.login-btn-masuk { height: 44px; font-size: 14px; font-weight: 600; border-radius: .5rem; }
+.login-versi-hp { margin: 2.5rem 0 0; text-align: center; font-size: 12px; color: var(--ink-3); }
+@media (min-width: 992px) { .login-versi-hp { display: none; } }
 .isian-ikon { position: relative; }
 .isian-ikon > .ikon { position: absolute; left: .875rem; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
 .isian-ikon > .form-control { padding-left: 2.5rem; }

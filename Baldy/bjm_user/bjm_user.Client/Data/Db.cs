@@ -661,7 +661,7 @@ public static class DatabaseRapikan
         foreach (var k in d.Karyawan) { k.DriverCode ??= ""; k.DriverName ??= ""; k.Role ??= PeranKaryawan.Sopir; k.Address1 ??= ""; k.Address2 ??= ""; k.City ??= ""; k.Phone ??= ""; k.Status ??= "aktif"; k.Attachments ??= []; }
         foreach (var v in d.Kendaraan) { v.PlateNumber ??= ""; v.VehicleType ??= ""; v.Configuration ??= ""; v.Status ??= "aktif"; v.Attachments ??= []; }
         foreach (var p in d.Klien) { p.ProjectCode ??= ""; p.ProjectName ??= ""; p.ClientType ??= TipeKlien.Callout; p.Description ??= ""; p.Status ??= "aktif"; }
-        foreach (var a in d.Alamat) { a.KodeArea ??= ""; a.Nama ??= ""; a.Jalan ??= ""; a.Kota ??= ""; a.NamaKontak ??= ""; a.Telepon ??= ""; a.ProjectId ??= ""; a.Jenis ??= JenisAlamat.Keduanya; a.LatLong ??= ""; a.IdLokasiKlien ??= ""; a.Catatan ??= ""; a.Status ??= "aktif"; }
+        foreach (var a in d.Alamat) { a.KodeArea ??= ""; a.Nama ??= ""; a.Jalan ??= ""; a.Kota ??= ""; a.NamaKontak ??= ""; a.Telepon ??= ""; a.ProjectId ??= ""; a.Jenis ??= JenisAlamat.Keduanya; a.LatLong ??= ""; a.IdLokasiKlien ??= ""; a.Catatan ??= ""; a.Status = "aktif"; } // status alamat sudah tidak dipakai: semua alamat aktif
         foreach (var p in d.Termin) { p.TripId ??= ""; p.PaymentDate ??= ""; p.DriverId ??= ""; p.Notes ??= ""; p.Attachments ??= []; }
         foreach (var e in d.Biaya) { e.TripId ??= ""; e.ExpenseType ??= ""; e.ExpenseDate ??= ""; e.Notes ??= ""; e.Attachments ??= []; }
         foreach (var c in d.BiayaInternal) { c.TripId ??= ""; c.CostType ??= ""; c.CostDate ??= ""; c.Notes ??= ""; c.RecipientRole ??= ""; c.RecipientId ??= ""; c.RecipientName ??= ""; c.Attachments ??= []; }

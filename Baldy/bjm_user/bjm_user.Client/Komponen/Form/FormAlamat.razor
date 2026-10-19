@@ -190,9 +190,7 @@
         var dobel = AlamatLain.FirstOrDefault(a => a.KodeArea.Trim().ToUpperInvariant() == kode
             && a.Nama.Trim().ToLowerInvariant() == _f.Nama.Trim().ToLowerInvariant());
         if (!_galat.ContainsKey("kode") && !_galat.ContainsKey("nama") && dobel is not null)
-            _galat["nama"] = dobel.Status == "nonaktif"
-                ? $"Alamat {dobel.Nama} di kode area {dobel.KodeArea} sudah ada tapi nonaktif. Aktifkan yang lama saja."
-                : $"Alamat {dobel.Nama} di kode area {dobel.KodeArea} sudah ada.";
+            _galat["nama"] = $"Alamat {dobel.Nama} di kode area {dobel.KodeArea} sudah ada.";
         return _galat.Count == 0;
     }
 
