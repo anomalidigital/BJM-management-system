@@ -148,56 +148,42 @@ table { font-variant-numeric: tabular-nums; }
 .kotak-peringatan { border: 1px solid #f6e2ac; background: #fff8e6; border-radius: .5rem; padding: .75rem 1rem; font-size: 13px; color: #8a6100; }
 
 /* Login: panel merek di kiri (navy polos seperti sidebar), form masuk di kanan.
-   Merek berbentuk rambu petunjuk jurusan biru (papan biru, bingkai putih membulat, piktogram tujuan).
-   Huruf Bahnschrift: turunan DIN, huruf rambu jalan, bawaan Windows. Mac/iPhone memakai DIN Alternate.
-   Warna login tetap (tidak ikut workspace) karena halaman ini dibuka sebelum workspace dipilih. */
+   Huruf merek Bahnschrift: turunan DIN, huruf rambu jalan, bawaan Windows. Mac/iPhone memakai DIN Condensed/DIN Alternate. */
 .login-shell { min-height: 100vh; min-height: 100dvh; display: grid; grid-template-rows: auto 1fr; background: #fff; }
-@media (min-width: 992px) { .login-shell { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); grid-template-rows: none; } }
+@media (min-width: 992px) { .login-shell { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); grid-template-rows: none; } }
 .login-merek {
-  --huruf-rambu: Bahnschrift, "DIN Alternate", "Segoe UI", system-ui, sans-serif;
-  --biru-rambu: #1c5cab;
+  --huruf-merek: Bahnschrift, "DIN Alternate", "Segoe UI", system-ui, sans-serif;
+  --huruf-merek-rapat: Bahnschrift, "DIN Condensed", "Roboto Condensed", "sans-serif-condensed", "Arial Narrow", sans-serif;
   display: flex; flex-direction: column; justify-content: space-between; gap: 3rem;
-  background: #0d1523; color: #fff; padding: 1.25rem 1rem;
+  background: var(--nav-900); color: #fff; padding: 1.75rem 1.25rem 1.5rem;
 }
-@media (min-width: 992px) { .login-merek { justify-content: center; gap: 4.5rem; padding: 3.5rem clamp(2.5rem, 5vw, 5.5rem); } }
-
-.login-rambu {
-  width: 100%; max-width: 740px; padding: 6px; border-radius: 16px; background: var(--biru-rambu);
-  box-shadow: 0 1px 0 rgba(255,255,255,.08) inset;
-  animation: rambuMasuk .6s cubic-bezier(.2,.9,.3,1) .1s both;
+@media (min-width: 992px) { .login-merek { padding: 3.5rem 4rem 3rem; } }
+.login-marka {
+  display: block; width: 3.25rem; height: 6px; margin-bottom: 1.25rem; background: var(--signal);
+  transform-origin: left center; animation: markaMasuk .55s cubic-bezier(.2,.9,.3,1) .15s both;
 }
-@keyframes rambuMasuk { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
-@media (prefers-reduced-motion: reduce) { .login-rambu { animation: none; } }
-.login-rambu-isi { border: 3px solid #fff; border-radius: 11px; padding: 1rem 1.125rem .875rem; font-family: var(--huruf-rambu); }
-@media (min-width: 992px) { .login-rambu { padding: 9px; border-radius: 22px; } .login-rambu-isi { border-width: 4px; border-radius: 15px; padding: 1.75rem 2rem 1.5rem; } }
-.login-nama { margin: 0; font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -.005em; color: #fff; }
-.login-pt { margin: .5rem 0 0; font-size: 15px; font-weight: 400; color: rgba(255,255,255,.82); }
+@keyframes markaMasuk { from { transform: scaleX(0) } to { transform: none } }
+@media (prefers-reduced-motion: reduce) { .login-marka { animation: none; } }
+.login-nama {
+  margin: 0; font-family: var(--huruf-merek-rapat); font-weight: 700; font-stretch: condensed;
+  font-size: 40px; line-height: .95; letter-spacing: -.005em; color: #fff;
+}
 @media (min-width: 992px) {
-  .login-nama { font-size: clamp(54px, 1.25rem + 3.6vw, 90px); }
-  .login-pt { margin-top: .75rem; font-size: clamp(17px, .65rem + .7vw, 23px); }
+  .login-nama { font-size: clamp(88px, 2rem + 6.4vw, 164px); line-height: .88; letter-spacing: -.01em; }
+  .login-nama > span { display: block; }
 }
-.login-arah {
-  display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;
-  margin-top: 1rem; padding-top: .875rem; border-top: 3px solid #fff;
-}
-@media (min-width: 992px) { .login-arah { margin-top: 1.5rem; padding-top: 1.25rem; border-top-width: 4px; } }
-.login-tujuan { display: inline-flex; align-items: center; gap: .5em; font-size: 16px; font-weight: 600; white-space: nowrap; }
-@media (min-width: 992px) { .login-tujuan { font-size: clamp(20px, .8rem + 1vw, 31px); gap: .45em; } }
-.login-tujuan:last-child { margin-left: auto; } /* arah kanan tetap rata kanan walau turun baris */
-.login-tujuan .login-panah { width: 1.05em; height: 1.05em; }
-.login-piktogram { display: inline-grid; place-items: center; width: 1.6em; height: 1.6em; border-radius: .22em; background: #fff; color: var(--biru-rambu); }
-.login-piktogram .ikon { width: 1em; height: 1em; }
-
-.login-pesan { display: none; max-width: 34rem; }
+.login-pt { margin: .75rem 0 0; font-family: var(--huruf-merek); font-size: 15px; letter-spacing: .01em; color: var(--nav-ink); }
+@media (min-width: 992px) { .login-pt { margin-top: 1.25rem; font-size: 17px; } }
+.login-pesan { display: none; max-width: 31rem; }
 @media (min-width: 992px) { .login-pesan { display: block; } }
-.login-slogan { margin: 0; font-family: var(--huruf-rambu); font-weight: 600; font-size: 28px; line-height: 1.2; color: #fff; }
-.login-subjudul { margin: 1rem 0 0; font-size: 14.5px; line-height: 1.7; color: #93a1b8; }
+.login-slogan { margin: 0; font-family: var(--huruf-merek); font-weight: 600; font-size: 28px; line-height: 1.2; color: #fff; }
+.login-subjudul { margin: 1rem 0 0; font-size: 14.5px; line-height: 1.7; color: var(--nav-ink); }
 .login-versi { margin: 2.5rem 0 0; font-size: 12px; color: rgba(147,161,184,.7); }
 
 .login-form { display: flex; align-items: flex-start; justify-content: center; padding: 2.25rem 1.25rem 2rem; background: #fff; }
 @media (min-width: 992px) { .login-form { align-items: center; padding: 3rem 2.5rem; } }
 .login-form-isi { width: 100%; max-width: 380px; }
-.login-form-judul { margin: 0; font-family: Bahnschrift, "DIN Alternate", "Segoe UI", system-ui, sans-serif; font-size: 30px; font-weight: 600; line-height: 1.2; color: var(--ink); }
+.login-form-judul { margin: 0; font-family: Bahnschrift, "DIN Alternate", "Segoe UI", system-ui, sans-serif; font-size: 26px; font-weight: 600; line-height: 1.2; color: var(--ink); }
 .login-form-sub { margin: .5rem 0 2rem; font-size: 13.5px; line-height: 1.5; color: var(--ink-3); }
 .login-input { height: 44px; font-size: 14px; border-radius: .5rem; border: 1px solid var(--hairline); }
 .login-input:focus { border-color: var(--brand-500); box-shadow: 0 0 0 3px rgba(42,120,214,.15); }
