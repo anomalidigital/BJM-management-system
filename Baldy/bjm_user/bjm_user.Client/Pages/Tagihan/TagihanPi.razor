@@ -26,7 +26,7 @@
     <Tabs Class="px-2" Items="TabItems(semua)" Value="@_tab" ValueChanged="GantiTab" />
     <Toolbar>
         <Left>
-            <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Width="20rem" Placeholder="Cari ID Trip, No. Referensi, No PI, plat, lokasi..." />
+            <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Width="20rem" Placeholder="Cari ID Trip, No Referensi, No PI, No. Kendaraan, rute..." />
             <PanelFilter T="FilterPi" Filter="_filter" Chips="Chips" Galat="@Format.GalatRentang(_filter.Draf.Dari, _filter.Draf.Sampai)">
                 <div>
                     <p class="form-label">Tanggal berangkat trip</p>
@@ -92,7 +92,7 @@
         <Footer>
             @{ var jumlah = (Pokok: tersaring.Sum(t => t.NilaiPokok), Tambahan: tersaring.Sum(t => t.NilaiTambahan), Total: tersaring.Sum(t => t.NilaiTotal)); }
             <tr class="fs-13">
-                @* Kolom pilih + ID Trip, No. Referensi, No. Pol, Muat → Bongkar *@
+                @* Kolom pilih + ID Trip, No Referensi, No. Kendaraan, Rute *@
                 <td colspan="5" class="text-ink-2">Total @Format.Angka(_tabel.Total) trip@(_tabel.Total > _tabel.PageSize ? " (semua halaman)" : "")</td>
                 <td class="tnum text-end text-ink">@Format.Rupiah(jumlah.Pokok)</td>
                 <td class="tnum text-end text-ink">@Format.Rupiah(jumlah.Tambahan)</td>
@@ -158,13 +158,13 @@
         _filter = new KendaliFilter<FilterPi>(() => new FilterPi(), StateHasChanged);
         // No. Trip lama tetap bisa dicari walau tidak ditampilkan.
         _tabel.Search = (t, q) => Util.CocokCari(q, t.R.IdTampil, t.T.TransactionNo, string.Join(' ', t.R.TrList), t.T.PiNumber, t.R.PlateNumber, t.R.Muat, t.R.Bongkar,
-            t.R.RouteName, t.R.ProjectCode, t.R.DriverNames, t.T.Pengirim?.Nama, t.T.Penerima?.Nama);
+            t.R.RouteName, t.R.RouteCode, t.R.ProjectCode, t.R.DriverNames, t.T.Pengirim?.Nama, t.T.Penerima?.Nama);
         _tabel.SortAccessor = k => k switch
         {
             "id_tampil" => t => t.R.IdTampil,
             "tr_list" => t => string.Join(", ", t.R.TrList),
             "plate_number" => t => t.R.PlateNumber,
-            "bongkar" => t => t.R.Bongkar,
+            "rute" => t => NamaRute(t),
             "nilai_pokok" => t => t.NilaiPokok,
             "nilai_tambahan" => t => t.NilaiTambahan,
             "nilai_total" => t => t.NilaiTotal,
@@ -388,19 +388,19 @@
         },
         new()
         {
-            Key = "tr_list", Header = "No. Referensi", Sortable = true, Width = "140px",
+            Key = "tr_list", Header = "No Referensi", Sortable = true, Width = "140px",
             Render = t => @<div class="lh-tight" title="@string.Join(", ", t.R.TrList)">
                 <div class="tnum d-flex align-items-center gap-1 text-ink-2">@(t.R.TrList.FirstOrDefault() ?? "—")@if (t.R.TrList.Count > 1) { <Badge Tone="neutral">+@(t.R.TrList.Count - 1)</Badge> }</div>
                 @if (t.R.ProjectCode != "") { <div class="fs-12 text-ink-3">@t.R.ProjectCode</div> }
             </div>,
         },
-        new() { Key = "plate_number", Header = "No. Pol", Sortable = true, Width = "108px", Render = t => @<span class="tnum text-ink-2">@(t.R.PlateNumber != "" ? t.R.PlateNumber : "—")</span> },
+        new() { Key = "plate_number", Header = "No. Kendaraan", Sortable = true, Width = "118px", Render = t => @<span class="tnum text-ink-2">@(t.R.PlateNumber != "" ? t.R.PlateNumber : "—")</span> },
         new()
         {
-            Key = "bongkar", Header = "Muat → Bongkar", Sortable = true,
+            Key = "rute", Header = "Rute", Sortable = true,
             Render = t => @<div class="lh-tight">
-                <span class="text-ink-2">@(t.R.Muat != "" ? t.R.Muat : "?") → @(t.R.Bongkar != "" ? t.R.Bongkar : "?")</span>
-                <span class="tnum d-block fs-12 text-ink-3">@(t.R.Ata != "" ? $"ATA {TagihanLogika.TanggalAta(t.R.Ata)}" : "ATA belum dicatat")</span>
+                <span class="text-ink-2">@NamaRute(t)</span>
+                <span class="tnum d-block fs-12 text-ink-3">@(t.R.Ata != "" ? $"Tiba {TagihanLogika.TanggalAta(t.R.Ata)}" : "Tiba belum dicatat")</span>
             </div>,
         },
         new()
@@ -413,7 +413,7 @@
         },
         new()
         {
-            Key = "nilai_tambahan", Header = "Tambahan", Sortable = true, Align = "right", Width = "120px",
+            Key = "nilai_tambahan", Header = "Biaya Ditagihkan", Sortable = true, Align = "right", Width = "120px",
             Render = t => @<span>@if (t.NilaiTambahan != 0) { <span class="tnum text-ink-2" title="@JudulTambahan(t)">@Format.Rupiah(t.NilaiTambahan)</span> } else { <span class="text-ink-3">—</span> }</span>,
         },
         new()
@@ -460,6 +460,10 @@
             </div>,
         },
     ];
+
+    /// <summary>Nama rute seperti di Excel klien ("BSA - WAYANG WINDU"); trip tanpa rute memakai pick up & destinasinya.</summary>
+    private static string NamaRute(BarisPi t) => t.R.RouteName != "" ? t.R.RouteName
+        : t.R.Muat != "" || t.R.Bongkar != "" ? $"{(t.R.Muat != "" ? t.R.Muat : "?")} - {(t.R.Bongkar != "" ? t.R.Bongkar : "?")}" : "—";
 
     private string JudulTambahan(BarisPi t)
     {

@@ -83,12 +83,12 @@ public static class Rekap
             Tambah(trip.DriverIds.Count > 0, $"Supir {trip.DriverNames}", "Supir belum dipilih", "edit");
             if (!dedicated) Tambah(t.RouteId != "", $"Rute {trip.RouteName}", "Rute belum dipilih", "edit");
             if (klien?.RequiresDocument != false)
-                Tambah(trip.TrList.Count > 0, $"No Referensi {string.Join(", ", trip.TrList)}", "No Referensi (TR) dari klien belum diisi", "edit");
+                Tambah(trip.TrList.Count > 0, $"No Referensi {string.Join(", ", trip.TrList)}", "No Referensi dari klien belum diisi", "edit");
             Tambah(!string.IsNullOrEmpty(t.Pengirim?.Nama), "Pick Up Details terisi", "Pick Up Details belum diisi", "edit", "catatan");
-            Tambah(!string.IsNullOrEmpty(t.Penerima?.Nama), "Destination Details terisi", "Destination Details (penerima) belum diisi", "edit");
+            Tambah(!string.IsNullOrEmpty(t.Penerima?.Nama), "Destination Details terisi", "Destination Details belum diisi", "edit");
             Tambah(!string.IsNullOrEmpty(t.PrintedAt), "Berita Acara sudah dicetak", "Berita Acara belum dicetak", AturDetail.Overview, "catatan");
-            Tambah(termin.Count > 0, $"Uang jalan {termin.Count} termin", "Uang jalan belum dicatat", AturDetail.Uj);
-            Tambah(kejadian.Any(e => e.Jenis is "tiba" or "bongkar"), "Tiba / bongkar di tujuan tercatat",
+            Tambah(termin.Count > 0, $"Uang Jalan {termin.Count} termin", "Uang Jalan belum dicatat", AturDetail.Uj);
+            Tambah(kejadian.Any(e => e.Jenis is "tiba" or "bongkar"), "Tiba / selesai bongkar di destinasi tercatat",
                 "Belum ada catatan tiba / selesai bongkar di tab Perjalanan", AturDetail.Perjalanan, "catatan");
             if (!dedicated) Tambah(trip.Harga > 0, $"Harga {Format.Rupiah(trip.Harga)}", $"Harga trip masih {Format.Rupiah(0)}: tagihan ke klien akan kosong", "edit");
             if (biaya.Count == 0) cek.Add(new CekRekap("catatan", "Belum ada biaya operasional (tol, solar, dst.). Abaikan bila memang tidak ada.", AturDetail.Biaya));

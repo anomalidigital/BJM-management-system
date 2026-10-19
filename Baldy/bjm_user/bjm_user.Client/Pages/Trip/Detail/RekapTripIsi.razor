@@ -31,7 +31,6 @@
             <h4 class="mb-2 fs-11-5 fw-semibold text-ink-2 text-uppercase" style="letter-spacing:.04em">Rute</h4>
             <dl class="row row-cols-1 row-cols-sm-2 gx-4 gy-2 mb-0">
                 @Isi("Rute", IsiRute(trip))
-                @Isi("Muat → Bongkar", Teks($"{AturDetail.Strip(trip.Muat)} → {AturDetail.Strip(trip.Bongkar)}"))
                 @Isi("Patokan Uang Jalan", Teks(Format.Rupiah(trip.Ujroute)))
                 @if (!dedicated) { @Isi("Harga", Teks($"{Format.Rupiah(trip.Harga)}{(trip.HargaKhusus ? " (khusus)" : "")}")) }
             </dl>

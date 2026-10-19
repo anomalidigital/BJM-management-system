@@ -30,7 +30,7 @@
 <Kartu>
     <Toolbar>
         <Left>
-            <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Width="18rem" Placeholder="Cari nama berkas, judul, ID Trip, karyawan, plat..." />
+            <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Width="18rem" Placeholder="Cari nama berkas, judul, ID Trip, karyawan, No. Kendaraan..." />
             <PanelFilter T="FilterBerkas" Filter="_filter" Chips="Chips" Lebar="360" Galat="@Format.GalatRentang(_filter.Draf.Dari, _filter.Draf.Sampai)">
                 <Field Label="Jenis / sumber berkas">
                     <Pilihan Id="@context" Options="OpsiJenis(semua)" Value="@_filter.Draf.Jenis" ValueChanged="v => _filter.Ubah(d => d.Jenis = v ?? string.Empty)" Cari="false" Clearable="false" />
@@ -118,9 +118,9 @@
                 @if (keTrip)
                 {
                     <Field Label="Trip" Required Class="col-12" Error="@_galat.GetValueOrDefault("trip_id")"
-                           Hint="@Teks("Ketik ID Trip, No. Referensi, plat, atau supir. Tanggal ikut tanggal berangkat trip, boleh diganti.")">
+                           Hint="@Teks("Ketik ID Trip, No Referensi, No. Kendaraan, atau supir. Tanggal ikut tanggal berangkat trip, boleh diganti.")">
                         <Pilihan Id="@context" Options="OpsiTrip" Value="@(_isi.TripId == "" ? null : _isi.TripId)" Invalid="@_galat.ContainsKey("trip_id")"
-                                 Placeholder="Pilih trip..." SearchPlaceholder="Cari ID Trip, plat, supir..." ValueChanged="PilihTrip" />
+                                 Placeholder="Pilih trip..." SearchPlaceholder="Cari ID Trip, No. Kendaraan, supir..." ValueChanged="PilihTrip" />
                     </Field>
                 }
                 <Field Label="Judul" Required Class="col-sm-8" Error="@_galat.GetValueOrDefault("judul")">

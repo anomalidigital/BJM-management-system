@@ -70,7 +70,7 @@
         return @<article style="border:@Garis;font-size:10px;break-inside:avoid">
             <header class="d-flex flex-wrap align-items-center justify-content-between px-2 py-1" style="column-gap:1rem;border-bottom:@Garis;background:#f5f5f5;font-size:11px">
                 <p class="m-0 fw-bold">@no. ID Trip @t.R.IdTampil@(batal ? " (batal, cancel fee)" : "")</p>
-                <p class="m-0">No. Referensi: <b>@(t.R.TrList.Count > 0 ? string.Join(", ", t.R.TrList) : "-")</b>@(t.R.ProjectCode != "" ? $" · {t.R.ProjectCode}" : "")</p>
+                <p class="m-0">No Referensi: <b>@(t.R.TrList.Count > 0 ? string.Join(", ", t.R.TrList) : "-")</b>@(t.R.ProjectCode != "" ? $" · {t.R.ProjectCode}" : "")</p>
             </header>
             <table class="w-100" style="border-collapse:collapse">
                 <tbody>
@@ -83,7 +83,7 @@
                         <td class="px-2 align-top" style="padding-top:1px;padding-bottom:1px">@asalNama → @tujuanNama</td>
                     </tr>
                     <tr>
-                        <th scope="row" class="px-2 text-start align-top fw-semibold text-nowrap" style="width:7rem;padding-top:1px;padding-bottom:1px">Mobil / Supir</th>
+                        <th scope="row" class="px-2 text-start align-top fw-semibold text-nowrap" style="width:7rem;padding-top:1px;padding-bottom:1px">Kendaraan / Supir</th>
                         <td class="px-2 align-top" style="padding-top:1px;padding-bottom:1px">@(t.R.PlateNumber != "" ? t.R.PlateNumber : "-") · @(t.R.DriverNames != "" ? t.R.DriverNames : "-")</td>
                     </tr>
                     <tr>

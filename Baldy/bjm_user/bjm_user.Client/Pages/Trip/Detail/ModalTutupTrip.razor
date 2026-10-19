@@ -20,7 +20,7 @@
     else
     {
         <Modal Open="true" Size="xl" Title="@($"Tutup Trip {Trip.IdTampil}?")" OnClose="Tutup"
-               Subtitle="@string.Join(" · ", new[] { Trip.PlateNumber, Trip.DriverNames, Trip.Ata != "" ? $"ATA {Format.Waktu(Trip.Ata)}" : "" }.Where(x => x != ""))">
+               Subtitle="@string.Join(" · ", new[] { Trip.PlateNumber, Trip.DriverNames, Trip.Ata != "" ? $"Tiba {Format.Waktu(Trip.Ata)}" : "" }.Where(x => x != ""))">
             <ChildContent>
                 <div class="d-flex flex-column gap-3">
                     <DaftarCek Cek="data.Cek" OnBuka="Buka" SebelumTutup="true" />
@@ -62,22 +62,22 @@
                         @if (tanyaPool)
                         {
                             <div>
-                                <p class="mb-2 fs-12-5 fw-semibold text-ink-2">Mobil @(Trip.PlateNumber != "" ? Trip.PlateNumber : "trip ini") sudah kembali ke pool?</p>
+                                <p class="mb-2 fs-12-5 fw-semibold text-ink-2">Kendaraan @(Trip.PlateNumber != "" ? Trip.PlateNumber : "trip ini") sudah kembali ke pool?</p>
                                 <div class="row g-2">
                                     <div class="col-sm-6">
                                         <Radio Name="pool-tutup" Class="h-100" Checked="@(_diPool == "ya")" OnChange="() => PilihPool(PoolYa)" Label="Ya, sudah di pool"
-                                               Description="Mobil langsung bisa dipakai trip lain." />
+                                               Description="Kendaraan langsung bisa dipakai trip lain." />
                                     </div>
                                     <div class="col-sm-6">
                                         <Radio Name="pool-tutup" Class="h-100" Checked="@(_diPool == "tidak")" OnChange="() => PilihPool(PoolBelum)" Label="Belum"
-                                               Description="Mobil tetap tertahan di trip ini. Lanjut backload? Buat dari menu ⋯ Ada Backload / Lanjutan di daftar trip." />
+                                               Description="Kendaraan tetap tertahan di trip ini. Lanjut backload? Buat dari menu ⋯ Ada Backload / Lanjutan di daftar trip." />
                                     </div>
                                 </div>
                             </div>
                         }
                         else if (Trip.T.VehicleId != "" && catatanPool != "")
                         {
-                            <p class="m-0 fs-12-5 text-ink-3">Mobil sudah tercatat kembali di pool @Format.Waktu(catatanPool).</p>
+                            <p class="m-0 fs-12-5 text-ink-3">Kendaraan sudah tercatat kembali di pool @Format.Waktu(catatanPool).</p>
                         }
 
                         <PesanGalat Teks="@_galat" />
@@ -135,11 +135,11 @@
         if (Trip.DriverIds.Count == 0) { await Gagal("Trip belum punya supir. Pilih supir di Edit sebelum ditutup."); return; }
         if (_pod == "") { await Gagal("Pilih keadaan dokumen POD."); return; }
         if (_pod == "foto" && _foto.Count + jumlahFotoBongkar == 0) { await Gagal("Lampirkan foto POD, karena dokumen fisiknya belum diterima."); return; }
-        if (tanyaPool && _diPool == "") { await Gagal("Jawab dulu: mobil sudah kembali ke pool atau belum."); return; }
+        if (tanyaPool && _diPool == "") { await Gagal("Jawab dulu: kendaraan sudah kembali ke pool atau belum."); return; }
         var masukPool = tanyaPool && _diPool == "ya";
         var id = Trip.IdTampil;
         Db.TutupTrip(Trip.Id, new OpsiTutup { PodFisik = _pod == "fisik", PodFoto = _foto.ToList(), DiPool = masukPool });
-        Toast.Sukses($"Trip {id} ditutup{(tanyaPool && !masukPool ? ". Mobil belum tercatat di pool: tandai setelah kembali, atau buat backload / lanjutan dari menu ⋯ di daftar trip." : " dan siap dibuatkan PI di Tagihan.")}");
+        Toast.Sukses($"Trip {id} ditutup{(tanyaPool && !masukPool ? ". Kendaraan belum tercatat di pool: tandai setelah kembali, atau buat backload / lanjutan dari menu ⋯ di daftar trip." : " dan siap dibuatkan PI di Tagihan.")}");
         await OnClose.InvokeAsync();
         await OnClosed.InvokeAsync();
     }

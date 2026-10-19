@@ -1,7 +1,7 @@
 @page "/pencarian/sijo"
 @inherits KomponenData
 @*
-    Pencarian nomor SI - Job Order (Priok). Bisa diakses langsung dengan mengetik nomor, atau otomatis terisi ketika user
+    Pencarian SI / Job Order (Priok). Bisa diakses langsung dengan mengetik nomor, atau otomatis terisi ketika user
     mengklik nilai Sijo dari Browsing Data / Trip (?sijo=).
 *@
 <PageTitle>Pencarian SI / Job Order — BJM Logistik</PageTitle>
@@ -11,8 +11,8 @@
     var rows = Rows(jobOrder);
 }
 
-<PageHeader Title="Pencarian nomor SI - Job Order" Crumbs="@(new List<Crumb> { new("Pencarian"), new("SI / Job Order") })">
-    <Description>Ketik nomor SI / Job Order, atau klik nilai Sijo dari halaman lain untuk langsung membuka detailnya.</Description>
+<PageHeader Title="Pencarian SI / Job Order" Crumbs="@(new List<Crumb> { new("Pencarian"), new("SI / Job Order") })">
+    <Description>Ketik nomor SI / Job Order, atau klik nomornya di halaman lain untuk langsung membuka detailnya.</Description>
 </PageHeader>
 
 <Kartu Class="mb-3">
@@ -40,7 +40,7 @@
         </div>
         <div class="col-lg-auto pb-2">
             <Checkbox Label="Komplit" Checked="_komplit" CheckedChanged="v => _komplit = v" />
-            <p class="m-0 mt-1 fs-11-5 text-ink-3">Batasi daftar hanya SI/JO berstatus Komplit.</p>
+            <p class="m-0 mt-1 fs-11-5 text-ink-3">Batasi daftar hanya SI / Job Order berstatus Komplit.</p>
         </div>
     </div>
 </Kartu>
@@ -51,7 +51,7 @@
         <div class="px-4 py-5 text-center">
             <div class="mx-auto mb-3 d-grid rounded-circle border border-hairline bg-sunken text-ink-3" style="width:44px;height:44px;place-items:center"><IkonSvg Def="Ikon.Ship" Size="20" /></div>
             <p class="m-0 fs-14 fw-semibold text-ink">Masukkan nomor SI / Job Order.</p>
-            <p class="m-0 mt-1 fs-13 text-ink-3">Sistem akan menampilkan customer beserta daftar mobil dan sopirnya.</p>
+            <p class="m-0 mt-1 fs-13 text-ink-3">Sistem akan menampilkan customer beserta daftar kendaraan dan supirnya.</p>
         </div>
     </Kartu>
 }
@@ -82,7 +82,7 @@ else
         </Kartu>
 
         <Kartu>
-            <KepalaKartu Title="Daftar Mobil & Sopir" Subtitle="Seluruh transaksi yang terhubung dengan SI / Job Order ini.">
+            <KepalaKartu Title="Daftar Kendaraan & Supir" Subtitle="Seluruh trip yang terhubung dengan SI / Job Order ini.">
                 <Actions>
                     <Tombol Icon="Ikon.Print" Disabled="@(rows.Count == 0)" OnClick="() => _preview = true">Cetak</Tombol>
                     <Tombol Variant="primary" OnClick="@(() => Ke("transaksi/tagihan"))">Selesai</Tombol>
@@ -91,14 +91,14 @@ else
             <DataTable T="BarisTrip" Columns="Kolom" Rows="UrutTabel(rows)" RowKey="t => t.Id" SortKey="@_sortKey" SortNaik="_naik" OnSortChange="UrutBerdasar" MaxHeight="480px">
                 <Empty>
                     <div class="px-4 py-5 text-center">
-                        <p class="m-0 fw-semibold text-ink" style="font-size:13.5px">Belum ada transaksi untuk SI/JO ini.</p>
-                        <p class="m-0 mt-1 fs-13 text-ink-3">Buat trip dengan SI / BL ini pada halaman Trip.</p>
+                        <p class="m-0 fw-semibold text-ink" style="font-size:13.5px">Belum ada trip untuk SI / Job Order ini.</p>
+                        <p class="m-0 mt-1 fs-13 text-ink-3">Buat trip dengan SI / Job Order ini pada halaman Trip.</p>
                     </div>
                 </Empty>
             </DataTable>
             <div class="d-flex align-items-center justify-content-between border-top border-hairline bg-sunken px-3 py-2">
-                <p class="m-0 tnum fs-13 fw-semibold text-ink">Jumlah: @Format.Angka(rows.Count) MOBIL</p>
-                <p class="m-0 fs-12 text-ink-3">@rows.Select(r => r.T.DriverId).Distinct().Count() sopir terlibat</p>
+                <p class="m-0 tnum fs-13 fw-semibold text-ink">Jumlah: @Format.Angka(rows.Count) kendaraan</p>
+                <p class="m-0 fs-12 text-ink-3">@rows.Select(r => r.T.DriverId).Distinct().Count() supir terlibat</p>
             </div>
         </Kartu>
     </div>
@@ -111,7 +111,7 @@ else
                 @for (var i = 0; i < hal.Count; i++)
                 {
                     var ii = i; var isi = hal[ii];
-                    <PrintPage Title="Daftar Mobil per SI / Job Order" Subtitle="@($"SI / Job Order {jobOrder.Sijo}")" Page="@(ii + 1)" TotalPages="hal.Count"
+                    <PrintPage Title="Daftar Kendaraan per SI / Job Order" Subtitle="@($"SI / Job Order {jobOrder.Sijo}")" Page="@(ii + 1)" TotalPages="hal.Count"
                                Meta="@(new List<(string, string)> { ("Customer", jobOrder.CustomerName), ("Kode Cust", jobOrder.CustomerCode), ("Party", jobOrder.Party), ("Kapal", jobOrder.Ship), ("Barang", jobOrder.Goods), ("Status", jobOrder.IsComplete ? "Komplit" : "Belum komplit") })">
                         <PrintTable Cols="KolomCetak">
                             @for (var r = 0; r < isi.Count; r++)
@@ -128,7 +128,7 @@ else
                             }
                             @if (ii == hal.Count - 1)
                             {
-                                <tr class="total"><td class="p-sel text-end" colspan="6">Jumlah: @rows.Count MOBIL</td></tr>
+                                <tr class="total"><td class="p-sel text-end" colspan="6">Jumlah: @rows.Count kendaraan</td></tr>
                             }
                         </PrintTable>
                     </PrintPage>
@@ -198,18 +198,18 @@ else
     }
 
     private static readonly List<(string, string, string?)> KolomCetak =
-        [("No.", "left", null), ("Sijo", "left", null), ("Tgltrans", "left", null), ("No. Kendaraan", "left", null), ("Sopir", "left", null), ("ID Perjalanan/Trip", "left", null)];
+        [("No.", "left", null), ("SI / Job Order", "left", null), ("Tanggal", "left", null), ("No. Kendaraan", "left", null), ("Supir", "left", null), ("ID Perjalanan", "left", null)];
 
     private List<Kolom<BarisTrip>> Kolom =>
     [
-        new() { Key = "sijo", Header = "Sijo", Width = "110px", Render = t => @<span class="tnum fw-semibold text-ink">@t.Sijo</span> },
-        new() { Key = "transaction_date", Header = "Tgltrans", Sortable = true, Width = "116px", Render = t => @<span class="tnum text-ink-2">@Format.Tanggal(t.T.TransactionDate)</span> },
+        new() { Key = "sijo", Header = "SI / Job Order", Width = "110px", Render = t => @<span class="tnum fw-semibold text-ink">@t.Sijo</span> },
+        new() { Key = "transaction_date", Header = "Tanggal", Sortable = true, Width = "116px", Render = t => @<span class="tnum text-ink-2">@Format.Tanggal(t.T.TransactionDate)</span> },
         new() { Key = "plate_number", Header = "No. Kendaraan", Sortable = true, Width = "136px", Render = t => @<span class="tnum fw-medium">@(t.PlateNumber != "" ? t.PlateNumber : "—")</span> },
         new()
         {
-            Key = "driver_names", Header = "Sopir", Sortable = true,
+            Key = "driver_names", Header = "Supir", Sortable = true,
             Render = t => @<a href="@($"transaksi/trip/{t.Id}")" class="fw-medium text-ink text-decoration-none" title="@($"Buka Trip {t.T.TransactionNo}")">@(t.DriverNames != "" ? t.DriverNames : "—")</a>,
         },
-        new() { Key = "trip_ids", Header = "ID Perjalanan/Trip", Width = "180px", Render = t => @<span class="tnum text-ink-2">@(t.T.TripIds.Count > 0 ? string.Join(", ", t.T.TripIds) : "—")</span> },
+        new() { Key = "trip_ids", Header = "ID Perjalanan", Width = "180px", Render = t => @<span class="tnum text-ink-2">@(t.T.TripIds.Count > 0 ? string.Join(", ", t.T.TripIds) : "—")</span> },
     ];
 }

@@ -1,7 +1,7 @@
 @* Buat PI untuk trip terpilih: nomor berurutan mengikuti format Summary Submission PI. *@
 
 <Modal Open="true" Title="@($"Buat PI untuk {Rows.Count} trip")" Size="md" OnClose="OnClose"
-       Subtitle="Satu PI per trip. Nomor terisi otomatis dan boleh diganti. Harga dan biaya tambahan dibekukan saat PI dibuat.">
+       Subtitle="Satu PI per trip. Nomor terisi otomatis dan boleh diganti. Harga dan biaya yang ditagihkan dibekukan saat PI dibuat.">
     <ChildContent>
         <div class="d-flex flex-column gap-3">
             <Field Label="Tanggal PI" Required>
@@ -14,8 +14,8 @@
                     <li class="px-3 py-2" style="@(ii > 0 ? "border-top:1px solid var(--grid)" : null)">
                         <div class="row g-2 align-items-center">
                             <div class="col-sm min-w-0 fs-12-5">
-                                <p class="m-0 tnum text-truncate fw-semibold text-ink">@t.R.IdTampil · @(t.R.PlateNumber != "" ? t.R.PlateNumber : "tanpa mobil")</p>
-                                <p class="m-0 text-truncate text-ink-3">@(t.R.TrList.Count > 0 ? string.Join(", ", t.R.TrList) : "tanpa No. Referensi") · @Format.Rupiah(t.NilaiTotal)</p>
+                                <p class="m-0 tnum text-truncate fw-semibold text-ink">@t.R.IdTampil · @(t.R.PlateNumber != "" ? t.R.PlateNumber : "tanpa kendaraan")</p>
+                                <p class="m-0 text-truncate text-ink-3">@(t.R.TrList.Count > 0 ? string.Join(", ", t.R.TrList) : "tanpa No Referensi") · @Format.Rupiah(t.NilaiTotal)</p>
                             </div>
                             <div class="col-sm-auto">
                                 <input class="form-control tnum" style="width:15rem;max-width:100%" aria-label="@($"Nomor PI trip {t.R.IdTampil}")"

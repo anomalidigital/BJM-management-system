@@ -5,7 +5,7 @@
     var idTrip = t.TripIds;
     var baris = new (string Label, string Nilai)[]
     {
-        ("No. Kendaraan", Note.PlateNumber), ("Sopir", Note.DriverNames), ("Party", t.Party), ("SI / BL", Note.Sijo), ("Jenis Brg", t.GoodsType),
+        ("No. Kendaraan", Note.PlateNumber), ("Supir", Note.DriverNames), ("Party", t.Party), ("SI / BL", Note.Sijo), ("Jenis Barang", t.GoodsType),
         ("Kosongan", t.Kosongan), ("Lokasi", t.Location), ("Kapal", t.Ship), ("Tujuan", t.DestinationDetail),
     };
     var kota = (string.IsNullOrEmpty(t.Workspace) ? WorkspaceKode.Priok : t.Workspace) == WorkspaceKode.Priok ? "Jakarta" : "Karawang";
@@ -45,10 +45,10 @@
         </tbody>
     </table>
     <div class="mb-4">
-        <p class="mb-1 fw-semibold" style="font-size:11.5px">ID Perjalanan/Trip <span class="fw-normal text-secondary">(@idTrip.Count ID)</span></p>
+        <p class="mb-1 fw-semibold" style="font-size:11.5px">ID Perjalanan <span class="fw-normal text-secondary">(@idTrip.Count ID)</span></p>
         @if (idTrip.Count == 0)
         {
-            <p class="m-0 px-2 py-3 text-center text-secondary" style="border:1px solid #6b7280;font-size:10.5px">Belum ada ID Perjalanan/Trip.</p>
+            <p class="m-0 px-2 py-3 text-center text-secondary" style="border:1px solid #6b7280;font-size:10.5px">Belum ada ID Perjalanan.</p>
         }
         else
         {
@@ -62,7 +62,7 @@
     </div>
     <p class="mb-5" style="font-size:11px;line-height:1.6">Mohon barang tersebut di atas diterima dalam keadaan baik dan lengkap. Atas perhatian dan kerja samanya kami ucapkan terima kasih.</p>
     <div class="mt-auto row row-cols-3 g-4 pt-3 text-center" style="font-size:11px">
-        @foreach (var peran in new[] { "Penerima", "Sopir", "Hormat kami," })
+        @foreach (var peran in new[] { "Penerima", "Supir", "Hormat kami," })
         {
             <div class="col"><p class="mb-5 pb-4">@peran</p><p class="mx-auto pt-1" style="width:80%;border-top:1px solid #000;font-size:10.5px">( ................................ )</p></div>
         }

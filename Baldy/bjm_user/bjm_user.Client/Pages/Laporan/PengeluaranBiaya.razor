@@ -134,7 +134,7 @@ else
                 <table class="table table-hover fs-13 w-100">
                     <thead class="sticky-top">
                         <tr>
-                            @foreach (var (h, i) in new[] { "Tanggal", "Trip", "Mobil · Supir", "Jenis", "Dibayar oleh", "Ditagihkan", "Nominal" }.Select((h, i) => (h, i)))
+                            @foreach (var (h, i) in new[] { "Tanggal", "Trip", "Kendaraan · Supir", "Jenis", "Dibayar oleh", "Ditagihkan", "Nominal" }.Select((h, i) => (h, i)))
                             {
                                 <th class="px-3 @(i == 6 ? "text-end" : "text-start")">@h</th>
                             }
@@ -230,7 +230,7 @@ else
     private string LabelTagih(long sisa) => $"Ditagihkan ke klien {LaporanLogika.TulisPersen(_total.Tagih, _total.Nominal)}, tidak ditagihkan {LaporanLogika.TulisPersen(sisa, _total.Nominal)}";
 
     private List<(string, string, string?)> KolomCetak => [
-        ("No.", "right", "5%"), ("Tanggal", "left", "10%"), (Karawang ? "ID Trip" : "No. Trip", "left", Karawang ? "19%" : "12%"), ("Supir", "left", null),
-        ("Mobil", "left", "11%"), ("Jenis Biaya", "left", "13%"), ("Ditagihkan", "center", "9%"), ("Nominal (Rp)", "right", "13%"),
+        ("No.", "right", "5%"), ("Tanggal", "left", "10%"), ("ID Trip", "left", Karawang ? "19%" : "12%"), ("Supir", "left", null),
+        ("No. Kendaraan", "left", "11%"), ("Jenis Biaya", "left", "13%"), ("Ditagihkan", "center", "9%"), ("Nominal (Rp)", "right", "13%"),
     ];
 }

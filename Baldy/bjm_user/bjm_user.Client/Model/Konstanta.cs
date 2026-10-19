@@ -119,7 +119,7 @@ public static class JenisPerjalanan
     public static string Label(string j) => j switch
     {
         "pickup" => "Pick up barang", "istirahat" => "Istirahat / rest area", "menginap" => "Menginap", "kendala" => "Kendala di jalan",
-        "dialihkan" => "Dialihkan / relokasi", "tiba" => "Tiba di tujuan (ATA)", "bongkar" => "Selesai bongkar",
+        "dialihkan" => "Dialihkan / relokasi", "tiba" => "Tiba di destinasi", "bongkar" => "Selesai bongkar",
         "retur" => "Dikembalikan (retur)", "pool" => "Tiba di pool", _ => j,
     };
 }

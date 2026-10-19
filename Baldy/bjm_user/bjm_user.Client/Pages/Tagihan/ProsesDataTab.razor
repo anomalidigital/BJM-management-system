@@ -89,7 +89,7 @@
 
                 <div class="row g-3">
                     <div class="col-sm-12 col-xl-4">
-                        <Field Label="No. SI/JO" Required Error="@_galat.GetValueOrDefault("job_order_id")">
+                        <Field Label="No. SI / Job Order" Required Error="@_galat.GetValueOrDefault("job_order_id")">
                             <Pilihan Id="@context" Options="OpsiJo" Value="@(_form.JobOrderId == "" ? null : _form.JobOrderId)" Disabled="readOnly" Invalid="@_galat.ContainsKey("job_order_id")"
                                      Placeholder="Cari nomor SI / Job Order..." ValueChanged="PilihJo" />
                         </Field>
@@ -108,10 +108,10 @@
                         </Field>
                     </div>
                     <div class="col-sm-6 col-xl-4">
-                        <Field Label="Customer" Hint="@Teks("Diambil dari SI/JO.")"><input id="@context" class="form-control" value="@(jo?.CustomerName ?? "")" readonly /></Field>
+                        <Field Label="Customer" Hint="@Teks("Diambil dari SI / Job Order.")"><input id="@context" class="form-control" value="@(jo?.CustomerName ?? "")" readonly /></Field>
                     </div>
                     <div class="col-sm-6 col-xl-4">
-                        <Field Label="Party" Hint="@Teks("Diambil dari SI/JO.")"><input id="@context" class="form-control" value="@(jo?.Party ?? "")" readonly /></Field>
+                        <Field Label="Party" Hint="@Teks("Diambil dari SI / Job Order.")"><input id="@context" class="form-control" value="@(jo?.Party ?? "")" readonly /></Field>
                     </div>
                 </div>
 
@@ -254,7 +254,7 @@
         if (_form.InvoiceNo.Trim() == "") _galat["invoice_no"] = "No Faktur wajib diisi.";
         else if (Db.Data.Tagihan.Any(b => string.Equals(b.InvoiceNo, _form.InvoiceNo.Trim(), StringComparison.OrdinalIgnoreCase) && b.Id != lain))
             _galat["invoice_no"] = "No Faktur sudah dipakai.";
-        if (_form.JobOrderId == "") _galat["job_order_id"] = "No. SI/JO wajib dipilih.";
+        if (_form.JobOrderId == "") _galat["job_order_id"] = "No. SI / Job Order wajib dipilih.";
         if (_form.CostCode.Trim() == "") _galat["cost_code"] = "Data Cost wajib diisi.";
         if (_form.BillingDate == "") _galat["billing_date"] = "Tanggal Tagih wajib diisi.";
         if (_form.Amount <= 0) _galat["amount"] = "Jumlah Rp harus lebih dari 0.";

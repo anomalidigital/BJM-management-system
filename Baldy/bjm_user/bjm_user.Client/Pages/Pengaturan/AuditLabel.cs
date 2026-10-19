@@ -8,15 +8,15 @@ public static class AuditLabel
     /// <summary>Nama isian untuk rincian perubahan; kunci yang tidak dikenal tampil apa adanya (null).</summary>
     private static readonly Dictionary<string, string> LabelField = new()
     {
-        ["transaction_no"] = "No. Trip",
+        ["transaction_no"] = "ID Trip",
         ["transaction_date"] = "Tanggal berangkat",
         ["order_date"] = "Tanggal order",
         ["service_type"] = "Layanan",
         ["contract_id"] = "Kontrak",
         ["trip_ids"] = "ID Perjalanan",
         ["route_id"] = "Rute",
-        ["tr_numbers"] = "No. Referensi",
-        ["tr_reference"] = "No. Referensi (lama)",
+        ["tr_numbers"] = "No Referensi",
+        ["tr_reference"] = "No Referensi (lama)",
         ["lokasi_muat"] = "Lokasi muat",
         ["lokasi_bongkar"] = "Lokasi bongkar",
         ["backload_dari"] = "Backload dari trip",

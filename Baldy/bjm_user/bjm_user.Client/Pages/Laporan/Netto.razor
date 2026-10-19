@@ -18,8 +18,8 @@
             @for (var i = 0; i < hal.Count; i++)
             {
                 var ii = i; var isi = hal[ii];
-                <PrintPage Page="@(ii + 1)" TotalPages="hal.Count" Title="Laporan Pendapatan Netto" Subtitle="Per mobil" Periode="@PeriodeTeks" Meta="MetaTotal">
-                    <PrintTable Cols="@(KolomCetak("No. Mobil", "13%"))">
+                <PrintPage Page="@(ii + 1)" TotalPages="hal.Count" Title="Laporan Pendapatan Netto" Subtitle="Per kendaraan" Periode="@PeriodeTeks" Meta="MetaTotal">
+                    <PrintTable Cols="@(KolomCetak("No. Kendaraan", "13%"))">
                         @for (var r = 0; r < isi.Count; r++)
                         {
                             var rr = r; var x = isi[rr];
@@ -118,11 +118,11 @@ else
             </div>
 
             <Kartu>
-                <KepalaKartu Title="Rekap per Mobil" Subtitle="@($"{_perMobil.Count} mobil aktif pada periode {PeriodeTeks}.")" />
+                <KepalaKartu Title="Rekap per Kendaraan" Subtitle="@($"{_perMobil.Count} kendaraan aktif pada periode {PeriodeTeks}.")" />
                 <div class="overflow-y-auto" style="max-height:420px">
                     @if (_perMobil.Count == 0)
                     {
-                        <p class="m-0 px-3 py-5 text-center fs-13 text-ink-3">Tidak ada transaksi pada periode tersebut.</p>
+                        <p class="m-0 px-3 py-5 text-center fs-13 text-ink-3">Tidak ada trip pada periode tersebut.</p>
                     }
                     else
                     {
@@ -229,7 +229,7 @@ else
         if (string.CompareOrdinal(_dari, _sampai) > 0) { _galat = "Tanggal Awal tidak boleh lebih besar dari Tanggal Akhir."; return; }
         if (_rows.Count == 0)
         {
-            _galat = "Tidak ada transaksi pada periode tersebut.";
+            _galat = "Tidak ada trip pada periode tersebut.";
             Toast.Info("Tidak ada data untuk ditampilkan.");
             return;
         }

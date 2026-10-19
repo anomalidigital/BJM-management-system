@@ -174,7 +174,7 @@ else
 
     private static string Keterangan(Model.Klien k) => string.Join(" · ", new[]
     {
-        k.ProjectCode, TipeKlien.Label(k.ClientType), k.RequiresDocument ? "Pakai TR / No PI" : "Tanpa dokumen", k.Status == "aktif" ? "Aktif" : "Nonaktif", k.Description,
+        k.ProjectCode, TipeKlien.Label(k.ClientType), k.RequiresDocument ? "Pakai No Referensi / No PI" : "Tanpa dokumen", k.Status == "aktif" ? "Aktif" : "Nonaktif", k.Description,
     }.Where(x => !string.IsNullOrEmpty(x)));
 
     private static string RuteTrip(BarisTrip t) => t.RouteName != "" ? t.RouteName : t.T.DestinationDetail != "" ? t.T.DestinationDetail : "—";
@@ -207,7 +207,7 @@ else
         new() { Key = "start_date", Header = "Periode", Width = "190px", Render = c => @<span class="tnum text-ink-2">@(c.C.StartDate != "" ? Format.Tanggal(c.C.StartDate) : "—") – @(c.C.EndDate != "" ? Format.Tanggal(c.C.EndDate) : "—")</span> },
         new() { Key = "value", Header = "Nilai Kontrak", Align = "right", Width = "140px", Render = c => @<span class="tnum fw-medium">@Format.Rupiah(c.C.Value)</span> },
         new() { Key = "terpakai", Header = "Terpakai", Align = "right", Width = "140px", Render = SelTerpakai },
-        new() { Key = "sisa", Header = "Sisa (balance)", Align = "right", Width = "140px", Render = c => @<span class="tnum fw-semibold @(c.Sisa < 0 ? "" : "text-ink")" style="@(c.Sisa < 0 ? "color:var(--critical)" : null)">@Format.Rupiah(c.Sisa)</span> },
+        new() { Key = "sisa", Header = "Sisa", Align = "right", Width = "140px", Render = c => @<span class="tnum fw-semibold @(c.Sisa < 0 ? "" : "text-ink")" style="@(c.Sisa < 0 ? "color:var(--critical)" : null)">@Format.Rupiah(c.Sisa)</span> },
         new() { Key = "komisi", Header = "Komisi (perkiraan)", Align = "right", Width = "150px", Render = SelKomisi },
         new() { Key = "attachments", Header = "Dokumen", Width = "96px", Render = c => @<LampiranThumbs Ids="c.C.Attachments" Ukuran="28" /> },
         new() { Key = "status", Header = "Status", Width = "100px", Render = SelStatus },

@@ -1,6 +1,6 @@
 @inherits KomponenData
 @*
-    Overview trip Karawang: yang dibutuhkan alur alat berat & DHL saja (ID Trip, No. Referensi, Pick Up & Destination Details berikut
+    Overview trip Karawang: yang dibutuhkan alur alat berat & DHL saja (ID Trip, No Referensi, Pick Up & Destination Details berikut
     catatannya, Add Items Details, posisi kendaraan, POD, backload / lanjutan, PI). Isian container Priok (Party, SI/BL, Kapal,
     penerima Surat Jalan, bon) tidak ditampilkan di sini.
 *@
@@ -69,7 +69,7 @@
                 <div class="flex-fill min-w-0" style="flex-basis:0"><TitikTrip Judul="Destination Details" Titik="t.Penerima" /></div>
             </div>
             <div class="p-3"><dl class="row row-cols-1 row-cols-sm-2 g-3 mb-0">
-                <InfoItem Label="No. Referensi">
+                <InfoItem Label="No Referensi">
                     @if (Trip.TrList.Count > 0)
                     {
                         <span class="d-flex flex-wrap gap-1">@foreach (var tr in Trip.TrList) { <span class="tnum rounded border border-hairline bg-sunken px-1 fs-12-5">@tr</span> }</span>
@@ -96,8 +96,7 @@
                         </ul>
                     }
                 </div>
-                <InfoItem Label="Lokasi Muat → Bongkar" Value="@($"{AturDetail.Strip(Trip.Muat)} → {AturDetail.Strip(Trip.Bongkar)}")" />
-                <InfoItem Label="Tiba di tujuan (ATA)" Value="@(Trip.Ata != "" ? Format.Waktu(Trip.Ata) : "—")" Mono />
+                <InfoItem Label="Tiba di destinasi" Value="@(Trip.Ata != "" ? Format.Waktu(Trip.Ata) : "—")" Mono />
                 <InfoItem Label="Posisi terakhir" Value="@(Trip.Posisi is not null ? $"{JenisPerjalanan.Label(Trip.Posisi.Jenis)} · {Format.Waktu(Trip.Posisi.Waktu)}" : "Belum ada catatan perjalanan")" />
             </dl></div>
         </Kartu>
@@ -185,7 +184,7 @@
         @if (induk is not null || anak.Count > 0)
         {
             <Kartu>
-                <KepalaKartu Title="Backload / Lanjutan" Subtitle="Trip lanjutan dari lokasi bongkar, dengan mobil dan supir yang sama." />
+                <KepalaKartu Title="Backload / Lanjutan" Subtitle="Trip lanjutan dari destinasi trip ini, dengan kendaraan dan supir yang sama." />
                 <ul class="list-unstyled m-0">
                     @if (induk is not null)
                     {
@@ -219,7 +218,7 @@
                     <InfoItem Label="No. Kontrak" Value="@kontrak.ContractNo" Mono />
                     <InfoItem Label="Nilai" Value="@Format.Rupiah(kontrak.Value)" Mono />
                     <InfoItem Label="Terpakai" Value="@Format.Rupiah(terpakaiKontrak)" Mono />
-                    <InfoItem Label="Sisa (balance)" Value="@Format.Rupiah(kontrak.Value - terpakaiKontrak)" Mono />
+                    <InfoItem Label="Sisa" Value="@Format.Rupiah(kontrak.Value - terpakaiKontrak)" Mono />
                 </dl></div>
             </Kartu>
         }

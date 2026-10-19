@@ -24,13 +24,18 @@ button.form-select > .hapus-pilihan:hover { background: rgba(0,0,0,.05); color: 
 .dropdown-item:disabled, .dropdown-item.disabled { opacity: .55; pointer-events: none; }
 .dropdown-item.aksi-tambah { font-weight: 500; color: var(--brand-700); }
 .dropdown-item.aksi-tambah:hover { background-color: var(--brand-50); }
-.dropdown-item.active, .dropdown-item:active { background-color: var(--brand-500); color: #fff; }
-.dropdown-item.active .label-opsi, .dropdown-item.active .meta-opsi { color: #fff; }
+/* Panel dropdown selalu putih: latar bawaan Bootstrap ikut warna halaman (abu-abu) sehingga pilihan tampak nonaktif. */
+.dropdown-menu { --bs-dropdown-bg: var(--surface); }
+/* Sorotan (arahkan mouse / tombol panah) cukup tipis supaya tidak terlihat sudah dipilih; yang terpilih ditandai centang. */
+.dropdown-item.active, .dropdown-item:hover, .dropdown-item:focus { background-color: var(--brand-50); color: var(--ink); }
+.dropdown-item:active { background-color: var(--brand-100); color: var(--ink); }
+.pilihan-daftar .dropdown-item[aria-selected="true"] .label-opsi { color: var(--brand-700); font-weight: 600; }
 .dropdown-footer { border-top: 1px solid var(--hairline); padding: .375rem .75rem 0; margin-top: .25rem; font-size: 11.5px; color: var(--ink-3); }
 .pilihan-daftar { max-height: 15rem; overflow-y: auto; outline: none; }
 .pilihan-daftar .dropdown-item .label-opsi { display: block; font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
 .pilihan-daftar .dropdown-item .meta-opsi { display: block; font-size: 11.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
 .pilihan-daftar .dropdown-item[aria-disabled="true"] { opacity: 1; cursor: not-allowed; }
+.pilihan-daftar .dropdown-item[aria-disabled="true"]:hover { background-color: transparent; }
 .pilihan-daftar .dropdown-item[aria-disabled="true"] .label-opsi { color: var(--ink-3); }
 .pilihan-daftar .dropdown-item[aria-disabled="true"] .meta-opsi { color: #8a6100; }
 .cek { display: inline-flex; align-items: center; gap: .5rem; font-size: 13px; color: var(--ink-2); cursor: pointer; margin: 0; }

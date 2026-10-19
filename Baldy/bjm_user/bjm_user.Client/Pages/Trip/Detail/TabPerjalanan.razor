@@ -15,17 +15,17 @@
     var ringkas = string.Join(" · ", new[]
     {
         pickup is not null ? $"Pick up {Format.Waktu(pickup.Waktu)}" : "Belum pick up",
-        Trip.Ata != "" ? $"ATA {Format.Waktu(Trip.Ata)}" : "belum tiba",
+        Trip.Ata != "" ? $"Tiba {Format.Waktu(Trip.Ata)}" : "belum tiba",
         Trip.Posisi is not null ? $"terakhir: {JenisPerjalanan.Label(Trip.Posisi.Jenis).ToLowerInvariant()}" : "",
     }.Where(x => x != ""));
 }
 <div>
     <KepalaTab Tombol="Catat kejadian" BisaUbah="BisaUbah" OnTambah="() => Buka(null)">
-        <Keterangan>@(Trip.Batal ? "Trip dibatalkan: riwayat di bawah hanya arsip." : $"{ringkas}. Catat kabar dari supir beserta buktinya; jam tiba (ATA) dipakai di PI.")</Keterangan>
+        <Keterangan>@(Trip.Batal ? "Trip dibatalkan: riwayat di bawah hanya arsip." : $"{ringkas}. Catat kabar dari supir beserta buktinya; jam tiba di destinasi dipakai di PI.")</Keterangan>
     </KepalaTab>
     @if (kejadian.Count == 0)
     {
-        <KosongTab Judul="Belum ada kejadian perjalanan." Keterangan="Mulai dari pick up barang di lokasi muat, lalu tiba dan selesai bongkar di tujuan." />
+        <KosongTab Judul="Belum ada kejadian perjalanan." Keterangan="Mulai dari pick up barang, lalu tiba dan selesai bongkar di destinasi." />
     }
     <ol class="list-unstyled m-0 px-3 py-3 px-sm-4 @(kejadian.Count == 0 ? "border-top border-hairline" : "")" data-riwayat>
         @for (var i = 0; i < titik.Count; i++)
@@ -140,8 +140,8 @@
         "istirahat" => "Berhenti di rest area atau tempat istirahat.",
         "menginap" => "Biaya menginap dicatat di Biaya Operasional jenis Overnight; ikut ditagihkan ke klien.",
         "kendala" => "Ban, mogok, razia, macet, atau kejadian lain di jalan.",
-        "dialihkan" => "Tulis alasan dan lokasi baru. Ubah rute lewat Edit bila tujuannya berganti.",
-        "tiba" => "Jam tiba di lokasi bongkar (ATA). Dipakai di PI dan laporan.",
+        "dialihkan" => "Tulis alasan dan lokasi baru. Ubah rute lewat Edit bila destinasinya berganti.",
+        "tiba" => "Jam tiba di destinasi. Dipakai sebagai ATA di Summary PI dan laporan.",
         "bongkar" => "Lampirkan Berita Acara, surat jalan, atau TR/OR klien yang sudah ditandatangani penerima, dan foto barang diterima.",
         "retur" => "Barang ditolak atau dikembalikan ke gudang: tulis alasannya.",
         "pool" => "Mencatat Tiba di pool membuat kendaraan bisa dipakai trip lain. Tutup trip setelah dokumen fisik diterima.",
@@ -254,7 +254,7 @@
             Db.DenganAudit(new IsianAudit
             {
                 Aksi = "pool", Entitas = Koleksi.Trip, EntityId = Trip.Id, Label = Trip.IdTampil,
-                Ringkasan = editing is not null ? $"Mengubah catatan tiba di pool ({Format.Waktu(waktu)})" : $"Mobil kembali di pool ({Format.Waktu(waktu)})",
+                Ringkasan = editing is not null ? $"Mengubah catatan tiba di pool ({Format.Waktu(waktu)})" : $"Kendaraan kembali di pool ({Format.Waktu(waktu)})",
             }, () => { Tulis(); SelaraskanPool(waktuPool); });
         }
         else Tulis();

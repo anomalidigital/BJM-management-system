@@ -81,7 +81,7 @@
                     <input id="@context" class="form-control" value="@_f.Description" @oninput="e => _f.Description = e.Value?.ToString() ?? string.Empty" />
                 </Field>
                 <div class="col-12">
-                    <Checkbox Label="Trip klien ini memakai alur dokumen (TR / No PI)" Checked="_f.RequiresDocument" CheckedChanged="v => _f.RequiresDocument = v" />
+                    <Checkbox Label="Trip klien ini memakai alur dokumen (No Referensi / No PI)" Checked="_f.RequiresDocument" CheckedChanged="v => _f.RequiresDocument = v" />
                     <p class="m-0 mt-1 fs-12 text-ink-3">Matikan untuk order tunai yang tidak melalui dokumen.</p>
                 </div>
             </div>
@@ -209,7 +209,7 @@
 
     private static RenderFragment SelDokumen(BarisKlien p)
     {
-        if (p.K.RequiresDocument) return @<Badge Tone="brand">Pakai TR / No PI</Badge>;
+        if (p.K.RequiresDocument) return @<Badge Tone="brand">Pakai No Referensi / No PI</Badge>;
         return @<Badge Tone="neutral">Tanpa dokumen</Badge>;
     }
 

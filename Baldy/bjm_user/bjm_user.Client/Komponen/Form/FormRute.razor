@@ -57,7 +57,7 @@
     [Parameter] public bool Open { get; set; }
     /// <summary>Rute yang diubah; null = tambah rute baru.</summary>
     [Parameter] public Rute? Rute { get; set; }
-    /// <summary>Isian awal Area Pick Up rute baru, mis. lokasi bongkar trip asal backload.</summary>
+    /// <summary>Isian awal Area Pick Up rute baru, mis. destinasi trip asal backload.</summary>
     [Parameter] public string? KodeAreaAsalAwal { get; set; }
     /// <summary>Pengganti keterangan di bawah judul modal.</summary>
     [Parameter] public string? Keterangan { get; set; }
@@ -183,7 +183,7 @@
     private RenderFragment? HintArea(string sisi)
     {
         var kode = sisi == "asal" ? _areaAsal : _areaTujuan;
-        var bawaan = sisi == "asal" ? "Lokasi muat. Cari dulu; belum ada? Tambah alamat." : "Lokasi bongkar.";
+        var bawaan = sisi == "asal" ? "Lokasi pick up. Cari dulu; belum ada? Tambah alamat." : "Lokasi destinasi.";
         if (kode == "" || LokasiArea().ContainsKey(kode.ToUpperInvariant())) return Teks(bawaan);
         return @<span>
             Area <span class="fw-semibold">@kode</span> belum punya alamat di Master Alamat.
@@ -210,7 +210,7 @@
     {
         if (kembar is null) return Teks("Kesimpulan dari area pick up dan destinasi. Boleh ditambah nomor site atau BCKLD, mis. CIB - RAWA 52.");
         return @<span style="color:#8a6100">
-            Sudah ada: <span class="fw-semibold">@kembar.RouteCode</span> @kembar.RouteName (UJ @Format.Rupiah(kembar.Ujroute), Harga @Format.Rupiah(kembar.Price)).
+            Sudah ada: <span class="fw-semibold">@kembar.RouteCode</span> @kembar.RouteName (Uang Jalan @Format.Rupiah(kembar.Ujroute), Harga @Format.Rupiah(kembar.Price)).
             @if (OnPakai.HasDelegate)
             {
                 <button type="button" class="btn btn-link p-0 fs-inherit fw-semibold align-baseline text-decoration-underline" style="color:inherit" @onclick="() => PakaiKembar(kembar)">Pakai rute ini</button>

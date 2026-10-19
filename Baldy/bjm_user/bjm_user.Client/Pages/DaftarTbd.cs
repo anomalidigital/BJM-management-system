@@ -117,7 +117,7 @@ public static class DaftarTbd
             "Form trip mengikuti mock 1a & 1b. Ditambah Tanggal Berangkat (dipakai Berita Acara, laporan, dan periode; bawaan hari ini) dan No. Kontrak yang muncul hanya untuk klien Dedicated. Tipe layanan, lokasi muat / bongkar, tanggal order, dan status terisi otomatis. Manager trip dipilih di tab Komisi.",
             "Tanggal Berangkat di form trip boleh tetap ada? Manager trip cukup dipilih di tab Komisi?"),
         new("TBD-37", "Istilah Sopir atau Supir",
-            "Menu memakai \"Supir / Karyawan\", sedangkan mock atasan 13 Okt 2026 memakai \"Sopir\" di tabel & form trip (judul kartunya \"Kendaraan dan Supir\"). Prototipe memakai \"Supir\" di semua tempat supaya seragam. KBBI: bentuk baku \"sopir\".",
+            "Menu memakai \"Supir / Karyawan\", sedangkan mock atasan 13 Okt 2026 memakai \"Sopir\" di tabel & form trip (judul kartunya \"Kendaraan dan Supir\"). Excel REKAPAN dari klien juga memakai \"SUPIR\". Aplikasi memakai \"Supir\" di semua tempat supaya seragam (diseragamkan lagi 19 Okt 2026, termasuk halaman Priok dan Ritan). KBBI: bentuk baku \"sopir\".",
             "Pakai \"Supir\" (seperti menu sekarang) atau \"Sopir\" (baku KBBI, seperti mock) di seluruh aplikasi?"),
         new("TBD-38", "Jenis dokumen penting",
             "Karyawan: KTP, SIM (berlaku s/d), Kartu Keluarga, NPWP, ditambah dokumen lainnya. Kendaraan: STNK, KIR, Pajak Kendaraan, Asuransi (semuanya berlaku s/d), ditambah foto & dokumen lainnya. Dokumen yang habis / habis dalam 30 hari ditandai merah di daftar.",

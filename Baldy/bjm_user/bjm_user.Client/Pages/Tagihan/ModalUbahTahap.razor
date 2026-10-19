@@ -47,7 +47,7 @@
     private async Task Simpan()
     {
         if (_tanggal == "") { _galat = "Tanggal wajib diisi."; return; }
-        if (Tahap == TahapPi.Revisi && _catatan.Trim() == "") { _galat = "Tulis apa yang perlu direvisi, mis. selisih harga atau biaya tambahan."; return; }
+        if (Tahap == TahapPi.Revisi && _catatan.Trim() == "") { _galat = "Tulis apa yang perlu direvisi, mis. selisih harga atau biaya yang ditagihkan."; return; }
         _galat = null;
         await OnSimpan.InvokeAsync(new IsiTahap(Rows, Tahap, _tanggal, _catatan.Trim(), _bukti));
     }

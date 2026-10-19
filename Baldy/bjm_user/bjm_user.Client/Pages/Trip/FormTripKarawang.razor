@@ -34,7 +34,7 @@ else
     var anakBackload = Asal is null ? [] : Db.Baris.Where(t => t.T.BackloadDari == Asal.Id && !t.Batal).Select(t => t.IdTampil).ToList();
     <div class="halaman-form">
         <PageHeader Title="@_kodeAwal" Crumbs="Remah">
-            <Description>Tiap mobil tersimpan sebagai trip sendiri dengan Berita Acara Serah Terima masing-masing.</Description>
+            <Description>Tiap kendaraan tersimpan sebagai trip sendiri dengan Berita Acara Serah Terima masing-masing.</Description>
         </PageHeader>
 
         @if (!Bisa("trip"))
@@ -53,7 +53,7 @@ else
         {
             <div class="kotak-backload mb-3">
                 <p class="m-0 fw-semibold">Backload / Lanjutan dari Trip <a href="@($"transaksi/trip/{Asal.Id}")" class="text-decoration-underline" style="color:inherit">@Asal.IdTampil</a></p>
-                <p class="m-0 mt-1">Kendaraan @(Asal.PlateNumber != "" ? Asal.PlateNumber : "(belum ada)")@(Asal.DriverNames != "" ? $" dan supir {Asal.DriverNames}" : "") mengikuti trip asal. Pick up dari lokasi bongkarnya@if (Asal.Bongkar != "") { <span>: <span class="fw-semibold">@Asal.Bongkar</span></span> }.</p>
+                <p class="m-0 mt-1">Kendaraan @(Asal.PlateNumber != "" ? Asal.PlateNumber : "(belum ada)")@(Asal.DriverNames != "" ? $" dan supir {Asal.DriverNames}" : "") mengikuti trip asal. Pick up dari destinasi trip asal@if (Asal.Bongkar != "") { <span>: <span class="fw-semibold">@Asal.Bongkar</span></span> }.</p>
                 @if (Asal.Status != StatusTrip.Selesai) { <p class="m-0 mt-1" style="color:var(--brand-700)">Trip asal masih @StatusTrip.Label(Asal.Status). Tutup trip asal setelah POD-nya difoto atau diterima.</p> }
                 @if (anakBackload.Count > 0) { <p class="m-0 mt-1" style="color:var(--brand-700)">Trip asal sudah punya backload: @string.Join(", ", anakBackload). Yang ini tersimpan sebagai backload berikutnya.</p> }
             </div>
@@ -388,7 +388,7 @@ else
                 .Select(r =>
                 {
                     var a = TripLogika.KodeArea(r);
-                    var meta = string.Join(" · ", new[] { DariBongkar(r) ? "dari lokasi bongkar trip asal" : "", pakai.TryGetValue(r.Id, out var n) ? $"{n}× dipakai klien ini" : "", $"No. {r.RouteCode}", $"Uang jalan {Format.Rupiah(r.Ujroute)}" }.Where(x => x != ""));
+                    var meta = string.Join(" · ", new[] { DariBongkar(r) ? "dari destinasi trip asal" : "", pakai.TryGetValue(r.Id, out var n) ? $"{n}× dipakai klien ini" : "", $"No. {r.RouteCode}", $"Uang Jalan {Format.Rupiah(r.Ujroute)}" }.Where(x => x != ""));
                     return new Opsi(r.Id, r.RouteName != "" ? r.RouteName : r.RouteCode, meta, $"{r.RouteCode} {r.RouteCodeLama} {a.Asal} {a.Tujuan}");
                 }).ToList();
         }
@@ -472,8 +472,8 @@ else
 
     private RenderFragment? HintRute => _galat.ContainsKey("rute") ? null
         : Kunci ? T(LewatKunci)
-        : Backload && Rute is null ? T($"Pilih rute dari lokasi bongkar trip asal{(Asal!.Bongkar != "" ? $" ({Asal.Bongkar})" : "")}.")
-        : Dedicated && Rute is null ? T("Opsional untuk Dedicated: patokan uang jalan dan lokasi muat / bongkar.")
+        : Backload && Rute is null ? T($"Pilih rute yang berangkat dari destinasi trip asal{(Asal!.Bongkar != "" ? $" ({Asal.Bongkar})" : "")}.")
+        : Dedicated && Rute is null ? T("Opsional untuk Dedicated: patokan uang jalan serta pick up dan destinasi.")
         : T("Pilih rute pengiriman, mis. CIB - DURI.");
 
     private RenderFragment? HintTitik(bool pengirim, string kode)
@@ -481,7 +481,7 @@ else
         var nilai = pengirim ? _f.Pengirim : _f.Penerima;
         var otomatis = pengirim ? _otomatisPengirim : _otomatisPenerima;
         if (otomatis && nilai != "") return T(pengirim ? $"Terisi dari area pick up rute ({kode}). Ganti bila beda." : $"Terisi dari area destinasi rute ({kode}). Ganti bila beda.");
-        if (pengirim && Backload && nilai != "" && nilai == _awal.Pengirim) return T("Terisi dari penerima trip asal (lokasi bongkarnya).");
+        if (pengirim && Backload && nilai != "" && nilai == _awal.Pengirim) return T("Terisi dari destinasi trip asal.");
         if (Rute is not null && nilai == "" && kode != "" && !AdaAlamatDiArea(kode))
         {
             return b =>

@@ -39,7 +39,10 @@ html { -webkit-text-size-adjust: 100%; }
 body { background: var(--page); color: var(--ink); font-size: 14px; -webkit-font-smoothing: antialiased; }
 table { font-variant-numeric: tabular-nums; }
 .tnum { font-variant-numeric: tabular-nums; }
-:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 2px; border-radius: 4px; }
+:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 2px; }
+/* Fokus yang dipindah sistem (judul halaman saat pindah halaman, panel, dialog: tabindex -1) tanpa garis. Elemen itu tidak bisa
+   dicapai dengan Tab, jadi garisnya hanya membuat halaman tampak "sudah terpilih" saat pertama dibuka. */
+[tabindex="-1"]:focus, [tabindex="-1"]:focus-visible { outline: none; }
 ::-webkit-scrollbar { width: 11px; height: 11px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #c9ccd2; border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }

@@ -9,7 +9,7 @@
     var tagihan = t.JobOrderId != "" ? Db.BarisTagihan.Where(b => b.B.JobOrderId == t.JobOrderId).ToList() : [];
     var pengiriman = new (string Label, string Nilai, bool Mono)[]
     {
-        ("No. Kendaraan", AturDetail.Strip(Trip.PlateNumber), true), ("Party", AturDetail.Strip(t.Party), false), ("Jenis Brg", AturDetail.Strip(t.GoodsType), false),
+        ("No. Kendaraan", AturDetail.Strip(Trip.PlateNumber), true), ("Party", AturDetail.Strip(t.Party), false), ("Jenis Barang", AturDetail.Strip(t.GoodsType), false),
         ("Kosongan", AturDetail.Strip(t.Kosongan), false), ("Lokasi", AturDetail.Strip(t.Location), false), ("Kapal", AturDetail.Strip(t.Ship), false),
         ("Tujuan", AturDetail.Strip(t.DestinationDetail), false),
     };
@@ -27,7 +27,7 @@
                 <dl class="row row-cols-1 row-cols-sm-3 g-3 mb-0">
                     <InfoItem Label="Tanggal Order" Value="@(string.IsNullOrEmpty(t.OrderDate) ? "—" : Format.Tanggal(t.OrderDate))" Mono />
                     <InfoItem Label="Tanggal Berangkat" Value="@Format.Tanggal(t.TransactionDate)" Mono />
-                    <InfoItem Label="Nomor Trip" Value="@t.TransactionNo" Mono />
+                    <InfoItem Label="ID Trip" Value="@t.TransactionNo" Mono />
                     <InfoItem Label="Nomor Surat Jalan" Value="@AturDetail.Strip(t.SjNo)" Mono />
                     <InfoItem Label="Manager">
                         @if (manager is not null) { <a href="@($"master/karyawan/{manager.Id}")" class="text-ink text-decoration-none">@manager.DriverName</a> }
@@ -66,7 +66,7 @@
             <KepalaKartu Title="Informasi Pengiriman" />
             <div class="p-3">
                 <div class="mb-3">
-                    <p class="m-0 fs-11-5 fw-semibold text-ink-3 text-uppercase" style="letter-spacing:.04em">Sopir</p>
+                    <p class="m-0 fs-11-5 fw-semibold text-ink-3 text-uppercase" style="letter-spacing:.04em">Supir</p>
                     @if (Trip.DriverIds.Count == 0) { <p class="m-0 mt-1 fs-13 fw-medium text-ink">—</p> }
                     else
                     {
@@ -88,7 +88,7 @@
                 <dl class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 mb-0">
                     <InfoItem Label="@pengiriman[0].Label" Value="@pengiriman[0].Nilai" Mono />
                     <InfoItem Label="@pengiriman[1].Label" Value="@pengiriman[1].Nilai" />
-                    <InfoItem Label="SI / BL" Mono>
+                    <InfoItem Label="SI / Job Order" Mono>
                         @if (Trip.Sijo != "") { <a href="@($"pencarian/sijo?sijo={Uri.EscapeDataString(Trip.Sijo)}")" class="text-decoration-none">@Trip.Sijo</a> }
                         else { @("—") }
                     </InfoItem>
@@ -101,7 +101,7 @@
             <KepalaKartu Title="Identifier & Catatan" />
             <div class="p-3">
                 <dl class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 mb-0">
-                    <InfoItem Label="TR" Value="@AturDetail.Strip(t.TrReference)" Mono />
+                    <InfoItem Label="No Referensi" Value="@AturDetail.Strip(t.TrReference)" Mono />
                     <InfoItem Label="No PI" Value="@AturDetail.Strip(t.PiNumber)" Mono />
                     <InfoItem Label="Status PI" Value="@AturDetail.Strip(t.PiStatus)" />
                     <InfoItem Label="Tanggal Bon" Value="@(string.IsNullOrEmpty(t.BonDate) ? "—" : Format.Tanggal(t.BonDate))" Mono />
@@ -120,11 +120,11 @@
 
     <div class="col-xl-4 d-flex flex-column gap-3">
         <Kartu>
-            <KepalaKartu Title="ID Perjalanan/Trip" Subtitle="@($"{t.TripIds.Count} ID pada trip ini.")" />
+            <KepalaKartu Title="ID Perjalanan" Subtitle="@($"{t.TripIds.Count} ID pada trip ini.")" />
             <div class="p-3">
                 @if (t.TripIds.Count == 0)
                 {
-                    <p class="m-0 py-4 text-center fs-13 text-ink-3">Belum ada ID Perjalanan/Trip.</p>
+                    <p class="m-0 py-4 text-center fs-13 text-ink-3">Belum ada ID Perjalanan.</p>
                 }
                 else
                 {
@@ -155,7 +155,7 @@
                         <InfoItem Label="No. Kontrak" Value="@kontrak.ContractNo" Mono />
                         <InfoItem Label="Nilai" Value="@Format.Rupiah(kontrak.Value)" Mono />
                         <InfoItem Label="Terpakai" Value="@Format.Rupiah(terpakaiKontrak)" Mono />
-                        <InfoItem Label="Sisa (balance)" Value="@Format.Rupiah(kontrak.Value - terpakaiKontrak)" Mono />
+                        <InfoItem Label="Sisa" Value="@Format.Rupiah(kontrak.Value - terpakaiKontrak)" Mono />
                     </dl>
                 </div>
             </Kartu>
@@ -165,7 +165,7 @@
             <KepalaKartu Title="Komisi" Subtitle="Dihitung otomatis dari Komisi → tab Aturan." />
             <div class="p-3">
                 <dl class="row row-cols-2 g-3 mb-0">
-                    <InfoItem Label="Sopir utama" Value="@Format.Rupiah(Trip.KomisiSopir)" Mono />
+                    <InfoItem Label="Supir utama" Value="@Format.Rupiah(Trip.KomisiSopir)" Mono />
                     <InfoItem Label="Manager" Value="@(t.ManagerId != "" || t.ManagerName != "" ? Format.Rupiah(Trip.KomisiManager) : "—")" Mono />
                 </dl>
             </div>
@@ -173,7 +173,7 @@
         </Kartu>
 
         <Kartu>
-            <KepalaKartu Title="Tagihan terkait" Subtitle="@(Trip.Sijo != "" ? $"Tagihan dengan SI/JO {Trip.Sijo}." : "Pilih SI / BL untuk menautkan tagihan.")" />
+            <KepalaKartu Title="Tagihan terkait" Subtitle="@(Trip.Sijo != "" ? $"Tagihan dengan SI / Job Order {Trip.Sijo}." : "Pilih SI / Job Order untuk menautkan tagihan.")" />
             @if (tagihan.Count == 0)
             {
                 <p class="m-0 px-3 py-4 text-center fs-13 text-ink-3">Belum ada tagihan terkait.</p>

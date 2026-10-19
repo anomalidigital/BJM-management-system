@@ -97,7 +97,7 @@
                                 <span class="min-w-0 flex-grow-1">
                                     <span class="d-flex align-items-baseline gap-2">
                                         <span class="tnum fs-13 fw-semibold text-ink">@b.B.InvoiceNo</span>
-                                        <span class="tnum fs-12 text-ink-3">SI/JO @b.Sijo</span>
+                                        <span class="tnum fs-12 text-ink-3">SI / Job Order @b.Sijo</span>
                                     </span>
                                     <span class="d-flex gap-3 fs-12 text-ink-3" style="margin-top:2px">
                                         <span>@b.B.CostCode</span>
@@ -120,11 +120,11 @@
 
     @if (Sijo is not null)
     {
-        <Panel Title="SI / Job Order terbaru" Subtitle="@($"{Format.Angka(Jumlah.Sijo)} SI/Job Order, {Format.Angka(Jumlah.Komplit)} sudah komplit.")"
-               Href="pencarian/sijo" Tautan="Cari SI/JO">
+        <Panel Title="SI / Job Order terbaru" Subtitle="@($"{Format.Angka(Jumlah.Sijo)} SI / Job Order, {Format.Angka(Jumlah.Komplit)} sudah komplit.")"
+               Href="pencarian/sijo" Tautan="Cari SI / Job Order">
             @if (Sijo.Count == 0)
             {
-                <p class="dash-kosong">Belum ada SI/Job Order.</p>
+                <p class="dash-kosong">Belum ada SI / Job Order.</p>
             }
             else
             {

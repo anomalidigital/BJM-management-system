@@ -82,7 +82,7 @@ else
             <p class="m-0 d-flex min-w-0 align-items-start gap-2">
                 <IkonSvg Def="Ikon.Warehouse" Size="16" Style="margin-top:1px" />
                 <span>
-                    <span class="fw-semibold">Mobil belum tercatat kembali di pool, jadi belum bisa dipakai trip lain.</span>
+                    <span class="fw-semibold">Kendaraan belum tercatat kembali di pool, jadi belum bisa dipakai trip lain.</span>
                     @if (t.AdaBackload == true)
                     {
                         <span class="d-block fs-12-5">Trip ini ditandai ada backload / lanjutan: buat tripnya lewat menu ⋯ di daftar trip, atau tandai sudah di pool bila tidak jadi.</span>
@@ -299,7 +299,7 @@ else
         var menu = new List<AksiMenu>();
         // Backload / lanjutan hanya dari menu ⋯ daftar trip (Baldy 14 Okt 2026), tidak dari detail.
         if (karawang) menu.Add(new AksiMenu("Rekap Trip", () => _rekap = true, Ikon.ClipboardCheck));
-        if (belumDiPool) menu.Add(new AksiMenu("Tandai mobil di pool", () => TandaiPool(trip), Ikon.Warehouse, disabled: !Bisa("trip")));
+        if (belumDiPool) menu.Add(new AksiMenu("Tandai kendaraan di pool", () => TandaiPool(trip), Ikon.Warehouse, disabled: !Bisa("trip")));
         menu.Add(new AksiMenu("Hapus Trip", () => _menghapus = true, Ikon.TrashCan, "danger", !Bisa("hapus")));
         return menu;
     }
@@ -307,6 +307,6 @@ else
     private void TandaiPool(BarisTrip trip)
     {
         Db.TandaiDiPool(trip.Id);
-        Toast.Sukses($"Mobil {(trip.PlateNumber != "" ? trip.PlateNumber : $"Trip {trip.IdTampil}")} tercatat kembali di pool dan bisa dipakai trip lain.");
+        Toast.Sukses($"Kendaraan {(trip.PlateNumber != "" ? trip.PlateNumber : $"Trip {trip.IdTampil}")} tercatat kembali di pool dan bisa dipakai trip lain.");
     }
 }

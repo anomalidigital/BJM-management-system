@@ -6,7 +6,7 @@
 <PageTitle>Trip / Job Order — BJM Logistik</PageTitle>
 
 <PageHeader Title="Trip / Job Order">
-    <Description>@(Karawang ? "Satu trip = satu mobil, dengan Berita Acara, perjalanan, uang jalan, biaya, dan PI-nya sendiri." : "Setiap trip memuat dokumen Surat Jalan beserta catatan uang jalan, biaya, dan lampirannya.")</Description>
+    <Description>@(Karawang ? "Satu trip = satu kendaraan, dengan Berita Acara, perjalanan, uang jalan, biaya, dan PI-nya sendiri." : "Setiap trip memuat dokumen Surat Jalan beserta catatan uang jalan, biaya, dan lampirannya.")</Description>
     <Actions><Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Bisa("trip"))" OnClick="@(() => Ke("transaksi/trip/tambah"))">Tambah Trip</Tombol></Actions>
 </PageHeader>
 
@@ -21,7 +21,7 @@
     <Toolbar>
         <Left>
             <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Width="20rem"
-                         Placeholder="@(Karawang ? "Cari ID Trip, No. Referensi, supir, plat, rute..." : "Cari No. Trip, ID Perjalanan, supir, rute, S/JO...")" />
+                         Placeholder="@(Karawang ? "Cari ID Trip, No Referensi, supir, No. Kendaraan, rute..." : "Cari ID Trip, ID Perjalanan, supir, rute, SI / Job Order...")" />
             <PanelFilter T="FilterTrip" Filter="_filter" Chips="Chips" Galat="@Format.GalatRentang(_filter.Draf.Dari, _filter.Draf.Sampai)" Lebar="380">
                 <div>
                     <p class="form-label">Tanggal berangkat</p>
@@ -57,7 +57,7 @@
                 </div>
                 @if (Karawang)
                 {
-                    <Checkbox Label="Hanya mobil yang belum kembali ke pool" Checked="_filter.Draf.Pool" CheckedChanged="v => _filter.Ubah(d => d.Pool = v)" />
+                    <Checkbox Label="Hanya kendaraan yang belum kembali ke pool" Checked="_filter.Draf.Pool" CheckedChanged="v => _filter.Ubah(d => d.Pool = v)" />
                 }
             </PanelFilter>
         </Left>
@@ -103,7 +103,7 @@
                 </p>
                 <p class="m-0 fs-12-5 text-ink-3">Ingin memeriksa rekapnya dulu? Tutup satu per satu lewat menu ⋯ Tutup Trip.</p>
                 <div class="rounded-3 border border-hairline bg-sunken px-3 py-2">
-                    <Checkbox Label="Mobil sudah kembali ke pool" @bind-Checked="_massalDiPool" />
+                    <Checkbox Label="Kendaraan sudah kembali ke pool" @bind-Checked="_massalDiPool" />
                     <p class="m-0 mt-1 ps-4 fs-12 text-ink-3">@(_massalDiPool ? "Mobilnya langsung bisa dipakai trip lain." : "Mobilnya tetap tertahan sampai ditandai sudah di pool lewat menu ⋯ tiap trip.")</p>
                 </div>
             </div>
@@ -241,7 +241,7 @@ else
             if (f.Supir != "") c.Add(new($"Supir: {DaftarSupir.FirstOrDefault(s => s.Id == f.Supir).Nama ?? "—"}", () => _filter.Lepas((n, a) => n.Supir = a.Supir)));
             if (f.Klien != "") c.Add(new($"Klien: {Db.Cari<Klien>(f.Klien)?.ProjectCode ?? "—"}", () => _filter.Lepas((n, a) => n.Klien = a.Klien)));
             if (f.Layanan != "") c.Add(new($"Layanan: {TipeKlien.Label(f.Layanan)}", () => _filter.Lepas((n, a) => n.Layanan = a.Layanan)));
-            if (f.Pool) c.Add(new("Mobil belum di pool", () => _filter.Lepas((n, a) => n.Pool = a.Pool)));
+            if (f.Pool) c.Add(new("Kendaraan belum di pool", () => _filter.Lepas((n, a) => n.Pool = a.Pool)));
             return c;
         }
     }
@@ -285,7 +285,7 @@ else
     private void TandaiPool(BarisTrip t)
     {
         Db.TandaiDiPool(t.Id);
-        Toast.Sukses($"Mobil {(t.PlateNumber != "" ? t.PlateNumber : $"Trip {t.IdTampil}")} tercatat kembali di pool dan bisa dipakai trip lain.");
+        Toast.Sukses($"Kendaraan {(t.PlateNumber != "" ? t.PlateNumber : $"Trip {t.IdTampil}")} tercatat kembali di pool dan bisa dipakai trip lain.");
     }
 
     private List<AksiMenu> AksiBaris(BarisTrip t)
@@ -295,7 +295,7 @@ else
         if (Karawang) a.Add(new("Rekap Trip", () => _rekap = t, Ikon.ClipboardCheck));
         if (Karawang && StatusTrip.BisaDitutup(t.Status)) a.Add(new("Tutup Trip", () => _tutup = t, Ikon.FlagCheckered, disabled: !Bisa("trip")));
         if (Karawang) a.Add(new("Ada Backload / Lanjutan", () => Ke($"transaksi/trip/tambah?backload={t.Id}"), Ikon.Route, disabled: !Bisa("trip") || batal || t.T.VehicleId == ""));
-        if (Karawang && BelumDiPool(t)) a.Add(new("Tandai mobil di pool", () => TandaiPool(t), Ikon.Warehouse, disabled: !Bisa("trip")));
+        if (Karawang && BelumDiPool(t)) a.Add(new("Tandai kendaraan di pool", () => TandaiPool(t), Ikon.Warehouse, disabled: !Bisa("trip")));
         // Trip yang sudah ditagih (punya PI) tidak dibatalkan: PI-nya akan tertinggal tanpa trip yang berlaku.
         a.Add(new AksiMenu
         {
@@ -339,7 +339,7 @@ else
         Key = "status", Header = "Status", Sortable = true, Width = "108px",
         Render = t => @<div class="d-flex flex-column align-items-start gap-1">
             <Badge Tone="@StatusTrip.Nada(t.Status)">@StatusTrip.Label(t.Status)</Badge>
-            @if (Karawang && BelumDiPool(t)) { <span class="fw-medium text-nowrap" style="font-size:11px;color:#8a6100" title="Mobil belum tercatat kembali di pool">Belum di pool</span> }
+            @if (Karawang && BelumDiPool(t)) { <span class="fw-medium text-nowrap" style="font-size:11px;color:#8a6100" title="Kendaraan belum tercatat kembali di pool">Belum di pool</span> }
             @if (!string.IsNullOrEmpty(t.T.PrintedAt)) { <span class="text-ink-3" style="font-size:11px">Tercetak</span> }
         </div>,
     };
@@ -374,11 +374,11 @@ else
         KolBerangkat, KolId,
         new()
         {
-            Key = "trip_ids", Header = "ID Perjalanan/Trip", Width = "160px",
+            Key = "trip_ids", Header = "ID Perjalanan", Width = "160px",
             Render = t => @<span>@if (t.T.TripIds.Count == 0) { <span class="text-ink-3">—</span> } else { <span class="tnum d-inline-flex align-items-center gap-1 text-ink-2" title="@string.Join(", ", t.T.TripIds)">@t.T.TripIds[0]@if (t.T.TripIds.Count > 1) { <Badge>+@(t.T.TripIds.Count - 1)</Badge> }</span> }</span>,
         },
         KolSupir, KolPlat, KolRute,
-        new() { Key = "sijo", Header = "S / JO", Sortable = true, Width = "96px", Render = t => @<span>@if (t.Sijo != "") { <a href="@($"pencarian/sijo?sijo={t.Sijo}")" class="tnum text-decoration-none" @onclick:stopPropagation="true">@t.Sijo</a> } else { <span class="text-ink-3">—</span> }</span> },
+        new() { Key = "sijo", Header = "SI / Job Order", Sortable = true, Width = "128px", Render = t => @<span>@if (t.Sijo != "") { <a href="@($"pencarian/sijo?sijo={t.Sijo}")" class="tnum text-decoration-none" @onclick:stopPropagation="true">@t.Sijo</a> } else { <span class="text-ink-3">—</span> }</span> },
         KolUj, KolStatus, KolAksi,
     ];
 }

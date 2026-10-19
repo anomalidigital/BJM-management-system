@@ -205,7 +205,7 @@ else
     [Parameter] public EventCallback OnTutupPreview { get; set; }
     [Parameter] public Func<string, string> Tautan { get; set; } = id => $"transaksi/trip/{id}?tab=uj";
 
-    private static readonly string[] KolomLayar = ["Trip", "Mobil · Supir", "Uang Jalan", "Potong Kasbon", "Biaya dari Uang Jalan", "Dibayar Perusahaan", "Biaya Internal", "Total Keluar", "Ditagihkan ke Klien"];
+    private static readonly string[] KolomLayar = ["Trip", "Kendaraan · Supir", "Uang Jalan", "Potong Kasbon", "Biaya dari Uang Jalan", "Dibayar Perusahaan", "Biaya Internal", "Total Keluar", "Ditagihkan ke Klien"];
 
     private sealed record Jumlah(long Uj, int Termin, long Kasbon, long BiayaSopir, long Perusahaan, long Internal, long Keluar, long Tagih);
     private sealed record BagianKomposisi(string Kunci, string Label, long Nilai, string Warna);
@@ -238,8 +238,8 @@ else
     }
 
     private List<(string, string, string?)> KolomCetak => [
-        ("No.", "right", "4%"), ("Tanggal", "left", "8%"), (Karawang ? "ID Trip" : "No. Trip", "left", Karawang ? "11%" : "9%"),
-        ("Mobil / Supir", "left", "12%"), ("Rute", "left", null),
+        ("No.", "right", "4%"), ("Tanggal", "left", "8%"), ("ID Trip", "left", Karawang ? "11%" : "9%"),
+        ("Kendaraan / Supir", "left", "12%"), ("Rute", "left", null),
         ("Uang Jalan", "right", null), ("Potong Kasbon", "right", null), ("Biaya dari Uang Jalan", "right", null),
         ("Dibayar Perusahaan", "right", null), ("Internal", "right", null), ("Total Keluar", "right", null), ("Ditagihkan", "right", null),
     ];

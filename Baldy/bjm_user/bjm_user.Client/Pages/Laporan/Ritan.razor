@@ -2,7 +2,7 @@
 @inherits KomponenData
 @*
     Cek Ritan Bulan Ini: satu baris satu trip pada bulan berjalan (bulan terakhir yang punya trip); trip batal tidak dihitung.
-    Tanggal Bon, Bon Pribadi, dan SI/JO adalah kolom Ritan sistem lama Priok; Karawang memakai rute & TR.
+    Tanggal Bon, Bon Pribadi, dan SI / Job Order adalah kolom Ritan sistem lama Priok; Karawang memakai rute & No Referensi.
 *@
 <PageTitle>Cek Ritan — BJM Logistik</PageTitle>
 @{ Susun(); }
@@ -21,11 +21,11 @@
             @for (var i = 0; i < hal.Count; i++)
             {
                 var ii = i; var isi = hal[ii];
-                <PrintPage Page="@(ii + 1)" TotalPages="hal.Count" Title="Ritan Sopir - Bulan Berjalan" Subtitle="Transportation Management System - Driver Reports"
+                <PrintPage Page="@(ii + 1)" TotalPages="hal.Count" Title="Ritan Supir - Bulan Berjalan" Subtitle="Transportation Management System - Driver Reports"
                            Periode="@($"{Format.Tanggal(_periode.Awal)} s/d {Format.Tanggal(_periode.Akhir)}")" Meta="meta">
                     @if (Karawang)
                     {
-                        <PrintTable Cols="@(new List<(string, string, string?)> { ("No.", "right", "5%"), ("NoTrans", "left", "12%"), ("Tanggal", "left", "10%"), ("Mobil", "left", "12%"), ("Rute", "left", null), ("TR", "left", "16%"), ("Sopir", "left", "16%") })">
+                        <PrintTable Cols="@(new List<(string, string, string?)> { ("No.", "right", "5%"), ("ID Trip", "left", "12%"), ("Tanggal", "left", "10%"), ("No. Kendaraan", "left", "12%"), ("Rute", "left", null), ("No Referensi", "left", "16%"), ("Supir", "left", "16%") })">
                             @for (var r = 0; r < isi.Count; r++)
                             {
                                 var rr = r; var t = isi[rr];
@@ -43,7 +43,7 @@
                     }
                     else
                     {
-                        <PrintTable Cols="@(new List<(string, string, string?)> { ("No.", "right", "5%"), ("NoTrans", "left", "12%"), ("Mobil", "left", "13%"), ("No. Rute", "left", "11%"), ("Tanggal Bon", "left", "10%"), ("Bon Pribadi", "right", "13%"), ("SI - JOB ORDER", "left", "12%"), ("Sopir", "left", null) })">
+                        <PrintTable Cols="@(new List<(string, string, string?)> { ("No.", "right", "5%"), ("ID Trip", "left", "12%"), ("No. Kendaraan", "left", "13%"), ("No. Rute", "left", "11%"), ("Tanggal Bon", "left", "10%"), ("Bon Pribadi", "right", "13%"), ("SI / Job Order", "left", "12%"), ("Supir", "left", null) })">
                             @for (var r = 0; r < isi.Count; r++)
                             {
                                 var rr = r; var t = isi[rr];
@@ -98,7 +98,7 @@ else
     <Kartu>
         <Toolbar>
             <Left>
-                <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Width="18rem" Placeholder="Cari No. Transaksi, mobil, rute..." />
+                <SearchInput Value="@_tabel.Query" ValueChanged="v => _tabel.SetQuery(v)" Width="18rem" Placeholder="Cari ID Trip, No. Kendaraan, rute..." />
                 <PanelFilter T="FilterRitan" Filter="_filter" Chips="Chips">
                     <Field Label="Supir">
                         <Pilihan Id="@context" Options="OpsiSupir" Value="@_filter.Draf.Driver" ValueChanged="v => _filter.Ubah(d => d.Driver = v ?? string.Empty)" Clearable="false" AriaLabel="Filter supir" />
@@ -209,8 +209,8 @@ else
     }
 
     private string Deskripsi => Karawang
-        ? $"Ritan sopir bulan berjalan ({Format.LabelBulan(_periode.Awal)}): satu baris satu trip. Trip batal tidak dihitung."
-        : $"Ritan Sopir — bulan berjalan ({Format.LabelBulan(_periode.Awal)}). Gunakan Sunting untuk mengubah Tanggal Bon dan Bon Pribadi langsung di tabel.";
+        ? $"Ritan supir bulan berjalan ({Format.LabelBulan(_periode.Awal)}): satu baris satu trip. Trip batal tidak dihitung."
+        : $"Ritan Supir — bulan berjalan ({Format.LabelBulan(_periode.Awal)}). Gunakan Sunting untuk mengubah Tanggal Bon dan Bon Pribadi langsung di tabel.";
 
     private List<Opsi> OpsiSupir => [new("", "Semua Supir"), .. Db.Data.Karyawan.Select(d => new Opsi(d.Id, $"{d.DriverCode} — {d.DriverName}"))];
     private List<Opsi> OpsiKota => [new("", "Semua Kota"), .. Db.Data.Karyawan.Select(d => d.City).Distinct().OrderBy(c => c, StringComparer.Ordinal).Select(c => new Opsi(c, c))];
@@ -262,23 +262,23 @@ else
 
     private List<Kolom<BarisTrip>> KolomKarawang =>
     [
-        new() { Key = "transaction_no", Header = "NoTrans", Sortable = true, Width = "116px", Render = t => @<a href="@($"transaksi/trip/{t.Id}")" class="tnum fw-semibold text-decoration-none remah" style="color:var(--brand-700)" @onclick:stopPropagation="true">@t.T.TransactionNo</a> },
+        new() { Key = "transaction_no", Header = "ID Trip", Sortable = true, Width = "116px", Render = t => @<a href="@($"transaksi/trip/{t.Id}")" class="tnum fw-semibold text-decoration-none remah" style="color:var(--brand-700)" @onclick:stopPropagation="true">@t.T.TransactionNo</a> },
         new() { Key = "transaction_date", Header = "Tanggal", Sortable = true, Width = "104px", Render = t => @<span class="tnum text-ink-2">@Format.Tanggal(t.T.TransactionDate)</span> },
-        new() { Key = "plate_number", Header = "Mobil", Sortable = true, Width = "128px", Render = t => @<span class="tnum text-ink-2">@(t.PlateNumber != "" ? t.PlateNumber : "—")</span> },
+        new() { Key = "plate_number", Header = "No. Kendaraan", Sortable = true, Width = "128px", Render = t => @<span class="tnum text-ink-2">@(t.PlateNumber != "" ? t.PlateNumber : "—")</span> },
         new() { Key = "route_name", Header = "Rute", Sortable = true, Render = t => @<span class="text-ink-2">@(t.RouteName != "" ? t.RouteName : "—")</span> },
-        new() { Key = "tr_list", Header = "TR", Sortable = true, Width = "150px", Render = t => @<span class="tnum text-ink-2">@(t.TrList.Count > 0 ? string.Join(", ", t.TrList) : "—")</span> },
-        new() { Key = "driver_names", Header = "Sopir", Sortable = true, Render = t => @<span class="fw-medium">@(t.DriverNames != "" ? t.DriverNames : "—")</span> },
+        new() { Key = "tr_list", Header = "No Referensi", Sortable = true, Width = "150px", Render = t => @<span class="tnum text-ink-2">@(t.TrList.Count > 0 ? string.Join(", ", t.TrList) : "—")</span> },
+        new() { Key = "driver_names", Header = "Supir", Sortable = true, Render = t => @<span class="fw-medium">@(t.DriverNames != "" ? t.DriverNames : "—")</span> },
     ];
 
     private List<Kolom<BarisTrip>> KolomPriok =>
     [
-        new() { Key = "transaction_no", Header = "NoTrans", Sortable = true, Width = "116px", Render = t => @<span class="tnum fw-semibold text-ink">@t.T.TransactionNo</span> },
-        new() { Key = "plate_number", Header = "Mobil", Sortable = true, Width = "128px", Render = t => @<span class="tnum text-ink-2">@(t.PlateNumber != "" ? t.PlateNumber : "—")</span> },
+        new() { Key = "transaction_no", Header = "ID Trip", Sortable = true, Width = "116px", Render = t => @<span class="tnum fw-semibold text-ink">@t.T.TransactionNo</span> },
+        new() { Key = "plate_number", Header = "No. Kendaraan", Sortable = true, Width = "128px", Render = t => @<span class="tnum text-ink-2">@(t.PlateNumber != "" ? t.PlateNumber : "—")</span> },
         new() { Key = "route_code", Header = "No. Rute", Sortable = true, Width = "112px", Render = t => @<span class="tnum text-ink-2">@(t.RouteCode != "" ? t.RouteCode : "—")</span> },
         new() { Key = "bon_date", Header = "Tanggal Bon", Sortable = true, Width = "150px", Render = t => SelTanggalBon(t) },
         new() { Key = "personal_bon", Header = "Bon Pribadi", Sortable = true, Align = "right", Width = "158px", Render = t => SelBonPribadi(t) },
-        new() { Key = "sijo", Header = "SI - JOB ORDER", Sortable = true, Width = "136px", Render = t => @<a href="@($"pencarian/sijo?sijo={Uri.EscapeDataString(t.Sijo)}")" class="tnum fw-medium text-decoration-none remah" style="color:var(--brand-700)" @onclick:stopPropagation="true">@(t.Sijo != "" ? t.Sijo : "—")</a> },
-        new() { Key = "driver_name", Header = "Sopir", Sortable = true, Render = t => @<span class="fw-medium">@(t.DriverName != "" ? t.DriverName : "—")</span> },
+        new() { Key = "sijo", Header = "SI / Job Order", Sortable = true, Width = "136px", Render = t => @<a href="@($"pencarian/sijo?sijo={Uri.EscapeDataString(t.Sijo)}")" class="tnum fw-medium text-decoration-none remah" style="color:var(--brand-700)" @onclick:stopPropagation="true">@(t.Sijo != "" ? t.Sijo : "—")</a> },
+        new() { Key = "driver_name", Header = "Supir", Sortable = true, Render = t => @<span class="fw-medium">@(t.DriverName != "" ? t.DriverName : "—")</span> },
     ];
 
     private RenderFragment SelTanggalBon(BarisTrip t)

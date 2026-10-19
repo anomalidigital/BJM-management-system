@@ -11,7 +11,7 @@
     {
         ("Supir bertugas", SopirBertugas, $"dari {Format.Angka(SopirAktif)} supir aktif"),
         ("Karyawan aktif", KaryawanAktif, $"dari {Format.Angka(KaryawanTotal)} terdaftar"),
-        ("Mobil terpakai", MobilTerpakai, $"dari {Format.Angka(MobilTotal)} aktif"),
+        ("Kendaraan terpakai", MobilTerpakai, $"dari {Format.Angka(MobilTotal)} aktif"),
     };
     // Status yang dijelaskan di keterangan papan.
     var tampil = StatusPapan.UrutTumpuk.Where(s => !(TanpaDraft && s == StatusTrip.Draft)).ToList();

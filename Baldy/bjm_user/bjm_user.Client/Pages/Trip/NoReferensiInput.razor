@@ -1,4 +1,4 @@
-@* Isian No. Referensi (TR / Order Release klien): ketik lalu Enter, koma, atau Tambah; boleh lebih dari satu; dihapus satu per satu (×). *@
+@* Isian No Referensi (TR / Order Release klien): ketik lalu Enter, koma, atau Tambah; boleh lebih dari satu; dihapus satu per satu (×). *@
 <div>
     <div class="d-flex align-items-center gap-2">
         <input id="@Id" class="form-control min-w-0 flex-grow-1" value="@_ketik" placeholder="TR2600512595" disabled="@Disabled"
@@ -12,7 +12,7 @@
             {
                 <li class="tnum d-inline-flex align-items-center gap-1 rounded-2 border border-hairline bg-sunken fs-12-5 fw-medium text-ink mw-100" style="padding:2px 4px 2px 8px">
                     <span class="text-truncate">@no</span>
-                    <button type="button" class="btn btn-link p-0 text-ink-3 place-center" style="width:20px;height:20px" aria-label="@($"Hapus No. Referensi {no}")" disabled="@Disabled" @onclick="() => Hapus(no)"><IkonSvg Def="Ikon.Xmark" Size="11" /></button>
+                    <button type="button" class="btn btn-link p-0 text-ink-3 place-center" style="width:20px;height:20px" aria-label="@($"Hapus No Referensi {no}")" disabled="@Disabled" @onclick="() => Hapus(no)"><IkonSvg Def="Ikon.Xmark" Size="11" /></button>
                 </li>
             }
         </ul>

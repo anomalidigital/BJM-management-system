@@ -185,7 +185,7 @@ else
                 <table class="table table-hover fs-13 w-100">
                     <thead class="sticky-top">
                         <tr>
-                            @foreach (var (h, i) in new[] { "Tanggal", "Trip", "Supir", "Mobil", "Ke-", "Jenis", "Uang Jalan", "Potong Kasbon", "Transfer ke Supir" }.Select((h, i) => (h, i)))
+                            @foreach (var (h, i) in new[] { "Tanggal", "Trip", "Supir", "No. Kendaraan", "Ke-", "Jenis", "Uang Jalan", "Potong Kasbon", "Transfer ke Supir" }.Select((h, i) => (h, i)))
                             {
                                 <th class="px-3 @(i == 4 || i >= 6 ? "text-end" : "text-start")">@h</th>
                             }
@@ -260,8 +260,8 @@ else
     ];
 
     private List<(string, string, string?)> KolomRincian => [
-        ("No.", "right", "5%"), ("Tanggal", "left", "9%"), (Karawang ? "ID Trip" : "No. Trip", "left", Karawang ? "17%" : "11%"), ("Supir", "left", null),
-        ("Mobil", "left", "10%"), ("Ke-", "right", "5%"), ("Jenis", "left", "10%"),
+        ("No.", "right", "5%"), ("Tanggal", "left", "9%"), ("ID Trip", "left", Karawang ? "17%" : "11%"), ("Supir", "left", null),
+        ("No. Kendaraan", "left", "10%"), ("Ke-", "right", "5%"), ("Jenis", "left", "10%"),
         ("Uang Jalan (Rp)", "right", null), ("Kasbon (Rp)", "right", null), ("Transfer (Rp)", "right", null),
     ];
 }

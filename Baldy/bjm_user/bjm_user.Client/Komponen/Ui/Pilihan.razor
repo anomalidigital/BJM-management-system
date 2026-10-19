@@ -110,9 +110,8 @@
     {
         if (_buka) { await TutupAsync(); return; }
         _q = "";
-        var l = Options;
-        var t = l.FindIndex(o => o.Value == Nilai && !o.Disabled);
-        _aktif = t >= 0 ? t : PertamaAktif(l);
+        // Saat dibuka hanya pilihan yang sedang terpakai yang disorot; tanpa pilihan, tidak ada yang tampak terpilih.
+        _aktif = Options.FindIndex(o => o.Value == Nilai && !o.Disabled);
         _buka = true;
         _perluPosisi = true;
     }
@@ -125,7 +124,9 @@
     private void Ketik(ChangeEventArgs e)
     {
         _q = e.Value?.ToString() ?? "";
-        _aktif = PertamaAktif(Saring(_q));
+        // Dengan kata kunci, hasil pertama disorot supaya Enter langsung memilih; kotak cari kosong kembali tanpa sorotan.
+        var l = Saring(_q);
+        _aktif = _q.Trim() == "" ? l.FindIndex(o => o.Value == Nilai && !o.Disabled) : PertamaAktif(l);
         _perluPosisi = true;
     }
 
@@ -144,7 +145,8 @@
 
     private void Geser(List<Opsi> l, int arah)
     {
-        for (var j = _aktif + arah; j >= 0 && j < l.Count; j += arah) if (!l[j].Disabled) { _aktif = j; return; }
+        var mulai = _aktif < 0 ? (arah > 0 ? 0 : l.Count - 1) : _aktif + arah;
+        for (var j = mulai; j >= 0 && j < l.Count; j += arah) if (!l[j].Disabled) { _aktif = j; return; }
     }
 
     private async Task Pilih(Opsi o)

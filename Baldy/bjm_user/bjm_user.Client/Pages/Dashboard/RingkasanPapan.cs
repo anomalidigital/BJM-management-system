@@ -163,7 +163,7 @@ public sealed class RingkasanPapan
         };
         // Karawang (12 Okt 2026): mobil baru bisa dipakai trip lain setelah tercatat kembali di pool.
         if (!cabangContainer)
-            tindak.Add(new("belum-pool", "Mobil belum kembali ke pool", "Trip sudah selesai. Tandai setelah mobil kembali, supaya bisa dipakai trip lain.",
+            tindak.Add(new("belum-pool", "Kendaraan belum kembali ke pool", "Trip sudah selesai. Tandai setelah kendaraan kembali, supaya bisa dipakai trip lain.",
                 rows.Count(t => t.Status == StatusTrip.Selesai && t.MenahanKendaraan), "transaksi/trip?pool=belum", "perhatian"));
         tindak.Add(cabangContainer
             ? new("sj-draft", "Surat Jalan belum dicetak", "Trip sudah bernomor Surat Jalan tapi belum dicetak.",
@@ -183,18 +183,18 @@ public sealed class RingkasanPapan
             data.Karyawan.Where(d => d.Status != "nonaktif").Select(d => DokumenPentingInput.Ringkas(DokumenPentingJenis.Karyawan, d.Dokumen))));
         tindak.Add(new("belum-selesai",
             cabangContainer ? "Trip belum ditandai Selesai" : "Trip belum ditutup",
-            cabangContainer ? "Tandai setelah mobil kembali ke pool." : "Tutup setelah POD diterima, sekaligus tanyakan backload / rute lanjutan.",
+            cabangContainer ? "Tandai setelah kendaraan kembali ke pool." : "Tutup setelah POD diterima, sekaligus tanyakan backload / rute lanjutan.",
             bulanIni.Count(t => t.Status != StatusTrip.Selesai), "transaksi/trip", "info"));
         tindak.Add(new("belum-lunas", "Tagihan belum lunas", "Belum ada tanggal lunas.",
             tagihan.Count(b => string.IsNullOrEmpty(b.B.PaidDate) && !b.B.IsRejected), "transaksi/tagihan", "info"));
         if (cabangContainer)
         {
             tindak.Add(new("sijo-belum-komplit", "SI / Job Order belum komplit", null, data.JobOrders.Count(j => !j.IsComplete), "pencarian/sijo", "info"));
-            tindak.Add(new("id-trip", "Trip tanpa ID Perjalanan/Trip", null, bulanIni.Count(t => t.T.TripIds.Count == 0), "transaksi/trip", "info"));
+            tindak.Add(new("id-trip", "Trip tanpa ID Perjalanan", null, bulanIni.Count(t => t.T.TripIds.Count == 0), "transaksi/trip", "info"));
         }
         else
         {
-            tindak.Add(new("tanpa-tr", "Trip tanpa No. Referensi", "Isi No. Referensi (nomor TR/OR dari DHL) di form trip.",
+            tindak.Add(new("tanpa-tr", "Trip tanpa No Referensi", "Isi No Referensi (nomor TR/OR dari DHL) di form trip.",
                 tripDokumen.Count(t => t.TrList.Count == 0), "transaksi/trip", "info"));
         }
 

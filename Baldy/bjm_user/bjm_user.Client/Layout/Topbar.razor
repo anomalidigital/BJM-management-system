@@ -9,7 +9,7 @@
     {
         <form class="topbar-cari d-none d-sm-block" @onsubmit="Cari">
             <IkonSvg Def="Ikon.MagnifyingGlass" Size="15" />
-            <input class="form-control" @bind="_q" placeholder="@(CariSijo ? "Lompat ke No. SI / Job Order..." : "Cari trip: ID Trip, No. Referensi, supir, plat...")"
+            <input class="form-control" @bind="_q" placeholder="@(CariSijo ? "Lompat ke No. SI / Job Order..." : "Cari trip: ID Trip, No Referensi, supir, No. Kendaraan...")"
                    aria-label="@(CariSijo ? "Cari nomor SI atau Job Order" : "Cari trip")" />
         </form>
     }
