@@ -120,7 +120,7 @@
     private const string StatusAktif = "aktif", NamaKunci = "nama";
 
     private static readonly List<Opsi> OpsiTipeFilter = [new("", "Semua"), .. TipeKlien.Semua.Select(t => new Opsi(t, TipeKlien.Label(t)))];
-    private static readonly List<Opsi> OpsiDokumen = [new("", "Semua"), new("ya", "Pakai TR / No PI"), new("tidak", "Tanpa dokumen")];
+    private static readonly List<Opsi> OpsiDokumen = [new("", "Semua"), new("ya", "Pakai No Referensi / No PI"), new("tidak", "Tanpa dokumen")];
     private static readonly List<Opsi> OpsiStatus = [new("aktif", "Aktif"), new("nonaktif", "Nonaktif")];
     private static readonly List<Opsi> OpsiStatusFilter = [new("", "Semua"), .. OpsiStatus];
 
@@ -180,7 +180,7 @@
             var f = _filter.Nilai;
             var l = new List<ChipFilter>();
             if (f.Layanan != "") l.Add(new($"Tipe: {TipeKlien.Label(f.Layanan)}", () => _filter.Lepas((n, a) => n.Layanan = a.Layanan)));
-            if (f.Dokumen != "") l.Add(new(f.Dokumen == "ya" ? "Pakai TR / No PI" : "Tanpa dokumen", () => _filter.Lepas((n, a) => n.Dokumen = a.Dokumen)));
+            if (f.Dokumen != "") l.Add(new(f.Dokumen == "ya" ? "Pakai No Referensi / No PI" : "Tanpa dokumen", () => _filter.Lepas((n, a) => n.Dokumen = a.Dokumen)));
             if (f.Status != "") l.Add(new($"Status: {(f.Status == "aktif" ? "Aktif" : "Nonaktif")}", () => _filter.Lepas((n, a) => n.Status = a.Status)));
             return l;
         }
