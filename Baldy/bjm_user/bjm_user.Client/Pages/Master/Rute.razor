@@ -5,9 +5,10 @@
 <PageTitle>Rute — BJM Logistik</PageTitle>
 
 <PageHeader Title="Rute" Crumbs="@(new List<Crumb> { new("Master Data"), new("Rute") })">
-    <Description>Area pick up &amp; destinasi diambil dari Master Alamat; nama rute kesimpulan keduanya. Klien dipilih di form trip. Nominal yang belum ada di data trip bertanda perkiraan.</Description>
+    <Description>Nama rute = pick up - destinasi. Klien dipilih di form trip. Nominal bertanda perkiraan belum ada di data trip.</Description>
     <Actions>
         <Tombol Icon="Ikon.Print" OnClick="() => _preview = true">Cetak</Tombol>
+        <Tombol Icon="Ikon.FileArrowUp" Disabled="@(!Bisa("master"))" OnClick="() => _import = true">Import</Tombol>
         <Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Bisa("master"))" OnClick="BukaTambah">Tambah Rute</Tombol>
     </Actions>
 </PageHeader>
@@ -118,7 +119,12 @@
     </ReportPreview>
 }
 
+
+<ModalImport Open="_import" Definisi="@ImportMaster.Rute(Db)" OnClose="() => _import = false" />
 @code {
+    /// <summary>Import dari template CSV / Excel (Baldy 22 Okt 2026).</summary>
+    private bool _import;
+
     public sealed class FilterRute { public string Kode { get; set; } = ""; public string Feet { get; set; } = ""; public string Kira { get; set; } = ""; }
 
     /// <summary>Baris tabel rute: rute beserta area pick up & destinasinya (dipilih di form rute, atau turunan nama lama).</summary>
@@ -143,7 +149,7 @@
     {
         base.OnInitialized();
         _filter = new KendaliFilter<FilterRute>(() => new FilterRute(), StateHasChanged);
-        _tabel.Search = (r, q) => Util.CocokCari(q, r.R.RouteCode, r.R.RouteCodeLama ?? "", r.R.RouteName, r.R.Feet, r.AreaAsal, r.AreaTujuan);
+        _tabel.Search = (r, q) => Util.CocokCari(q, r.R.RouteCode, r.R.RouteCodeLama ?? "", r.R.RouteName, r.R.Feet, r.AreaAsal, r.AreaTujuan, r.R.Catatan);
         _tabel.SortAccessor = k => k switch
         {
             "route_name" => r => r.R.RouteName, "area_asal" => r => r.AreaAsal, "area_tujuan" => r => r.AreaTujuan, "feet" => r => r.R.Feet,
@@ -205,7 +211,11 @@
             var k = new List<Kolom<BarisRute>>
             {
                 new() { Key = "route_code", Header = "No. Rute", Sortable = true, Width = "150px", Render = SelKode },
-                new() { Key = "route_name", Header = "Nama Rute", Sortable = true, Render = r => @<span class="fw-medium">@r.R.RouteName</span> },
+                new()
+                {
+                    Key = "route_name", Header = "Nama Rute", Sortable = true,
+                    Render = r => @<span class="d-block lh-tight"><span class="fw-medium">@r.R.RouteName</span>@if (r.R.Catatan != "") { <span class="mt-1 d-block fs-12 text-ink-3 text-truncate" style="max-width:320px" title="@r.R.Catatan">@r.R.Catatan</span> }</span>,
+                },
                 new() { Key = "area_asal", Header = "Area Pick Up", Sortable = true, Width = "180px", Render = r => SelArea(r.AreaAsal) },
                 new() { Key = "area_tujuan", Header = "Area Destinasi", Sortable = true, Width = "180px", Render = r => SelArea(r.AreaTujuan) },
             };

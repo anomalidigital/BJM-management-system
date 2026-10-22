@@ -15,12 +15,17 @@
 }
 else if (Existing?.Status == StatusTrip.Batal)
 {
-    <PageHeader Title="@($"Trip {Existing.TransactionNo}")" Crumbs="@(new List<Crumb> { new("Trip / Job Order", "transaksi/trip"), new(Existing.TransactionNo) })" />
+    <PageHeader Title="@($"Trip {Existing.TransactionNo}")" Kembali="@($"transaksi/trip/{Existing.Id}")" Crumbs="@(new List<Crumb> { new("Trip / Job Order", "transaksi/trip"), new(Existing.TransactionNo) })" />
     <Kartu><div class="px-4 py-5 text-center">
         <p class="m-0 fs-14 fw-semibold text-ink">Trip ini sudah dibatalkan.</p>
         <p class="m-0 mt-1 fs-13 text-ink-3">Trip yang dibatalkan disimpan sebagai arsip dan tidak bisa diubah.</p>
         <Tombol Class="mt-3" OnClick="@(() => Ke($"transaksi/trip/{Existing.Id}"))">Lihat trip</Tombol>
     </div></Kartu>
+}
+else if (Existing is not null && StatusTrip.Terkunci(Existing.Status) && Db.BarisTrip(Existing.Id) is { } terkunci)
+{
+    <PageHeader Title="@($"Trip {Existing.TransactionNo}")" Kembali="@($"transaksi/trip/{Existing.Id}")" Crumbs="Remah" />
+    <KunciTrip Trip="terkunci" OnAktif="MuatUlang" />
 }
 else
 {
@@ -41,18 +46,14 @@ else
     var tampilContainer = CabangContainer || _f.Party != "" || _f.JobOrderId != "" || _f.Ship != "" || _f.Kosongan != "" || _f.Location != "" || _f.GoodsType != "";
     var tampilDokumen = (klien is not null ? klien.RequiresDocument : !CabangContainer) || _f.TrReference != "" || _f.PiNumber != "" || _f.PiStatus != "";
     var tampilBon = CabangContainer || _f.BonDate != "" || _f.PersonalBon != 0;
-    <div class="halaman-form">
-        <PageHeader Title="@(Existing is not null ? $"Ubah Trip {Existing.TransactionNo}" : "Tambah Trip")" Crumbs="Remah">
+    <div class="halaman-form form-ringkas">
+        <PageHeader Title="@(Existing is not null ? $"Ubah Trip {Existing.TransactionNo}" : "Tambah Trip")" Kembali="@(Existing is not null ? $"transaksi/trip/{Existing.Id}" : "transaksi/trip")" Crumbs="Remah">
             <Description>Klien tidak perlu dipilih: ikut rute (Callout) atau kontrak (Dedicated), begitu juga Harga Jual dan Uang Jalan Rute. Uang jalan, biaya, dan lampiran dicatat di halaman detail trip.</Description>
         </PageHeader>
 
         @if (!Bisa("trip"))
         {
             <Peringatan Class="mb-3">Peran @(Sesi.Pengguna?.Role == Peran.Viewer ? "Viewer" : "ini") tidak dapat menyimpan perubahan. Form ini hanya untuk melihat struktur data.</Peringatan>
-        }
-        @if (SudahJalan && Existing is not null)
-        {
-            <KunciTrip Status="@Existing.Status" Terbuka="_bukaKunci" BolehBuka="@Bisa("override")" OnBuka="() => _bukaKunci = true" Isian="rute, layanan & kontrak, kendaraan, supir, dan ID Trip" />
         }
 
         <div class="d-flex flex-column gap-3">
@@ -61,11 +62,11 @@ else
                 <div class="p-3">
                     <div class="row g-3">
                         <div class="col-sm-6">
-                            <Radio Name="layanan" Class="h-100" Checked="@(!Dedicated)" Disabled="Kunci" OnChange="() => GantiLayanan(TipeKlien.Callout)" Label="Callout"
+                            <Radio Name="layanan" Class="h-100" Checked="@(!Dedicated)" OnChange="() => GantiLayanan(TipeKlien.Callout)" Label="Callout"
                                    Description="@(CabangContainer ? "Order per perjalanan: penerima, SI / Job Order, dan nomor container." : "Order per perjalanan: penerima, No Referensi, dan No PI.")" />
                         </div>
                         <div class="col-sm-6">
-                            <Radio Name="layanan" Class="h-100" Checked="Dedicated" Disabled="Kunci" OnChange="() => GantiLayanan(TipeKlien.Dedicated)" Label="Dedicated"
+                            <Radio Name="layanan" Class="h-100" Checked="Dedicated" OnChange="() => GantiLayanan(TipeKlien.Dedicated)" Label="Dedicated"
                                    Description="Kendaraan dikontrak satu klien. Form ringkas, wajib memilih nomor kontrak." />
                         </div>
                     </div>
@@ -75,7 +76,7 @@ else
                         <div class="mt-3 row g-3">
                             <div class="col-lg-6">
                                 <Field Label="No. Kontrak" Required Error="@_galat.GetValueOrDefault("contract_id")" Hint="HintKontrak">
-                                    <Pilihan Id="@context" Options="OpsiKontrak" Value="@Kosong(_f.ContractId)" Invalid="@_galat.ContainsKey("contract_id")" Disabled="Kunci" Cari="true"
+                                    <Pilihan Id="@context" Options="OpsiKontrak" Value="@Kosong(_f.ContractId)" Invalid="@_galat.ContainsKey("contract_id")" Cari="true"
                                              Placeholder="Pilih nomor kontrak..." SearchPlaceholder="Ketik nomor kontrak atau klien..." ValueChanged="PilihKontrak" />
                                 </Field>
                             </div>
@@ -103,7 +104,7 @@ else
                     <div class="row g-3">
                         <div class="col-lg-6">
                             <Field Label="ID Perjalanan" Required="@(WajibId && !IdTerkunci)" Error="@_galat.GetValueOrDefault("trip_ids")"
-                                   Hint="@T(_galat.ContainsKey("trip_ids") ? null : IdTerkunci ? "ID Perjalanan dikunci setelah trip tersimpan." : "Terisi ID unik otomatis; ganti dengan nomor container / ID perjalanan bila ada. Nomor container boleh sama dengan trip lain karena dipakai ulang.")">
+                                   Info="@(IdTerkunci ? "ID Perjalanan dikunci setelah trip tersimpan." : "Terisi ID unik otomatis; ganti dengan nomor container / ID perjalanan bila ada. Nomor container boleh sama dengan trip lain karena dipakai ulang.")">
                                 <div class="d-flex flex-column gap-2">
                                     @for (var i = 0; i < _f.TripIds.Count; i++)
                                     {
@@ -134,9 +135,9 @@ else
 
                         <div class="col-lg-6 d-flex flex-column gap-3">
                             <Field Label="Rute" Required="WajibRoute" Error="@_galat.GetValueOrDefault("route_id")" Hint="HintRute(rute, routeProject)">
-                                <Pilihan Id="@context" Options="OpsiRute" Value="@Kosong(_f.RouteId)" Invalid="@_galat.ContainsKey("route_id")" Disabled="Kunci" Cari="true"
+                                <Pilihan Id="@context" Options="OpsiRute" Value="@Kosong(_f.RouteId)" Invalid="@_galat.ContainsKey("route_id")" Cari="true"
                                          Placeholder="Pilih rute..." SearchPlaceholder="Ketik nama atau No. Rute..." ValueChanged="v => PilihRute(v)"
-                                         Tambahan="@(Kunci ? null : new AksiTambahan { Label = _ => "Tambah rute baru", Disabled = !Bisa("master"), OnClick = BukaTambahRute })" />
+                                         Tambahan="@(new AksiTambahan { Label = _ => "Tambah rute baru", Disabled = !Bisa("master"), OnClick = BukaTambahRute })" />
                             </Field>
                             @if (rute is not null || komisi.Aturan is not null)
                             {
@@ -176,35 +177,36 @@ else
                         <div class="p-3">
                             <div class="row g-3">
                                 <div class="col-sm-6 @(Dedicated ? "col-lg-4" : "")">
-                                    <Field Label="Tanggal Order" Hint="@T("Hari permintaan klien masuk.")">
+                                    <Field Label="Tanggal Order" Info="Hari permintaan klien masuk.">
                                         <TanggalInput Id="@context" Value="@_f.OrderDate" ValueChanged="v => _f.OrderDate = v" />
                                     </Field>
                                 </div>
                                 <div class="col-sm-6 @(Dedicated ? "col-lg-4" : "")">
                                     <Field Label="Tanggal Berangkat" Required Error="@_galat.GetValueOrDefault("transaction_date")"
-                                           Hint="@T(_f.OrderDate != "" && _f.TransactionDate != "" && string.CompareOrdinal(_f.TransactionDate, _f.OrderDate) < 0 ? "Lebih awal dari Tanggal Order. Pastikan memang benar." : "Hari trip jalan. Dipakai untuk Nomor Trip, Surat Jalan, dan laporan.")">
+                                           Info="Hari trip jalan. Dipakai untuk Nomor Trip, Surat Jalan, dan laporan."
+                                           Hint="@T(_f.OrderDate != "" && _f.TransactionDate != "" && string.CompareOrdinal(_f.TransactionDate, _f.OrderDate) < 0 ? "Lebih awal dari Tanggal Order. Pastikan memang benar." : null)">
                                         <TanggalInput Id="@context" Value="@_f.TransactionDate" Invalid="@_galat.ContainsKey("transaction_date")" ValueChanged="UbahTanggal" />
                                     </Field>
                                 </div>
                                 <div class="col-sm-6 @(Dedicated ? "col-lg-4" : "")">
-                                    <Field Label="ID Trip" Required Error="@_galat.GetValueOrDefault("transaction_no")" Hint="@T(_galat.ContainsKey("transaction_no") ? null : Kunci ? LewatKunci : "Nomor urut otomatis per bulan.")">
-                                        <KodeInput Id="@context" Value="@_f.TransactionNo" Invalid="@_galat.ContainsKey("transaction_no")" ReadOnly="Kunci"
+                                    <Field Label="ID Trip" Required Error="@_galat.GetValueOrDefault("transaction_no")" Info="Nomor urut otomatis per bulan. Ikon di sampingnya membuat nomor berikutnya.">
+                                        <KodeInput Id="@context" Value="@_f.TransactionNo" Invalid="@_galat.ContainsKey("transaction_no")"
                                                    GenerateTitle="Buat ID Trip berikutnya untuk bulan tanggal trip" ValueChanged="v => _f.TransactionNo = v" OnGenerate="GenerateNomorTrip" />
                                     </Field>
                                 </div>
                                 <div class="col-sm-6 @(Dedicated ? "col-lg-4" : "")">
-                                    <Field Label="Nomor Surat Jalan" Error="@_galat.GetValueOrDefault("sj_no")" Hint="@T(_galat.ContainsKey("sj_no") ? null : _f.SjNo != "" ? "Nomor urut otomatis." : "Kosong = dicetak memakai Nomor Trip.")">
+                                    <Field Label="Nomor Surat Jalan" Error="@_galat.GetValueOrDefault("sj_no")" Info="@(_f.SjNo != "" ? "Nomor urut otomatis." : "Kosong = dicetak memakai ID Trip.")">
                                         <KodeInput Id="@context" Value="@_f.SjNo" Invalid="@_galat.ContainsKey("sj_no")" Placeholder="SJ-000001" Uppercase="true"
                                                    GenerateTitle="Buat nomor Surat Jalan berikutnya" ValueChanged="v => _f.SjNo = v" OnGenerate="GenerateSuratJalan" />
                                     </Field>
                                 </div>
                                 <div class="col-sm-6 @(Dedicated ? "col-lg-4" : "")">
-                                    <Field Label="Status" Hint="@T(MenungguSopir && adaSopir ? "Sopir sudah dipilih. Ubah ke Aktif bila trip sudah jalan." : _statusManual ? "Pembatalan lewat tombol Batalkan Trip." : $"Otomatis: {StatusTrip.Label(StatusTrip.MenungguSopir)} sampai sopir dipilih, lalu Aktif.")">
+                                    <Field Label="Status" Info="@(MenungguSopir && adaSopir ? "Supir sudah dipilih. Ubah ke Aktif bila trip sudah jalan." : _statusManual ? "Pembatalan lewat menu ⋯ Batalkan Trip di detail trip." : $"Otomatis: {StatusTrip.Label(StatusTrip.MenungguSopir)} sampai supir dipilih, lalu Aktif.")">
                                         <Pilihan Id="@context" Options="OpsiStatus" Value="@_f.Status" Cari="false" Clearable="false" ValueChanged="UbahStatus" />
                                     </Field>
                                 </div>
                                 <div class="col-sm-6 @(Dedicated ? "col-lg-4" : "")">
-                                    <Field Label="Manager" Hint="@T(managerTerdaftar.Count > 0 ? "Pilih manager terdaftar, atau isi nama sendiri." : "Belum ada manager di Supir / Karyawan — isi nama sendiri.")">
+                                    <Field Label="Manager" Info="@(managerTerdaftar.Count > 0 ? "Pilih manager terdaftar, atau isi nama sendiri." : "Belum ada manager di Supir / Karyawan; isi nama sendiri.")">
                                         <PilihKaryawan Id="@context" Karyawan="managerTerdaftar" ValueId="@_f.ManagerId" ValueNama="@_f.ManagerName" Peran="@PeranKaryawan.Manager"
                                                        Placeholder="Pilih manager..." OnChange="v => { _f.ManagerId = v.Id; _f.ManagerName = v.Nama; }" />
                                     </Field>
@@ -223,7 +225,7 @@ else
                                 <Field Label="Kepada Yth">
                                     <input id="@context" class="form-control" value="@_f.RecipientName" placeholder="PT PINDODELI PULP &amp; PAPER MILLS" @oninput="e => _f.RecipientName = Teks(e)" />
                                 </Field>
-                                <Field Label="di" Hint="@T("Dua baris alamat penerima.")">
+                                <Field Label="di" Info="Dua baris alamat penerima.">
                                     <div class="d-flex flex-column gap-2">
                                         <input id="@context" class="form-control" value="@_f.RecipientAddress1" placeholder="Kawasan Industri Pindodeli" @oninput="e => _f.RecipientAddress1 = Teks(e)" />
                                         <input class="form-control" value="@_f.RecipientAddress2" placeholder="Karawang" aria-label="Alamat penerima baris 2" @oninput="e => _f.RecipientAddress2 = Teks(e)" />
@@ -241,33 +243,30 @@ else
                     <div class="row g-3">
                         <div class="col-sm-6">
                             <Field Label="No. Kendaraan" Required="WajibKendaraan" Error="@_galat.GetValueOrDefault("vehicle_id")"
-                                   Hint="@T(_galat.ContainsKey("vehicle_id") ? null : Kunci ? LewatKunci : kendaraan is not null && kendaraan.Configuration != "" ? $"Konfigurasi {kendaraan.Configuration}" : null)">
-                                <Pilihan Id="@context" Options="OpsiKendaraan" Value="@Kosong(_f.VehicleId)" Invalid="@_galat.ContainsKey("vehicle_id")" Disabled="Kunci" Cari="true"
+                                   Info="@(kendaraan is not null && kendaraan.Configuration != "" ? $"Konfigurasi {kendaraan.Configuration}." : null)">
+                                <Pilihan Id="@context" Options="OpsiKendaraan" Value="@Kosong(_f.VehicleId)" Invalid="@_galat.ContainsKey("vehicle_id")" Cari="true"
                                          Placeholder="Pilih nomor kendaraan..." ValueChanged="PilihKendaraan" />
                             </Field>
                         </div>
                         <div class="col-sm-6">
-                            <Field Label="Supir" Required="WajibSopir" Error="@_galat.GetValueOrDefault("driver_ids")" Hint="@T(HintSopir(adaSopir))">
+                            <Field Label="Supir" Required="WajibSopir" Error="@_galat.GetValueOrDefault("driver_ids")" Info="@InfoSopir(adaSopir)">
                                 <div class="d-flex flex-column gap-2">
                                     @for (var i = 0; i < _f.DriverIds.Count; i++)
                                     {
                                         var k = i; var v = _f.DriverIds[k];
                                         <div class="d-flex align-items-center gap-2">
                                             <div class="min-w-0 flex-grow-1">
-                                                <Pilihan Id="@(k == 0 ? context : null)" Options="OpsiSopir(v)" Value="@Kosong(v)" Disabled="Kunci" Cari="true"
+                                                <Pilihan Id="@(k == 0 ? context : null)" Options="OpsiSopir(v)" Value="@Kosong(v)" Cari="true"
                                                          Invalid="@(_galat.ContainsKey("driver_ids") && k == 0 && v == "")"
                                                          Placeholder="@(k == 0 ? "Cari kode / nama supir..." : "Supir tambahan...")" ValueChanged="nv => UbahSopir(k, nv)" />
                                             </div>
-                                            @if (_f.DriverIds.Count > 1 && !Kunci)
+                                            @if (_f.DriverIds.Count > 1)
                                             {
                                                 <TombolIkon Label="Hapus supir ini" Tone="danger" Icon="Ikon.Xmark" OnClick="() => HapusSopir(k)" />
                                             }
                                         </div>
                                     }
-                                    @if (!Kunci)
-                                    {
-                                        <div><Tombol Size="sm" Variant="ghost" Icon="Ikon.Plus" IconSize="14" OnClick="() => _f.DriverIds.Add(string.Empty)">Tambah supir</Tombol></div>
-                                    }
+                                    <div><Tombol Size="sm" Variant="ghost" Icon="Ikon.Plus" IconSize="14" OnClick="() => _f.DriverIds.Add(string.Empty)">Tambah supir</Tombol></div>
                                 </div>
                             </Field>
                         </div>
@@ -279,7 +278,7 @@ else
                                 </Field>
                             </div>
                             <div class="col-sm-6">
-                                <Field Label="SI / Job Order" Hint="@T(jo is not null ? $"Penerima: {jo.CustomerName}. Kosongkan untuk menghapus isian darinya." : "Kosongkan bila bukan order container.")">
+                                <Field Label="SI / Job Order" Info="@(jo is not null ? $"Penerima: {jo.CustomerName}. Kosongkan untuk menghapus isian darinya." : "Kosongkan bila bukan order container.")">
                                     <Pilihan Id="@context" Options="OpsiJo" Value="@Kosong(_f.JobOrderId)" Cari="true" Placeholder="Cari SI / Job Order..." ValueChanged="PilihJobOrder" />
                                 </Field>
                             </div>
@@ -305,7 +304,7 @@ else
                             </div>
                         }
                         <div class="col-sm-6">
-                            <Field Label="Tujuan" Hint="@T("Terisi otomatis dari rute, masih bisa diubah.")">
+                            <Field Label="Tujuan" Info="Terisi otomatis dari rute, masih bisa diubah.">
                                 <input id="@context" class="form-control" value="@_f.DestinationDetail" placeholder="CIB - DURI" @oninput="e => _f.DestinationDetail = Teks(e)" />
                             </Field>
                         </div>
@@ -330,7 +329,7 @@ else
                             @if (tampilDokumen)
                             {
                                 <div class="col-sm-6 col-lg-3">
-                                    <Field Label="No Referensi" Hint="@T("Nomor referensi dari klien.")">
+                                    <Field Label="No Referensi" Info="Nomor referensi dari klien.">
                                         <input id="@context" class="form-control" value="@_f.TrReference" placeholder="2600305331" @oninput="e => _f.TrReference = Teks(e)" />
                                     </Field>
                                 </div>
@@ -340,7 +339,7 @@ else
                                     </Field>
                                 </div>
                                 <div class="col-sm-6 col-lg-3">
-                                    <Field Label="Status PI" Hint="@T("mis. di pool, masih moving.")">
+                                    <Field Label="Status PI" Info="Mis. di pool, masih moving.">
                                         <input id="@context" class="form-control" value="@_f.PiStatus" @oninput="e => _f.PiStatus = Teks(e)" />
                                     </Field>
                                 </div>
@@ -369,7 +368,7 @@ else
             }
         </div>
 
-        <FormRute Open="_tambahRute" Keterangan="Rute baru langsung dipilih untuk trip ini. Tanda * wajib diisi."
+        <FormRute Open="_tambahRute" Keterangan="Rute baru langsung dipilih untuk trip ini."
                   PesanSukses="@(r => $"Rute {r.RouteName} tersimpan dan dipilih untuk trip ini.")" OnClose="() => _tambahRute = false"
                   OnTersimpan="r => { _tambahRute = false; PilihRute(r.Id, r); }" OnPakai="r => { _tambahRute = false; PilihRute(r.Id, r); }" />
 
@@ -378,7 +377,7 @@ else
                 <p class="m-0 d-none d-sm-block tnum min-w-0 flex-grow-1 text-truncate fs-12-5 text-ink-3">@Ringkasan(kontrak, rute, idTerisi.Count)</p>
                 <div class="ms-auto d-flex align-items-center gap-2">
                     <Tombol OnClick="Batal">Batal</Tombol>
-                    <Tombol Icon="Ikon.Print" Disabled="@(!Bisa("trip"))" OnClick="() => SimpanAsync(true)">Simpan &amp; Cetak Surat Jalan</Tombol>
+                    <Tombol Icon="Ikon.Print" Disabled="@(!Bisa("trip"))" OnClick="() => SimpanAsync(true)">Simpan &amp; Cetak</Tombol>
                     <Tombol Variant="primary" Icon="Ikon.FloppyDisk" Disabled="@(!Bisa("trip"))" OnClick="() => SimpanAsync(false)">Simpan</Tombol>
                 </div>
             </div>
@@ -427,7 +426,6 @@ else
 
     private sealed record IdLain(string Id, string Nomor);
 
-    private const string LewatKunci = "Dikunci karena trip sudah jalan.";
     /// <summary>Status yang boleh dipilih di form; "Dibatalkan" hanya lewat tombol Batalkan Trip.</summary>
     private static readonly string[] StatusForm = [StatusTrip.Draft, StatusTrip.MenungguSopir, StatusTrip.Aktif, StatusTrip.Selesai];
 
@@ -436,14 +434,11 @@ else
     private readonly Dictionary<string, string> _galat = [];
     /// <summary>Status mengikuti sopir (Menunggu Supir ↔ Aktif) sampai diubah sendiri; trip lama tidak diubah.</summary>
     private bool _statusManual;
-    private bool _bukaKunci, _tambahRute;
+    private bool _tambahRute;
 
     private Model.Trip? Existing { get; set; }
     /// <summary>Priok = angkutan container (SI/BL, Party, Kapal).</summary>
     private bool CabangContainer => !Karawang;
-    /// <summary>Trip Aktif / Selesai: rute, layanan, kendaraan, sopir, nomor trip dikunci; Manager / Owner boleh membuka.</summary>
-    private bool SudahJalan => TripId is not null && AturanTrip.TripSudahJalan(Existing?.Status);
-    private bool Kunci => SudahJalan && !_bukaKunci;
     /// <summary>Trip yang sudah tersimpan: ID Perjalanan dikunci, tidak bisa diganti.</summary>
     private bool IdTerkunci => Existing is not null;
     private bool Dedicated => _f.ServiceType == TipeKlien.Dedicated;
@@ -478,6 +473,14 @@ else
         base.OnInitialized();
         Existing = TripId is null ? null : Db.Data.Trip.FirstOrDefault(t => t.Id == TripId);
         _statusManual = TripId is not null;
+        _f = IsianAwal();
+        _hargaAwal = _f.Harga;
+    }
+
+    /// <summary>Trip terkunci baru saja diaktifkan lagi: baca ulang trip dan isi form-nya.</summary>
+    private void MuatUlang()
+    {
+        Existing = Db.Data.Trip.FirstOrDefault(t => t.Id == TripId);
         _f = IsianAwal();
         _hargaAwal = _f.Harga;
     }
@@ -592,7 +595,6 @@ else
             : T("Kontrak aktif di workspace ini.");
 
     private RenderFragment? HintRute(Rute? rute, Klien? routeProject) => _galat.ContainsKey("route_id") ? null
-        : Kunci ? T(LewatKunci)
         : rute is null ? T(Dedicated ? "Opsional untuk Dedicated: patokan uang jalan & tujuan." : "Klien, Harga Jual, dan Uang Jalan Rute ikut rute.")
         : routeProject is not null ? T($"Klien {routeProject.ProjectName} ikut rute ini. Uang Jalan Rute jadi patokan uang jalan.")
         : b =>
@@ -603,9 +605,7 @@ else
             b.AddContent(6, " supaya trip tercatat ke klien.");
         };
 
-    private string? HintSopir(bool adaSopir) => _galat.ContainsKey("driver_ids") ? null
-        : Kunci ? LewatKunci
-        : MenungguSopir && !adaSopir ? $"Boleh dikosongkan; trip tersimpan sebagai {StatusTrip.Label(StatusTrip.MenungguSopir)}."
+    private string? InfoSopir(bool adaSopir) => MenungguSopir && !adaSopir ? $"Boleh dikosongkan; trip tersimpan sebagai {StatusTrip.Label(StatusTrip.MenungguSopir)}."
         : _f.DriverIds.Count > 1 ? "Supir pertama adalah supir utama (penerima komisi)."
         : null;
 

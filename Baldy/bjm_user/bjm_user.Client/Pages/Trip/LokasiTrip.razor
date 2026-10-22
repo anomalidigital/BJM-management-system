@@ -1,0 +1,189 @@
+@* Pick Up Details / Destination Details (Baldy 22 Okt 2026): ketik nama lokasi atau alamat. Saran muncul dari alamat tersimpan
+   (alamat di area rute paling atas) dan peta Google Maps langsung menampilkan lokasi yang diketik / dipilih. Lokasi yang belum ada di
+   Master Alamat boleh diketik bebas. Peta memakai tampilan Google Maps tanpa API key; saran dari Google (Places Autocomplete) butuh
+   API key Google Cloud perusahaan dan bisa disambungkan nanti. *@
+@implements IDisposable
+
+<div class="lokasi-trip d-flex flex-column gap-2">
+    <Field Label="@Label" Info="@Info" Hint="Hint">
+        <div class="position-relative" @onfocusout="Lepas">
+            <div class="kotak-cari">
+                <IkonSvg Def="Ikon.LocationDot" Size="13" Class="ikon-cari" />
+                <input id="@context" class="form-control" role="combobox" autocomplete="off" aria-autocomplete="list" aria-expanded="@(Terbuka ? "true" : "false")"
+                       aria-controls="@_idDaftar" aria-activedescendant="@(Terbuka && _aktif >= 0 ? $"{_idDaftar}-{_aktif}" : null)"
+                       value="@_teks" placeholder="Ketik nama lokasi atau alamat..." disabled="@Disabled"
+                       @oninput="Ketik" @onkeydown="Tombol" @onfocus="() => { _buka = true; _aktif = -1; }" />
+                @if (_teks != "" && !Disabled)
+                {
+                    <button type="button" class="hapus-cari btn btn-sm btn-link p-0 text-ink-3" aria-label="@($"Kosongkan {Label}")" @onclick="Kosongkan"><IkonSvg Def="Ikon.Xmark" Size="12" /></button>
+                }
+            </div>
+            @if (Terbuka)
+            {
+                var saran = Saran;
+                <ul id="@_idDaftar" role="listbox" class="dropdown-menu show w-100 mt-1 p-1 lokasi-saran" aria-label="@($"Saran {Label}")">
+                    @if (BolehTambah)
+                    {
+                        <li role="option" id="@($"{_idDaftar}--1")" aria-selected="false" class="dropdown-item aksi-tambah" @onmousedown:preventDefault="true" @onclick="Tambah">
+                            <IkonSvg Def="Ikon.Plus" Size="12" /><span>@(_teks.Trim() != "" ? $"Simpan “{_teks.Trim()}” ke Master Alamat" : "Tambah alamat baru")</span>
+                        </li>
+                    }
+                    @for (var i = 0; i < saran.Count; i++)
+                    {
+                        var ii = i; var a = saran[ii];
+                        <li role="option" id="@($"{_idDaftar}-{ii}")" aria-selected="@(a.Id == Nilai ? "true" : "false")" class="dropdown-item @(ii == _aktif ? "active" : "")"
+                            @onmousedown:preventDefault="true" @onclick="() => Pilih(a)">
+                            <IkonSvg Def="Ikon.MapLocationDot" Size="12" Class="flex-shrink-0 text-ink-3" />
+                            <span class="min-w-0">
+                                <span class="d-block label-opsi">@a.Nama</span>
+                                <span class="d-block fs-11-5 text-ink-3">@MetaAlamat(a)</span>
+                            </span>
+                        </li>
+                    }
+                    @if (saran.Count == 0)
+                    {
+                        <li class="px-2 py-2 fs-12 text-ink-3">@(_teks.Trim() == "" ? "Belum ada alamat tersimpan." : "Tidak ada alamat tersimpan yang cocok. Lokasi yang diketik tetap dipakai.")</li>
+                    }
+                </ul>
+            }
+        </div>
+    </Field>
+    @if (_peta != "")
+    {
+        <div class="peta-lokasi">
+            <iframe title="@($"Peta {Label}")" src="@UrlPeta(_peta)" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            <a href="@UrlBuka(_peta)" target="_blank" rel="noopener" class="peta-buka">Buka di Google Maps <IkonSvg Def="Ikon.ArrowRight" Size="10" /></a>
+        </div>
+    }
+    <Field Label="@LabelCatatan">
+        <input id="@context" class="form-control" value="@Catatan" disabled="@Disabled" placeholder="@PlaceholderCatatan" @oninput="e => CatatanChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" />
+    </Field>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string? Info { get; set; }
+    /// <summary>Pesan yang harus terlihat di bawah isian (mis. area rute belum punya alamat).</summary>
+    [Parameter] public RenderFragment? Hint { get; set; }
+    /// <summary>Id Master Alamat, AturanTrip.TitikLama (isian lama trip), atau kosong (lokasi diketik bebas / belum diisi).</summary>
+    [Parameter] public string Nilai { get; set; } = "";
+    [Parameter] public EventCallback<string> NilaiChanged { get; set; }
+    /// <summary>Lokasi yang diketik bebas (bukan dari Master Alamat).</summary>
+    [Parameter] public string Teks { get; set; } = "";
+    [Parameter] public EventCallback<string> TeksChanged { get; set; }
+    [Parameter] public string Catatan { get; set; } = "";
+    [Parameter] public EventCallback<string> CatatanChanged { get; set; }
+    [Parameter] public string LabelCatatan { get; set; } = "Catatan";
+    [Parameter] public string PlaceholderCatatan { get; set; } = "";
+    [Parameter] public List<Alamat> Daftar { get; set; } = [];
+    /// <summary>Kode area rute di sisi ini: alamatnya tampil paling atas.</summary>
+    [Parameter] public string Area { get; set; } = "";
+    [Parameter] public TitikAlamat? TitikLama { get; set; }
+    [Parameter] public EventCallback<string> OnTambah { get; set; }
+    [Parameter] public bool BolehTambah { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+
+    private readonly string _idDaftar = "lokasi-" + Guid.NewGuid().ToString("N")[..6];
+    private string _teks = "", _peta = "";
+    private string? _nilaiTerakhir, _teksTerakhir;
+    private bool _buka;
+    private int _aktif = -1;
+    private CancellationTokenSource? _tunda;
+
+    private bool Terbuka => _buka && !Disabled;
+
+    protected override void OnParametersSet()
+    {
+        // Isian dari luar (alamat dipilih otomatis dari rute, trip lama dibuka): tulisan & peta mengikutinya.
+        if (Nilai == _nilaiTerakhir && Teks == _teksTerakhir) return;
+        _nilaiTerakhir = Nilai; _teksTerakhir = Teks;
+        var a = Daftar.FirstOrDefault(x => x.Id == Nilai);
+        if (a is not null) { _teks = a.Nama; _peta = KueriAlamat(a); }
+        else if (Nilai == AturanTrip.TitikLama && TitikLama is not null) { _teks = TitikLama.Nama != "" ? TitikLama.Nama : TitikLama.Jalan; _peta = KueriTitik(TitikLama); }
+        else { _teks = Teks; _peta = Teks.Trim(); }
+    }
+
+    /// <summary>Alamat tersimpan yang cocok dengan ketikan; alamat di area rute paling atas.</summary>
+    private List<Alamat> Saran
+    {
+        get
+        {
+            var q = _teks.Trim();
+            var pilihan = Daftar.FirstOrDefault(x => x.Id == Nilai);
+            var cari = pilihan is not null && q == pilihan.Nama ? "" : q;
+            return Daftar
+                .Where(a => a.Status == "aktif" || a.Id == Nilai)
+                .Where(a => cari == "" || Util.CocokCari(cari, a.Nama, a.KodeArea, a.Jalan, a.Kota, a.NamaKontak, a.Catatan))
+                .OrderByDescending(a => AturanTrip.SamaArea(a.KodeArea, Area)).ThenBy(a => a.Nama, StringComparer.OrdinalIgnoreCase)
+                .Take(8).ToList();
+        }
+    }
+
+    private string MetaAlamat(Alamat a) => string.Join(" · ", new[]
+    {
+        AturanTrip.SamaArea(a.KodeArea, Area) ? $"Area rute {a.KodeArea}" : a.KodeArea != "" ? $"Area {a.KodeArea}" : "", AturanTrip.TulisAlamat(a),
+    }.Where(x => x != ""));
+
+    private static string KueriAlamat(Alamat a) => string.Join(", ", new[] { a.Nama, a.Jalan, a.Kota }.Where(x => !string.IsNullOrWhiteSpace(x)));
+    private static string KueriTitik(TitikAlamat t) => string.Join(", ", new[] { t.Nama, t.Jalan }.Where(x => !string.IsNullOrWhiteSpace(x)));
+    private static string UrlPeta(string q) => $"https://maps.google.com/maps?q={Uri.EscapeDataString(q)}&z=15&output=embed";
+    private static string UrlBuka(string q) => $"https://www.google.com/maps/search/?api=1&query={Uri.EscapeDataString(q)}";
+
+    private async Task Ketik(ChangeEventArgs e)
+    {
+        _teks = e.Value?.ToString() ?? "";
+        _buka = true; _aktif = -1;
+        _nilaiTerakhir = ""; _teksTerakhir = _teks;
+        await NilaiChanged.InvokeAsync("");
+        await TeksChanged.InvokeAsync(_teks);
+        TundaPeta(_teks.Trim());
+    }
+
+    /// <summary>Peta diperbarui setelah berhenti mengetik sebentar, supaya Google Maps tidak dimuat ulang tiap huruf.</summary>
+    private void TundaPeta(string q)
+    {
+        _tunda?.Cancel();
+        var t = _tunda = new CancellationTokenSource();
+        _ = Task.Delay(700, t.Token).ContinueWith(_ => InvokeAsync(() => { if (!t.IsCancellationRequested) { _peta = q; StateHasChanged(); } }), TaskScheduler.Default);
+    }
+
+    private async Task Pilih(Alamat a)
+    {
+        _tunda?.Cancel();
+        _teks = a.Nama; _peta = KueriAlamat(a); _buka = false; _aktif = -1;
+        _nilaiTerakhir = a.Id; _teksTerakhir = "";
+        await TeksChanged.InvokeAsync("");
+        await NilaiChanged.InvokeAsync(a.Id);
+    }
+
+    private async Task Kosongkan()
+    {
+        _tunda?.Cancel();
+        _teks = ""; _peta = ""; _aktif = -1;
+        _nilaiTerakhir = ""; _teksTerakhir = "";
+        await TeksChanged.InvokeAsync("");
+        await NilaiChanged.InvokeAsync("");
+    }
+
+    private async Task Tambah()
+    {
+        _buka = false;
+        await OnTambah.InvokeAsync(_teks.Trim());
+    }
+
+    private async Task Tombol(KeyboardEventArgs e)
+    {
+        var saran = Saran;
+        switch (e.Key)
+        {
+            case "ArrowDown": _buka = true; if (saran.Count > 0) _aktif = (_aktif + 1) % saran.Count; break;
+            case "ArrowUp": _buka = true; if (saran.Count > 0) _aktif = _aktif <= 0 ? saran.Count - 1 : _aktif - 1; break;
+            case "Enter": if (Terbuka && _aktif >= 0 && _aktif < saran.Count) await Pilih(saran[_aktif]); else _buka = false; break;
+            case "Escape": case "Tab": _buka = false; break;
+        }
+    }
+
+    private void Lepas() => _buka = false;
+
+    public void Dispose() => _tunda?.Cancel();
+}

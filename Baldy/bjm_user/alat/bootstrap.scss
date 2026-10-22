@@ -38,7 +38,7 @@ $enable-gradients: false;
 $enable-dark-mode: false;
 
 // Isian & tombol: tinggi 36 px (kecil 32 px).
-$input-btn-padding-y: .4375rem;
+$input-btn-padding-y: .375rem; // isian ringkas ±33px (22 Okt 2026)
 $input-btn-padding-x: .75rem;
 $input-btn-padding-y-sm: .3125rem;
 $input-btn-padding-x-sm: .625rem;
@@ -106,6 +106,9 @@ $modal-header-padding-x: 1.25rem;
 $modal-inner-padding: 1.25rem;
 $modal-footer-bg: #f8f9fa;
 $modal-footer-border-color: $border-color;
+// Form popup lebih ramping (Baldy 22 Okt 2026: "jangan terlalu lebar"): lg 800 -> 680px, md 500 -> 520px.
+$modal-lg: 680px;
+$modal-md: 520px;
 
 $alert-padding-y: .625rem;
 $alert-padding-x: .875rem;

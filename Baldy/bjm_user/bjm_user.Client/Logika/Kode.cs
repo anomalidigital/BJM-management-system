@@ -9,6 +9,20 @@ public static class Kode
     private const string Konsonan = "BCDFGHJKLMNPQRSTVWXYZ";
     private static readonly Random Acak = new();
 
+    /// <summary>
+    /// No. Kendaraan pola TNKB: kode wilayah 1–2 huruf, nomor 1–4 angka, seri 0–3 huruf ("B 9015 UWW", "AB 1 C").
+    /// Ketikan "b9015uww" atau "B 9015UWW" dirapikan; yang tidak sesuai pola hanya dibesarkan dan spasinya dirapikan.
+    /// </summary>
+    public static string RapikanNoKendaraan(string? s)
+    {
+        var m = Regex.Match(KunciNoKendaraan(s), @"^([A-Z]{1,2})(\d{1,4})([A-Z]{0,3})$");
+        if (m.Success) return string.Join(' ', new[] { m.Groups[1].Value, m.Groups[2].Value, m.Groups[3].Value }.Where(x => x != ""));
+        return Regex.Replace((s ?? "").Trim().ToUpperInvariant(), @"\s+", " ");
+    }
+
+    /// <summary>No. Kendaraan tanpa spasi / tanda baca, untuk membandingkan ("B9015UWW" = "B 9015 UWW").</summary>
+    public static string KunciNoKendaraan(string? s) => Regex.Replace((s ?? "").ToUpperInvariant(), @"[^A-Z0-9]", "");
+
     /// <summary>13 digit waktu + 7 huruf mati acak, mis. 1779754321123KDFRZMP (ID Perjalanan Priok).</summary>
     public static string BuatKodeUnik(IEnumerable<string>? terpakai = null)
     {

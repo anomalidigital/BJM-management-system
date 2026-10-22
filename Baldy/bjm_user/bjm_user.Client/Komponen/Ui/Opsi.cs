@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Components;
+
 namespace bjm_user.Client.Komponen.Ui;
 
 /// <summary>Satu pilihan dropdown. Pilihan nonaktif tetap tampil (dengan alasannya di Meta) tapi tidak bisa dipilih.</summary>
@@ -62,3 +64,9 @@ public sealed class ChipFilter
     public ChipFilter() { }
     public ChipFilter(string label, Action? lepas = null) { Label = label; Lepas = lepas; }
 }
+
+/// <summary>
+/// Satu dokumen yang bisa dicetak dari tombol / menu Cetak (mis. "Berita Acara", "Rekap Trip"). Jalankan berupa EventCallback milik
+/// halaman pemanggil (EventCallback.Factory.Create(this, ...)) supaya halaman itu dirender ulang dan preview-nya terbuka.
+/// </summary>
+public sealed record PilihanCetak(string Label, EventCallback Jalankan, string? Keterangan = null);

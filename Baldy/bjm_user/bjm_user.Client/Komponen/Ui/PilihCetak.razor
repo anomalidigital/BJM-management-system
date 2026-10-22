@@ -1,0 +1,30 @@
+@* Pilihan dokumen untuk tombol / menu Cetak bila halaman punya lebih dari satu dokumen cetak. *@
+<Modal Open="Open" Size="sm" Title="Cetak" Subtitle="Pilih dokumen yang dicetak." OnClose="OnClose">
+    <ChildContent>
+        <div class="d-flex flex-column gap-2">
+            @foreach (var p in Pilihan)
+            {
+                var pp = p;
+                <button type="button" class="pilihan-cetak" @onclick="() => Pilih(pp)">
+                    <IkonSvg Def="Ikon.FileLines" Size="16" Class="flex-shrink-0 text-ink-3" />
+                    <span class="min-w-0 text-start">
+                        <span class="d-block fw-semibold text-ink">@pp.Label</span>
+                        @if (pp.Keterangan is not null) { <span class="d-block fs-12 text-ink-3">@pp.Keterangan</span> }
+                    </span>
+                </button>
+            }
+        </div>
+    </ChildContent>
+</Modal>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter] public List<PilihanCetak> Pilihan { get; set; } = [];
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private async Task Pilih(PilihanCetak p)
+    {
+        await OnClose.InvokeAsync();
+        await p.Jalankan.InvokeAsync();
+    }
+}

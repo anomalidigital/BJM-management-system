@@ -7,6 +7,7 @@
 <PageHeader Title="Alamat" Crumbs="@(new List<Crumb> { new("Master Data"), new("Alamat") })">
     <Description>Lokasi pick up dan destinasi beserta kontaknya. Dipakai di form trip (Pick Up / Destination Details) dan sebagai Area di rute. Kode area dibuat otomatis dari kota.</Description>
     <Actions>
+        <Tombol Icon="Ikon.FileArrowUp" Disabled="@(!Bisa("master"))" OnClick="() => _import = true">Import</Tombol>
         <Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Bisa("master"))" OnClick="BukaTambah">Tambah Alamat</Tombol>
     </Actions>
 </PageHeader>
@@ -78,7 +79,12 @@
     <p class="m-0 mt-2 fs-13 fw-medium text-ink">@_hapus?.KodeArea · @_hapus?.Nama</p>
 </KonfirmasiDialog>
 
+
+<ModalImport Open="_import" Definisi="@ImportMaster.Alamat(Db)" OnClose="() => _import = false" />
 @code {
+    /// <summary>Import dari template CSV / Excel (Baldy 22 Okt 2026).</summary>
+    private bool _import;
+
     public sealed class FilterAlamat { public string Kode { get; set; } = ""; public string Pakai { get; set; } = ""; }
 
     private static readonly List<Opsi> OpsiPakai = [new("", "Semua"), new("ya", "Sudah dipakai"), new("tidak", "Belum pernah dipakai")];

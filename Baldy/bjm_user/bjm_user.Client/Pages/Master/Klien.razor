@@ -7,6 +7,7 @@
 <PageHeader Title="Klien / Pelanggan" Crumbs="@(new List<Crumb> { new("Master Data"), new("Klien / Pelanggan") })">
     <Description>Tipe layanan klien (Callout / Dedicated) terbawa otomatis ke form trip. Kontrak klien Dedicated dikelola di halaman klien.</Description>
     <Actions>
+        <Tombol Icon="Ikon.FileArrowUp" Disabled="@(!Bisa("master"))" OnClick="() => _import = true">Import</Tombol>
         <Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Bisa("master"))" OnClick="BukaTambah">Tambah Klien</Tombol>
     </Actions>
 </PageHeader>
@@ -49,13 +50,12 @@
     }
 </Kartu>
 
-<Modal Open="_formOpen" Size="lg" Title="@(_editing is not null ? "Ubah Klien" : "Tambah Klien")"
-       Subtitle="@(_editing?.ProjectCode ?? "Tanda * wajib diisi. Kontrak klien Dedicated ditambahkan setelah klien tersimpan.")" OnClose="() => _formOpen = false">
+<Modal Open="_formOpen" Size="lg" Title="@(_editing is not null ? "Ubah Klien" : "Tambah Klien")" OnClose="() => _formOpen = false">
     <ChildContent>
         @if (_formOpen)
         {
             <div class="row g-3">
-                <Field Label="Tipe Layanan" Required Error="@G("tipe")" Class="col-12" Hint="@Teks("Terdeteksi otomatis di form trip saat klien ini dipilih.")">
+                <Field Label="Tipe Layanan" Required Error="@G("tipe")" Class="col-12" Info="Terbawa otomatis ke form trip saat klien ini dipilih. Kontrak klien Dedicated ditambahkan di halaman klien setelah tersimpan.">
                     <div class="row g-3">
                         @foreach (var j in TipeKlien.Semua)
                         {
@@ -66,21 +66,15 @@
                         }
                     </div>
                 </Field>
-                <Field Label="Nama Klien" Required Error="@G("nama")" Class="col-sm-8" Hint="@Teks("Nama resmi perusahaan.")">
+                <Field Label="Nama Klien" Required Error="@G("nama")" Class="col-sm-8" Info="Nama resmi perusahaan.">
                     <input id="@context" class="form-control @(G("nama") is not null ? "is-invalid" : "")" value="@_f.ProjectName" placeholder="PT Delta Energi Riau"
                            @oninput="e => { _f.ProjectName = e.Value?.ToString() ?? string.Empty; _galat.Remove(NamaKunci); }" @onfocusout="IsiKodeDariNama" />
                 </Field>
-                <Field Label="Kode Klien" Required Error="@G("kode")" Class="col-sm-4" Hint="@Teks("Dari singkatan Nama Klien (PT Delta Energi Riau → DER). Boleh diubah.")">
+                <Field Label="Kode Klien" Required Error="@G("kode")" Class="col-sm-4" Info="Singkatan Nama Klien (PT Delta Energi Riau → DER). Ikon di sampingnya membuat kode; boleh diubah.">
                     <KodeInput Id="@context" Value="@_f.ProjectCode" Invalid="@(G("kode") is not null)" Placeholder="Isi Nama Klien dulu" Uppercase GenerateTitle="Buat kode dari Nama Klien"
                                ValueChanged="@(v => { _f.ProjectCode = v; _galat.Remove("kode"); })" OnGenerate="GenerateKode" />
                 </Field>
-                <Field Label="Alamat Resmi" Class="col-sm-6">
-                    <input id="@context" class="form-control" value="@_f.AlamatResmi" placeholder="Alamat sesuai akta / NPWP" @oninput="e => _f.AlamatResmi = e.Value?.ToString() ?? string.Empty" />
-                </Field>
-                <Field Label="Alamat Surat-Menyurat" Class="col-sm-6" Hint="@Teks("Kosongkan bila sama dengan alamat resmi.")">
-                    <input id="@context" class="form-control" value="@_f.AlamatSurat" placeholder="Alamat pengiriman surat & tagihan" @oninput="e => _f.AlamatSurat = e.Value?.ToString() ?? string.Empty" />
-                </Field>
-                <Field Label="NPWP" Class="col-sm-4" Hint="@Teks("ID perpajakan klien.")">
+                <Field Label="NPWP" Class="col-sm-4" Info="Nomor pokok wajib pajak klien.">
                     <input id="@context" class="form-control tnum" value="@_f.Npwp" placeholder="00.000.000.0-000.000" @oninput="e => _f.Npwp = e.Value?.ToString() ?? string.Empty" />
                 </Field>
                 <Field Label="Status" Class="col-sm-3">
@@ -89,10 +83,6 @@
                 <Field Label="Deskripsi" Class="col-sm-5">
                     <input id="@context" class="form-control" value="@_f.Description" @oninput="e => _f.Description = e.Value?.ToString() ?? string.Empty" />
                 </Field>
-                <div class="col-12">
-                    <Checkbox Label="Trip klien ini memakai alur dokumen (No Referensi / No PI)" Checked="_f.RequiresDocument" CheckedChanged="v => _f.RequiresDocument = v" />
-                    <p class="m-0 mt-1 fs-12 text-ink-3">Matikan untuk order tunai yang tidak melalui dokumen.</p>
-                </div>
             </div>
         }
     </ChildContent>
@@ -112,7 +102,12 @@
     }
 </KonfirmasiDialog>
 
+
+<ModalImport Open="_import" Definisi="@ImportMaster.Klien(Db)" OnClose="() => _import = false" />
 @code {
+    /// <summary>Import dari template CSV / Excel (Baldy 22 Okt 2026).</summary>
+    private bool _import;
+
     public sealed class FilterKlien { public string Layanan { get; set; } = ""; public string Dokumen { get; set; } = ""; public string Status { get; set; } = ""; }
 
     public sealed record BarisKlien(Model.Klien K, int Trip, long Uj, int KontrakAktif, int KontrakTotal, int KontrakLain, long NilaiAktif);
@@ -202,7 +197,7 @@
         new() { Key = "trip", Header = "Trip", Sortable = true, Align = "right", Width = "80px", Render = p => @<span class="tnum text-ink-2">@Format.Angka(p.Trip)</span> },
         new() { Key = "uj", Header = "Total Uang Jalan", Sortable = true, Align = "right", Width = "140px", Render = p => @<span class="tnum text-ink-2">@Format.Rupiah(p.Uj)</span> },
         new() { Key = "status", Header = "Status", Sortable = true, Width = "104px", Render = SelStatus },
-        new() { Key = "action", Header = "Action", Align = "right", Width = "124px", NoPrint = true, Render = SelAksi },
+        new() { Key = "action", Header = "Action", Align = "right", Width = "92px", NoPrint = true, Render = SelAksi },
     ];
 
     private static RenderFragment SelNama(BarisKlien p) => @<div class="lh-tight">
@@ -244,7 +239,6 @@
         var bisa = Bisa("master");
         var dipakai = DipakaiTrip(p.K.Id);
         return @<span class="d-inline-flex justify-content-end gap-1">
-            <TombolIkon Label="@($"Lihat detail {p.K.ProjectName} (kontrak & trip)")" Icon="Ikon.FileLines" OnClick="@(() => Ke($"master/klien/{p.K.Id}"))" />
             <TombolIkon Label="Ubah" Icon="Ikon.Pen" Disabled="@(!bisa)" OnClick="() => BukaUbah(p.K)" />
             <TombolIkon Label="Hapus" Tone="danger" Icon="Ikon.TrashCan" Disabled="@(!bisa || dipakai > 0)" Title="@(bisa && dipakai > 0 ? $"Dipakai {dipakai} trip" : null)" OnClick="() => _hapus = p.K" />
         </span>;

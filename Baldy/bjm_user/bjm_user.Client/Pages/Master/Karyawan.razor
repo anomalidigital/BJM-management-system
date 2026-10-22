@@ -1,12 +1,14 @@
 @page "/master/karyawan"
 @* Master -> Supir / Karyawan. Revisi 13 Okt 2026: tanpa status lunas / belum lunas, piutang tampil merah bertanda minus; dokumen penting
-   (KTP, SIM, KK, NPWP) punya tempat upload sendiri di form, terpisah dari dokumen lainnya. Transaksi piutang dicatat di menu Piutang Karyawan. *@
+   (KTP, SIM, KK, NPWP) punya tempat upload sendiri di form, terpisah dari dokumen lainnya. Transaksi piutang dicatat di menu Piutang Karyawan.
+   Revisi 22 Okt 2026: status Aktif / Nonaktif saja, penjelasan isian lewat ikon "?", dokumen sebagai tabel ringkas. *@
 @using System.Text.RegularExpressions
 @inherits KomponenData
 <PageTitle>Supir / Karyawan — BJM Logistik</PageTitle>
 
 <PageHeader Title="Supir / Karyawan" Crumbs="@(new List<Crumb> { new("Master Data"), new("Supir / Karyawan") })">
     <Actions>
+        <Tombol Icon="Ikon.FileArrowUp" Disabled="@(!Bisa("master"))" OnClick="() => _import = true">Import</Tombol>
         <Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Bisa("master"))" OnClick="BukaTambah">Tambah Karyawan</Tombol>
     </Actions>
 </PageHeader>
@@ -49,17 +51,16 @@
     }
 </Kartu>
 
-<Modal Open="_formOpen" Size="lg" Title="@(_editing is not null ? "Ubah Karyawan" : "Tambah Karyawan")"
-       Subtitle="@(_editing is not null ? $"Kode {_editing.DriverCode}" : "Lengkapi data karyawan baru. Tanda * wajib diisi.")" OnClose="() => _formOpen = false">
+<Modal Open="_formOpen" Size="lg" Title="@(_editing is not null ? "Ubah Karyawan" : "Tambah Karyawan")" OnClose="() => _formOpen = false">
     <ChildContent>
         @if (_formOpen)
         {
-            @* Ringkas tanpa scroll (Baldy 14 Okt 2026): tiga kolom, dokumen sebaris di bawah. *@
+            @* Ringkas (Baldy 14 & 22 Okt 2026): tiga kolom, penjelasan lewat ikon "?", dokumen sebagai tabel di bawah. *@
             <div class="row g-3">
                 <Field Label="Peran" Required Class="col-sm-4">
                     <Pilihan Id="@context" Options="OpsiPeran" Value="@_f.Role" ValueChanged="GantiPeran" Cari="false" Clearable="false" />
                 </Field>
-                <Field Label="Kode" Required Error="@G("kode")" Class="col-sm-4">
+                <Field Label="Kode" Required Error="@G("kode")" Class="col-sm-4" Info="SPR untuk supir, MGR untuk manager. Ikon di sampingnya membuat kode berikutnya.">
                     <KodeInput Id="@context" Value="@_f.DriverCode" Invalid="@(G("kode") is not null)" Placeholder="SPR027" Uppercase
                                GenerateTitle="Buat kode berikutnya: SPR untuk supir, MGR untuk manager"
                                ValueChanged="@(v => { _f.DriverCode = v; _galat.Remove("kode"); })" OnGenerate="GenerateKode" />
@@ -67,11 +68,11 @@
                 <Field Label="Status" Class="col-sm-4">
                     <Pilihan Id="@context" Options="OpsiStatus" Value="@_f.Status" ValueChanged="v => _f.Status = v ?? StatusAktif" Cari="false" Clearable="false" />
                 </Field>
-                <Field Label="Nama Lengkap (sesuai KTP)" Class="col-sm-8">
-                    <input id="@context" class="form-control" value="@_f.NamaLengkap" placeholder="Nama sesuai KTP"
-                           @oninput="e => _f.NamaLengkap = e.Value?.ToString() ?? string.Empty" />
+                <Field Label="Nama Lengkap" Required="NamaLengkapWajib" Error="@G("lengkap")" Class="col-sm-8" Info="Nama sesuai KTP.">
+                    <input id="@context" class="form-control @(G("lengkap") is not null ? "is-invalid" : "")" value="@_f.NamaLengkap" placeholder="Nama sesuai KTP"
+                           @oninput="e => { _f.NamaLengkap = e.Value?.ToString() ?? string.Empty; _galat.Remove(LengkapKunci); }" />
                 </Field>
-                <Field Label="Nama Panggilan" Required Error="@G("nama")" Class="col-sm-4" Hint="@Teks("Dipakai di trip, laporan, dan cetakan.")">
+                <Field Label="Nama Panggilan" Required Error="@G("nama")" Class="col-sm-4" Info="Dipakai di trip, laporan, dan cetakan.">
                     <input id="@context" class="form-control @(G("nama") is not null ? "is-invalid" : "")" value="@_f.DriverName" placeholder="mis. AGUS"
                            @oninput="e => { _f.DriverName = e.Value?.ToString() ?? string.Empty; _galat.Remove(NamaKunci); }" />
                 </Field>
@@ -87,9 +88,9 @@
                            @oninput="e => { _f.Phone = e.Value?.ToString() ?? string.Empty; _galat.Remove(TeleponKunci); }" />
                 </Field>
                 <fieldset class="col-12 min-w-0">
-                    <legend class="form-label">Dokumen <span class="fw-normal text-ink-3">· klik kotak untuk upload; foto diperkecil otomatis, PDF juga bisa</span></legend>
+                    <div class="label-isian"><legend class="form-label m-0 float-none w-auto">Dokumen</legend><InfoTanya Teks="Upload foto atau PDF. Foto diperkecil otomatis." /></div>
                     <DokumenPentingInput Jenis="DokumenPentingJenis.Karyawan" Value="_dokumen" ValueChanged="v => _dokumen = v"
-                                         LainnyaLabel="Dokumen lainnya" Lainnya="_f.Attachments" LainnyaChanged="v => _f.Attachments = v" />
+                                         LainnyaLabel="Dokumen Lainnya" Lainnya="_f.Attachments" LainnyaChanged="v => _f.Attachments = v" />
                 </fieldset>
             </div>
         }
@@ -105,13 +106,18 @@
     <p class="m-0 mt-2 fs-13 fw-medium text-ink">@_hapus?.DriverCode — @_hapus?.DriverName</p>
 </KonfirmasiDialog>
 
+
+<ModalImport Open="_import" Definisi="@ImportMaster.Karyawan(Db)" OnClose="() => _import = false" />
 @code {
+    /// <summary>Import dari template CSV / Excel (Baldy 22 Okt 2026).</summary>
+    private bool _import;
+
     public sealed class FilterKaryawan { public string Peran { get; set; } = ""; public string Status { get; set; } = ""; public string Piutang { get; set; } = ""; public string Dokumen { get; set; } = ""; }
 
     /// <summary>Saldo piutang dari sisi karyawan (minus = masih punya piutang) dan jumlah dokumen penting yang sudah diunggah.</summary>
     public sealed record BarisKaryawan(Model.Karyawan K, long Saldo, int JumlahDok);
 
-    private const string StatusAktif = "aktif", NamaKunci = "nama", TeleponKunci = "telepon", KotaKunci = "kota";
+    private const string StatusAktif = "aktif", NamaKunci = "nama", LengkapKunci = "lengkap", TeleponKunci = "telepon", KotaKunci = "kota";
 
     private static readonly List<Opsi> OpsiPeran = PeranKaryawan.Semua.Select(r => new Opsi(r, PeranKaryawan.Label(r))).ToList();
     private static readonly List<Opsi> OpsiPeranFilter = [new("", "Semua"), .. OpsiPeran];
@@ -204,7 +210,6 @@
     </span>;
 
     private static string NoKtp(Model.Karyawan k) => k.Dokumen?.GetValueOrDefault("KTP")?.Nomor ?? "";
-    private static RenderFragment? Teks(string? s) => s is null ? null : b => b.AddContent(0, s);
 
     private RenderFragment SelAksi(BarisKaryawan d)
     {
@@ -223,6 +228,8 @@
 
     /// <summary>Karyawan dari data asli belum punya kota; jangan paksa diisi hanya untuk menambah dokumen.</summary>
     private bool KotaWajib => _editing is null || _editing.City != "";
+    /// <summary>Nama lengkap wajib (Baldy 22 Okt 2026); karyawan dari data asli yang belum punya nama lengkap tidak dipaksa saat diubah.</summary>
+    private bool NamaLengkapWajib => _editing is null || _editing.NamaLengkap != "";
 
     private void BukaTambah()
     {
@@ -263,6 +270,7 @@
         var kode = _f.DriverCode.Trim();
         if (kode == "") _galat["kode"] = "Kode karyawan wajib diisi.";
         else if (Db.Data.Karyawan.Any(k => k.DriverCode.Equals(kode, StringComparison.OrdinalIgnoreCase) && k.Id != _editing?.Id)) _galat["kode"] = "Kode karyawan sudah dipakai.";
+        if (NamaLengkapWajib && _f.NamaLengkap.Trim() == "") _galat["lengkap"] = "Nama lengkap wajib diisi.";
         if (_f.DriverName.Trim() == "") _galat["nama"] = "Nama panggilan wajib diisi.";
         if (KotaWajib && _f.City.Trim() == "") _galat["kota"] = "Kota wajib diisi.";
         if (_f.Phone != "" && !Regex.IsMatch(_f.Phone.Trim(), @"^[\d+\-\s()]{6,20}$")) _galat["telepon"] = "Format nomor telepon tidak valid.";

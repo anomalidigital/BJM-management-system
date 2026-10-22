@@ -1,12 +1,14 @@
 @page "/transaksi/trip"
 @inherits KomponenData
 @* Trip / Job Order. Kolom mock atasan 13 Okt 2026: Berangkat · ID Trip · No Referensi · Supir · No. Kendaraan · Rute · No PI ·
-   Uang Jalan · Status · Action. Seluruh filter di satu tombol Filter. Menu ⋯: Cetak Berita Acara, Rekap Trip, Tutup Trip,
-   Ada Backload / Lanjutan (satu-satunya pintu backload), Tandai mobil di pool, Batalkan, Hapus. *@
+   Uang Jalan · Status · Action. Seluruh filter di satu tombol Filter.
+   Revisi Baldy 22 Okt 2026: detail trip dibuka lewat ID Trip saja (tanpa ikon detail kembar); menu ⋯ hanya Cetak, Ada Backload /
+   Lanjutan (satu-satunya pintu backload), dan Tandai kendaraan di pool. Tutup Trip (sekaligus rekap) dan Batalkan Trip ada di detail
+   trip; Hapus Trip dihapus. Tutup Trip di bar pilihan: satu trip membuka Tutup Trip lengkap, beberapa trip ditutup sekaligus. *@
 <PageTitle>Trip / Job Order — BJM Logistik</PageTitle>
 
 <PageHeader Title="Trip / Job Order">
-    <Description>@(Karawang ? "Satu trip = satu kendaraan, dengan Berita Acara, perjalanan, uang jalan, biaya, dan PI-nya sendiri." : "Setiap trip memuat dokumen Surat Jalan beserta catatan uang jalan, biaya, dan lampirannya.")</Description>
+    <Description>@(Karawang ? "Satu trip = satu kendaraan, dengan Berita Acara, uang jalan, biaya, dan PI-nya sendiri." : "Setiap trip memuat dokumen Surat Jalan beserta catatan uang jalan, biaya, dan lampirannya.")</Description>
     <Actions><Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Bisa("trip"))" OnClick="@(() => Ke("transaksi/trip/tambah"))">Tambah Trip</Tombol></Actions>
 </PageHeader>
 
@@ -39,7 +41,7 @@
                         <Field Label="Status"><Pilihan Id="@context" Options="OpsiStatus" Value="@_filter.Draf.Status" Clearable="false" Cari="false" ValueChanged="v => _filter.Ubah(d => d.Status = v ?? string.Empty)" /></Field>
                     </div>
                     <div class="col-6">
-                        <Field Label="@($"Cetak {NamaDokumen}")">
+                        <Field Label="Status Cetak">
                             <Pilihan Id="@context" Options="@(new List<Opsi> { new("", "Semua"), new("tercetak", "Sudah dicetak"), new("belum", "Belum dicetak") })" Value="@_filter.Draf.Cetak" Clearable="false" Cari="false" ValueChanged="v => _filter.Ubah(d => d.Cetak = v ?? string.Empty)" />
                         </Field>
                     </div>
@@ -71,8 +73,9 @@
         <div class="bar-pilihan animate-in-fade">
             <p class="m-0 fs-13 fw-semibold" style="color:var(--brand-800)">@_pilih.Count trip dipilih</p>
             <div class="d-flex flex-wrap align-items-center gap-2">
-                <Tombol Size="sm" Icon="Ikon.Print" IconSize="14" OnClick="() => Cetak(terpilih)">Cetak @NamaDokumen</Tombol>
-                <Tombol Size="sm" Icon="Ikon.CheckDouble" IconSize="14" Disabled="@(!Bisa("trip") || bisaSelesai.Count == 0)" OnClick="BukaTutupMassal">@(Karawang ? "Tutup Trip" : "Tandai Selesai")</Tombol>
+                <TombolCetak Size="sm" Pilihan="@([new PilihanCetak(NamaDokumen, EventCallback.Factory.Create(this, () => Cetak(terpilih)))])" />
+                <Tombol Size="sm" Icon="Ikon.CheckDouble" IconSize="14" Disabled="@(!Bisa("trip") || bisaSelesai.Count == 0)"
+                        Title="@(bisaSelesai.Count == 0 ? "Trip terpilih sudah selesai, dibatalkan, atau belum punya supir." : null)" OnClick="() => BukaTutup(bisaSelesai)">@(Karawang ? "Tutup Trip" : "Tandai Selesai")</Tombol>
                 <Tombol Size="sm" Variant="ghost" OnClick="() => _pilih.Clear()">Batalkan pilihan</Tombol>
             </div>
         </div>
@@ -98,14 +101,10 @@
         <ChildContent>
             <div class="d-flex flex-column gap-3 fs-13 text-ink-2" style="line-height:1.6">
                 <p class="m-0">
-                    @bisaSelesai.Count trip akan ditutup dengan dokumen fisik POD diterima.
+                    @bisaSelesai.Count trip akan ditutup dengan dokumen fisik POD diterima, jadi kendaraannya tercatat kembali di pool.
                     @if (bisaSelesai.Count < terpilih.Count) { <span> Trip yang sudah selesai, dibatalkan, atau belum punya supir dilewati.</span> }
                 </p>
-                <p class="m-0 fs-12-5 text-ink-3">Ingin memeriksa rekapnya dulu? Tutup satu per satu lewat menu ⋯ Tutup Trip.</p>
-                <div class="rounded-3 border border-hairline bg-sunken px-3 py-2">
-                    <Checkbox Label="Kendaraan sudah kembali ke pool" @bind-Checked="_massalDiPool" />
-                    <p class="m-0 mt-1 ps-4 fs-12 text-ink-3">@(_massalDiPool ? "Mobilnya langsung bisa dipakai trip lain." : "Mobilnya tetap tertahan sampai ditandai sudah di pool lewat menu ⋯ tiap trip.")</p>
-                </div>
+                <p class="m-0 fs-12-5 text-ink-3">Ingin memeriksa rekapnya dulu? Pilih satu trip saja, atau tutup dari halaman detail trip.</p>
             </div>
         </ChildContent>
         <Footer>
@@ -121,10 +120,7 @@ else
                       OnCancel="() => _tutupMassal = false" OnConfirm="() => TutupMassal(bisaSelesai)" />
 }
 
-<ModalRekapTrip Trip="_rekap" OnClose="() => _rekap = null" />
-<ModalBatalTrip Trip="_batal" OnClose="() => _batal = null" />
-<ModalTutupTrip Trip="_tutup" OnClose="() => _tutup = null" />
-<ModalHapusTrip Trip="_hapus" OnClose="() => _hapus = null" OnDeleted="id => _pilih.Remove(id)" />
+<ModalTutupTrip Trip="_tutup" OnClose="() => _tutup = null" OnClosed="() => _pilih.Clear()" />
 
 @code {
     public sealed class FilterTrip
@@ -148,8 +144,7 @@ else
     private readonly HashSet<string> _pilih = [];
     private List<BarisTrip>? _cetak;
     private bool _tutupMassal;
-    private bool _massalDiPool = true;
-    private BarisTrip? _rekap, _batal, _tutup, _hapus;
+    private BarisTrip? _tutup;
     private string? _qTerpakai;
 
     private string NamaDokumen => Karawang ? "Berita Acara" : "Surat Jalan";
@@ -265,14 +260,20 @@ else
 
     private void Cetak(List<BarisTrip> rows) { if (rows.Count > 0) _cetak = rows; }
 
-    private void BukaTutupMassal() { _massalDiPool = true; _tutupMassal = true; }
+    /// <summary>Satu trip Karawang: Tutup Trip lengkap (rekap + POD + pool). Beberapa trip: ditutup sekaligus.</summary>
+    private void BukaTutup(List<BarisTrip> bisa)
+    {
+        if (Karawang && bisa.Count == 1) { _tutup = bisa[0]; return; }
+        _tutupMassal = true;
+    }
 
     private void TutupMassal(List<BarisTrip> rows)
     {
         if (Karawang)
         {
-            foreach (var t in rows) Db.TutupTrip(t.Id, new OpsiTutup { PodFisik = true, PodFoto = t.T.PodAttachments ?? [], DiPool = _massalDiPool && t.MenahanKendaraan });
-            Toast.Sukses($"{rows.Count} trip ditutup{(_massalDiPool ? "." : ". Mobilnya belum tercatat di pool: tandai dari menu ⋯ tiap trip setelah kembali.")}");
+            // Dokumen fisik diterima = supir sudah di pool, jadi kendaraannya ikut tercatat kembali di pool (Baldy 22 Okt 2026).
+            foreach (var t in rows) Db.TutupTrip(t.Id, new OpsiTutup { PodFisik = true, PodFoto = t.T.PodAttachments ?? [], DiPool = t.MenahanKendaraan });
+            Toast.Sukses($"{rows.Count} trip ditutup; kendaraannya tercatat kembali di pool.");
         }
         else
         {
@@ -288,22 +289,12 @@ else
         Toast.Sukses($"Kendaraan {(t.PlateNumber != "" ? t.PlateNumber : $"Trip {t.IdTampil}")} tercatat kembali di pool dan bisa dipakai trip lain.");
     }
 
+    /// <summary>Menu ⋯ (Baldy 22 Okt 2026): Cetak, backload, dan tandai pool. Tutup / Rekap / Batalkan Trip ada di detail trip.</summary>
     private List<AksiMenu> AksiBaris(BarisTrip t)
     {
-        var batal = t.Batal;
-        var a = new List<AksiMenu> { new($"Cetak {NamaDokumen}", () => _cetak = [t], Ikon.Print) };
-        if (Karawang) a.Add(new("Rekap Trip", () => _rekap = t, Ikon.ClipboardCheck));
-        if (Karawang && StatusTrip.BisaDitutup(t.Status)) a.Add(new("Tutup Trip", () => _tutup = t, Ikon.FlagCheckered, disabled: !Bisa("trip")));
-        if (Karawang) a.Add(new("Ada Backload / Lanjutan", () => Ke($"transaksi/trip/tambah?backload={t.Id}"), Ikon.Route, disabled: !Bisa("trip") || batal || t.T.VehicleId == ""));
+        var a = new List<AksiMenu> { new("Cetak", () => _cetak = [t], Ikon.Print) };
+        if (Karawang) a.Add(new("Ada Backload / Lanjutan", () => Ke($"transaksi/trip/tambah?backload={t.Id}"), Ikon.Route, disabled: !Bisa("trip") || t.Batal || t.T.VehicleId == ""));
         if (Karawang && BelumDiPool(t)) a.Add(new("Tandai kendaraan di pool", () => TandaiPool(t), Ikon.Warehouse, disabled: !Bisa("trip")));
-        // Trip yang sudah ditagih (punya PI) tidak dibatalkan: PI-nya akan tertinggal tanpa trip yang berlaku.
-        a.Add(new AksiMenu
-        {
-            Label = "Batalkan Trip", Icon = Ikon.Ban, Tone = "danger", Disabled = !Bisa("batal") || batal || t.T.PiNumber != "",
-            Alasan = t.T.PiNumber != "" && !batal ? $"Sudah ditagih lewat PI {t.T.PiNumber}" : null,
-            OnSelect = () => { _batal = t; return Task.CompletedTask; },
-        });
-        a.Add(new("Hapus Trip", () => _hapus = t, Ikon.TrashCan, "danger", !Bisa("hapus")));
         return a;
     }
 
@@ -347,8 +338,8 @@ else
     {
         Key = "action", Header = "Action", Align = "right", Width = "112px", NoPrint = true,
         Render = t => @<div class="d-flex justify-content-end gap-1">
-            <TombolIkon Label="@($"Lihat detail trip {t.IdTampil}")" Icon="Ikon.FileLines" OnClick="@(() => Ke($"transaksi/trip/{t.Id}"))" />
-            <TombolIkon Label="Edit" Icon="Ikon.Pen" Disabled="@(!Bisa("trip") || t.Batal)" OnClick="@(() => Ke($"transaksi/trip/{t.Id}/edit"))" />
+            <TombolIkon Label="Edit" Icon="Ikon.Pen" Disabled="@(!Bisa("trip") || t.Batal || StatusTrip.Terkunci(t.Status))"
+                        Title="@(StatusTrip.Terkunci(t.Status) ? "Trip selesai terkunci: aktifkan lagi di detail trip untuk mengubah." : null)" OnClick="@(() => Ke($"transaksi/trip/{t.Id}/edit"))" />
             <OverflowMenu Actions="@AksiBaris(t)" />
         </div>,
     };

@@ -114,10 +114,10 @@
     var akunSaya = _edit is not null && AkunSaya(_edit);
     var ownerTerakhir = _edit is not null && OwnerTerakhir(_edit);
     <Modal Open="true" Title="@(_edit is not null ? "Ubah Akun" : "Tambah Akun")" Size="sm" OnClose="() => _form = false"
-           Subtitle="@(_edit is not null ? $"Username {_edit.Username}" : "Tanda * wajib diisi. Sandi diatur setelah terhubung ke backend.")">
+           Subtitle="@(_edit is not null ? $"Username {_edit.Username}" : null)">
         <ChildContent>
             <div class="d-flex flex-column gap-3">
-                <Field Label="Username" Required Error="@_galat.GetValueOrDefault("username")" Hint="@Teks("Dipakai untuk masuk. Huruf kecil tanpa spasi, mis. admin.krw")">
+                <Field Label="Username" Required Error="@_galat.GetValueOrDefault("username")" Info="Dipakai untuk masuk. Huruf kecil tanpa spasi, mis. admin.krw">
                     <input id="@context" class="form-control @(_galat.ContainsKey("username") ? "is-invalid" : "")" value="@_isi.Username" autocomplete="off" spellcheck="false"
                            placeholder="admin.krw" @oninput="e => _isi.Username = e.Value?.ToString() ?? string.Empty" />
                 </Field>

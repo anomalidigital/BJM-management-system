@@ -1,24 +1,46 @@
-@* Peringatan di atas form ubah trip yang sudah jalan: isian inti dikunci; Manager / Owner boleh membuka kuncinya. *@
-@if (Terbuka)
-{
-    <div class="mb-3 d-flex align-items-start gap-2 rounded-3 px-3 py-2 fs-12-5" style="border:1px solid #f6e2ac;background:#fff8e6;color:#8a6100">
-        <IkonSvg Def="Ikon.LockOpen" Size="15" Style="margin-top:1px" />
-        <span>Kunci dibuka: @Isian boleh diubah. Periksa uang jalan, Berita Acara, dan tagihan trip ini setelah disimpan.</span>
+@inherits KomponenData
+@* Kunci trip (Baldy 22 Okt 2026): trip yang sudah selesai terkunci penuh: data trip, uang jalan, biaya operasional, biaya internal,
+   dan dokumen lainnya tidak bisa diubah. Tombol Aktifkan Lagi (Manager / Owner) mengembalikan trip ke Aktif supaya bisa diubah, lalu
+   ditutup lagi. PI yang sudah dibuat tidak ikut berubah: nilainya beku, dan halaman Tagihan menandai PI yang nilai tripnya berubah.
+   PI yang sudah Lunas tidak bisa dibuka lagi. *@
+<div class="kotak-kunci mb-3" data-kunci-trip>
+    <IkonSvg Def="Ikon.Lock" Size="15" Class="flex-shrink-0" Style="margin-top:2px" />
+    <p class="m-0 min-w-0 flex-grow-1">
+        <span class="fw-semibold text-ink">Trip sudah selesai dan terkunci.</span>
+        Data trip, uang jalan, biaya operasional, biaya internal, dan dokumen lainnya tidak bisa diubah. Perlu diubah? Aktifkan lagi trip ini.
+    </p>
+    <Tombol Size="sm" Icon="Ikon.LockOpen" IconSize="13" Disabled="@(!Bisa("override") || PiLunas)" Title="@(PiLunas ? $"PI {Trip.T.PiNumber} sudah lunas." : null)"
+            OnClick="() => _konfirmasi = true">Aktifkan Lagi</Tombol>
+</div>
+
+<KonfirmasiDialog Open="_konfirmasi" Title="@($"Aktifkan lagi Trip {Trip.IdTampil}?")" ConfirmLabel="Aktifkan Lagi" OnCancel="() => _konfirmasi = false" OnConfirm="Aktifkan">
+    <div class="d-flex flex-column gap-2 mt-2 fs-13 text-ink-2" style="line-height:1.6">
+        <p class="m-0">Status trip kembali Aktif sehingga trip bisa diubah. Setelah selesai diubah, tutup lagi trip-nya.</p>
+        @if (!string.IsNullOrEmpty(Trip.T.PiTahap))
+        {
+            <KotakInfo Jenis="peringatan" Class="d-flex align-items-start gap-2 fs-12-5">
+                <IkonSvg Def="Ikon.TriangleExclamation" Size="14" Class="mt-1 flex-shrink-0" />
+                <span>Trip ini sudah punya PI @(Trip.T.PiNumber != "" ? Trip.T.PiNumber : "") (@TahapPi.Label(Trip.T.PiTahap)). Nilai PI tidak ikut berubah otomatis:
+                    bila Harga Jual atau biaya yang ditagihkan berubah, perbarui nilai PI-nya di halaman Tagihan.</span>
+            </KotakInfo>
+        }
     </div>
-}
-else
-{
-    <div class="mb-3 d-flex flex-wrap align-items-center gap-3 rounded-3 border border-hairline bg-sunken px-3 py-2 fs-12-5 text-ink-2">
-        <IkonSvg Def="Ikon.Lock" Size="15" Class="text-ink-3" />
-        <span class="min-w-0 flex-grow-1">Trip sudah <span class="fw-semibold text-ink">@StatusTrip.Label(Status)</span>: @Isian dikunci.@(BolehBuka ? " Perlu diubah? Buka kuncinya." : " Perubahan perlu Manager atau Owner.")</span>
-        @if (BolehBuka) { <Tombol Size="sm" Icon="Ikon.LockOpen" IconSize="13" OnClick="OnBuka">Buka kunci</Tombol> }
-    </div>
-}
+</KonfirmasiDialog>
 
 @code {
-    [Parameter] public string Status { get; set; } = StatusTrip.Aktif;
-    [Parameter] public bool Terbuka { get; set; }
-    [Parameter] public bool BolehBuka { get; set; }
-    [Parameter] public EventCallback OnBuka { get; set; }
-    [Parameter] public string Isian { get; set; } = "rute, layanan & kontrak, kendaraan, gandengan, dan supir";
+    [Parameter, EditorRequired] public BarisTrip Trip { get; set; } = default!;
+    /// <summary>Dipanggil setelah trip diaktifkan lagi.</summary>
+    [Parameter] public EventCallback OnAktif { get; set; }
+
+    private bool _konfirmasi;
+    private bool PiLunas => Trip.T.PiTahap == TahapPi.Lunas;
+
+    private async Task Aktifkan()
+    {
+        _konfirmasi = false;
+        if (!Bisa("override") || PiLunas) return;
+        Db.AktifkanLagiTrip(Trip.Id);
+        Toast.Sukses($"Trip {Trip.IdTampil} aktif lagi dan bisa diubah. Tutup lagi setelah selesai.");
+        await OnAktif.InvokeAsync();
+    }
 }

@@ -96,7 +96,7 @@
 {
     var keTrip = _isi.Simpan == "trip";
     <Modal Open="true" Title="@(_edit is not null ? "Ubah Dokumen Umum" : "Unggah Dokumen")" Size="md" OnClose="() => _unggah = false"
-           Subtitle="@(_edit is not null ? _edit.Judul : "Tanda * wajib diisi. Gambar diperkecil otomatis.")">
+           Subtitle="@_edit?.Judul">
         <ChildContent>
             <div class="row g-3">
                 @if (_edit is null)
@@ -118,7 +118,7 @@
                 @if (keTrip)
                 {
                     <Field Label="Trip" Required Class="col-12" Error="@_galat.GetValueOrDefault("trip_id")"
-                           Hint="@Teks("Ketik ID Trip, No Referensi, No. Kendaraan, atau supir. Tanggal ikut tanggal berangkat trip, boleh diganti.")">
+                           Info="Ketik ID Trip, No Referensi, No. Kendaraan, atau supir. Tanggal ikut tanggal berangkat trip, boleh diganti.">
                         <Pilihan Id="@context" Options="OpsiTrip" Value="@(_isi.TripId == "" ? null : _isi.TripId)" Invalid="@_galat.ContainsKey("trip_id")"
                                  Placeholder="Pilih trip..." SearchPlaceholder="Cari ID Trip, No. Kendaraan, supir..." ValueChanged="PilihTrip" />
                     </Field>
@@ -136,7 +136,7 @@
                         <Pilihan Id="@context" Options="OpsiKategori" Value="@_isi.Kategori" ValueChanged="v => _isi.Kategori = v ?? KategoriDokumen.Semua[0]" Cari="false" Clearable="false" />
                     </Field>
                 }
-                <Field Label="Berkas" Required Class="col-12" Error="@_galat.GetValueOrDefault("attachments")" Hint="@Teks("Gambar, PDF, atau berkas lain. Boleh lebih dari satu.")">
+                <Field Label="Berkas" Required Class="col-12" Error="@_galat.GetValueOrDefault("attachments")" Info="Gambar, PDF, atau berkas lain. Boleh lebih dari satu.">
                     <LampiranInput Id="@context" Accept="" Label="Tambah berkas" Value="_isi.Attachments" ValueChanged="UbahBerkas" />
                 </Field>
                 <Field Label="Catatan" Class="col-12">
@@ -181,9 +181,9 @@
     /// <summary>Tempat berkas itu diubah atau dihapus (untuk tombol tautan).</summary>
     private static string TempatSumber(string s) => s switch
     {
-        "dokumen" => "halaman ini", "tripNotes" => "tab Dokumen di detail trip", "pod" => "Tutup Trip di detail trip", "pi" => "halaman Tagihan / detail trip",
+        "dokumen" => "halaman ini", "tripNotes" => "tab Dokumen Lainnya di detail trip", "pod" => "Tutup Trip di detail trip", "pi" => "halaman Tagihan / detail trip",
         "override" => "form trip", "ujPayments" => "tab Uang Jalan di detail trip", "expenses" => "tab Biaya Operasional di detail trip",
-        "internalCosts" => "tab Komisi di detail trip", "tripEvents" => "tab Perjalanan di detail trip", "kasbonEntries" => "menu Piutang Karyawan",
+        "internalCosts" => "tab Biaya Internal di detail trip", "tripEvents" => "catatan perjalanan lama (Overview detail trip)", "kasbonEntries" => "menu Piutang Karyawan",
         "drivers" => "Ubah karyawan di Supir / Karyawan", "vehicles" => "Ubah kendaraan di halaman Kendaraan", "contracts" => "daftar kontrak di halaman klien", _ => "",
     };
 
@@ -318,9 +318,9 @@
                 Tambah(c.Attachments, "internalCosts", c.CostType, c.Notes, t.TransactionNo, KetTrip(t), KeTrip(t, "internal"), c.CostDate, c.Id);
         foreach (var ev in d.Kejadian)
             if (tripMap.TryGetValue(ev.TripId, out var t))
-                // Tab Perjalanan hanya ada di trip Karawang.
+                // Catatan perjalanan lama (tab Perjalanan dihapus 22 Okt 2026): berkasnya tetap bisa dibuka dari detail trip.
                 Tambah(ev.Attachments, "tripEvents", JenisPerjalanan.Label(ev.Jenis), string.Join(" · ", new[] { ev.Lokasi, ev.Catatan }.Where(x => x != "")),
-                    t.TransactionNo, KetTrip(t), KeTrip(t, WsDari(t.Workspace) == WorkspaceKode.Karawang ? "perjalanan" : null), ev.Waktu.Length >= 10 ? ev.Waktu[..10] : ev.Waktu, ev.Id);
+                    t.TransactionNo, KetTrip(t), KeTrip(t, null), ev.Waktu.Length >= 10 ? ev.Waktu[..10] : ev.Waktu, ev.Id);
         var orang = d.Karyawan.ToDictionary(x => x.Id);
         foreach (var k in d.Kasbon)
         {

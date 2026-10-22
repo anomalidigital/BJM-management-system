@@ -8,3 +8,17 @@
 .bar-pilihan { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; border-bottom: 1px solid var(--brand-100); background: var(--brand-50); padding: .625rem 1rem; }
 .grid-konfigurasi { display: grid; gap: 1rem; }
 @media (min-width: 768px) { .grid-konfigurasi { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 13rem); } .kotak-rute { margin-top: 22px; } }
+/* Trip selesai terkunci (Baldy 22 Okt 2026). */
+.kotak-kunci { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .625rem .75rem; padding: .75rem 1rem; border: 1px solid var(--hairline); border-radius: .5rem;
+  background: var(--sunken); font-size: 12.5px; color: var(--ink-2); line-height: 1.55; }
+/* Form trip ringkas (Baldy 22 Okt 2026): tidak melebar ke seluruh layar; bilah simpan sejajar dengan form. */
+.form-ringkas { max-width: 1120px; }
+.form-ringkas .card-header { padding-top: .625rem; padding-bottom: .625rem; }
+.form-ringkas ~ .form-bar .isi, .form-ringkas .form-bar .isi { max-width: 1120px; margin: 0; }
+/* Pick Up / Destination Details: saran alamat + peta Google Maps. */
+.lokasi-saran { max-height: 18rem; overflow-y: auto; z-index: 1060; }
+.lokasi-saran .dropdown-item { align-items: flex-start; cursor: pointer; }
+.peta-lokasi { position: relative; height: 190px; border: 1px solid var(--hairline); border-radius: .5rem; overflow: hidden; background: var(--sunken); }
+.peta-lokasi iframe { display: block; width: 100%; height: 100%; border: 0; }
+.peta-buka { position: absolute; right: .5rem; bottom: .5rem; display: inline-flex; align-items: center; gap: .25rem; padding: .1875rem .5rem; border-radius: .375rem;
+  background: var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,.18); font-size: 11.5px; font-weight: 600; color: var(--brand-700); text-decoration: none; }

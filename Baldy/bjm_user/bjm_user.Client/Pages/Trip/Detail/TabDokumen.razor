@@ -8,12 +8,12 @@
     var dokumen = Dokumen;
 }
 <div>
-    <KepalaTab Judul="Dokumen trip" Tombol="Tambah Dokumen" BisaUbah="BisaUbah" OnTambah="() => Buka(null)">
+    <KepalaTab Judul="Dokumen Lainnya" Tombol="Tambah Dokumen Lainnya" BisaUbah="BisaUbah" OnTambah="() => Buka(null)">
         <Keterangan>Berkas apa pun untuk trip ini: Berita Acara bertanda tangan, surat jalan, foto barang atau segel, tanda terima, atau kronologi di jalan.</Keterangan>
     </KepalaTab>
     @if (dokumen.Count == 0)
     {
-        <KosongTab Judul="Belum ada dokumen trip." Keterangan="Unggah Berita Acara bertanda tangan, surat jalan, atau foto untuk trip ini." />
+        <KosongTab Judul="Belum ada dokumen lainnya." Keterangan="Unggah Berita Acara bertanda tangan, surat jalan, atau foto untuk trip ini." />
     }
     else
     {
@@ -43,7 +43,7 @@
     }
 </div>
 
-<Modal Open="_terbuka" Title="@(_editing is not null ? "Ubah Dokumen Trip" : "Tambah Dokumen Trip")" Subtitle="@($"Trip {Trip.IdTampil}")" Size="md" OnClose="() => _terbuka = false">
+<Modal Open="_terbuka" Title="@(_editing is not null ? "Ubah Dokumen Lainnya" : "Tambah Dokumen Lainnya")" Subtitle="@($"Trip {Trip.IdTampil}")" Size="md" OnClose="() => _terbuka = false">
     <ChildContent>
         @if (_terbuka)
         {
@@ -54,7 +54,7 @@
                 <Field Label="Tanggal" Required Class="col-sm-4">
                     <TanggalInput Id="@context" Value="@_tanggal" ValueChanged="v => _tanggal = v" />
                 </Field>
-                <Field Label="Berkas" Class="col-12" Hint="@AturDetail.Teks("Gambar, PDF, atau berkas lain. Foto diperkecil otomatis.")">
+                <Field Label="Berkas" Class="col-12" Info="Gambar, PDF, atau berkas lain. Foto diperkecil otomatis.">
                     <LampiranInput Id="@context" Accept="" Label="Tambah berkas" Value="_lampiran" ValueChanged="v => _lampiran = v" />
                 </Field>
                 <Field Label="Catatan" Class="col-12">

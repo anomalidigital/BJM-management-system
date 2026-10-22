@@ -88,8 +88,7 @@ public static class Rekap
             Tambah(!string.IsNullOrEmpty(t.Penerima?.Nama), "Destination Details terisi", "Destination Details belum diisi", "edit");
             Tambah(!string.IsNullOrEmpty(t.PrintedAt), "Berita Acara sudah dicetak", "Berita Acara belum dicetak", AturDetail.Overview, "catatan");
             Tambah(termin.Count > 0, $"Uang Jalan {termin.Count} termin", "Uang Jalan belum dicatat", AturDetail.Uj);
-            Tambah(kejadian.Any(e => e.Jenis is "tiba" or "bongkar"), "Tiba / selesai bongkar di destinasi tercatat",
-                "Belum ada catatan tiba / selesai bongkar di tab Perjalanan", AturDetail.Perjalanan, "catatan");
+            // Catatan tiba / selesai bongkar tidak dicek lagi: tab Perjalanan dihapus (Baldy 22 Okt 2026).
             if (!dedicated) Tambah(trip.Harga > 0, $"Harga Jual {Format.Rupiah(trip.Harga)}", $"Harga Jual trip masih {Format.Rupiah(0)}: tagihan ke klien akan kosong", "edit");
             if (biaya.Count == 0) cek.Add(new CekRekap("catatan", "Belum ada biaya operasional (tol, solar, dst.). Abaikan bila memang tidak ada.", AturDetail.Biaya));
             if (trip.Ujroute > 0 && uj > trip.Ujroute) cek.Add(new CekRekap("catatan", $"Uang jalan {Format.Rupiah(uj)} di atas patokan {Format.Rupiah(trip.Ujroute)}", AturDetail.Uj));

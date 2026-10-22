@@ -96,8 +96,8 @@ else
                     <div>
                         <p class="mb-2 fs-12 fw-semibold text-ink-2" style="letter-spacing:.02em">Tipe Laporan</p>
                         <div class="d-flex flex-column gap-2">
-                            <Radio Name="netto-mode" Label="Cetak Pendapatan Netto perMobil" Description="Satu baris per nomor polisi." Checked="@(_mode == "perMobil")" OnChange="@(() => GantiMode("perMobil"))" />
-                            <Radio Name="netto-mode" Label="Cetak Pendapatan Netto GLOBAL" Description="Rekap harian seluruh armada." Checked="@(_mode == "global")" OnChange="@(() => GantiMode("global"))" />
+                            <Radio Name="netto-mode" Label="Pendapatan Netto per Mobil" Description="Satu baris per nomor polisi." Checked="@(_mode == "perMobil")" OnChange="@(() => GantiMode("perMobil"))" />
+                            <Radio Name="netto-mode" Label="Pendapatan Netto Global" Description="Rekap harian seluruh armada." Checked="@(_mode == "global")" OnChange="@(() => GantiMode("global"))" />
                         </div>
                     </div>
                     @if (_galat is not null) { <p class="invalid-feedback m-0">@_galat</p> }

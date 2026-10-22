@@ -1,12 +1,14 @@
 @page "/master/mobil"
-@* Master Data -> Kendaraan. Revisi 13 Okt 2026: surat penting (STNK, KIR, Pajak, Asuransi) punya tempat upload sendiri beserta masa
-   berlakunya, terpisah dari foto & dokumen lainnya. *@
+@* Master Data -> Kendaraan. Revisi 13 Okt 2026: surat penting punya tempat upload sendiri beserta masa berlakunya.
+   Revisi 22 Okt 2026: dokumen STNK, KIR, BPKB + Dokumen Lainnya (Pajak & Asuransi dilepas), status Aktif / Nonaktif (tanpa Servis),
+   No. Kendaraan dirapikan otomatis ke pola "B 9015 UWW", penjelasan isian lewat ikon "?". *@
 @inherits KomponenData
 <PageTitle>Kendaraan — BJM Logistik</PageTitle>
 
 <PageHeader Title="Kendaraan" Crumbs="@(new List<Crumb> { new("Master Data"), new("Kendaraan") })">
-    <Description>Master kendaraan beserta konfigurasi dan surat pentingnya (STNK, KIR, Pajak, Asuransi, BPKB).</Description>
+    <Description>Kendaraan beserta konfigurasi dan dokumennya (STNK, KIR, BPKB).</Description>
     <Actions>
+        <Tombol Icon="Ikon.FileArrowUp" Disabled="@(!Bisa("master"))" OnClick="() => _import = true">Import</Tombol>
         <Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Bisa("master"))" OnClick="BukaTambah">Tambah Kendaraan</Tombol>
     </Actions>
 </PageHeader>
@@ -24,7 +26,7 @@
                         <Pilihan Id="@context" Options="OpsiStatusFilter" Value="@_filter.Draf.Status" ValueChanged="v => _filter.Ubah(d => d.Status = v ?? string.Empty)" Cari="false" Clearable="false" />
                     </Field>
                 </div>
-                <Field Label="Surat penting">
+                <Field Label="Dokumen">
                     <Pilihan Id="@context" Options="OpsiSurat" Value="@_filter.Draf.Dok" ValueChanged="v => _filter.Ubah(d => d.Dok = v ?? string.Empty)" Cari="false" Clearable="false" />
                 </Field>
             </PanelFilter>
@@ -47,16 +49,17 @@
     }
 </Kartu>
 
-<Modal Open="_formOpen" Size="lg" Title="@(_editing is not null ? "Ubah Kendaraan" : "Tambah Kendaraan")" Subtitle="@(_editing?.PlateNumber ?? "Tanda * wajib diisi.")" OnClose="() => _formOpen = false">
+<Modal Open="_formOpen" Size="lg" Title="@(_editing is not null ? "Ubah Kendaraan" : "Tambah Kendaraan")" OnClose="() => _formOpen = false">
     <ChildContent>
         @if (_formOpen)
         {
             var tripAktif = _editing is not null ? TripMenahan(_editing.Id) : [];
-            @* Ringkas tanpa scroll (Baldy 14 Okt 2026): data kendaraan sebaris, surat sebaris di bawah. *@
+            @* Ringkas (Baldy 14 & 22 Okt 2026): data kendaraan sebaris, dokumen sebagai tabel di bawah. *@
             <div class="row g-3">
-                <Field Label="No. Kendaraan" Required Error="@G("plat")" Class="col-sm-6 col-md-3">
-                    <input id="@context" class="form-control @(G("plat") is not null ? "is-invalid" : "")" value="@_f.PlateNumber" placeholder="B 9015 UWW"
-                           @oninput="e => { _f.PlateNumber = e.Value?.ToString() ?? string.Empty; _galat.Remove(PlatKunci); }" />
+                <Field Label="No. Kendaraan" Required Error="@G("plat")" Class="col-sm-6 col-md-3" Info="Dirapikan otomatis ke pola wilayah, nomor, seri, mis. B 9015 UWW.">
+                    <input id="@context" class="form-control tnum @(G("plat") is not null ? "is-invalid" : "")" value="@_f.PlateNumber" placeholder="B 9015 UWW"
+                           @oninput="e => { _f.PlateNumber = e.Value?.ToString() ?? string.Empty; _galat.Remove(PlatKunci); }"
+                           @onchange="e => _f.PlateNumber = Kode.RapikanNoKendaraan(e.Value?.ToString())" />
                 </Field>
                 <Field Label="Jenis Kendaraan" Required="JenisWajib" Error="@G("jenis")" Class="col-sm-6 col-md-3">
                     <Pilihan Id="@context" Options="OpsiJenis" Value="@_f.VehicleType" Placeholder="Pilih jenis..." Invalid="@(G("jenis") is not null)" Cari="false" Clearable="false"
@@ -83,9 +86,9 @@
                     </div>
                 }
                 <fieldset class="col-12 min-w-0">
-                    <legend class="form-label">Surat &amp; dokumen <span class="fw-normal text-ink-3">· klik kotak untuk upload; foto diperkecil otomatis, PDF juga bisa</span></legend>
+                    <div class="label-isian"><legend class="form-label m-0 float-none w-auto">Dokumen</legend><InfoTanya Teks="Upload foto atau PDF. Foto diperkecil otomatis. Foto kendaraan masuk Dokumen Lainnya." /></div>
                     <DokumenPentingInput Jenis="DokumenPentingJenis.Kendaraan" Value="_dokumen" ValueChanged="v => _dokumen = v"
-                                         LainnyaLabel="@("Foto & lainnya")" Lainnya="_f.Attachments" LainnyaChanged="v => _f.Attachments = v" />
+                                         LainnyaLabel="Dokumen Lainnya" Lainnya="_f.Attachments" LainnyaChanged="v => _f.Attachments = v" />
                 </fieldset>
             </div>
         }
@@ -101,7 +104,12 @@
     <p class="m-0 mt-2 fs-13 fw-medium text-ink">@_hapus?.PlateNumber</p>
 </KonfirmasiDialog>
 
+
+<ModalImport Open="_import" Definisi="@ImportMaster.Kendaraan(Db)" OnClose="() => _import = false" />
 @code {
+    /// <summary>Import dari template CSV / Excel (Baldy 22 Okt 2026).</summary>
+    private bool _import;
+
     public sealed class FilterKendaraan { public string Config { get; set; } = ""; public string Status { get; set; } = ""; public string Dok { get; set; } = ""; }
 
     private const string StatusAktif = "aktif", PlatKunci = "plat", JenisKunci = "jenis";
@@ -111,7 +119,7 @@
     private static readonly List<Opsi> OpsiKonfigurasiDasar = KonfigurasiKendaraan.Semua.Select(c => new Opsi(c, KonfigurasiKendaraan.Label(c))).ToList();
     private static readonly List<Opsi> OpsiKonfigurasi = [new("", "Standar"), .. OpsiKonfigurasiDasar];
     private static readonly List<Opsi> OpsiKonfigurasiFilter = [new("", "Semua"), .. OpsiKonfigurasiDasar];
-    private static readonly List<Opsi> OpsiStatus = [new("aktif", "Aktif"), new("servis", "Servis"), new("nonaktif", "Nonaktif")];
+    private static readonly List<Opsi> OpsiStatus = StatusKendaraan.Semua.Select(s => new Opsi(s, StatusKendaraan.Label(s))).ToList();
     private static readonly List<Opsi> OpsiStatusFilter = [new("", "Semua"), .. OpsiStatus];
     private static readonly List<Opsi> OpsiSurat = [new("", "Semua"), new("kurang", "Belum lengkap"), new("habis", "Habis / segera habis")];
 
@@ -143,7 +151,7 @@
         };
     }
 
-    private static string LabelStatus(string s) => s switch { "aktif" => "Aktif", "servis" => "Servis", "nonaktif" => "Nonaktif", _ => s };
+    private static string LabelStatus(string s) => StatusKendaraan.Label(s);
 
     /// <summary>Jumlah trip per kendaraan di workspace aktif (kolom Jumlah Trip).</summary>
     private Dictionary<string, int> JumlahTrip()
@@ -174,7 +182,7 @@
             var l = new List<ChipFilter>();
             if (f.Config != "") l.Add(new($"Konfigurasi: {KonfigurasiKendaraan.Label(f.Config)}", () => _filter.Lepas((n, a) => n.Config = a.Config)));
             if (f.Status != "") l.Add(new($"Status: {LabelStatus(f.Status)}", () => _filter.Lepas((n, a) => n.Status = a.Status)));
-            if (f.Dok != "") l.Add(new(f.Dok == "kurang" ? "Surat belum lengkap" : "Surat habis / segera habis", () => _filter.Lepas((n, a) => n.Dok = a.Dok)));
+            if (f.Dok != "") l.Add(new(f.Dok == "kurang" ? "Dokumen belum lengkap" : "Dokumen habis / segera habis", () => _filter.Lepas((n, a) => n.Dok = a.Dok)));
             return l;
         }
     }
@@ -182,10 +190,9 @@
     private List<Kolom<Model.Kendaraan>> Kolom =>
     [
         new() { Key = "plate_number", Header = "No. Kendaraan", Sortable = true, Width = "140px", Render = v => @<span class="tnum fw-semibold text-ink">@v.PlateNumber</span> },
-        new() { Key = "foto", Header = "Foto", Width = "120px", Render = v => @<LampiranThumbs Ids="v.Attachments" Ukuran="30" /> },
         new() { Key = "vehicle_type", Header = "Jenis Kendaraan", Sortable = true, Render = v => @<span class="text-ink-2">@v.VehicleType</span> },
         new() { Key = "configuration", Header = "Konfigurasi", Sortable = true, Width = "130px", Render = SelKonfigurasi },
-        new() { Key = "dokumen", Header = "Surat", Width = "250px", Render = v => @<TagDokumen Jenis="DokumenPentingJenis.Kendaraan" Dokumen="v.Dokumen" /> },
+        new() { Key = "dokumen", Header = "Dokumen", Width = "250px", Render = v => @<TagDokumen Jenis="DokumenPentingJenis.Kendaraan" Dokumen="v.Dokumen" Lainnya="v.Attachments.Count" /> },
         new() { Key = "trip", Header = "Jumlah Trip", Align = "right", Width = "110px", Render = v => @<span class="tnum text-ink-2">@Format.Angka(_jumlahTrip.GetValueOrDefault(v.Id))</span> },
         new() { Key = "status", Header = "Status", Sortable = true, Width = "110px", Render = SelStatus },
         new() { Key = "action", Header = "Action", Align = "right", Width = "92px", NoPrint = true, Render = SelAksi },
@@ -197,12 +204,7 @@
         return @<Badge Tone="brand">@KonfigurasiKendaraan.Label(v.Configuration)</Badge>;
     }
 
-    private static RenderFragment SelStatus(Model.Kendaraan v) => v.Status switch
-    {
-        "aktif" => @<Badge Tone="good">Aktif</Badge>,
-        "servis" => @<Badge Tone="warning">Servis</Badge>,
-        _ => @<Badge Tone="neutral">Nonaktif</Badge>,
-    };
+    private static RenderFragment SelStatus(Model.Kendaraan v) => @<Badge Tone="@StatusKendaraan.Nada(v.Status)">@StatusKendaraan.Label(v.Status)</Badge>;
 
     private RenderFragment SelAksi(Model.Kendaraan v)
     {
@@ -240,9 +242,10 @@
     private bool Validasi()
     {
         _galat.Clear();
-        var plat = _f.PlateNumber.Trim();
-        if (plat == "") _galat["plat"] = "No. Kendaraan wajib diisi.";
-        else if (Db.Data.Kendaraan.Any(v => v.PlateNumber.Equals(plat, StringComparison.OrdinalIgnoreCase) && v.Id != _editing?.Id)) _galat["plat"] = "No. Kendaraan sudah terdaftar.";
+        _f.PlateNumber = Kode.RapikanNoKendaraan(_f.PlateNumber);
+        var kunci = Kode.KunciNoKendaraan(_f.PlateNumber);
+        if (kunci == "") _galat["plat"] = "No. Kendaraan wajib diisi.";
+        else if (Db.Data.Kendaraan.Any(v => Kode.KunciNoKendaraan(v.PlateNumber) == kunci && v.Id != _editing?.Id)) _galat["plat"] = "No. Kendaraan sudah terdaftar.";
         if (JenisWajib && _f.VehicleType.Trim() == "") _galat["jenis"] = "Jenis kendaraan wajib diisi.";
         return _galat.Count == 0;
     }
@@ -254,7 +257,7 @@
         var dok = DokumenPentingInput.Rapikan(_dokumen);
         void Isi(Model.Kendaraan v)
         {
-            v.PlateNumber = f.PlateNumber.Trim().ToUpperInvariant(); v.VehicleType = f.VehicleType; v.Configuration = f.Configuration;
+            v.PlateNumber = Kode.RapikanNoKendaraan(f.PlateNumber); v.VehicleType = f.VehicleType; v.Configuration = f.Configuration;
             v.Status = f.Status; v.Dokumen = dok; v.Attachments = f.Attachments;
         }
         if (_editing is not null)

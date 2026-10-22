@@ -78,6 +78,8 @@ public sealed class Db(Penyimpanan simpan, Sesi sesi, HttpClient http)
 
     private int _versi;
     private int _diam;
+    /// <summary>Selama > 0 (import massal), simpan & pemberitahuan perubahan ditunda sampai akhir.</summary>
+    private int _tahan;
     private bool _hidrasi;
     private readonly List<CatatanAudit> _antrianAudit = [];
 
@@ -135,6 +137,7 @@ public sealed class Db(Penyimpanan simpan, Sesi sesi, HttpClient http)
 
     private void Ubah()
     {
+        if (_tahan > 0) return;
         _versi++;
         Berubah?.Invoke();
         if (_hidrasi) _ = simpan.SimpanAsync(Penyimpanan.KunciDb, Semua.KeJson());
@@ -276,6 +279,14 @@ public sealed class Db(Penyimpanan simpan, Sesi sesi, HttpClient http)
         _diam++;
         try { kerja(); }
         finally { _diam--; CatatAudit(e); Ubah(); }
+    }
+
+    /// <summary>Banyak perubahan sekaligus (import master): satu catatan Audit Log dan satu kali simpan di akhir.</summary>
+    public void Massal(IsianAudit e, Action kerja)
+    {
+        _diam++; _tahan++;
+        try { kerja(); }
+        finally { _diam--; _tahan--; CatatAudit(e); Ubah(); }
     }
 
     private string LabelTrip(string tripId) => Cari<Trip>(tripId)?.TransactionNo ?? "";
@@ -590,6 +601,38 @@ public sealed class Db(Penyimpanan simpan, Sesi sesi, HttpClient http)
         });
     }
 
+    /// <summary>
+    /// Dokumen fisik POD diterima (Baldy 22 Okt 2026): supir menyerahkan hardcopy di pool, jadi kendaraannya ikut tercatat kembali
+    /// di pool bila belum (kecuali trip sudah dilanjutkan backload: kendaraannya masih dipakai trip lanjutan).
+    /// </summary>
+    public void TerimaPodFisik(string tripId)
+    {
+        var t = Cari<Trip>(tripId);
+        if (t is null) return;
+        var dilanjutkan = Semua.Trip.Any(x => x.BackloadDari == tripId && x.Status != StatusTrip.Batal);
+        var catatPool = t.VehicleId != "" && !PunyaPool(tripId) && !dilanjutkan;
+        var w = Format.SekarangLokal();
+        DenganAudit(new IsianAudit
+        {
+            Aksi = "ubah", Entitas = Koleksi.Trip, EntityId = tripId, Label = LabelTrip(tripId),
+            Ringkasan = catatPool ? "Dokumen fisik POD diterima; kendaraan tercatat kembali di pool" : "Dokumen fisik POD diterima",
+        }, () =>
+        {
+            Ubah<Trip>(tripId, x => { x.PodFisik = true; x.PodFisikAt = Format.HariIni(); if (catatPool) x.PoolAt = w; });
+            if (catatPool) Buat(new KejadianTrip { TripId = tripId, Jenis = "pool", Waktu = w, Lokasi = "Pool", Catatan = "Dicatat saat dokumen fisik POD diterima" });
+        });
+    }
+
+    /// <summary>
+    /// Aktifkan lagi trip yang sudah selesai (Baldy 22 Okt 2026): status kembali Aktif supaya trip bisa diubah, lalu ditutup lagi.
+    /// Nilai PI yang sudah dibuat tetap beku; bila nilai trip berubah, halaman Tagihan menandainya dan nilainya bisa diperbarui.
+    /// </summary>
+    public void AktifkanLagiTrip(string tripId)
+    {
+        DenganAudit(new IsianAudit { Aksi = "aktifkan", Entitas = Koleksi.Trip, EntityId = tripId, Label = LabelTrip(tripId), Ringkasan = "Mengaktifkan lagi trip yang sudah selesai" },
+            () => Ubah<Trip>(tripId, t => { t.Status = StatusTrip.Aktif; t.ClosedAt = null; }));
+    }
+
     public void TandaiDiPool(string tripId, string? waktu = null, string lokasi = "Pool")
     {
         var w = waktu ?? Format.SekarangLokal();
@@ -657,9 +700,21 @@ public static class DatabaseRapikan
             t.JobOrderId ??= ""; t.Party ??= ""; t.GoodsType ??= ""; t.Kosongan ??= ""; t.Location ??= ""; t.Ship ??= ""; t.DestinationDetail ??= "";
             t.TrReference ??= ""; t.PiNumber ??= ""; t.PiStatus ??= ""; t.Notes ??= ""; t.CancelReason ??= ""; t.ContainerNo ??= "";
         }
-        foreach (var r in d.Rute) { r.RouteCode ??= ""; r.RouteName ??= ""; r.ProjectId ??= ""; r.Feet ??= ""; }
-        foreach (var k in d.Karyawan) { k.DriverCode ??= ""; k.DriverName ??= ""; k.NamaLengkap ??= ""; k.Role ??= PeranKaryawan.Sopir; k.Address1 ??= ""; k.Address2 ??= ""; k.City ??= ""; k.Phone ??= ""; k.Status ??= "aktif"; k.Attachments ??= []; }
-        foreach (var v in d.Kendaraan) { v.PlateNumber ??= ""; v.VehicleType ??= ""; v.Configuration ??= ""; v.Status ??= "aktif"; v.Attachments ??= []; }
+        foreach (var r in d.Rute) { r.RouteCode ??= ""; r.RouteName ??= ""; r.ProjectId ??= ""; r.Feet ??= ""; r.Catatan ??= ""; }
+        foreach (var k in d.Karyawan) { k.DriverCode ??= ""; k.DriverName ??= ""; k.NamaLengkap ??= ""; k.Role ??= PeranKaryawan.Sopir; k.Address1 ??= ""; k.Address2 ??= ""; k.City ??= ""; k.Phone ??= ""; k.Status ??= "aktif"; k.Attachments ??= [];
+            if (k.Status != StatusKaryawan.Nonaktif) k.Status = StatusKaryawan.Aktif; } // status Cuti dilepas 22 Okt 2026
+        foreach (var v in d.Kendaraan)
+        {
+            v.PlateNumber ??= ""; v.VehicleType ??= ""; v.Configuration ??= ""; v.Status ??= "aktif"; v.Attachments ??= [];
+            if (v.Status != StatusKendaraan.Nonaktif) v.Status = StatusKendaraan.Aktif; // status Servis dilepas 22 Okt 2026
+            // Slot Pajak Kendaraan & Asuransi dilepas (22 Okt 2026): berkasnya pindah ke Dokumen Lainnya supaya tidak hilang.
+            if (v.Dokumen is { } dok)
+            {
+                foreach (var kode in new[] { "PAJAK", "ASURANSI" })
+                    if (dok.Remove(kode, out var lama)) v.Attachments.AddRange(lama.Berkas.Where(b => !v.Attachments.Contains(b)));
+                if (dok.Count == 0) v.Dokumen = null;
+            }
+        }
         foreach (var p in d.Klien) { p.ProjectCode ??= ""; p.ProjectName ??= ""; p.ClientType ??= TipeKlien.Callout; p.Description ??= ""; p.AlamatResmi ??= ""; p.AlamatSurat ??= ""; p.Npwp ??= ""; p.Status ??= "aktif"; }
         foreach (var a in d.Alamat) { a.KodeArea ??= ""; a.Nama ??= ""; a.Jalan ??= ""; a.Kota ??= ""; a.NamaKontak ??= ""; a.Telepon ??= ""; a.ProjectId ??= ""; a.Jenis ??= JenisAlamat.Keduanya; a.LatLong ??= ""; a.IdLokasiKlien ??= ""; a.Catatan ??= ""; a.Status = "aktif"; } // status alamat sudah tidak dipakai: semua alamat aktif
         foreach (var p in d.Termin) { p.TripId ??= ""; p.PaymentDate ??= ""; p.DriverId ??= ""; p.Notes ??= ""; p.Attachments ??= []; }

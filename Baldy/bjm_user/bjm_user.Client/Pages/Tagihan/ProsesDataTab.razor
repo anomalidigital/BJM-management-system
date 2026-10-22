@@ -95,23 +95,23 @@
                         </Field>
                     </div>
                     <div class="col-sm-6 col-xl-4">
-                        <Field Label="Data Cost" Required Error="@_galat.GetValueOrDefault("cost_code")" Hint="@(_galat.ContainsKey("cost_code") ? null : Teks("Kode biaya (Kodecost)."))">
+                        <Field Label="Data Cost" Required Error="@_galat.GetValueOrDefault("cost_code")" Info="Kode biaya (Kodecost).">
                             <input id="@context" class="form-control @(_galat.ContainsKey("cost_code") ? "is-invalid" : "")" value="@_form.CostCode" readonly="@readOnly"
                                    @oninput="e => _form.CostCode = e.Value?.ToString() ?? string.Empty" />
                         </Field>
                     </div>
                     <div class="col-sm-6 col-xl-4">
-                        <Field Label="No Faktur" Required Error="@_galat.GetValueOrDefault("invoice_no")" Hint="@(readOnly || _galat.ContainsKey("invoice_no") ? null : Teks("Terisi otomatis, boleh diganti."))">
+                        <Field Label="No Faktur" Required Error="@_galat.GetValueOrDefault("invoice_no")" Info="@(readOnly ? null : "Terisi otomatis, boleh diganti.")">
                             <KodeInput Id="@context" Value="@_form.InvoiceNo" ReadOnly="readOnly" Invalid="@_galat.ContainsKey("invoice_no")" Placeholder="INV-047" Uppercase
                                        GenerateTitle="Buat nomor faktur berikutnya" ValueChanged="v => _form.InvoiceNo = v"
                                        OnGenerate="() => FakturBerikut(active)" />
                         </Field>
                     </div>
                     <div class="col-sm-6 col-xl-4">
-                        <Field Label="Customer" Hint="@Teks("Diambil dari SI / Job Order.")"><input id="@context" class="form-control" value="@(jo?.CustomerName ?? "")" readonly /></Field>
+                        <Field Label="Customer" Info="Diambil dari SI / Job Order."><input id="@context" class="form-control" value="@(jo?.CustomerName ?? "")" readonly /></Field>
                     </div>
                     <div class="col-sm-6 col-xl-4">
-                        <Field Label="Party" Hint="@Teks("Diambil dari SI / Job Order.")"><input id="@context" class="form-control" value="@(jo?.Party ?? "")" readonly /></Field>
+                        <Field Label="Party" Info="Diambil dari SI / Job Order."><input id="@context" class="form-control" value="@(jo?.Party ?? "")" readonly /></Field>
                     </div>
                 </div>
 
@@ -125,7 +125,7 @@
                         <Field Label="Tanggal Tarik"><TanggalInput Id="@context" Value="@_form.WithdrawalDate" Disabled="readOnly" ValueChanged="v => _form.WithdrawalDate = v" /></Field>
                     </div>
                     <div class="col-sm-6 col-xl-4">
-                        <Field Label="Tanggal Lunas" Hint="@Teks("Kosongkan bila belum lunas.")">
+                        <Field Label="Tanggal Lunas" Info="Kosongkan bila belum lunas.">
                             <TanggalInput Id="@context" Value="@(_form.PaidDate ?? "")" Disabled="readOnly" ValueChanged="v => _form.PaidDate = v == string.Empty ? null : v" />
                         </Field>
                     </div>

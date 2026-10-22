@@ -27,22 +27,32 @@ public static class DokumenPentingJenis
 {
     public static readonly JenisDokumenPenting[] Karyawan =
     [
-        new("KTP", "KTP", Nomor: true), new("SIM", "SIM", true), new("KK", "Kartu Keluarga"), new("NPWP", "NPWP"),
+        new("KTP", "KTP", Nomor: true), new("SIM", "SIM", true, true), new("KK", "Kartu Keluarga"), new("NPWP", "NPWP"),
     ];
     public static readonly JenisDokumenPenting[] Kendaraan =
     [
-        new("STNK", "STNK", true, true), new("KIR", "KIR", true, true), new("PAJAK", "Pajak Kendaraan", true), new("ASURANSI", "Asuransi", true),
-        new("BPKB", "BPKB", Nomor: true),
+        // Baldy 22 Okt 2026: Pajak Kendaraan & Asuransi dilepas; KIR tetap (uji berkala wajib untuk truk, diminta Ibu Anne).
+        new("STNK", "STNK", true, true), new("KIR", "KIR", true, true), new("BPKB", "BPKB", Nomor: true),
     ];
 }
 
-/// <summary>Status karyawan: hanya yang Aktif bisa dipilih di trip; Cuti (On Leave) dan Nonaktif tidak.</summary>
+/// <summary>Status karyawan: Aktif atau Nonaktif; hanya yang Aktif bisa dipilih di trip. Status Cuti dilepas (Baldy 22 Okt 2026),
+/// data lama berstatus "cuti" dirapikan menjadi Aktif saat dimuat.</summary>
 public static class StatusKaryawan
 {
-    public const string Aktif = "aktif", Cuti = "cuti", Nonaktif = "nonaktif";
-    public static readonly string[] Semua = [Aktif, Cuti, Nonaktif];
-    public static string Label(string s) => s switch { Cuti => "Cuti", Nonaktif => "Nonaktif", _ => "Aktif" };
-    public static string Nada(string s) => s switch { Cuti => "warning", Nonaktif => "neutral", _ => "good" };
+    public const string Aktif = "aktif", Nonaktif = "nonaktif";
+    public static readonly string[] Semua = [Aktif, Nonaktif];
+    public static string Label(string s) => s == Nonaktif ? "Nonaktif" : "Aktif";
+    public static string Nada(string s) => s == Nonaktif ? "neutral" : "good";
+}
+
+/// <summary>Status kendaraan: Aktif atau Nonaktif. Status Servis dilepas (Baldy 22 Okt 2026); data lama "servis" menjadi Aktif.</summary>
+public static class StatusKendaraan
+{
+    public const string Aktif = "aktif", Nonaktif = "nonaktif";
+    public static readonly string[] Semua = [Aktif, Nonaktif];
+    public static string Label(string s) => s == Nonaktif ? "Nonaktif" : "Aktif";
+    public static string Nada(string s) => s == Nonaktif ? "neutral" : "good";
 }
 
 public static class PeranKaryawan
@@ -94,6 +104,8 @@ public static class StatusTrip
         Draft => "neutral", MenungguSopir => "warning", Aktif => "brand", Selesai => "good", Batal => "critical", _ => "neutral",
     };
     public static bool BisaDitutup(string s) => s is Aktif or MenungguSopir;
+    /// <summary>Trip selesai terkunci penuh (form, uang jalan, biaya, biaya internal, dokumen) sampai diaktifkan lagi (Baldy 22 Okt 2026).</summary>
+    public static bool Terkunci(string s) => s == Selesai;
 }
 
 public static class JenisTermin
@@ -163,10 +175,10 @@ public static class DasarKomisi
 
 public static class AksiAudit
 {
-    public static readonly string[] Semua = ["buat", "ubah", "hapus", "batal", "tutup", "pool", "tahap_pi", "cetak"];
+    public static readonly string[] Semua = ["buat", "ubah", "hapus", "batal", "tutup", "aktifkan", "pool", "tahap_pi", "cetak"];
     public static string Label(string a) => a switch
     {
-        "buat" => "Tambah", "ubah" => "Ubah", "hapus" => "Hapus", "batal" => "Batalkan trip", "tutup" => "Tutup trip",
+        "buat" => "Tambah", "ubah" => "Ubah", "hapus" => "Hapus", "batal" => "Batalkan trip", "tutup" => "Tutup trip", "aktifkan" => "Aktifkan lagi trip",
         "pool" => "Kembali ke pool", "tahap_pi" => "Tahap PI", "cetak" => "Cetak", _ => a,
     };
 }

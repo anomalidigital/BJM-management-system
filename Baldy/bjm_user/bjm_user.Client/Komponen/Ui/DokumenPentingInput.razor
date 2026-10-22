@@ -1,35 +1,42 @@
-@* Upload dokumen penting (KTP, SIM, ... / STNK, KIR, ...): satu kotak kecil per jenis + nomor dan tanggal berlaku bila jenisnya memakai,
-   dokumen lainnya di ujung. *@
-<div class="d-flex flex-wrap align-items-end gap-3">
+@* Dokumen penting (KTP, SIM, ... / STNK, KIR, ...) sebagai tabel mini: satu baris per jenis dengan nomor dan tanggal berlaku bila
+   jenisnya memakai, lalu baris Dokumen Lainnya (Baldy 22 Okt 2026: kotak upload besar terlalu berantakan). *@
+<div class="dok-tabel">
+    <div class="dok-baris dok-kepala" aria-hidden="true"><span>Dokumen</span><span>Nomor</span><span>Berlaku s/d</span><span>Berkas</span></div>
     @foreach (var j in Jenis)
     {
         var dok = Value.GetValueOrDefault(j.Kode);
         var s = StatusBerlaku(dok?.BerlakuSampai);
-        var warna = s == "habis" ? "var(--critical)" : s == "segera" ? "#8a6100" : "var(--ink-3)";
-        var tambahan = s == "habis" ? " · sudah habis" : s == "segera" ? " · segera habis" : "";
-        <div class="d-flex align-items-end gap-2">
-            <LampiranInput Nama="@j.Label" Value="@(dok?.Berkas ?? new List<string>())" ValueChanged="@(berkas => UbahBerkas(j.Kode, berkas))" />
-            @if (j.Nomor)
-            {
-                <div style="width:168px">
-                    <label for="@($"{_dasar}-{j.Kode}-no")" class="d-block mb-1 fw-semibold text-ink-3" style="font-size:11px">No. @j.Label</label>
-                    <input id="@($"{_dasar}-{j.Kode}-no")" class="form-control tnum" value="@(dok?.Nomor ?? "")" @onchange="@(e => UbahNomor(j.Kode, e.Value?.ToString() ?? ""))" />
-                </div>
-            }
-            @if (j.Berlaku)
-            {
-                <div style="width:168px">
-                    <label for="@($"{_dasar}-{j.Kode}-tgl")" class="d-block mb-1 fw-semibold" style="font-size:11px;color:@warna">
-                        <span class="visually-hidden">@($"{j.Label} ")</span>Berlaku s/d@(tambahan)
-                    </label>
+        <div class="dok-baris">
+            <span class="dok-nama">@j.Label</span>
+            <span class="min-w-0">
+                @if (j.Nomor)
+                {
+                    <label for="@($"{_dasar}-{j.Kode}-no")" class="visually-hidden">No. @j.Label</label>
+                    <input id="@($"{_dasar}-{j.Kode}-no")" class="form-control tnum" value="@(dok?.Nomor ?? "")" placeholder="@($"No. {j.Label}")"
+                           @onchange="@(e => UbahNomor(j.Kode, e.Value?.ToString() ?? ""))" />
+                }
+                else { <span class="dok-kosong">—</span> }
+            </span>
+            <span class="min-w-0">
+                @if (j.Berlaku)
+                {
+                    <label for="@($"{_dasar}-{j.Kode}-tgl")" class="visually-hidden">@($"{j.Label} Berlaku s/d")</label>
                     <TanggalInput Id="@($"{_dasar}-{j.Kode}-tgl")" Value="@(dok?.BerlakuSampai ?? "")" Invalid="@(s == "habis")" ValueChanged="@(v => UbahTanggal(j.Kode, v))" />
-                </div>
-            }
+                    @if (s == "habis") { <span class="dok-status" style="color:var(--critical)">Sudah habis</span> }
+                    else if (s == "segera") { <span class="dok-status" style="color:#8a6100">Habis dalam 30 hari</span> }
+                }
+                else { <span class="dok-kosong">—</span> }
+            </span>
+            <LampiranInput Nama="@j.Label" Value="@(dok?.Berkas ?? new List<string>())" ValueChanged="@(berkas => UbahBerkas(j.Kode, berkas))" />
         </div>
     }
     @if (LainnyaLabel is not null)
     {
-        <LampiranInput Label="@LainnyaLabel" Value="Lainnya" ValueChanged="LainnyaChanged" />
+        <div class="dok-baris">
+            <span class="dok-nama">@LainnyaLabel</span>
+            <span class="dok-lebar"></span>
+            <LampiranInput Nama="@LainnyaLabel" Label="@($"Tambah {LainnyaLabel}")" Value="Lainnya" ValueChanged="LainnyaChanged" />
+        </div>
     }
 </div>
 

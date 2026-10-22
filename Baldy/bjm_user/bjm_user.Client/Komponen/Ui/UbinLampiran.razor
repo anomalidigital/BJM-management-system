@@ -1,7 +1,7 @@
 @* Satu kotak thumbnail lampiran (gambar / berkas), dengan nama slot dan tombol hapus opsional. *@
 @inject Lampiran LampiranSvc
 
-<div class="position-relative flex-shrink-0" style="width:@(Ukuran)px;height:@(Ukuran)px">
+<div class="ubin-lampiran position-relative flex-shrink-0" style="width:@(Ukuran)px;height:@(Ukuran)px">
     <button type="button" class="lampiran-tile w-100 h-100" title="@Judul" @onclick="OnBuka">
         @if (!_dimuat)
         {

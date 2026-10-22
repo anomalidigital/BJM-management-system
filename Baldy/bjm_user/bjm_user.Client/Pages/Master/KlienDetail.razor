@@ -20,10 +20,9 @@ else
     var kontrak = DaftarKontrak;
     var tripKlien = TripKlien;
     var dedicated = klien.ClientType == TipeKlien.Dedicated;
-    <PageHeader Title="@klien.ProjectName" Crumbs="@(new List<Crumb> { new("Master Data"), new("Klien / Pelanggan", "master/klien"), new(klien.ProjectCode) })">
+    <PageHeader Title="@klien.ProjectName" Kembali="master/klien" Crumbs="@(new List<Crumb> { new("Master Data"), new("Klien / Pelanggan", "master/klien"), new(klien.ProjectCode) })">
         <Description>@Keterangan(klien)</Description>
         <Actions>
-            <Tombol Icon="Ikon.ArrowLeft" OnClick="@(() => Ke("master/klien"))">Kembali</Tombol>
             @if (dedicated)
             {
                 <Tombol Variant="primary" Icon="Ikon.Plus" Disabled="@(!Bisa("master"))" OnClick="BukaTambah">Tambah Kontrak</Tombol>
@@ -48,8 +47,8 @@ else
         <KepalaKartu Title="Data Klien" />
         <div class="p-3">
             <dl class="row row-cols-1 row-cols-md-3 g-3 mb-0">
-                <InfoItem Label="Alamat Resmi" Value="@(klien.AlamatResmi != "" ? klien.AlamatResmi : "—")" />
-                <InfoItem Label="Alamat Surat-Menyurat" Value="@(klien.AlamatSurat != "" ? klien.AlamatSurat : klien.AlamatResmi != "" ? "Sama dengan alamat resmi" : "—")" />
+                <InfoItem Label="Kode Klien" Value="@klien.ProjectCode" Mono />
+                <InfoItem Label="Tipe Layanan" Value="@TipeKlien.Label(klien.ClientType)" />
                 <InfoItem Label="NPWP" Value="@(klien.Npwp != "" ? klien.Npwp : "—")" Mono />
             </dl>
         </div>
@@ -111,12 +110,12 @@ else
         }
     </Kartu>
 
-    <Modal Open="_formOpen" Title="@(_editing is not null ? "Ubah Kontrak" : "Tambah Kontrak")" Subtitle="@($"Klien {klien.ProjectName}. Dipakai trip berlayanan Dedicated.")" OnClose="() => _formOpen = false">
+    <Modal Open="_formOpen" Title="@(_editing is not null ? "Ubah Kontrak" : "Tambah Kontrak")" Subtitle="@klien.ProjectName" OnClose="() => _formOpen = false">
         <ChildContent>
             @if (_formOpen)
             {
                 <div class="row g-3">
-                    <Field Label="No. Kontrak" Required Error="@G("no")" Class="col-sm-6" Hint="@Teks("Nomor urut otomatis per tahun, boleh diganti.")">
+                    <Field Label="No. Kontrak" Required Error="@G("no")" Class="col-sm-6" Info="Nomor urut otomatis per tahun; ikon di sampingnya membuat nomor berikutnya, boleh diganti.">
                         <KodeInput Id="@context" Value="@_f.ContractNo" Invalid="@(G("no") is not null)" Uppercase GenerateTitle="Buat nomor kontrak berikutnya"
                                    ValueChanged="@(v => { _f.ContractNo = v; _galat.Remove("no"); })" OnGenerate="GenerateNomor" />
                     </Field>
@@ -135,7 +134,7 @@ else
                     <Field Label="Catatan" Class="col-12">
                         <textarea id="@context" class="form-control" rows="2" value="@_f.Notes" @oninput="e => _f.Notes = e.Value?.ToString() ?? string.Empty"></textarea>
                     </Field>
-                    <Field Label="Dokumen kontrak" Class="col-12">
+                    <Field Label="Dokumen Kontrak" Class="col-12">
                         <LampiranInput Id="@context" Label="Tambah dokumen" Value="_f.Attachments" ValueChanged="v => _f.Attachments = v" />
                     </Field>
                 </div>

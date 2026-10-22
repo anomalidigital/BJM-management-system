@@ -68,6 +68,8 @@ public sealed class Rute : Record
     public List<string>? EstimatedFields { get; set; }
     public string? KodeAreaAsal { get; set; }
     public string? KodeAreaTujuan { get; set; }
+    /// <summary>Catatan bebas rute (Baldy 22 Okt 2026, arahan Pak Stef: pengganti isian Area Pick Up / Destinasi di form).</summary>
+    public string Catatan { get; set; } = "";
 }
 
 /// <summary>Master -> Kendaraan.</summary>

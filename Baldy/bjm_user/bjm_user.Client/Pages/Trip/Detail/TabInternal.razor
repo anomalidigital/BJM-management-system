@@ -86,7 +86,7 @@
                             <Field Label="Komisi untuk" Required Class="col-sm-6">
                                 <Pilihan Id="@context" Options="OpsiPeran" Value="@_peran" ValueChanged="UbahPeran" Cari="false" Clearable="false" />
                             </Field>
-                            <Field Label="Atas nama" Required Class="col-sm-6" Hint="@AturDetail.Teks(_peran != "" ? "Terdaftar di Supir / Karyawan, atau isi nama sendiri." : "Pilih peran lebih dulu.")">
+                            <Field Label="Atas nama" Required Class="col-sm-6" Info="@(_peran != "" ? "Terdaftar di Supir / Karyawan, atau isi nama sendiri." : "Pilih peran lebih dulu.")">
                                 @if (_peran != "")
                                 {
                                     <PilihKaryawan @key="_peran" Id="@context" Karyawan="KaryawanPeran" ValueId="@_penerimaId" ValueNama="@_penerimaNama" Peran="@_peran"

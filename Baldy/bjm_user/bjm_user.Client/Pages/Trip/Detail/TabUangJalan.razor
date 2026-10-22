@@ -134,13 +134,13 @@
         {
             var jenis = Jenis;
             <div class="row gx-3 gy-3">
-                <Field Label="Jenis" Required Class="col-12" Hint="@AturDetail.Teks(PetunjukJenis(jenis))">
+                <Field Label="Jenis" Required Class="col-12" Info="@PetunjukJenis(jenis)">
                     <Pilihan Id="@context" Options="OpsiJenis" Value="@jenis" ValueChanged="GantiJenis" Cari="false" Clearable="false" />
                 </Field>
                 <Field Label="Tanggal" Required Class="col-sm-6">
                     <TanggalInput Id="@context" Value="@_form.PaymentDate" ValueChanged="v => _form.PaymentDate = v" />
                 </Field>
-                <Field Label="Supir penerima" Class="col-sm-6" Hint="@AturDetail.Teks("Kasbon yang dipotong milik supir ini.")">
+                <Field Label="Supir penerima" Class="col-sm-6" Info="Kasbon yang dipotong milik supir ini.">
                     <Pilihan Id="@context" Options="OpsiSopir" Value="@(_form.DriverId == "" ? null : _form.DriverId)" Placeholder="Pilih supir..." ValueChanged="v => _form.DriverId = v ?? string.Empty" />
                 </Field>
                 <Field Label="Uang Jalan" Required Class="col-sm-6">

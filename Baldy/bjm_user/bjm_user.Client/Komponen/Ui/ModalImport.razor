@@ -1,0 +1,153 @@
+@* Import master data (Baldy 22 Okt 2026): unduh template → isi di Excel → unggah CSV / XLSX → periksa pratinjau → simpan.
+   Data yang kuncinya (kode / nomor / nama) sudah ada diperbarui pada kolom yang diisi saja; kolom kosong tidak menghapus isian lama.
+   Baris bermasalah dilewati dengan keterangannya. Seluruh import tercatat sebagai satu catatan Audit Log. *@
+@inherits KomponenData
+@inject Penyimpanan Simpan
+
+<Modal Open="Open" Size="lg" Title="@($"Import {Definisi.Nama}")" OnClose="Tutup">
+    <ChildContent>
+        @if (Open)
+        {
+            <div class="d-flex flex-column gap-3">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <Tombol Icon="Ikon.FileArrowDown" IconSize="14" OnClick="UnduhTemplate">Unduh Template</Tombol>
+                    <label class="btn btn-outline-secondary bg-white text-ink border-hairline d-inline-flex align-items-center gap-2 m-0" style="cursor:pointer">
+                        @if (_membaca) { <span class="spinner-border spinner-border-sm" aria-hidden="true"></span> }
+                        else { <IkonSvg Def="Ikon.FileArrowUp" Size="14" /> }
+                        <span>@(_hasil is null ? "Pilih Berkas" : "Ganti Berkas")</span>
+                        <InputFile class="visually-hidden" accept=".csv,.xlsx" OnChange="Pilih" aria-label="Pilih berkas CSV atau Excel" />
+                    </label>
+                    <InfoTanya Teks="@($"CSV atau Excel (.xlsx), baris pertama berisi judul kolom seperti template. {Definisi.Kunci} yang sudah ada diperbarui; selain itu ditambahkan. Kolom kosong tidak menghapus isian lama.")" />
+                    @if (_namaBerkas is not null) { <span class="fs-12-5 text-ink-3 text-truncate" style="max-width:16rem">@_namaBerkas</span> }
+                </div>
+
+                @if (_galat is not null) { <PesanGalat Teks="@_galat" /> }
+
+                @if (_hasil is null)
+                {
+                    <div class="rounded-3 border border-hairline">
+                        <p class="m-0 px-3 py-2 fs-12 fw-semibold text-ink-3 border-bottom border-hairline bg-sunken">Kolom template</p>
+                        <ul class="list-unstyled m-0 px-3 py-2 d-flex flex-column gap-1 fs-12-5">
+                            @foreach (var k in Definisi.Kolom)
+                            {
+                                <li class="d-flex flex-wrap column-gap-2">
+                                    <span class="fw-semibold text-ink" style="min-width:10rem">@k.Judul@if (k.Wajib) { <span class="text-danger">*</span> }</span>
+                                    @if (k.Keterangan is not null) { <span class="text-ink-3">@k.Keterangan</span> }
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+                else
+                {
+                    var baru = _hasil.Count(h => h.Status == HasilImport.Baru);
+                    var ubah = _hasil.Count(h => h.Status == HasilImport.Diperbarui);
+                    var galat = _hasil.Count(h => h.Status == HasilImport.Galat);
+                    <div class="d-flex flex-wrap align-items-center gap-2" data-ringkas-import>
+                        <Badge Tone="good">@baru baru</Badge>
+                        <Badge Tone="brand">@ubah diperbarui</Badge>
+                        @if (galat > 0) { <Badge Tone="critical">@galat dilewati</Badge> }
+                        @if (_kolomAsing.Count > 0) { <span class="fs-12 text-ink-3">Kolom tidak dikenal diabaikan: @string.Join(", ", _kolomAsing)</span> }
+                    </div>
+                    <div class="table-responsive rounded-3 border border-hairline" style="max-height:22rem">
+                        <table class="table table-sm align-middle m-0 fs-12-5">
+                            <thead class="table-light position-sticky top-0">
+                                <tr><th style="width:4rem">Baris</th><th style="width:7rem">Status</th><th>@Definisi.Kunci</th><th>Nama</th><th>Keterangan</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var h in _hasil.Take(300))
+                                {
+                                    <tr>
+                                        <td class="tnum text-ink-3">@h.Baris</td>
+                                        <td><Badge Tone="@(h.Status == HasilImport.Galat ? "critical" : h.Status == HasilImport.Baru ? "good" : "brand")">@h.Status</Badge></td>
+                                        <td class="tnum fw-medium">@(h.Kunci != "" ? h.Kunci : "—")</td>
+                                        <td>@h.Nama</td>
+                                        <td class="@(h.Status == HasilImport.Galat ? "text-danger" : "text-ink-3")">@h.Pesan</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    @if (_hasil.Count > 300) { <p class="m-0 fs-12 text-ink-3">Ditampilkan 300 baris pertama dari @_hasil.Count.</p> }
+                }
+            </div>
+        }
+    </ChildContent>
+    <Footer>
+        <Tombol OnClick="Tutup">Batal</Tombol>
+        <Tombol Variant="primary" Icon="Ikon.FileArrowUp" IconSize="14" Disabled="@(JumlahSiap == 0 || !Bisa("master"))" OnClick="Import">
+            @(JumlahSiap > 0 ? $"Import {JumlahSiap} Data" : "Import")
+        </Tombol>
+    </Footer>
+</Modal>
+
+@code {
+    [Parameter] public bool Open { get; set; }
+    [Parameter, EditorRequired] public DefinisiImport Definisi { get; set; } = default!;
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private const long BatasUkuran = 5 * 1024 * 1024;
+
+    private List<HasilImport>? _hasil;
+    private List<string> _kolomAsing = [];
+    private string? _namaBerkas, _galat;
+    private bool _membaca, _aktif;
+
+    private int JumlahSiap => _hasil?.Count(h => h.Status != HasilImport.Galat) ?? 0;
+
+    protected override void OnParametersSet()
+    {
+        if (Open && !_aktif) { _aktif = true; _hasil = null; _namaBerkas = null; _galat = null; _kolomAsing = []; }
+        else if (!Open) _aktif = false;
+    }
+
+    private async Task UnduhTemplate()
+    {
+        await Simpan.UnduhAsync(Definisi.NamaTemplate, ImportData.Template(Definisi.Kolom.Select(k => k.Judul)), "text/csv;charset=utf-8");
+        Toast.Info($"Template {Definisi.Nama} diunduh. Isi mulai baris kedua, lalu unggah lagi di sini.");
+    }
+
+    private async Task Pilih(InputFileChangeEventArgs e)
+    {
+        _galat = null; _hasil = null;
+        var berkas = e.File;
+        _namaBerkas = berkas.Name;
+        if (!berkas.Name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase) && !berkas.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            _galat = "Berkas harus CSV atau Excel (.xlsx). Simpan dulu dari Excel dengan salah satu format itu.";
+            return;
+        }
+        if (berkas.Size > BatasUkuran) { _galat = "Berkas lebih dari 5 MB. Pecah menjadi beberapa berkas."; return; }
+        _membaca = true;
+        try
+        {
+            using var ms = new MemoryStream();
+            await berkas.OpenReadStream(BatasUkuran).CopyToAsync(ms);
+            var (judul, baris) = ImportData.Baca(berkas.Name, ms.ToArray());
+            var dikenal = Definisi.Kolom.Select(k => ImportData.Normal(k.Judul)).ToHashSet();
+            var hilang = Definisi.Kolom.Where(k => k.Wajib && !judul.Select(ImportData.Normal).Contains(ImportData.Normal(k.Judul))).Select(k => k.Judul).ToList();
+            if (judul.Count == 0 || baris.Count == 0) { _galat = "Berkas kosong atau belum ada data di bawah judul kolom."; return; }
+            if (hilang.Count > 0) { _galat = $"Kolom wajib tidak ditemukan: {string.Join(", ", hilang)}. Pakai judul kolom dari template."; return; }
+            _kolomAsing = judul.Where(j => j.Trim() != "" && !dikenal.Contains(ImportData.Normal(j))).ToList();
+            var konteks = new KonteksImport();
+            _hasil = baris.Select(b => Definisi.Periksa(b, konteks)).ToList();
+        }
+        catch (Exception ex) { _galat = $"Berkas tidak bisa dibaca ({ex.Message}). Pastikan formatnya CSV atau .xlsx dari Excel."; }
+        finally { _membaca = false; }
+    }
+
+    private async Task Import()
+    {
+        if (_hasil is null || !Bisa("master")) return;
+        var siap = _hasil.Where(h => h.Status != HasilImport.Galat && h.Terapkan is not null).ToList();
+        if (siap.Count == 0) return;
+        var baru = siap.Count(h => h.Status == HasilImport.Baru);
+        var ubah = siap.Count - baru;
+        Db.Massal(new IsianAudit { Aksi = "buat", Entitas = Definisi.Koleksi, EntityId = "", Label = $"Import {Definisi.Nama}", Ringkasan = $"Import {Definisi.Nama.ToLowerInvariant()}: {baru} baru, {ubah} diperbarui" },
+            () => { foreach (var h in siap) h.Terapkan!(); });
+        Toast.Sukses($"Import {Definisi.Nama}: {baru} data baru, {ubah} diperbarui.{(siap.Count < _hasil.Count ? $" {_hasil.Count - siap.Count} baris dilewati." : "")}");
+        await Tutup();
+    }
+
+    private Task Tutup() => OnClose.InvokeAsync();
+}

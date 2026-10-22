@@ -1,43 +1,43 @@
-@* Modal Tambah / Ubah Rute (revisi 13 Okt 2026), dipakai menu Rute dan form trip (tambah rute di tempat). Urutannya: Area Pick Up &
-   Area Destinasi (dari Master Alamat & rute lain; area baru cukup diketik di kotak cari, keputusan Baldy 15 Okt 2026), lalu Nama Rute
-   sebagai kesimpulan keduanya. No. Rute dibuat otomatis dari nama saat disimpan dan tidak bisa diubah. Klien dipilih di form trip. *@
+@* Modal Tambah / Ubah Rute, dipakai menu Rute dan form trip (tambah rute di tempat). Revisi Baldy 22 Okt 2026 (arahan Pak Stef):
+   isian Area Pick Up / Area Destinasi dihapus, diganti Catatan besar di bawah Nama Rute. Area rute mengikuti Nama Rute ("CIB - DURI").
+   No. Rute terisi otomatis dari Nama Rute dengan ikon generate seperti kode di form master lain; setelah tersimpan No. Rute tetap.
+   Penjelasan isian memakai ikon "?" (Info). Klien dipilih di form trip. *@
 @using System.Text.RegularExpressions
 @inherits KomponenData
 
-<Modal Open="@(Open && _tambahAlamat is null)" Size="lg" Title="@(_editing is not null ? "Ubah Rute" : "Tambah Rute")" Subtitle="@Subjudul" OnClose="Tutup">
+<Modal Open="@Open" Size="lg" Title="@(_editing is not null ? "Ubah Rute" : "Tambah Rute")" Subtitle="@Keterangan" OnClose="Tutup">
     <ChildContent>
         @if (Open)
         {
             var kembar = Kembar;
             <div class="row g-3">
-                <Field Label="Area Pick Up" Required="@(_editing is null)" Error="@G("asal")" Hint="@HintArea("asal")" Class="col-sm-6">
-                    <Pilihan Id="@context" Options="OpsiArea" Value="@_areaAsal" ValueChanged="@(v => PilihArea("asal", v))" Invalid="@(G("asal") is not null)" Cari="true"
-                             Placeholder="Pilih area pick up..." SearchPlaceholder="Cari kode area, nama lokasi, atau kota..." Tambahan="@Tambahan("asal")" />
+                <Field Label="Nama Rute" Required Error="@G("nama")" Hint="@HintKembar(kembar)" Class="col-sm-8"
+                       Info="Pick up - destinasi, mis. CIB - DURI. Boleh ditambah nomor site atau BCKLD, mis. CIB - RAWA 52.">
+                    <input id="@context" class="form-control text-uppercase @(G("nama") is not null ? "is-invalid" : "")" value="@_nama" placeholder="CIB - DURI" @oninput="UbahNama" />
                 </Field>
-                <Field Label="Area Destinasi" Required="@(_editing is null)" Error="@G("tujuan")" Hint="@HintArea("tujuan")" Class="col-sm-6">
-                    <Pilihan Id="@context" Options="OpsiArea" Value="@_areaTujuan" ValueChanged="@(v => PilihArea("tujuan", v))" Invalid="@(G("tujuan") is not null)" Cari="true"
-                             Placeholder="Pilih area destinasi..." SearchPlaceholder="Cari kode area, nama lokasi, atau kota..." Tambahan="@Tambahan("tujuan")" />
+                <Field Label="No. Rute" Required="@(_editing is null)" Error="@G("kode")" Class="col-sm-4"
+                       Info="@(_editing is not null ? $"No. Rute tetap setelah tersimpan.{(_editing.RouteCodeLama is not null ? $" Dulu {_editing.RouteCodeLama}." : "")}" : "Terisi otomatis dari Nama Rute. Ikon di sampingnya membuat ulang kode.")">
+                    <KodeInput Id="@context" Value="@KodeTampil" ReadOnly="@(_editing is not null)" Invalid="@(G("kode") is not null)" Uppercase Placeholder="Otomatis"
+                               GenerateTitle="Buat No. Rute dari Nama Rute" ValueChanged="UbahKode" OnGenerate="GenerateKode" />
                 </Field>
-                <Field Label="Nama Rute" Required Error="@G("nama")" Hint="@HintNama(kembar)" Class="col-sm-8">
-                    <input id="@context" class="form-control text-uppercase @(G("nama") is not null ? "is-invalid" : "")" value="@_nama" placeholder="Terisi dari area" @oninput="UbahNama" />
-                </Field>
-                <Field Label="No. Rute" Class="col-sm-4" Hint="@Teks(_editing is not null ? $"Tetap, tidak bisa diubah.{(_editing.RouteCodeLama is not null ? $" Dulu {_editing.RouteCodeLama}." : "")}" : "Otomatis dari nama; pembeda (nomor site, BCKLD) ikut bila mirip rute lain.")">
-                    <input id="@context" class="form-control tnum fw-semibold" value="@KodeTampil" readonly placeholder="Otomatis" />
+                <Field Label="Catatan" Class="col-12" Info="Catatan bebas rute, mis. jalur yang dipakai, lokasi bongkar, atau kontak di lapangan.">
+                    <textarea id="@context" class="form-control" rows="4" placeholder="Catatan rute" @oninput="e => _catatan = e.Value?.ToString() ?? string.Empty">@_catatan</textarea>
                 </Field>
                 @if (PakaiFeet)
                 {
-                    <Field Label="Feet" Required="FeetWajib" Error="@G("feet")" Class="col-sm-4" Hint="@Teks(_feet == "" && G("feet") is null ? "Data asli belum mencatat ukuran container rute ini." : null)">
+                    <Field Label="Feet" Required="FeetWajib" Error="@G("feet")" Class="col-sm-3" Info="Ukuran container rute ini."
+                           Hint="@Teks(_feet == "" && G("feet") is null ? "Data asli belum mencatat ukuran container rute ini." : null)">
                         <Pilihan Id="@context" Options="OpsiFeet" Value="@_feet" ValueChanged="@(v => { _feet = v ?? ""; _galat.Remove("feet"); })" Invalid="@(G("feet") is not null)" Cari="false" Clearable="false" />
                     </Field>
                 }
-                <Field Label="Uang Jalan Rute" Required Error="@G("uj")" Class="col-sm-4" Hint="@Teks(MasihKira("ujroute") ? "Masih perkiraan." : "Patokan uang jalan.")">
+                <Field Label="Uang Jalan Rute" Required Error="@G("uj")" Class="@KolomNilai" Info="Patokan uang jalan untuk satu trip di rute ini." Hint="@Kira("ujroute")">
                     <UangInput Id="@context" Value="_uj" ValueChanged="@(v => { _uj = v; _galat.Remove("uj"); })" Invalid="@(G("uj") is not null)" />
                 </Field>
-                <Field Label="Uang Tol" Error="@G("tol")" Class="col-sm-4" Hint="@Teks(MasihKira("toll") ? "Masih perkiraan." : "Patokan tol.")">
+                <Field Label="Uang Tol" Error="@G("tol")" Class="@KolomNilai" Info="Patokan biaya tol satu trip." Hint="@Kira("toll")">
                     <UangInput Id="@context" Value="_tol" ValueChanged="@(v => { _tol = v; _galat.Remove("tol"); })" Invalid="@(G("tol") is not null)" />
                 </Field>
-                <Field Label="Harga Jual" Required="HargaWajib" Error="@G("harga")" Class="col-sm-4"
-                       Hint="@Teks(MasihKira("price") ? "Masih perkiraan." : _editing is not null ? "Harga Jual baru berlaku untuk trip berikutnya; trip yang sudah ada tetap." : "Harga ke klien per trip.")">
+                <Field Label="Harga Jual" Required="HargaWajib" Error="@G("harga")" Class="@KolomNilai" Hint="@Kira("price")"
+                       Info="@(_editing is not null ? "Harga ke klien per trip. Harga Jual baru berlaku untuk trip berikutnya; trip yang sudah ada tetap." : "Harga ke klien per trip.")">
                     <UangInput Id="@context" Value="_harga" ValueChanged="@(v => { _harga = v; _galat.Remove("harga"); })" Invalid="@(G("harga") is not null)" />
                 </Field>
             </div>
@@ -49,17 +49,13 @@
     </Footer>
 </Modal>
 
-<FormAlamat Open="@(Open && _tambahAlamat is not null)" NamaAwal="@_tambahAlamat?.Nama" KodeAwal="@_tambahAlamat?.Kode"
-            Keterangan="@($"Area alamat baru langsung dipilih sebagai Area {(_tambahAlamat?.Sisi == "tujuan" ? "Destinasi" : "Pick Up")}.")"
-            PesanSukses="PesanAlamat" OnClose="() => _tambahAlamat = null" OnTersimpan="AlamatTersimpan" />
-
 @code {
     [Parameter] public bool Open { get; set; }
     /// <summary>Rute yang diubah; null = tambah rute baru.</summary>
     [Parameter] public Rute? Rute { get; set; }
-    /// <summary>Isian awal Area Pick Up rute baru, mis. destinasi trip asal backload.</summary>
+    /// <summary>Awal Nama Rute baru (pick up), mis. destinasi trip asal backload: terisi "ASAL - ".</summary>
     [Parameter] public string? KodeAreaAsalAwal { get; set; }
-    /// <summary>Pengganti keterangan di bawah judul modal.</summary>
+    /// <summary>Keterangan singkat di bawah judul modal (mis. dari form trip).</summary>
     [Parameter] public string? Keterangan { get; set; }
     /// <summary>Pesan toast setelah tersimpan; bawaan "Data berhasil diperbarui." / "Rute … tersimpan dengan No. Rute …".</summary>
     [Parameter] public Func<Rute, string>? PesanSukses { get; set; }
@@ -72,17 +68,17 @@
     /// <summary>Ukuran container rute Priok.</summary>
     public static readonly string[] PilihanFeet = ["1X20", "1X40", "2X20", "1X20K", "1X40K"];
 
-    private sealed record IsianAlamat(string Sisi, string Nama, string? Kode);
-
     private bool _aktif;
     private Rute? _editing;
-    private string _areaAsal = "", _areaTujuan = "", _nama = "", _feet = "";
+    private string _nama = "", _feet = "", _catatan = "", _kode = "";
+    /// <summary>No. Rute diketik sendiri: berhenti mengikuti Nama Rute sampai ikon generate ditekan.</summary>
+    private bool _kodeManual;
     private long _uj, _tol, _harga;
-    private IsianAlamat? _tambahAlamat;
     private readonly Dictionary<string, string> _galat = [];
 
     /// <summary>Feet = ukuran container, hanya untuk rute container Priok. Rute Karawang (alat berat) tidak memakainya.</summary>
     private bool PakaiFeet => Sesi.Workspace == WorkspaceKode.Priok;
+    private string KolomNilai => PakaiFeet ? "col-sm-3" : "col-sm-4";
     private bool HargaWajib => _editing is null || _editing.Price > 0;
     /// <summary>Rute dari data asli belum punya ukuran container; wajib dipilih hanya untuk rute baru.</summary>
     private bool FeetWajib => PakaiFeet && (_editing is null || _editing.Feet != "");
@@ -90,112 +86,38 @@
     protected override void OnParametersSet()
     {
         if (Open && !_aktif) { _aktif = true; Mulai(); }
-        else if (!Open) { _aktif = false; _tambahAlamat = null; }
+        else if (!Open) _aktif = false;
     }
 
     private void Mulai()
     {
         _editing = Rute;
         _galat.Clear();
-        _tambahAlamat = null;
+        _kodeManual = false;
         if (_editing is not null)
         {
-            var k = TripLogika.KodeArea(_editing);
-            _areaAsal = k.Asal; _areaTujuan = k.Tujuan;
             _nama = _editing.RouteName; _feet = _editing.Feet; _uj = _editing.Ujroute; _tol = _editing.Toll; _harga = _editing.Price;
+            _catatan = _editing.Catatan; _kode = _editing.RouteCode;
         }
         else
         {
-            _areaAsal = KodeArea.Rapikan(KodeAreaAsalAwal ?? "").Trim(); _areaTujuan = "";
-            _nama = NamaDariArea(_areaAsal, _areaTujuan); _feet = PakaiFeet ? "1X40" : ""; _uj = 0; _tol = 0; _harga = 0;
+            var asal = KodeArea.Rapikan(KodeAreaAsalAwal ?? "").Trim();
+            _nama = asal != "" ? $"{asal} - " : ""; _feet = PakaiFeet ? "1X40" : ""; _uj = 0; _tol = 0; _harga = 0; _catatan = "";
+            _kode = KodeOtomatis();
         }
     }
 
     private string? G(string k) => _galat.GetValueOrDefault(k);
     private static RenderFragment? Teks(string? s) => s is null ? null : b => b.AddContent(0, s);
 
-    private string Subjudul => Keterangan ?? (_editing is not null
-        ? $"No. Rute {_editing.RouteCode}{(_editing.RouteCodeLama is not null ? $" (dulu {_editing.RouteCodeLama})" : "")}"
-        : "Tanda * wajib diisi. Pilih area pick up dan destinasi dulu.");
-
-    /// <summary>Nama rute "ASAL - TUJUAN" dari dua kode area.</summary>
-    private static string NamaDariArea(string asal, string tujuan) => asal != "" && tujuan != "" ? $"{asal} - {tujuan}" : asal != "" ? $"{asal} - " : "";
-
     private string NamaRapi => Regex.Replace(_nama.Trim().ToUpperInvariant(), @"\s+", " ");
+    private bool NamaLengkap => NamaRapi != "" && !Regex.IsMatch(NamaRapi, @"-\s*$");
 
-    /// <summary>No. Rute: rute lama tetap; rute baru dibuat dari nama (pembedanya ikut bila mirip rute lain), tidak bisa diketik.</summary>
-    private string KodeRute => _editing?.RouteCode ?? Kode.KodeRuteDari(NamaRapi, Db.Data.Rute);
-    private string KodeTampil => _editing is null && _nama.Trim() == "" ? "" : KodeRute;
+    /// <summary>No. Rute dari nama (pembedanya ikut bila mirip rute lain); kosong selama nama belum lengkap.</summary>
+    private string KodeOtomatis() => NamaLengkap ? Kode.KodeRuteDari(NamaRapi, Db.Semua.Rute) : "";
+    private string KodeTampil => _editing?.RouteCode ?? _kode;
 
-    /// <summary>Kode area yang punya alamat aktif di Master Alamat, dengan nama lokasinya.</summary>
-    private Dictionary<string, List<string>> LokasiArea()
-    {
-        var lokasi = new Dictionary<string, List<string>>();
-        foreach (var a in Db.Data.Alamat)
-        {
-            if (a.Status != "aktif" || a.KodeArea.Trim() == "") continue;
-            var k = a.KodeArea.Trim().ToUpperInvariant();
-            if (!lokasi.TryGetValue(k, out var l)) lokasi[k] = l = [];
-            l.Add($"{a.Nama}{(a.Kota != "" ? $" ({a.Kota.Split(',')[0]})" : "")}");
-        }
-        return lokasi;
-    }
-
-    /// <summary>Pilihan area: kode area di Master Alamat dan rute lain; area baru yang diketik ikut tampil.</summary>
-    private List<Opsi> OpsiArea
-    {
-        get
-        {
-            var pakai = KodeArea.Pemakaian(Db.Data.Rute, Db.Data.Alamat, _editing?.Id);
-            var lokasi = LokasiArea();
-            var opsi = pakai
-                .OrderBy(p => lokasi.ContainsKey(p.Key) ? 0 : 1).ThenBy(p => p.Key, StringComparer.Ordinal)
-                .Select(p => new Opsi(p.Key, p.Key,
-                    string.Join(" · ", new[] { lokasi.TryGetValue(p.Key, out var l) ? string.Join(", ", l.Take(2)) : "belum ada alamat", p.Value.Rute > 0 ? $"{p.Value.Rute} rute" : "" }.Where(x => x != "")),
-                    lokasi.TryGetValue(p.Key, out var l2) ? string.Join(" ", l2) : ""))
-                .ToList();
-            foreach (var baru in new[] { _areaAsal, _areaTujuan }.Distinct())
-                if (baru != "" && opsi.All(o => o.Value != baru)) opsi.Insert(0, new Opsi(baru, baru, "area baru · belum ada alamat"));
-            return opsi;
-        }
-    }
-
-    private static readonly List<Opsi> FeetOpsi = PilihanFeet.Select(f => new Opsi(f, f)).ToList();
-    private List<Opsi> OpsiFeet => FeetWajib ? FeetOpsi : [new Opsi("", "— belum diisi —"), .. FeetOpsi];
-
-    /// <summary>Baris pertama dropdown area: ketikan dipakai sebagai area baru; tanpa ketikan = tambah alamat baru.</summary>
-    private AksiTambahan Tambahan(string sisi) => new()
-    {
-        Label = q => q.Trim() == "" ? "Tambah alamat baru" : $"Pakai area “{KodeArea.Rapikan(q).Trim()}”",
-        OnClick = q =>
-        {
-            var kode = KodeArea.Rapikan(q).Trim();
-            if (kode == "") _tambahAlamat = new IsianAlamat(sisi, "", null);
-            else PilihArea(sisi, kode);
-            StateHasChanged();
-            return Task.CompletedTask;
-        },
-        Disabled = !Bisa("master"),
-        Hint = "Area belum terdaftar? Ketik kodenya lalu pakai; alamatnya bisa ditambahkan nanti.",
-    };
-
-    /// <summary>Petunjuk area: area tanpa alamat di Master Alamat ditawari Tambah alamat.</summary>
-    private RenderFragment? HintArea(string sisi)
-    {
-        var kode = sisi == "asal" ? _areaAsal : _areaTujuan;
-        var bawaan = sisi == "asal" ? "Lokasi pick up. Cari dulu; belum ada? Tambah alamat." : "Lokasi destinasi.";
-        if (kode == "" || LokasiArea().ContainsKey(kode.ToUpperInvariant())) return Teks(bawaan);
-        return @<span>
-            Area <span class="fw-semibold">@kode</span> belum punya alamat di Master Alamat.
-            <button type="button" class="btn btn-link p-0 fs-inherit fw-semibold align-baseline text-decoration-underline" disabled="@(!Bisa("master"))"
-                    @onclick="() => _tambahAlamat = new IsianAlamat(sisi, string.Empty, kode)">Tambah alamat @kode</button>
-        </span>;
-    }
-
-    /// <summary>
-    /// Rute lain dengan nama yang sama, termasuk yang beda spasi / tanda baca ("CIB-DURI", "REBON JARO" = "REBONJARO"):
-    /// ditampilkan sejak area dipilih supaya rute kembar tidak dibuat lagi (Baldy 14 Okt 2026).
-    /// </summary>
+    /// <summary>Rute lain dengan nama yang sama, termasuk yang beda spasi / tanda baca ("CIB-DURI", "REBON JARO" = "REBONJARO").</summary>
     private Rute? Kembar
     {
         get
@@ -206,9 +128,9 @@
         }
     }
 
-    private RenderFragment? HintNama(Rute? kembar)
+    private RenderFragment? HintKembar(Rute? kembar)
     {
-        if (kembar is null) return Teks("Kesimpulan dari area pick up dan destinasi. Boleh ditambah nomor site atau BCKLD, mis. CIB - RAWA 52.");
+        if (kembar is null) return null;
         return @<span style="color:#8a6100">
             Sudah ada: <span class="fw-semibold">@kembar.RouteCode</span> @kembar.RouteName (Uang Jalan @Format.Rupiah(kembar.Ujroute), Harga Jual @Format.Rupiah(kembar.Price)).
             @if (OnPakai.HasDelegate)
@@ -222,41 +144,50 @@
         </span>;
     }
 
+    private static readonly List<Opsi> FeetOpsi = PilihanFeet.Select(f => new Opsi(f, f)).ToList();
+    private List<Opsi> OpsiFeet => FeetWajib ? FeetOpsi : [new Opsi("", "— belum diisi —"), .. FeetOpsi];
+
     private long NilaiForm(string k) => k switch { "ujroute" => _uj, "toll" => _tol, _ => _harga };
     private static long NilaiRute(Rute r, string k) => k switch { "ujroute" => r.Ujroute, "toll" => r.Toll, _ => r.Price };
 
     /// <summary>Nominal perkiraan yang belum diubah di form ini.</summary>
     private bool MasihKira(string k) => _editing?.EstimatedFields?.Contains(k) == true && NilaiForm(k) == NilaiRute(_editing, k);
-
-    /// <summary>Ganti area: nama rute ikut berubah selama belum ditulis sendiri (masih sama dengan turunan area lama).</summary>
-    private void PilihArea(string sisi, string? v)
-    {
-        var kode = v ?? "";
-        var asalBaru = sisi == "asal" ? kode : _areaAsal;
-        var tujuanBaru = sisi == "tujuan" ? kode : _areaTujuan;
-        var namaLama = NamaDariArea(_areaAsal, _areaTujuan);
-        var nama = _nama.Trim();
-        if (nama == "" || nama == namaLama.Trim() || nama == $"{_areaAsal} -") _nama = NamaDariArea(asalBaru, tujuanBaru);
-        if (sisi == "asal") _areaAsal = kode; else _areaTujuan = kode;
-        _galat.Remove("nama"); _galat.Remove(sisi);
-    }
+    private RenderFragment? Kira(string k) => MasihKira(k) ? Teks("Masih perkiraan.") : null;
 
     private void UbahNama(ChangeEventArgs e)
     {
         _nama = e.Value?.ToString() ?? "";
         _galat.Remove("nama");
+        if (_editing is null && !_kodeManual) { _kode = KodeOtomatis(); _galat.Remove("kode"); }
+    }
+
+    private void UbahKode(string v)
+    {
+        _kode = Regex.Replace(v.ToUpperInvariant(), @"\s+", "");
+        _kodeManual = _kode != "";
+        _galat.Remove("kode");
+    }
+
+    private void GenerateKode()
+    {
+        _kodeManual = false;
+        _kode = KodeOtomatis();
+        _galat.Remove("kode");
+        if (_kode == "") _galat["kode"] = "Isi Nama Rute dulu.";
     }
 
     private bool Validasi()
     {
         _galat.Clear();
-        var wajibArea = _editing is null;
-        if (wajibArea && _areaAsal == "") _galat["asal"] = "Area Pick Up wajib dipilih.";
-        if (wajibArea && _areaTujuan == "") _galat["tujuan"] = "Area Destinasi wajib dipilih.";
-        var nama = _nama.Trim();
         var kembar = Kembar;
-        if (nama == "" || Regex.IsMatch(nama, @"-\s*$")) _galat["nama"] = "Nama Rute wajib lengkap: ASAL - TUJUAN.";
+        if (!NamaLengkap) _galat["nama"] = "Nama Rute wajib diisi, mis. CIB - DURI.";
         else if (kembar is not null) _galat["nama"] = $"Sudah ada rute {kembar.RouteName} (No. Rute {kembar.RouteCode}).";
+        if (_editing is null)
+        {
+            var kode = _kode.Trim();
+            if (kode == "") _galat["kode"] = "No. Rute wajib diisi.";
+            else if (Db.Semua.Rute.Any(r => r.RouteCode.Equals(kode, StringComparison.OrdinalIgnoreCase))) _galat["kode"] = $"No. Rute {kode} sudah dipakai rute lain.";
+        }
         if (FeetWajib && _feet == "") _galat["feet"] = "Feet wajib dipilih.";
         // Rute dari data asli belum punya harga; jangan paksa diisi saat hanya mengubah UJ / tol.
         if (HargaWajib && _harga <= 0) _galat["harga"] = "Harga Jual harus lebih dari 0.";
@@ -269,11 +200,7 @@
     {
         if (!Validasi()) return;
         var nama = NamaRapi;
-        // Kode area disimpan bila berbeda dari turunan nama; sama / kosong = ikut nama (tidak tersimpan).
-        var dariNama = TripLogika.KodeArea(nama, null, null);
-        static string? KodeSimpan(string pilih, string turunan) => pilih != "" && TripLogika.NormalKodeArea(pilih) != TripLogika.NormalKodeArea(turunan) ? pilih : null;
-        var asal = KodeSimpan(_areaAsal, dariNama.Asal);
-        var tujuan = KodeSimpan(_areaTujuan, dariNama.Tujuan);
+        var catatan = _catatan.Trim();
         Rute tersimpan;
         if (_editing is not null)
         {
@@ -282,18 +209,17 @@
             var kira = lama.EstimatedFields?.Where(k => NilaiForm(k) == NilaiRute(lama, k)).ToList();
             Db.Ubah<Rute>(lama.Id, r =>
             {
-                r.RouteName = nama; r.Feet = _feet; r.Ujroute = _uj; r.Toll = _tol; r.Price = _harga;
-                r.KodeAreaAsal = asal; r.KodeAreaTujuan = tujuan; r.EstimatedFields = kira;
+                r.RouteName = nama; r.Feet = _feet; r.Ujroute = _uj; r.Toll = _tol; r.Price = _harga; r.Catatan = catatan; r.EstimatedFields = kira;
             });
             tersimpan = Db.Cari<Rute>(lama.Id) ?? lama;
         }
         else
         {
-            // No. Rute dibuat sekali di sini dan tidak berubah lagi.
+            // No. Rute dibuat sekali di sini dan tidak berubah lagi. Area mengikuti Nama Rute (tidak disimpan terpisah).
             tersimpan = Db.Buat(new Rute
             {
-                RouteCode = Kode.KodeRuteDari(nama, Db.Semua.Rute), RouteName = nama, ProjectId = "", Feet = _feet,
-                Ujroute = _uj, Toll = _tol, Commissioner = 0, Price = _harga, EstimatedFields = [], KodeAreaAsal = asal, KodeAreaTujuan = tujuan,
+                RouteCode = _kode.Trim().ToUpperInvariant(), RouteName = nama, ProjectId = "", Feet = _feet,
+                Ujroute = _uj, Toll = _tol, Commissioner = 0, Price = _harga, EstimatedFields = [], Catatan = catatan,
             });
         }
         Toast.Sukses(PesanSukses?.Invoke(tersimpan) ?? (_editing is not null ? "Data berhasil diperbarui." : $"Rute {tersimpan.RouteName} tersimpan dengan No. Rute {tersimpan.RouteCode}."));
@@ -305,13 +231,6 @@
     {
         await OnPakai.InvokeAsync(r);
         await Tutup();
-    }
-
-    private static string PesanAlamat(Alamat a) => $"{a.Nama} tersimpan di Master Alamat (area {a.KodeArea}).";
-
-    private void AlamatTersimpan(Alamat a)
-    {
-        if (_tambahAlamat is not null) PilihArea(_tambahAlamat.Sisi, a.KodeArea.Trim().ToUpperInvariant());
     }
 
     private Task Tutup() => OnClose.InvokeAsync();

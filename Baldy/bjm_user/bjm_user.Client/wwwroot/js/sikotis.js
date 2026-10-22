@@ -48,3 +48,47 @@ window.sikotis = {
   lepasTutupLuar(pegangan) { pegangan?.lepas?.() },
   kunciGulir(kunci) { document.body.style.overflow = kunci ? 'hidden' : '' },
 }
+
+// Tooltip ikon "?" ([data-info]): satu elemen fixed di <body> supaya tidak terpotong modal yang bisa digulir.
+// Muncul saat diarahkan mouse, difokus keyboard, atau diketuk (layar sentuh); hilang saat keluar, Esc, atau digulir.
+;(() => {
+  let tip = null, pemilik = null, sejak = 0
+  const tampil = (el) => {
+    const teks = el.getAttribute('data-info')
+    if (!teks) return
+    if (!tip) {
+      tip = document.createElement('div')
+      tip.className = 'tip-info'
+      tip.id = 'tip-info'
+      tip.setAttribute('role', 'tooltip')
+      document.body.appendChild(tip)
+    }
+    tip.textContent = teks
+    tip.style.display = 'block'
+    pemilik = el
+    sejak = Date.now()
+    const r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight
+    const x = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, innerWidth - w - 8))
+    const y = r.top - h - 8 < 8 ? r.bottom + 8 : r.top - h - 8
+    tip.style.left = `${x}px`
+    tip.style.top = `${y}px`
+  }
+  const sembunyi = () => {
+    if (tip) tip.style.display = 'none'
+    pemilik = null
+  }
+  const cari = (e) => (e.target instanceof Element ? e.target.closest('[data-info]') : null)
+  document.addEventListener('mouseover', (e) => { const el = cari(e); if (el && el !== pemilik) tampil(el) })
+  document.addEventListener('mouseout', (e) => { const el = cari(e); if (el && !(e.relatedTarget instanceof Node && el.contains(e.relatedTarget))) sembunyi() })
+  document.addEventListener('focusin', (e) => { const el = cari(e); if (el) tampil(el) })
+  document.addEventListener('focusout', (e) => { if (cari(e)) sembunyi() })
+  document.addEventListener('click', (e) => {
+    const el = cari(e)
+    if (!el) { if (pemilik) sembunyi(); return }
+    // Ketukan sentuh memicu mouseover lalu click: jangan langsung ditutup lagi.
+    if (pemilik === el && Date.now() - sejak > 400) sembunyi()
+    else tampil(el)
+  })
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && pemilik) sembunyi() })
+  addEventListener('scroll', () => { if (pemilik) sembunyi() }, true)
+})()

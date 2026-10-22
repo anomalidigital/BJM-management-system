@@ -1,8 +1,9 @@
 @inherits KomponenData
 @*
     Overview trip Karawang: yang dibutuhkan alur alat berat & DHL saja (ID Trip, No Referensi, Pick Up & Destination Details berikut
-    catatannya, Add Items Details, posisi kendaraan, POD, backload / lanjutan, PI). Isian container Priok (Party, SI/BL, Kapal,
-    penerima Surat Jalan, bon) tidak ditampilkan di sini.
+    catatannya, posisi kendaraan, POD, backload / lanjutan, PI). Isian container Priok (Party, SI/BL, Kapal, penerima Surat Jalan, bon)
+    tidak ditampilkan di sini. Revisi Baldy 22 Okt 2026: rincian supir lengkap (nama lengkap, telepon, KTP, SIM beserta masa berlakunya)
+    dan dokumen kendaraan; Add Items Details dan catatan perjalanan (tab Perjalanan dihapus) tidak tampil lagi.
 *@
 @{
     var t = Trip.T;
@@ -19,11 +20,11 @@
     var batal = Trip.Batal;
     var dedicated = t.ServiceType == TipeKlien.Dedicated;
     var totalTagihan = batal ? t.CancelFee ?? 0 : Trip.Harga + Trip.BiayaDitagihkan;
-    var muatan = TripLogika.Muatan(t);
     /* Ditutup dengan foto dulu: begitu supir menyerahkan hardcopy di pool, ditandai di sini. */
     var fisikMenyusul = t.Status == StatusTrip.Selesai && t.PodFisik == false;
     var lanjutan = anak.Where(a => !a.Batal).ToList();
     var waktuPool = AturDetail.WaktuPool(Trip, kejadian);
+    var jenisSim = DokumenPentingJenis.Karyawan.Where(j => j.Kode == "SIM").ToArray();
 }
 <div class="row g-3 p-3">
     <div class="col-xl-8 d-flex flex-column gap-3">
@@ -77,27 +78,6 @@
                     else { @("—") }
                 </InfoItem>
                 <InfoItem Label="Kosongan" Value="@AturDetail.Strip(t.Kosongan)" />
-                <div class="col-12 col-sm-12 min-w-0" style="width:100%">
-                    <p class="m-0 fs-11-5 fw-semibold text-ink-3 text-uppercase" style="letter-spacing:.04em">Add Items Details</p>
-                    @if (muatan.Count == 0)
-                    {
-                        <p class="m-0 mt-1 fs-13 text-ink-3">Belum diisi</p>
-                    }
-                    else
-                    {
-                        <ul class="list-unstyled m-0 mt-1 d-flex flex-column gap-1 fs-13">
-                            @foreach (var m in muatan)
-                            {
-                                <li class="d-flex flex-wrap align-items-baseline column-gap-2">
-                                    <span class="tnum fw-semibold text-ink">@(m.IdPerjalanan != "" ? m.IdPerjalanan : "Tanpa ID Perjalanan")</span>
-                                    @if (m.Keterangan != "") { <span class="text-ink-2">@m.Keterangan</span> }
-                                </li>
-                            }
-                        </ul>
-                    }
-                </div>
-                <InfoItem Label="Tiba di destinasi" Value="@(Trip.Ata != "" ? Format.Waktu(Trip.Ata) : "—")" Mono />
-                <InfoItem Label="Posisi terakhir" Value="@(Trip.Posisi is not null ? $"{JenisPerjalanan.Label(Trip.Posisi.Jenis)} · {Format.Waktu(Trip.Posisi.Waktu)}" : "Belum ada catatan perjalanan")" />
             </dl></div>
         </Kartu>
 
@@ -124,31 +104,52 @@
                     else if (Trip.MenahanKendaraan) { <Badge Tone="@(t.Status == StatusTrip.Selesai ? "warning" : "brand")">Masih dipakai trip ini</Badge> }
                     else { <span class="text-ink-3">Tidak ditahan (trip lama)</span> }
                 </InfoItem>
-                <div class="min-w-0">
-                    <p class="m-0 fs-11-5 fw-semibold text-ink-3 text-uppercase" style="letter-spacing:.04em">Supir</p>
-                    @if (Trip.DriverIds.Count == 0) { <p class="m-0 mt-1 fs-13 fw-medium text-ink">—</p> }
-                    else
-                    {
-                        <ul class="list-unstyled m-0 mt-1 d-flex flex-column gap-1 fs-13">
-                            @for (var i = 0; i < Trip.DriverIds.Count; i++)
-                            {
-                                var d = Db.Cari<Karyawan>(Trip.DriverIds[i]);
-                                var utama = i == 0;
-                                if (d is null) { continue; }
-                                <li class="d-flex flex-wrap align-items-center gap-2">
-                                    <a href="@($"master/karyawan/{d.Id}")" class="fw-medium text-ink text-decoration-none">@d.DriverName</a>
-                                    <span class="tnum fs-12 text-ink-3">@d.DriverCode</span>
-                                    @if (Trip.DriverIds.Count > 1) { if (utama) { <Badge Tone="brand">Utama · penerima komisi</Badge> } else { <Badge Tone="neutral">Pendamping</Badge> } }
-                                </li>
-                            }
-                        </ul>
-                    }
+                <div class="col-12 col-sm-12 min-w-0">
+                    <dt class="fs-11-5 fw-semibold text-ink-3 text-uppercase" style="letter-spacing:.04em">Dokumen kendaraan</dt>
+                    <dd class="m-0 mt-1 fs-13">
+                        @if (kendaraan is null) { <span class="text-ink-3">—</span> }
+                        else { <TagDokumen Jenis="DokumenPentingJenis.Kendaraan" Dokumen="kendaraan.Dokumen" Lainnya="kendaraan.Attachments.Count" /> }
+                    </dd>
                 </div>
             </dl></div>
+            @* Rincian supir (Baldy 22 Okt 2026): nama lengkap, kontak, KTP, dan SIM beserta masa berlakunya. *@
+            <div class="border-top border-hairline">
+                @if (Trip.DriverIds.Count == 0)
+                {
+                    <p class="m-0 px-3 py-3 fs-13 text-ink-3">Belum ada supir di trip ini.</p>
+                }
+                @for (var i = 0; i < Trip.DriverIds.Count; i++)
+                {
+                    var d = Db.Cari<Karyawan>(Trip.DriverIds[i]);
+                    var utama = i == 0;
+                    if (d is null) { continue; }
+                    var sim = d.Dokumen?.GetValueOrDefault("SIM");
+                    var ktp = d.Dokumen?.GetValueOrDefault("KTP");
+                    <div class="px-3 py-3 @(i > 0 ? "border-top border-hairline" : "")" data-rincian-supir>
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span class="fs-11-5 fw-semibold text-ink-3 text-uppercase" style="letter-spacing:.04em">@(utama ? "Supir" : "Supir pendamping")</span>
+                            <a href="@($"master/karyawan/{d.Id}")" class="fw-semibold text-ink text-decoration-none">@d.DriverName</a>
+                            <span class="tnum fs-12 text-ink-3">@d.DriverCode</span>
+                            @if (Trip.DriverIds.Count > 1 && utama) { <Badge Tone="brand">Utama · penerima komisi</Badge> }
+                            @if (d.Status != StatusKaryawan.Aktif) { <Badge Tone="@StatusKaryawan.Nada(d.Status)">@StatusKaryawan.Label(d.Status)</Badge> }
+                        </div>
+                        <dl class="row row-cols-2 row-cols-sm-3 row-cols-lg-5 g-3 mb-0 mt-0">
+                            <InfoItem Label="Nama Lengkap" Value="@(d.NamaLengkap != "" ? d.NamaLengkap : "—")" />
+                            <InfoItem Label="Telepon" Value="@(d.Phone != "" ? d.Phone : "—")" Mono />
+                            <InfoItem Label="No. KTP" Value="@(ktp?.Nomor ?? "—")" Mono />
+                            <InfoItem Label="No. SIM" Value="@(sim?.Nomor ?? "—")" Mono />
+                            <div class="min-w-0">
+                                <dt class="fs-11-5 fw-semibold text-ink-3 text-uppercase" style="letter-spacing:.04em">Masa berlaku SIM</dt>
+                                <dd class="m-0 mt-1 fs-13"><TagDokumen Jenis="jenisSim" Dokumen="d.Dokumen" /></dd>
+                            </div>
+                        </dl>
+                    </div>
+                }
+            </div>
         </Kartu>
 
         <Kartu>
-            <KepalaKartu Title="Penutupan & POD" Subtitle="@(fisikMenyusul ? "POD baru difoto. Tandai setelah supir menyerahkan dokumen fisiknya di pool." : "Trip ditutup setelah bukti dokumen (POD) diterima.")">
+            <KepalaKartu Title="Penutupan & POD" Subtitle="@(fisikMenyusul ? "POD baru difoto. Tandai setelah supir menyerahkan dokumen fisiknya di pool; kendaraannya ikut tercatat kembali di pool." : "Trip ditutup setelah bukti dokumen (POD) diterima.")">
                 <Actions>
                     @if (fisikMenyusul) { <Tombol Size="sm" Variant="primary" Disabled="@(!Bisa("trip"))" OnClick="TandaiFisik">Tandai fisik diterima</Tombol> }
                 </Actions>
@@ -246,7 +247,7 @@
         </Kartu>
 
         <Kartu>
-            <KepalaKartu Title="Komisi" Subtitle="Dihitung otomatis dari Aturan Komisi; pembayaran dicatat di tab Komisi." />
+            <KepalaKartu Title="Komisi" Subtitle="Dihitung otomatis dari Aturan Komisi; pembayarannya dicatat di tab Biaya Internal." />
             <div class="p-3"><dl class="row row-cols-2 g-3 mb-0">
                 <InfoItem Label="Supir utama" Value="@Format.Rupiah(Trip.KomisiSopir)" Mono />
                 <InfoItem Label="Manager" Value="@(t.ManagerId != "" || t.ManagerName != "" ? Format.Rupiah(Trip.KomisiManager) : "—")" Mono />
@@ -261,7 +262,7 @@
 
     private void TandaiFisik()
     {
-        Db.Ubah<Model.Trip>(Trip.Id, x => { x.PodFisik = true; x.PodFisikAt = Format.HariIni(); });
-        Toast.Sukses($"Dokumen fisik POD Trip {Trip.IdTampil} diterima.");
+        Db.TerimaPodFisik(Trip.Id);
+        Toast.Sukses($"Dokumen fisik POD Trip {Trip.IdTampil} diterima{(Trip.PlateNumber != "" ? $"; {Trip.PlateNumber} tercatat kembali di pool" : "")}.");
     }
 }

@@ -45,7 +45,7 @@
         </Left>
         <Right>
             <Tombol Size="sm" Icon="Ikon.FileExport" IconSize="14" Disabled="@(_tabel.Total == 0)" OnClick="() => ExportTabel(tersaring)">Export tabel</Tombol>
-            <Tombol Size="sm" Icon="Ikon.Print" IconSize="14" Disabled="@(_tabel.Total == 0)" OnClick="() => _cetak = tersaring">Cetak ringkasan</Tombol>
+            <TombolCetak Size="sm" Disabled="@(_tabel.Total == 0)" Pilihan="@([new PilihanCetak("Summary PI", EventCallback.Factory.Create(this, () => _cetak = tersaring))])" />
         </Right>
     </Toolbar>
 
@@ -67,8 +67,7 @@
                 {
                     <Tombol Size="sm" Icon="Ikon.ArrowsRotate" IconSize="14" Disabled="@(!boleh)" OnClick="() => _perbarui = berubahTerpilih">Perbarui nilai PI (@berubahTerpilih.Count)</Tombol>
                 }
-                <Tombol Size="sm" Icon="Ikon.ClipboardCheck" IconSize="14" OnClick="() => _rekap = terpilih">Cetak rekap dokumen</Tombol>
-                <Tombol Size="sm" Icon="Ikon.Print" IconSize="14" OnClick="() => _cetak = terpilih">Cetak ringkasan</Tombol>
+                <TombolCetak Size="sm" Pilihan="@PilihanCetakPi(terpilih)" />
                 <Tombol Size="sm" Icon="Ikon.FileExport" IconSize="14" OnClick="() => ExportTabel(terpilih)">Export</Tombol>
                 <Tombol Size="sm" Variant="ghost" OnClick="() => _pilih.Clear()">Batalkan pilihan</Tombol>
             </div>
@@ -127,6 +126,7 @@
 {
     <CetakRekapDokumen Rows="_rekap" NotaTrip="NotaTrip" Alamat="Db.Data.Alamat" OnClose="() => _rekap = null" />
 }
+<PilihCetak Open="@(_pilihCetak is not null)" Pilihan="@(_pilihCetak ?? [])" OnClose="() => _pilihCetak = null" />
 
 @code {
     public sealed class FilterPi
@@ -333,8 +333,8 @@
 
     private void TandaiFisik(BarisPi t)
     {
-        Db.Ubah<Model.Trip>(t.Id, x => { x.PodFisik = true; x.PodFisikAt = Format.HariIni(); });
-        Toast.Sukses($"Dokumen fisik POD {t.R.IdTampil} diterima.");
+        Db.TerimaPodFisik(t.Id);
+        Toast.Sukses($"Dokumen fisik POD {t.R.IdTampil} diterima; kendaraannya tercatat kembali di pool.");
     }
 
     private async Task ExportTabel(List<BarisPi> rows)
@@ -362,6 +362,17 @@
     /// <summary>Aksi menu ⋯: menu dirender komponen lain, jadi halaman ini dirender ulang sesudah aksinya jalan.</summary>
     private AksiMenu Aksi(string label, Action kerja, bool mati = false) => new(label, () => { kerja(); StateHasChanged(); }, disabled: mati);
 
+    /// <summary>Dokumen cetak untuk trip terpilih: Summary PI (trip yang sudah ber-PI) dan Rekap Dokumen.</summary>
+    private List<PilihanCetak> PilihanCetakPi(List<BarisPi> rows)
+    {
+        var l = new List<PilihanCetak>();
+        if (rows.Any(r => r.PunyaTahap)) l.Add(new PilihanCetak("Summary PI", EventCallback.Factory.Create(this, () => _cetak = rows), "Ringkasan PI format DHL."));
+        l.Add(new PilihanCetak("Rekap Dokumen", EventCallback.Factory.Create(this, () => _rekap = rows), "Kelengkapan No Referensi, PI, bukti, dan POD."));
+        return l;
+    }
+
+    private List<PilihanCetak>? _pilihCetak;
+
     private List<AksiMenu> AksiBaris(BarisPi t)
     {
         var boleh = Bisa("tagihan");
@@ -369,8 +380,7 @@
         if (!t.PunyaTahap) aksi.Add(Aksi("Buat PI", () => _buatPi = [t], !boleh));
         else aksi.AddRange(TagihanLogika.Lanjut(t.T.PiTahap).Select(p => Aksi(TagihanLogika.Aksi(p), () => _ubah = (new List<BarisPi> { t }, p), !boleh)));
         if (t.Selisih != 0) aksi.Add(Aksi("Perbarui nilai PI", () => _perbarui = [t], !boleh));
-        if (t.PunyaTahap) aksi.Add(Aksi("Cetak ringkasan", () => _cetak = [t]));
-        aksi.Add(Aksi("Cetak rekap dokumen", () => _rekap = [t]));
+        aksi.Add(Aksi("Cetak", () => _pilihCetak = PilihanCetakPi([t])));
         // Hardcopy POD yang menyusul: dibutuhkan untuk berkas tagihan fisik.
         if (t.T.PodFisik == false) aksi.Add(Aksi("Tandai fisik diterima", () => TandaiFisik(t), !Bisa("trip")));
         return aksi;
@@ -455,7 +465,6 @@
         {
             Key = "action", Header = "Action", Align = "right", Width = "92px", NoPrint = true,
             Render = t => @<div class="d-flex justify-content-end gap-1">
-                <TombolIkon Label="@($"Lihat trip {t.R.IdTampil}")" Icon="Ikon.FileLines" OnClick="@(() => Ke($"transaksi/trip/{t.Id}"))" />
                 <OverflowMenu Actions="AksiBaris(t)" />
             </div>,
         },

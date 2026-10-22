@@ -112,16 +112,10 @@ else
                 </PanelFilter>
             </Left>
             <Right>
-                @* Supir dipilih: hanya satu laporan (komisi supir itu). Seluruh supir: rekap per supir atau rincian transaksi. *@
-                @if (_filter.Nilai.Supir != "")
-                {
-                    <Tombol Size="sm" Icon="Ikon.Print" IconSize="14" OnClick="@(() => BukaCetak("perSopir"))">Cetak Komisi Supir</Tombol>
-                }
-                else
-                {
-                    <Tombol Size="sm" Icon="Ikon.Print" IconSize="14" OnClick="@(() => BukaCetak("global"))">Cetak Rekap</Tombol>
-                    <Tombol Size="sm" Icon="Ikon.Print" IconSize="14" OnClick="@(() => BukaCetak("semuaSopir"))">Cetak Rincian</Tombol>
-                }
+                @* Satu tombol Cetak (22 Okt 2026). Supir dipilih: komisi supir itu. Seluruh supir: pilih rekap per supir atau rincian transaksi. *@
+                <TombolCetak Size="sm" Pilihan="@(_filter.Nilai.Supir != ""
+                    ? [new PilihanCetak("Komisi Supir", EventCallback.Factory.Create(this, () => BukaCetak("perSopir")))]
+                    : [new PilihanCetak("Rekap Komisi", EventCallback.Factory.Create(this, () => BukaCetak("global")), "Satu baris per supir."), new PilihanCetak("Rincian Komisi", EventCallback.Factory.Create(this, () => BukaCetak("semuaSopir")), "Rincian transaksi seluruh supir.")])" />
             </Right>
         </Toolbar>
         @if (_galat is not null)

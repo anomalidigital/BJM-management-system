@@ -1,0 +1,20 @@
+@* Satu tombol "Cetak" di semua halaman (Baldy 22 Okt 2026). Satu dokumen: langsung ke preview. Beberapa dokumen (mis. Berita Acara
+   dan Rekap Trip): muncul pilihan dokumen dulu (PilihCetak), lalu preview. *@
+<Tombol Variant="@Variant" Size="@Size" Icon="Ikon.Print" IconSize="@(Size == "sm" ? 14 : 15)" Disabled="@(Disabled || Pilihan.Count == 0)" Title="@Title" OnClick="Klik">Cetak</Tombol>
+<PilihCetak Open="_pilih" Pilihan="Pilihan" OnClose="() => _pilih = false" />
+
+@code {
+    [Parameter] public List<PilihanCetak> Pilihan { get; set; } = [];
+    [Parameter] public string Variant { get; set; } = "secondary";
+    [Parameter] public string Size { get; set; } = "md";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? Title { get; set; }
+
+    private bool _pilih;
+
+    private async Task Klik()
+    {
+        if (Pilihan.Count == 1) await Pilihan[0].Jalankan.InvokeAsync();
+        else if (Pilihan.Count > 1) _pilih = true;
+    }
+}

@@ -22,9 +22,8 @@ else
     var tripSaya = TripSaya;
     var adaRentang = _filter.Nilai.Dari != "" || _filter.Nilai.Sampai != "";
     var teksRentang = TeksRentang;
-    <PageHeader Title="@orang.DriverName" Crumbs="@(new List<Crumb> { new("Master Data"), new("Supir / Karyawan", "master/karyawan"), new(orang.DriverName) })">
+    <PageHeader Title="@orang.DriverName" Kembali="master/karyawan" Crumbs="@(new List<Crumb> { new("Master Data"), new("Supir / Karyawan", "master/karyawan"), new(orang.DriverName) })">
         <Description>@orang.DriverCode · @PeranKaryawan.Label(orang.Role) · @(orang.City != "" ? orang.City : "kota belum diisi")</Description>
-        <Actions><Tombol Icon="Ikon.ArrowLeft" OnClick="@(() => Ke("master/karyawan"))">Kembali</Tombol></Actions>
     </PageHeader>
 
     <div class="row g-3 mb-4">
@@ -64,7 +63,7 @@ else
                         </dl>
                     </div>
                     <div class="rounded-3 border border-hairline">
-                        <KepalaKartu Title="Dokumen" Subtitle="KTP, SIM, KK, NPWP, dan dokumen lainnya. Diubah lewat Ubah di Supir / Karyawan." />
+                        <KepalaKartu Title="Dokumen" Subtitle="KTP, SIM, KK, NPWP, dan Dokumen Lainnya. Diubah lewat Ubah di Supir / Karyawan." />
                         <div class="p-3">
                             <DokumenPentingRingkas Jenis="DokumenPentingJenis.Karyawan" Dokumen="orang.Dokumen" Lainnya="orang.Attachments" Kosong="Belum ada dokumen. Tambahkan lewat Ubah di Supir / Karyawan." />
                         </div>
@@ -164,7 +163,7 @@ else
                             <thead>
                                 <tr>
                                     <th>Tanggal</th><th>Jenis</th><th>Keterangan</th>
-                                    <th class="text-end">Piutang</th><th class="text-end">Lunas</th><th class="text-end">Saldo</th><th>Bukti</th>
+                                    <th class="text-end">Piutang</th><th class="text-end">Pelunasan</th><th class="text-end">Saldo</th><th>Bukti</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -186,7 +185,7 @@ else
                                     var j = Kasbon.JenisPiutang(e.M);
                                     <tr class="align-top" @key="e.M.Id">
                                         <td class="tnum text-ink-2">@Format.Tanggal(e.M.EntryDate)</td>
-                                        <td><Badge Tone="@(j == "piutang" ? "critical" : "good")">@(j == "piutang" ? "Piutang" : "Lunas")</Badge></td>
+                                        <td><Badge Tone="@(j == "piutang" ? "critical" : "good")">@(j == "piutang" ? "Piutang" : "Pelunasan")</Badge></td>
                                         <td style="max-width:380px">@Keterangan(e.M)</td>
                                         <td class="text-end">@if (e.Nilai < 0) { <NilaiPiutang Nilai="e.Nilai" /> }</td>
                                         <td class="text-end">@if (e.Nilai > 0) { <NilaiPiutang Nilai="e.Nilai" /> }</td>
@@ -208,7 +207,7 @@ else
                     </div>
                 }
                 <p class="m-0 border-top border-hairline px-3 py-2 fs-12 text-ink-3" style="line-height:1.6">
-                    Piutang (minus) = utang karyawan bertambah, mis. kasbon. Lunas (plus) = pelunasan: dipotong dari uang jalan trip atau dibayar langsung.
+                    Piutang (minus) = utang karyawan bertambah, mis. kasbon. Pelunasan (plus) = dipotong dari uang jalan trip atau dibayar langsung.
                     Saldo minus berarti karyawan masih punya piutang.
                 </p>
             </div>
@@ -224,7 +223,7 @@ else
     public sealed record BarisMutasi(MutasiKasbon M, long Nilai, long Saldo);
     public sealed record BukuPiutang(long SaldoAwal, List<BarisMutasi> Isi, long Piutang, long Lunas, long SaldoAkhir);
 
-    private static readonly List<Opsi> OpsiJenis = [new("", "Piutang & Lunas"), new("piutang", "Piutang saja"), new("lunas", "Lunas saja")];
+    private static readonly List<Opsi> OpsiJenis = [new("", "Piutang & Pelunasan"), new("piutang", "Piutang saja"), new("lunas", "Pelunasan saja")];
 
     private string _tab = "overview";
     private KendaliFilter<FilterTransaksi> _filter = default!;
@@ -312,7 +311,7 @@ else
             var f = _filter.Nilai;
             var l = new List<ChipFilter>();
             if (f.Dari != "" || f.Sampai != "") l.Add(new($"Tanggal {Format.RentangTanggal(f.Dari, f.Sampai)}", () => _filter.Lepas((n, a) => { n.Dari = a.Dari; n.Sampai = a.Sampai; })));
-            if (f.Jenis != "") l.Add(new(f.Jenis == "piutang" ? "Piutang saja" : "Lunas saja", () => _filter.Lepas((n, a) => n.Jenis = a.Jenis)));
+            if (f.Jenis != "") l.Add(new(f.Jenis == "piutang" ? "Piutang saja" : "Pelunasan saja", () => _filter.Lepas((n, a) => n.Jenis = a.Jenis)));
             return l;
         }
     }

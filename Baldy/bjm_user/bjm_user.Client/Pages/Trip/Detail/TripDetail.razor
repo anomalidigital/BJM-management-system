@@ -1,10 +1,12 @@
 @page "/transaksi/trip/{Id}"
 @inherits KomponenData
 @*
-    Detail Trip: dokumen Surat Jalan / Berita Acara dan seluruh catatan keuangan perjalanan. Trip Karawang punya tab Perjalanan,
-    Tutup Trip (POD, pool), dan Berita Acara sebagai dokumen cetak. Tab yang terbuka selalu mengikuti ?tab= di URL, jadi tab lain
+    Detail Trip: dokumen Surat Jalan / Berita Acara dan seluruh catatan keuangan perjalanan. Trip Karawang punya Tutup Trip (POD, pool,
+    sekaligus rekap keseluruhan trip) dan Berita Acara sebagai dokumen cetak. Tab yang terbuka selalu mengikuti ?tab= di URL, jadi tab lain
     bisa memindahkan tab lewat URL (mis. ?tab=uj&tambah=uang_dorong). ?print=1 langsung membuka preview cetak.
     Backload / lanjutan hanya dari menu ⋯ daftar trip (Baldy 14 Okt 2026), tidak dari detail.
+    Baldy 22 Okt 2026: tombol kembali di kiri judul; tab Perjalanan dihapus, Komisi → Biaya Internal, Dokumen → Dokumen Lainnya;
+    Batalkan Trip di menu ⋯ (Hapus Trip dihapus); Rekap Trip = Tutup Trip; trip Selesai terkunci penuh sampai diaktifkan lagi.
 *@
 @{
     var trip = Db.BarisTrip(Id);
@@ -27,29 +29,35 @@ else
     var t = trip.T;
     var batal = trip.Batal;
     var karawang = AturDetail.Karawang(trip);
-    var bisaUbah = Bisa("trip") && !batal;
+    /* Trip selesai terkunci penuh (Baldy 22 Okt 2026): form, uang jalan, biaya, biaya internal, dan dokumen. */
+    var terkunci = StatusTrip.Terkunci(t.Status);
+    var bisaUbah = Bisa("trip") && !batal && !terkunci;
     /* Tutup Trip: trip yang masih jalan. */
     var bisaTutup = karawang && bisaUbah && StatusTrip.BisaDitutup(t.Status);
     /* Trip sudah selesai tetapi mobilnya belum tercatat kembali di pool: mobil belum bisa dipakai trip lain. */
     var belumDiPool = karawang && t.Status == StatusTrip.Selesai && trip.MenahanKendaraan;
     /* Biaya tambahan (operasional & internal) hanya Owner & Manager. */
-    var bisaBiaya = Bisa("biaya") && !batal;
+    var bisaBiaya = Bisa("biaya") && !batal && !terkunci;
     var tabs = DaftarTab(trip, karawang);
     var tab = tabs.Any(x => x.Id == AturDetail.NormalTab(TabUrl)) ? AturDetail.NormalTab(TabUrl) : AturDetail.Overview;
 
-    <PageHeader Title="@($"Trip {trip.IdTampil}")" Crumbs="Crumbs(trip.IdTampil)">
+    <PageHeader Title="@($"Trip {trip.IdTampil}")" Kembali="@KembaliKe" Crumbs="Crumbs(trip.IdTampil)">
         <Description>Berangkat @Format.TanggalPanjang(t.TransactionDate) · @(trip.DriverNames != "" ? trip.DriverNames : "tanpa supir") · @(trip.PlateNumber != "" ? trip.PlateNumber : "tanpa kendaraan")</Description>
         <Actions>
             <Badge Tone="@StatusTrip.Nada(t.Status)">@StatusTrip.Label(t.Status)</Badge>
-            <Tombol Icon="Ikon.ArrowLeft" OnClick="() => Ke(KembaliKe)">Kembali</Tombol>
-            <Tombol Icon="Ikon.Pen" Disabled="@(!bisaUbah)" OnClick="@(() => Ke($"transaksi/trip/{trip.Id}/edit"))">Edit</Tombol>
-            <Tombol Variant="outlineDanger" Icon="Ikon.Ban" Disabled="@(!Bisa("batal") || batal || t.PiNumber != "")" OnClick="() => _membatalkan = true"
-                    Title="@(t.PiNumber != "" && !batal ? $"Sudah ditagih lewat PI {t.PiNumber}: trip yang sudah ditagih tidak bisa dibatalkan." : null)">Batalkan Trip</Tombol>
-            <Tombol Variant="@(bisaTutup ? "secondary" : "primary")" Icon="Ikon.Print" OnClick="() => _printing = true">@(karawang ? "Cetak Berita Acara" : "Cetak Surat Jalan")</Tombol>
+            <Tombol Icon="Ikon.Pen" Disabled="@(!bisaUbah)" Title="@(terkunci ? "Trip terkunci: aktifkan lagi untuk mengubah." : null)" OnClick="@(() => Ke($"transaksi/trip/{trip.Id}/edit"))">Edit</Tombol>
+            <TombolCetak Variant="@(bisaTutup || (terkunci && karawang) ? "secondary" : "primary")" Pilihan="@([new PilihanCetak(karawang ? "Berita Acara" : "Surat Jalan", EventCallback.Factory.Create(this, () => _printing = true))])" />
+            @* Tutup Trip menampilkan rekap keseluruhan trip; setelah ditutup, rekapnya dibuka lewat Rekap Trip di tempat yang sama. *@
             @if (bisaTutup) { <Tombol Variant="primary" Icon="Ikon.FlagCheckered" OnClick="() => _menutup = true">Tutup Trip</Tombol> }
-            <OverflowMenu Actions="MenuLain(trip, karawang, belumDiPool)" />
+            else if (karawang && terkunci) { <Tombol Variant="primary" Icon="Ikon.ClipboardCheck" OnClick="() => _rekap = true">Rekap Trip</Tombol> }
+            <OverflowMenu Actions="MenuLain(trip, belumDiPool)" />
         </Actions>
     </PageHeader>
+
+    @if (terkunci)
+    {
+        <KunciTrip Trip="trip" />
+    }
 
     @if (batal)
     {
@@ -118,14 +126,11 @@ else
         <div @key="@($"{trip.Id}-{tab}")">
             @switch (tab)
             {
-                case AturDetail.Perjalanan:
-                    <TabPerjalanan Trip="trip" BisaUbah="bisaUbah" />
-                    break;
                 case AturDetail.Uj:
                     <TabUangJalan Trip="trip" BisaUbah="bisaUbah" Tambah="@Tambah" />
                     break;
                 case AturDetail.Biaya:
-                    <TabBiaya Trip="trip" />
+                    <TabBiaya Trip="trip" Terkunci="terkunci" />
                     break;
                 case AturDetail.Internal:
                     <TabInternal Trip="trip" BisaUbah="bisaBiaya" />
@@ -144,7 +149,6 @@ else
     <ModalBatalTrip Trip="@(_membatalkan ? trip : null)" OnClose="() => _membatalkan = false" />
     <ModalTutupTrip Trip="@(_menutup ? trip : null)" OnClose="() => _menutup = false" />
     <ModalRekapTrip Trip="@(_rekap ? trip : null)" OnClose="() => _rekap = false" />
-    <ModalHapusTrip Trip="@(_menghapus ? trip : null)" OnClose="() => _menghapus = false" OnDeleted="_ => Ke(KembaliKe)" />
 }
 
 @code {
@@ -159,7 +163,7 @@ else
     [SupplyParameterFromQuery(Name = "awal")] public string? Awal { get; set; }
     [SupplyParameterFromQuery(Name = "akhir")] public string? Akhir { get; set; }
 
-    private bool _printing, _membatalkan, _menghapus, _menutup, _rekap;
+    private bool _printing, _membatalkan, _menutup, _rekap;
     private bool _hapusPrint;
 
     /* ── Asal dari Laporan → Pengeluaran (breadcrumb & tombol Kembali) ───────────────────── */
@@ -219,12 +223,11 @@ else
     {
         var d = Db.Semua;
         var tabs = new List<TabItem> { new(AturDetail.Overview, "Overview") };
-        if (karawang) tabs.Add(new(AturDetail.Perjalanan, "Perjalanan", d.Kejadian.Count(e => e.TripId == trip.Id).ToString()));
         tabs.Add(new(AturDetail.Uj, "Uang Jalan", d.Termin.Count(p => p.TripId == trip.Id).ToString()));
         tabs.Add(new(AturDetail.Biaya, "Biaya Operasional", d.Biaya.Count(e => e.TripId == trip.Id).ToString()));
-        // Atasan 13 Okt 2026: "biaya internal diubah ke Komisi" (komisi supir & manager + biaya internal lain).
-        tabs.Add(new(AturDetail.Internal, "Komisi", d.BiayaInternal.Count(c => c.TripId == trip.Id).ToString()));
-        tabs.Add(new(AturDetail.Dokumen, "Dokumen", d.CatatanTrip.Count(n => n.TripId == trip.Id).ToString()));
+        // Baldy 22 Okt 2026: tab Komisi kembali bernama Biaya Internal; Dokumen menjadi Dokumen Lainnya. Tab Perjalanan dihapus.
+        tabs.Add(new(AturDetail.Internal, "Biaya Internal", d.BiayaInternal.Count(c => c.TripId == trip.Id).ToString()));
+        tabs.Add(new(AturDetail.Dokumen, "Dokumen Lainnya", d.CatatanTrip.Count(n => n.TripId == trip.Id).ToString()));
         return tabs;
     }
 
@@ -280,27 +283,34 @@ else
                 karawang
                     ? $"{(prsh > 0 ? $"{Format.Rupiah(prsh)} oleh perusahaan" : "dari uang jalan")} · {Format.Rupiah(tagih)} ke klien{arsip}"
                     : $"{biaya.Count} item{arsip}", AturDetail.Biaya),
-            // Pembayaran komisi dan biaya internal lain disebut terpisah supaya uang makan / kernet tidak terbaca sebagai komisi.
-            new("Komisi", Format.Rupiah(batal ? 0 : trip.KomisiSopir + trip.KomisiManager),
-                batal ? "trip batal"
+            // Biaya internal: pembayaran komisi, uang makan, kernet, dan sejenisnya (tab Biaya Internal).
+            new("Biaya Internal", Format.Rupiah(batal ? 0 : komisiDibayar + internalLain),
+                batal ? $"trip batal{arsip}"
                     : string.Join(" · ", new[]
                     {
-                        komisiDibayar > 0 ? $"dibayar {Format.Rupiah(komisiDibayar)}" : "dari Aturan Komisi",
-                        internalLain > 0 ? $"biaya internal lain {Format.Rupiah(internalLain)}" : "",
-                    }.Where(x => x != "")) + arsip, AturDetail.Internal),
+                        internal_.Count > 0 ? $"{internal_.Count} catatan" : "belum ada catatan",
+                        komisiDibayar > 0 ? $"komisi {Format.Rupiah(komisiDibayar)}" : "",
+                    }.Where(x => x != "")), AturDetail.Internal),
         };
         return kartu;
     }
 
     /* ── Aksi ──────────────────────────────────────────────────────────────────────────── */
 
-    private List<AksiMenu> MenuLain(BarisTrip trip, bool karawang, bool belumDiPool)
+    /// <summary>Menu ⋯ detail: tandai pool dan Batalkan Trip (Baldy 22 Okt 2026: Hapus Trip dihapus, Batalkan pindah ke sini).</summary>
+    private List<AksiMenu> MenuLain(BarisTrip trip, bool belumDiPool)
     {
+        var t = trip.T;
         var menu = new List<AksiMenu>();
         // Backload / lanjutan hanya dari menu ⋯ daftar trip (Baldy 14 Okt 2026), tidak dari detail.
-        if (karawang) menu.Add(new AksiMenu("Rekap Trip", () => _rekap = true, Ikon.ClipboardCheck));
         if (belumDiPool) menu.Add(new AksiMenu("Tandai kendaraan di pool", () => TandaiPool(trip), Ikon.Warehouse, disabled: !Bisa("trip")));
-        menu.Add(new AksiMenu("Hapus Trip", () => _menghapus = true, Ikon.TrashCan, "danger", !Bisa("hapus")));
+        // Trip yang sudah ditagih (punya PI) tidak dibatalkan: PI-nya akan tertinggal tanpa trip yang berlaku.
+        menu.Add(new AksiMenu
+        {
+            Label = "Batalkan Trip", Icon = Ikon.Ban, Tone = "danger", Disabled = !Bisa("batal") || trip.Batal || t.PiNumber != "",
+            Alasan = t.PiNumber != "" && !trip.Batal ? $"Sudah ditagih lewat PI {t.PiNumber}" : null,
+            OnSelect = () => { _membatalkan = true; StateHasChanged(); return Task.CompletedTask; },
+        });
         return menu;
     }
 

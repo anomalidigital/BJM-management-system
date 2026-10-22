@@ -1,8 +1,9 @@
 @inherits KomponenData
 @*
     Tutup Trip (Receive all POD / bukti dokumen fisik). Sebelum ditutup tampil rekap keseluruhan trip beserta daftar yang masih
-    kurang (bisa dicetak / disimpan PDF). Lalu dua pertanyaan: keadaan dokumen POD, dan apakah mobil sudah kembali ke pool (selama
-    belum, mobilnya tidak bisa dipilih trip lain). Backload / lanjutan tidak ditanyakan di sini: dibuat dari menu ⋯ daftar trip.
+    kurang (bisa dicetak / disimpan PDF). Lalu satu pertanyaan: keadaan dokumen POD. Baldy 22 Okt 2026: posisi kendaraan tidak
+    ditanyakan lagi karena mengikuti POD: dokumen fisik diterima = supir sudah di pool (kendaraan tercatat kembali di pool); foto dulu
+    = supir masih jalan (kendaraan tetap tertahan sampai dokumen fisiknya diterima, atau dilanjutkan backload dari menu ⋯ daftar trip).
     Keputusan Baldy 15 Okt 2026: trip tanpa supir tidak bisa ditutup (komisi & Siap PI butuh supir).
     Rincian rekap dilipat supaya muat tanpa scroll: angka utamanya tetap tampil di judulnya.
 *@
@@ -43,11 +44,11 @@
                             <div class="row g-2">
                                 <div class="col-sm-6">
                                     <Radio Name="pod-tutup" Class="h-100" Checked="@(_pod == "fisik")" OnChange="() => PilihPod(PodFisik)" Label="Dokumen fisik diterima"
-                                           Description="Supir sudah menyerahkan hardcopy di pool." />
+                                           Description="@(tanyaPool ? "Supir sudah menyerahkan hardcopy di pool; kendaraan tercatat kembali di pool." : "Supir sudah menyerahkan hardcopy di pool.")" />
                                 </div>
                                 <div class="col-sm-6">
                                     <Radio Name="pod-tutup" Class="h-100" Checked="@(_pod == "foto")" OnChange="() => PilihPod(PodFoto)" Label="Foto dulu, fisik menyusul"
-                                           Description="Supir lanjut jalan, mis. backload / lanjutan. PI tetap bisa dibuat." />
+                                           Description="@(tanyaPool ? "Supir lanjut jalan, mis. backload / lanjutan; kendaraan belum di pool. PI tetap bisa dibuat." : "Supir lanjut jalan, mis. backload / lanjutan. PI tetap bisa dibuat.")" />
                                 </div>
                             </div>
                             @if (_pod != "")
@@ -59,23 +60,7 @@
                             }
                         </div>
 
-                        @if (tanyaPool)
-                        {
-                            <div>
-                                <p class="mb-2 fs-12-5 fw-semibold text-ink-2">Kendaraan @(Trip.PlateNumber != "" ? Trip.PlateNumber : "trip ini") sudah kembali ke pool?</p>
-                                <div class="row g-2">
-                                    <div class="col-sm-6">
-                                        <Radio Name="pool-tutup" Class="h-100" Checked="@(_diPool == "ya")" OnChange="() => PilihPool(PoolYa)" Label="Ya, sudah di pool"
-                                               Description="Kendaraan langsung bisa dipakai trip lain." />
-                                    </div>
-                                    <div class="col-sm-6">
-                                        <Radio Name="pool-tutup" Class="h-100" Checked="@(_diPool == "tidak")" OnChange="() => PilihPool(PoolBelum)" Label="Belum"
-                                               Description="Kendaraan tetap tertahan di trip ini. Lanjut backload? Buat dari menu ⋯ Ada Backload / Lanjutan di daftar trip." />
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                        else if (Trip.T.VehicleId != "" && catatanPool != "")
+                        @if (Trip.T.VehicleId != "" && catatanPool != "")
                         {
                             <p class="m-0 fs-12-5 text-ink-3">Kendaraan sudah tercatat kembali di pool @Format.Waktu(catatanPool).</p>
                         }
@@ -86,7 +71,7 @@
             </ChildContent>
             <Footer>
                 <Tombol OnClick="Tutup">Batal</Tombol>
-                <Tombol Icon="Ikon.Print" IconSize="14" OnClick="() => _cetak = true">Cetak Rekap</Tombol>
+                <Tombol Icon="Ikon.Print" IconSize="14" OnClick="() => _cetak = true">Cetak</Tombol>
                 <Tombol Variant="primary" OnClick="() => Konfirmasi(tanyaPool, fotoBongkar.Count)">Tutup Trip</Tombol>
             </Footer>
         </Modal>
@@ -103,7 +88,6 @@
 
     private string _pod = "";
     private List<string> _foto = [];
-    private string _diPool = "";
     private string? _galat;
     private bool _cetak;
     private bool _rincian;
@@ -113,13 +97,12 @@
     {
         if (Trip?.Id == _idTerakhir) return;
         _idTerakhir = Trip?.Id;
-        _pod = ""; _foto = Trip?.T.PodAttachments?.ToList() ?? []; _diPool = ""; _galat = null; _cetak = false; _rincian = false;
+        _pod = ""; _foto = Trip?.T.PodAttachments?.ToList() ?? []; _galat = null; _cetak = false; _rincian = false;
     }
 
-    private const string PodFisik = "fisik", PodFoto = "foto", PoolYa = "ya", PoolBelum = "tidak";
+    private const string PodFisik = "fisik", PodFoto = "foto";
 
     private void PilihPod(string v) { _pod = v; _galat = null; }
-    private void PilihPool(string v) { _diPool = v; _galat = null; }
 
     private Task Tutup() => OnClose.InvokeAsync();
 
@@ -135,11 +118,11 @@
         if (Trip.DriverIds.Count == 0) { await Gagal("Trip belum punya supir. Pilih supir di Edit sebelum ditutup."); return; }
         if (_pod == "") { await Gagal("Pilih keadaan dokumen POD."); return; }
         if (_pod == "foto" && _foto.Count + jumlahFotoBongkar == 0) { await Gagal("Lampirkan foto POD, karena dokumen fisiknya belum diterima."); return; }
-        if (tanyaPool && _diPool == "") { await Gagal("Jawab dulu: kendaraan sudah kembali ke pool atau belum."); return; }
-        var masukPool = tanyaPool && _diPool == "ya";
+        // Posisi kendaraan mengikuti POD: dokumen fisik hanya diserahkan supir di pool.
+        var masukPool = tanyaPool && _pod == PodFisik;
         var id = Trip.IdTampil;
         Db.TutupTrip(Trip.Id, new OpsiTutup { PodFisik = _pod == "fisik", PodFoto = _foto.ToList(), DiPool = masukPool });
-        Toast.Sukses($"Trip {id} ditutup{(tanyaPool && !masukPool ? ". Kendaraan belum tercatat di pool: tandai setelah kembali, atau buat backload / lanjutan dari menu ⋯ di daftar trip." : " dan siap dibuatkan PI di Tagihan.")}");
+        Toast.Sukses($"Trip {id} ditutup{(tanyaPool && !masukPool ? ". Kendaraan belum di pool: tandai fisik diterima setelah supir kembali, atau buat backload / lanjutan dari menu ⋯ di daftar trip." : " dan siap dibuatkan PI di Tagihan.")}");
         await OnClose.InvokeAsync();
         await OnClosed.InvokeAsync();
     }

@@ -1,10 +1,10 @@
-@* Kolom kode: terisi otomatis, tetap bisa diketik, tombol Generate membuat kode baru. *@
+@* Kolom kode: terisi otomatis, tetap bisa diketik; tombol ikon di sampingnya membuat kode baru (sama di semua form master). *@
 <div class="@(ReadOnly ? "" : "input-group") @Class">
     <input id="@Id" class="form-control tnum fw-medium @(Invalid ? "is-invalid" : "") @InputClass" value="@Value" placeholder="@Placeholder" readonly="@ReadOnly"
            aria-label="@AriaLabel" style="letter-spacing:.02em" @oninput="Ketik" />
     @if (!ReadOnly)
     {
-        <Tombol Icon="Ikon.WandMagicSparkles" IconSize="14" Title="@GenerateTitle" OnClick="OnGenerate">Generate</Tombol>
+        <Tombol Icon="Ikon.WandMagicSparkles" IconSize="14" Class="tombol-generate" Title="@GenerateTitle" AriaLabel="@GenerateTitle" OnClick="OnGenerate" />
     }
 </div>
 

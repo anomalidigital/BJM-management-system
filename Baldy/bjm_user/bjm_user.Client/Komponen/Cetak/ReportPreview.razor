@@ -1,4 +1,4 @@
-@* Layar Preview Laporan: pengaturan di kiri (opsional), lembar A4 di kanan, satu tombol Cetak / PDF. Ditutup lewat X atau Esc. *@
+@* Layar Preview Laporan: pengaturan di kiri (opsional), lembar A4 di kanan, satu tombol Cetak. Ditutup lewat X atau Esc. *@
 @implements IAsyncDisposable
 @inject Penyimpanan Simpan
 @inject IJSRuntime JS
@@ -17,7 +17,7 @@
             {
                 <TombolSegmen Label="Orientasi kertas" Value="@Orientasi" ValueChanged="GantiOrientasi" Pilihan="@(new List<Segmen> { new("potret", "Potret"), new("lanskap", "Lanskap") })" />
             }
-            <Tombol Variant="primary" Icon="Ikon.Print" OnClick="Cetak">Cetak / PDF</Tombol>
+            <Tombol Variant="primary" Icon="Ikon.Print" OnClick="Cetak">Cetak</Tombol>
         </div>
     </header>
     <div class="d-flex flex-grow-1" style="min-height:0">
@@ -28,7 +28,7 @@
         <div class="print-scroll flex-grow-1 overflow-auto p-3 p-lg-4" data-orientasi="@Orientasi" style="min-width:0">
             <div class="d-flex flex-column gap-4 print-gap">@ChildContent?.Invoke(Orientasi)</div>
             <p class="no-print mx-auto mt-4 text-center fs-11-5 text-ink-3" style="max-width:210mm; line-height:1.6">
-                Untuk menyimpan sebagai PDF: klik <span class="fw-medium text-ink-2">Cetak / PDF</span>, lalu pilih tujuan <span class="fw-medium text-ink-2">Save as PDF</span> pada dialog cetak browser.
+                Untuk menyimpan sebagai PDF: klik <span class="fw-medium text-ink-2">Cetak</span>, lalu pilih tujuan <span class="fw-medium text-ink-2">Save as PDF</span> pada dialog cetak browser.
             </p>
         </div>
     </div>

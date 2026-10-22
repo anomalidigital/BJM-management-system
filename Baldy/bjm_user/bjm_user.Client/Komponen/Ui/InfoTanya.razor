@@ -1,0 +1,8 @@
+@* Ikon "?" kecil: penjelasan muncul saat diarahkan, difokus, atau diketuk (tooltip di js/sikotis.js, tidak terpotong modal). *@
+<button type="button" class="info-tanya @Class" data-info="@Teks" aria-label="@($"Penjelasan: {Teks}")"><IkonSvg Def="Ikon.CircleQuestion" Size="@Size" /></button>
+
+@code {
+    [Parameter, EditorRequired] public string Teks { get; set; } = "";
+    [Parameter] public int Size { get; set; } = 12;
+    [Parameter] public string? Class { get; set; }
+}

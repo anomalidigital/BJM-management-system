@@ -13,7 +13,7 @@
         if (isi.Termin > 0) yield return $"{isi.Termin} termin uang jalan · {Format.Rupiah(isi.Uj)}{(isi.Kasbon > 0 ? $" (potong kasbon {Format.Rupiah(isi.Kasbon)})" : "")}";
         if (isi.Biaya > 0) yield return $"{isi.Biaya} biaya operasional · {Format.Rupiah(isi.BiayaTotal)}";
         if (isi.Internal > 0) yield return $"{isi.Internal} biaya internal · {Format.Rupiah(isi.InternalTotal)}";
-        if (isi.Lainnya > 0) yield return $"{isi.Lainnya} dokumen di tab Dokumen";
-        if (isi.Perjalanan > 0) yield return $"{isi.Perjalanan} catatan di tab Perjalanan";
+        if (isi.Lainnya > 0) yield return $"{isi.Lainnya} dokumen di tab Dokumen Lainnya";
+        if (isi.Perjalanan > 0) yield return $"{isi.Perjalanan} catatan perjalanan lama";
     }
 }

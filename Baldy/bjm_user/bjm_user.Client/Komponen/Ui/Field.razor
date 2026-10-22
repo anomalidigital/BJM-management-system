@@ -1,11 +1,19 @@
 @* Pembungkus label + isian + pesan galat / petunjuk (Bootstrap .form-label / .form-text / .invalid-feedback).
-   Pakai: <Field Label="Klien" Required Error="@galat"> <input id="@context" class="form-control" ... /> </Field> *@
+   Info = penjelasan isian: tampil sebagai ikon "?" di samping label (tooltip), bukan teks di bawah isian (Baldy 22 Okt 2026).
+   Hint = pesan yang memang harus terlihat (peringatan, tombol Pakai, dsb.).
+   Pakai: <Field Label="Klien" Required Info="Nama resmi perusahaan." Error="@galat"> <input id="@context" class="form-control" ... /> </Field> *@
 <div class="@Class">
     @if (Label is not null)
     {
-        <label class="form-label" for="@Id">@Label@if (Required) { <span class="wajib">*</span> }</label>
+        <div class="label-isian">
+            <label class="form-label" for="@Id">@Label@if (Required) { <span class="wajib">*</span> }</label>
+            @if (!string.IsNullOrEmpty(Info))
+            {
+                <InfoTanya Teks="@Info" />
+            }
+        </div>
     }
-    @ChildContent?.Invoke(Id)
+    @ChildContent?.Invoke(Id!)
     @if (!string.IsNullOrEmpty(Error))
     {
         <p class="invalid-feedback">@Error</p>
@@ -20,6 +28,8 @@
     [Parameter] public string? Label { get; set; }
     [Parameter] public bool Required { get; set; }
     [Parameter] public string? Error { get; set; }
+    /// <summary>Penjelasan singkat isian, dibuka lewat ikon "?" di samping label.</summary>
+    [Parameter] public string? Info { get; set; }
     [Parameter] public RenderFragment? Hint { get; set; }
     [Parameter] public string? Class { get; set; }
     [Parameter] public string? Id { get; set; }

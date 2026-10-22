@@ -1,5 +1,5 @@
 @inherits KomponenData
-@* Menu ⋯ "Rekap Trip": rekap keseluruhan trip beserta daftar yang masih kurang, bisa dicetak / disimpan PDF. Dipakai juga dari daftar trip. *@
+@* Rekap Trip (trip yang sudah ditutup): rekap keseluruhan trip beserta daftar yang masih kurang, bisa dicetak / disimpan PDF. *@
 @if (Trip is not null)
 {
     var data = Rekap.Susun(Trip, Db.Semua);
@@ -19,7 +19,7 @@
             </ChildContent>
             <Footer>
                 <Tombol OnClick="Tutup">Tutup</Tombol>
-                <Tombol Variant="primary" Icon="Ikon.Print" IconSize="14" OnClick="() => _cetak = true">Cetak / PDF</Tombol>
+                <Tombol Variant="primary" Icon="Ikon.Print" IconSize="14" OnClick="() => _cetak = true">Cetak</Tombol>
             </Footer>
         </Modal>
     }
