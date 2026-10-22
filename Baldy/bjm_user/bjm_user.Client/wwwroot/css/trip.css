@@ -11,10 +11,8 @@
 /* Trip selesai terkunci (Baldy 22 Okt 2026). */
 .kotak-kunci { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .625rem .75rem; padding: .75rem 1rem; border: 1px solid var(--hairline); border-radius: .5rem;
   background: var(--sunken); font-size: 12.5px; color: var(--ink-2); line-height: 1.55; }
-/* Form trip ringkas (Baldy 22 Okt 2026): tidak melebar ke seluruh layar; bilah simpan sejajar dengan form. */
-.form-ringkas { max-width: 1120px; }
+/* Form trip ringkas (Baldy 22 Okt 2026): isian rapat tanpa teks bantuan; tetap selebar halaman supaya tidak ada ruang kosong. */
 .form-ringkas .card-header { padding-top: .625rem; padding-bottom: .625rem; }
-.form-ringkas ~ .form-bar .isi, .form-ringkas .form-bar .isi { max-width: 1120px; margin: 0; }
 /* Pick Up / Destination Details: saran alamat + peta Google Maps. */
 .lokasi-saran { max-height: 18rem; overflow-y: auto; z-index: 1060; }
 .lokasi-saran .dropdown-item { align-items: flex-start; cursor: pointer; }

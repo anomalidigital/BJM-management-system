@@ -84,8 +84,7 @@ public static class Rekap
             if (!dedicated) Tambah(t.RouteId != "", $"Rute {trip.RouteName}", "Rute belum dipilih", "edit");
             if (klien?.RequiresDocument != false)
                 Tambah(trip.TrList.Count > 0, $"No Referensi {string.Join(", ", trip.TrList)}", "No Referensi dari klien belum diisi", "edit");
-            Tambah(!string.IsNullOrEmpty(t.Pengirim?.Nama), "Pick Up Details terisi", "Pick Up Details belum diisi", "edit", "catatan");
-            Tambah(!string.IsNullOrEmpty(t.Penerima?.Nama), "Destination Details terisi", "Destination Details belum diisi", "edit");
+            // Pick Up / Destination Details tidak dicek: isiannya dihilangkan dulu dari form (Baldy 22 Okt 2026).
             Tambah(!string.IsNullOrEmpty(t.PrintedAt), "Berita Acara sudah dicetak", "Berita Acara belum dicetak", AturDetail.Overview, "catatan");
             Tambah(termin.Count > 0, $"Uang Jalan {termin.Count} termin", "Uang Jalan belum dicatat", AturDetail.Uj);
             // Catatan tiba / selesai bongkar tidak dicek lagi: tab Perjalanan dihapus (Baldy 22 Okt 2026).

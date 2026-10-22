@@ -293,7 +293,13 @@ else
     private List<AksiMenu> AksiBaris(BarisTrip t)
     {
         var a = new List<AksiMenu> { new("Cetak", () => _cetak = [t], Ikon.Print) };
-        if (Karawang) a.Add(new("Ada Backload / Lanjutan", () => Ke($"transaksi/trip/tambah?backload={t.Id}"), Ikon.Route, disabled: !Bisa("trip") || t.Batal || t.T.VehicleId == ""));
+        // Backload memakai kendaraan & supir yang sama, jadi trip tanpa kendaraan belum bisa dilanjutkan (alasannya ditampilkan).
+        if (Karawang) a.Add(new AksiMenu
+        {
+            Label = "Ada Backload / Lanjutan", Icon = Ikon.Route, Disabled = !Bisa("trip") || t.Batal || t.T.VehicleId == "",
+            Alasan = !t.Batal && t.T.VehicleId == "" ? "Trip belum punya kendaraan; isi lewat Edit dulu" : null,
+            OnSelect = () => { Ke($"transaksi/trip/tambah?backload={t.Id}"); return Task.CompletedTask; },
+        });
         if (Karawang && BelumDiPool(t)) a.Add(new("Tandai kendaraan di pool", () => TandaiPool(t), Ikon.Warehouse, disabled: !Bisa("trip")));
         return a;
     }

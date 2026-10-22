@@ -2,9 +2,9 @@
    (Rute, Pick Up & Destination Details + catatan, Kosongan). Kode Trip dibuat saat form dibuka dan menjadi judul.
    Tipe layanan ikut klien. Harga selalu ikut rute (diubah di Master Rute). Kendaraan & supir tidak saling mengisi.
    Backload dibuka dari menu ⋯ daftar trip (?backload=<id trip asal>).
-   Revisi Baldy 22 Okt 2026: form ringkas (lebar dibatasi, penjelasan lewat ikon "?"), Add Items Details dihapus, Pick Up / Destination
-   Details memakai pencarian lokasi + peta Google Maps (LokasiTrip). Kunci sebagian ("trip sudah jalan") dilepas: trip yang belum selesai
-   bebas diubah; trip Selesai terkunci penuh sampai diaktifkan lagi. *@
+   Revisi Baldy 22 Okt 2026: form ringkas (penjelasan lewat ikon "?"), Add Items Details dihapus, isian Pick Up / Destination Details
+   dihilangkan dulu (tinggal Catatan Pick Up & Catatan Destinasi; titik lama trip tetap tersimpan). Kunci sebagian ("trip sudah jalan")
+   dilepas: trip yang belum selesai bebas diubah; trip Selesai terkunci penuh sampai diaktifkan lagi. *@
 @inherits KomponenData
 @inject Penyimpanan Simpan
 
@@ -177,25 +177,16 @@ else
                         }
                     </div>
 
+                    @* Isian Pick Up / Destination Details dihilangkan dulu (Baldy 22 Okt 2026); catatannya tetap diisi di sini. *@
                     <div class="row g-3">
-                        <div class="col-md-6">
-                            <LokasiTrip Label="Pick Up Details" Info="Ketik lokasi pick up atau pilih alamat tersimpan; peta langsung menampilkan lokasinya."
-                                        Hint="HintTitik(true, area.Item1)" Nilai="@_f.Pengirim" NilaiChanged="v => { _f.Pengirim = v; _otomatisPengirim = false; }"
-                                        Teks="@_f.TeksPengirim" TeksChanged="v => _f.TeksPengirim = v"
-                                        Catatan="@_f.CatatanPengirim" CatatanChanged="v => _f.CatatanPengirim = v" LabelCatatan="Catatan Pick Up"
-                                        PlaceholderCatatan="mis. info kapal, lokasi di pelabuhan, kontak pengambilan" Daftar="Db.Data.Alamat"
-                                        Area="@(area.Item1 != "" ? area.Item1 : AreaBackload)" TitikLama="PengirimLama" BolehTambah="@Bisa("master")"
-                                        OnTambah="q => BukaTambahAlamat(true, q, AreaKosong(area.Item1))" />
-                        </div>
-                        <div class="col-md-6">
-                            <LokasiTrip Label="Destination Details" Info="Ketik lokasi destinasi atau pilih alamat tersimpan; peta langsung menampilkan lokasinya."
-                                        Hint="HintTitik(false, area.Item2)" Nilai="@_f.Penerima" NilaiChanged="v => { _f.Penerima = v; _otomatisPenerima = false; }"
-                                        Teks="@_f.TeksPenerima" TeksChanged="v => _f.TeksPenerima = v"
-                                        Catatan="@_f.CatatanPenerima" CatatanChanged="v => _f.CatatanPenerima = v" LabelCatatan="Catatan Destinasi"
-                                        PlaceholderCatatan="mis. jam bongkar, gerbang masuk, kontak penerima di lokasi" Daftar="Db.Data.Alamat"
-                                        Area="@area.Item2" TitikLama="PenerimaLama" BolehTambah="@Bisa("master")"
-                                        OnTambah="q => BukaTambahAlamat(false, q, AreaKosong(area.Item2))" />
-                        </div>
+                        <Field Label="Catatan Pick Up" Class="col-md-6">
+                            <input id="@context" class="form-control" value="@_f.CatatanPengirim" placeholder="mis. info kapal, lokasi di pelabuhan, kontak pengambilan"
+                                   @oninput="e => _f.CatatanPengirim = e.Value?.ToString() ?? string.Empty" />
+                        </Field>
+                        <Field Label="Catatan Destinasi" Class="col-md-6">
+                            <input id="@context" class="form-control" value="@_f.CatatanPenerima" placeholder="mis. jam bongkar, gerbang masuk, kontak penerima di lokasi"
+                                   @oninput="e => _f.CatatanPenerima = e.Value?.ToString() ?? string.Empty" />
+                        </Field>
                     </div>
 
                     <div class="row g-3">
@@ -537,14 +528,9 @@ else
     {
         var baru = ruteBaru ?? Db.Cari<Rute>(routeId);
         var a = baru is not null ? TripLogika.KodeArea(baru) : ("", "");
-        var ikutPengirim = (_f.Pengirim == "" && _f.TeksPengirim.Trim() == "") || _otomatisPengirim;
-        var ikutPenerima = (_f.Penerima == "" && _f.TeksPenerima.Trim() == "") || _otomatisPenerima;
-        if (ikutPengirim) _f.Pengirim = baru is not null ? AlamatUntukArea(a.Item1, true, baru.Id) : "";
-        if (ikutPenerima) _f.Penerima = baru is not null ? AlamatUntukArea(a.Item2, false, baru.Id) : "";
+        // Isian Pick Up / Destination Details disembunyikan (Baldy 22 Okt 2026): rute tidak lagi mengisinya diam-diam.
         _f.RouteId = baru?.Id ?? "";
         _f.Harga = baru?.Price ?? 0;
-        _otomatisPengirim = ikutPengirim && _f.Pengirim != "";
-        _otomatisPenerima = ikutPenerima && _f.Penerima != "";
         _galat.Remove("rute");
     }
 
@@ -592,6 +578,8 @@ else
     private TitikAlamat? TitikTrip(string nilai, string teks, string catatan, TitikAlamat? lama)
     {
         if (nilai == "" && teks.Trim() != "") return AturanTrip.TitikRapi(new TitikAlamat { Nama = teks.Trim(), Catatan = catatan });
+        // Hanya catatan (isian lokasi disembunyikan): catatannya tetap tersimpan.
+        if (nilai == "") return catatan.Trim() != "" ? AturanTrip.TitikRapi(new TitikAlamat { Catatan = catatan }) : null;
         if (nilai == AturanTrip.TitikLama)
         {
             if (lama is null) return null;
